@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Screen =
@@ -792,7 +792,7 @@ function SOSScreen({ go }: { go: (s: Screen) => void }) {
 export default function Demo() {
   const [screen, setScreen] = useState<Screen>("home");
 
-  const screens: Record<Screen, JSX.Element> = {
+  const screens: Record<Screen, React.ReactElement> = {
     home: <HomeScreen go={setScreen} />,
     onboarding1: <Onboarding1 go={setScreen} />,
     onboarding2: <Onboarding2 go={setScreen} />,

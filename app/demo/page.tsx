@@ -332,6 +332,7 @@ export default function Demo() {
         <div style={{textAlign:'center'}}>
           <div style={{fontSize:52,fontWeight:900,letterSpacing:'-0.05em',color:C.text,lineHeight:1}}>CLUTCH</div>
           <div style={{fontSize:13,letterSpacing:'0.2em',color:C.primary,fontWeight:600,marginTop:6}}>BE SPONTANEOUS</div>
+          <div style={{fontSize:10,color:C.textLight,marginTop:4,fontWeight:500}}>v5.06.06-A</div>
         </div>
         <div style={{width:110,height:110,borderRadius:'50%',background:`linear-gradient(135deg,${C.primary},${C.peach})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:48,boxShadow:`0 8px 32px ${C.primaryLight}`}}>☕</div>
         <p style={{textAlign:'center',color:C.textMid,fontSize:15,lineHeight:1.6,maxWidth:260}}>Un vrai café.<br/>Pas un match de plus.</p>

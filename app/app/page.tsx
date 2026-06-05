@@ -185,7 +185,7 @@ function Splash({ go }: { go:(s:Screen)=>void }) {
         <Btn variant="secondary" onClick={()=>go('login')}>J'ai déjà un compte</Btn>
       </div>
       <div style={{ textAlign:'center' }}>
-        <p style={{ fontSize:12, color:C.textLight, marginBottom:8 }}>Toujours gratuit pour les femmes 💜</p>
+        <p style={{ fontSize:12, color:C.textLight, marginBottom:8 }}>Sécurité & contrôle inclus pour tous 🛡</p>
         <a href="/demo" style={{ fontSize:12, color:C.primary, fontWeight:600, textDecoration:'none' }}>→ Voir la démo interactive d'abord</a>
       </div>
     </div>
@@ -279,7 +279,7 @@ function Register({ go, setUser }: any) {
         <Input label="Mot de passe" type="password" value={pass} onChange={(e:any)=>setPass(e.target.value)} placeholder="6 caractères minimum" error={err} />
       </div>
       <div style={{ background:C.sageLight, border:`1px solid ${C.sage}44`, borderRadius:12, padding:'10px 14px' }}>
-        <span style={{ color:C.sage, fontSize:13, fontWeight:600 }}>💜 Toujours gratuit pour les femmes.</span>
+        <span style={{ color:C.sage, fontSize:13, fontWeight:600 }}>🛡 Clutch est gratuit pour commencer. Ton contrôle, tes règles.</span>
       </div>
       {/* CGU */}
       <button onClick={()=>setCgu(v=>!v)} style={{ display:'flex', gap:10, alignItems:'flex-start', background:'none', border:'none', cursor:'pointer', padding:0, textAlign:'left' }}>
@@ -331,7 +331,7 @@ function ObName({ go, user, save }: any) {
 function ObGender({ go, user, save }: any) {
   const locked = !!user?.gender
   const [picked,setPicked]=useState(user?.gender||null); const [loading,setLoading]=useState(false)
-  const opts=[{id:'woman',label:'Femme',desc:'Accès complet · toujours gratuit',color:C.sage},{id:'man',label:'Homme',desc:'Premium CHF 19.90/mois',color:C.primary},{id:'nb',label:'Non-binaire',desc:'Tu chooses tes préférences',color:C.purple}]
+  const opts=[{id:'woman',label:'Femme',desc:'Contrôles de sécurité avancés inclus',color:C.sage},{id:'man',label:'Homme',desc:'Accès gratuit · Premium disponible',color:C.primary},{id:'nb',label:'Non-binaire',desc:'Tu choisis tes préférences',color:C.purple}]
   const next=async()=>{
     if(locked){go('ob-age');return}
     if(!picked)return;setLoading(true);await supabase.from('profiles').upsert({id:user.id,gender:picked});save({gender:picked});go('ob-age');setLoading(false)
@@ -1297,7 +1297,7 @@ function MyProfile({ user, go, signOut, save }: any) {
               style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.bgDeep, cursor:'pointer', color:C.text, fontSize:13, fontWeight:600, textAlign:'left', fontFamily:'inherit' }}>
               👤 Partager mon profil
             </button>
-            <button onClick={()=>shareIt({ title:'Rejoins Clutch !', text:`Viens sur Clutch — l'app pour se retrouver en vrai dans les 18h à Lausanne. Toujours gratuit pour les femmes 💜`, url:APP_URL })}
+            <button onClick={()=>shareIt({ title:'Rejoins Clutch !', text:`Viens sur Clutch — l'app pour se retrouver en vrai dans les 18h à Lausanne ☕`, url:APP_URL })}
               style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.primary}44`, background:C.primaryLight, cursor:'pointer', color:C.primary, fontSize:13, fontWeight:600, textAlign:'left', fontFamily:'inherit' }}>
               ✉️ Inviter un(e) ami(e)
             </button>

@@ -324,7 +324,7 @@ export default function Demo() {
           <Btn variant="secondary" onClick={()=>go('ob1')}>Créer mon profil de démo</Btn>
           {lsGet('demo_done',false)&&<Btn variant="ghost" onClick={()=>go('scenarios')}>→ Reprendre où j'en étais</Btn>}
         </div>
-        <p style={{fontSize:12,color:C.textLight}}>Toujours gratuit pour les femmes 💜</p>
+        <p style={{fontSize:12,color:C.textLight}}>Gratuit pour commencer · Sécurité incluse 🛡</p>
       </div>
     </Frame>
   )
@@ -1222,7 +1222,7 @@ export default function Demo() {
             {ME.interests.map(i=><Pill key={i} active>{i}</Pill>)}
           </div>
           <button onClick={()=>go('premium')} style={{padding:16,borderRadius:16,background:isPremium?`linear-gradient(135deg,${C.gold}22,${C.gold}44)`:`linear-gradient(135deg,${C.gold}11,${C.gold}22)`,border:`1.5px solid ${C.gold}`,cursor:'pointer',textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div><p style={{fontWeight:700,color:C.text}}>{isPremium?'⭐ Premium actif':'⭐ Passer en Premium'}</p><p style={{fontSize:12,color:C.textLight}}>{isPremium?'Profite de toutes les fonctions':'19.90 CHF/mois · Gratuit pour les femmes'}</p></div>
+            <div><p style={{fontWeight:700,color:C.text}}>{isPremium?'⭐ Premium actif':'⭐ Passer en Premium'}</p><p style={{fontSize:12,color:C.textLight}}>{isPremium?'Profite de toutes les fonctions':'19.90 CHF/mois · Clutches illimités + boost'}</p></div>
             <span style={{color:C.gold,fontSize:20}}>→</span>
           </button>
           {/* Share section */}
@@ -1233,7 +1233,7 @@ export default function Demo() {
                 style={{padding:'11px 14px',borderRadius:12,border:`1.5px solid ${C.border}`,background:C.bgDeep,cursor:'pointer',color:C.text,fontSize:13,fontWeight:600,textAlign:'left',fontFamily:'inherit'}}>
                 👤 Partager mon profil
               </button>
-              <button onClick={()=>shareIt({title:'Rejoins Clutch !',text:`Viens sur Clutch — l'app pour se retrouver en vrai dans les 18h à Lausanne. Toujours gratuit pour les femmes 💜`,url:APP_URL})}
+              <button onClick={()=>shareIt({title:'Rejoins Clutch !',text:`Viens sur Clutch — l'app pour se retrouver en vrai dans les 18h à Lausanne ☕`,url:APP_URL})}
                 style={{padding:'11px 14px',borderRadius:12,border:`1.5px solid ${C.primary}44`,background:C.primaryLight,cursor:'pointer',color:C.primary,fontSize:13,fontWeight:600,textAlign:'left',fontFamily:'inherit'}}>
                 ✉️ Inviter un(e) ami(e)
               </button>
@@ -1285,7 +1285,7 @@ export default function Demo() {
             <p style={{fontSize:42}}>⭐</p>
             <h2 style={{fontSize:24,fontWeight:800,color:C.text}}>Clutch Premium</h2>
             <p style={{fontSize:28,fontWeight:900,color:C.gold,marginTop:4}}>19.90 CHF<span style={{fontSize:14,fontWeight:500,color:C.textMid}}>/mois</span></p>
-            <p style={{fontSize:13,color:C.sage,fontWeight:600,marginTop:4}}>✓ Toujours GRATUIT pour les femmes</p>
+            <p style={{fontSize:13,color:C.sage,fontWeight:600,marginTop:4}}>✓ Sécurité & contrôle inclus par défaut</p>
           </div>
           {[
             {icon:'💜',title:'Voir qui a aimé ton profil',desc:'Accède directement aux profils intéressés par toi.'},

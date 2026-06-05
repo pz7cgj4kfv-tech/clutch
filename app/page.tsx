@@ -137,7 +137,7 @@ export default function Landing() {
             )}
 
             {status === 'error' && <div style={{ color:'#D64545', fontSize:12, textAlign:'center' }}>Erreur — réessaie dans un instant.</div>}
-            <div style={{ color:C.textLight, fontSize:12 }}>Toujours gratuit pour les femmes 💜</div>
+            <div style={{ color:C.textLight, fontSize:12 }}>Gratuit pour commencer. Tes règles, ton contrôle. 🛡</div>
           </div>
         </section>
 
@@ -147,7 +147,7 @@ export default function Landing() {
             <div style={{ color:C.textLight, fontSize:11, fontWeight:700, letterSpacing:'0.25em', textTransform:'uppercase', textAlign:'center', marginBottom:32 }}>Comment ça marche</div>
             {[
               { n:'01', title:'Tu découvres un profil', desc:'Score de compatibilité basé sur tes vraies passions. Pas un algorithme opaque.', color:C.primary },
-              { n:'02', title:'Tu proposes un café', desc:'Un lieu public sûr, une heure précise. La femme valide toujours le lieu final.', color:C.peach },
+              { n:'02', title:'Tu proposes un café', desc:'Un lieu public sûr, une heure précise. Les deux personnes valident le lieu final.', color:C.peach },
               { n:'03', title:'Elle répond en 2h max', desc:"Passé ce délai, l'invitation expire automatiquement. Fini le ghosting infini.", color:C.sage },
               { n:'04', title:'Vous vous retrouvez', desc:"RDV réel, dans les 18h. Clutch disparaît ensuite. C'est à vous.", color:C.purple },
             ].map((s,i,arr)=>(
@@ -169,7 +169,7 @@ export default function Landing() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               {[
                 { icon:'🛡', label:'Sécurité d\'abord', desc:'Lieux publics uniquement. Position partagée optionnelle.', color:C.sage, bg:C.sageLight },
-                { icon:'💜', label:'Gratuit pour les femmes', desc:'Toujours. Sans conditions.', color:C.primary, bg:C.primaryLight },
+                { icon:'🛡', label:'Sécurité d\'abord', desc:'Filtres avancés & contrôle total inclus par défaut.', color:C.primary, bg:C.primaryLight },
                 { icon:'⏱', label:'18h maximum', desc:"Un RDV aujourd'hui ou demain.", color:C.peach, bg:C.peachLight },
                 { icon:'◎', label:'Qualité > quantité', desc:'3 invitations/semaine. Chaque message compte.', color:C.purple, bg:C.purpleLight },
               ].map(v=>(
@@ -187,18 +187,28 @@ export default function Landing() {
         <section style={{ padding:'44px 28px', background:C.bgDeep, borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`, position:'relative', zIndex:1 }}>
           <div style={{ maxWidth:500, margin:'0 auto' }}>
             <div style={{ color:C.textLight, fontSize:11, fontWeight:700, letterSpacing:'0.25em', textTransform:'uppercase', marginBottom:24 }}>Tarifs</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ background:C.bgDeep, border:`1.5px solid ${C.border}`, borderRadius:20, padding:'20px 16px' }}>
+                <div style={{ color:C.text, fontSize:20, fontWeight:900, marginBottom:3 }}>Gratuit</div>
+                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Pour tout le monde · toujours</div>
+                {['Profil & découverte de profils','3 clutches par jour','Messagerie sécurisée','Bouton SOS intégré','Événements Lausanne'].map(f=>(
+                  <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.border}`, display:'flex', gap:7 }}><span style={{color:C.sage}}>✓</span>{f}</div>
+                ))}
+              </div>
               <div style={{ background:C.sageLight, border:`1.5px solid ${C.sage}55`, borderRadius:20, padding:'20px 16px' }}>
-                <div style={{ color:C.sage, fontSize:24, fontWeight:900, marginBottom:3 }}>Gratuit</div>
-                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Pour les femmes · toujours</div>
-                {['Accès complet','Invitations illimitées','RDV illimités','SOS intégré'].map(f=>(
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                  <div style={{ color:C.sage, fontSize:18, fontWeight:900 }}>Sécurité+</div>
+                  <span style={{ background:C.sage, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:10 }}>INCLUS</span>
+                </div>
+                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Outils de contrôle & sécurité avancés — disponibles pour qui en a besoin</div>
+                {['Filtres : qui peut te clutcher','Score de fiabilité minimum requis','Mode discret (invisible quand tu veux)','Certifiés uniquement si tu le souhaites'].map(f=>(
                   <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.sage}33`, display:'flex', gap:7 }}><span style={{color:C.sage}}>✓</span>{f}</div>
                 ))}
               </div>
               <div style={{ background:`linear-gradient(160deg,${C.peachLight},${C.purpleLight})`, border:`1.5px solid ${C.gold}55`, borderRadius:20, padding:'20px 16px' }}>
-                <div style={{ color:C.gold, fontSize:20, fontWeight:900, marginBottom:2 }}>CHF 19.90</div>
-                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Pour les hommes · /mois</div>
-                {["3 invitations/sem.","Voir qui t'a liké","Affinités détaillées","Priorité découverte"].map(f=>(
+                <div style={{ color:C.gold, fontSize:20, fontWeight:900, marginBottom:2 }}>CHF 19.90<span style={{ fontSize:12, fontWeight:500, color:C.textMid }}>/mois</span></div>
+                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Premium · pour aller plus loin</div>
+                {['Clutches illimités','Boost de visibilité','Voir qui a vu ton profil','Affinités & filtres détaillés','Badge Premium sur ton profil'].map(f=>(
                   <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.gold}33`, display:'flex', gap:7 }}><span style={{color:C.gold}}>✓</span>{f}</div>
                 ))}
               </div>

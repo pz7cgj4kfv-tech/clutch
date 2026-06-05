@@ -521,7 +521,7 @@ export default function Demo() {
   // ── DISCOVER ──────────────────────────────────────────────────────────────
   if(screen==='discover') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bgDeep,overflow:'hidden'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bgDeep,minHeight:0}}>
         <div style={{padding:'12px 16px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',background:C.bg,flexShrink:0}}>
           <div>
             <div style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text}}>CLU<span style={{color:C.primary}}>TCH</span></div>
@@ -1450,7 +1450,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         <div style={{height:44,background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
           <div style={{width:120,height:32,background:C.text,borderRadius:20,opacity:0.08}}/>
         </div>
-        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
+        <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0,position:'relative'}}>
           {children}
         </div>
         <div style={{height:28,display:'flex',alignItems:'center',justifyContent:'center',background:C.bg,flexShrink:0}}>

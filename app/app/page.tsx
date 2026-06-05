@@ -495,7 +495,7 @@ function Discover({ profiles, user, onSelect, go }: any) {
   const displayed = showAll ? profiles : withOverlap
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, overflow:'hidden' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, minHeight:0 }}>
       <div style={{ padding:'12px 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
         <div>
           <div style={{ fontSize:18, fontWeight:900, letterSpacing:'-0.05em', color:C.text }}>CLUTCH <span style={{ fontSize:10, background:C.primaryLight, color:C.primary, padding:'2px 7px', borderRadius:7, fontWeight:700, letterSpacing:0 }}>BÊTA</span></div>
@@ -826,7 +826,7 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
   const badgeLabel = (type:string) => type==='clutch'?'✦ Clutch':type==='partner'?'🤝 Partenaire':'👥 Communauté'
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
       <div style={{ padding:'12px 16px 8px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <h2 style={{ fontSize:19, fontWeight:800, color:C.text }}>Événements <span style={{ fontSize:10, background:C.bgDeep, color:C.textLight, padding:'2px 7px', borderRadius:7, fontWeight:600 }}>Lausanne</span></h2>
@@ -1962,7 +1962,7 @@ export default function App() {
         </div>}
 
         {/* Content */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0, overflow:isMobile?'visible':'hidden' }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0, position:'relative' }}>
           {screen==='splash' && <Splash go={go}/>}
           {screen==='login' && <Login go={go} setUser={setUser}/>}
           {screen==='register' && <Register go={go} setUser={setUser}/>}

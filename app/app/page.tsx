@@ -15,13 +15,16 @@ const C = {
 }
 
 type Screen =
-  | 'splash' | 'login' | 'register'
+  | 'splash' | 'login' | 'register' | 'forgot-password'
   | 'ob-name' | 'ob-gender' | 'ob-age' | 'ob-photo' | 'ob-interests' | 'ob-done'
   | 'discover' | 'events' | 'inbox' | 'myprofile'
   | 'profile-detail'
   | 'propose' | 'propose2' | 'propose3' | 'sent'
   | 'clutch-received' | 'chat' | 'rdv' | 'rdv-active' | 'sos'
   | 'create-event' | 'my-events'
+  | 'feedback' | 'get-certified'
+
+const BANNED_WORDS = ['salope','pute','fdp','enculé','nique','bite','chier','merde ta gueule','ta gueule']
 
 const INTERESTS_CATS = [
   { label:'Sport', icon:'🏃', items:['Randonnée','Yoga','Tennis','Natation','Cyclisme','Course','Escalade','Ski','Fitness'] },
@@ -198,7 +201,6 @@ function Login({ go, setUser }: any) {
     if(data.user){
       const {data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single()
       setUser(p||{id:data.user.id,email})
-      // Si profil incomplet (pas de vrai prénom), on lance l'onboarding
       if(p?.name&&p.name!=='Utilisateur'&&p.gender&&p.age){go('discover')}
       else{go('ob-name')}
     }
@@ -214,15 +216,53 @@ function Login({ go, setUser }: any) {
       </div>
       <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', gap:12 }}>
         <Btn onClick={login} loading={loading} disabled={!email||!pass}>Se connecter →</Btn>
+        <button onClick={()=>go('forgot-password')} style={{ background:'none', border:'none', color:C.primary, fontSize:13, cursor:'pointer', fontWeight:600 }}>Mot de passe oublié ?</button>
         <button onClick={()=>go('register')} style={{ background:'none', border:'none', color:C.textMid, fontSize:13, cursor:'pointer' }}>Pas de compte ? <span style={{ color:C.primary, fontWeight:700 }}>Créer un compte</span></button>
       </div>
     </div>
   )
 }
 
+function ForgotPassword({ go }: any) {
+  const [email,setEmail]=useState(''); const [loading,setLoading]=useState(false); const [done,setDone]=useState(false); const [err,setErr]=useState('')
+  const send=async()=>{
+    if(!email.trim())return
+    setLoading(true);setErr('')
+    const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin+'/app'})
+    if(error){setErr('Email non trouvé ou erreur. Vérifie l\'adresse.');setLoading(false);return}
+    setDone(true);setLoading(false)
+  }
+  if(done) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:40, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:60 }}>📧</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>Email envoyé !</h2>
+      <p style={{ color:C.textMid, lineHeight:1.7, fontSize:14 }}>Vérifie ta boîte mail à <strong>{email}</strong>.<br/>Clique sur le lien pour choisir un nouveau mot de passe.</p>
+      <div style={{ background:C.bgDeep, borderRadius:12, padding:'12px 16px', width:'100%' }}>
+        <p style={{ fontSize:12, color:C.textLight }}>Pas reçu ? Vérifie tes spams ou réessaie dans 2 minutes.</p>
+      </div>
+      <Btn variant="secondary" onClick={()=>go('login')}>← Retour à la connexion</Btn>
+    </div>
+  )
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'32px 24px', gap:24, background:C.bg }}>
+      <button onClick={()=>go('login')} style={{ background:'none', border:'none', color:C.textMid, fontSize:22, cursor:'pointer', alignSelf:'flex-start' }}>←</button>
+      <div>
+        <h2 style={{ color:C.text, fontSize:26, fontWeight:800 }}>Mot de passe oublié ?</h2>
+        <p style={{ color:C.textMid, fontSize:14, marginTop:6 }}>On t'envoie un lien pour en choisir un nouveau.</p>
+      </div>
+      <Input label="Ton email" type="email" value={email} onChange={(e:any)=>setEmail(e.target.value)} placeholder="ton@email.com" autoFocus error={err}/>
+      <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', gap:12 }}>
+        <Btn onClick={send} loading={loading} disabled={!email.trim()}>Envoyer le lien →</Btn>
+        <button onClick={()=>go('login')} style={{ background:'none', border:'none', color:C.textMid, fontSize:13, cursor:'pointer' }}>← Annuler</button>
+      </div>
+    </div>
+  )
+}
+
 function Register({ go, setUser }: any) {
-  const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
+  const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [loading,setLoading]=useState(false); const [err,setErr]=useState(''); const [cgu,setCgu]=useState(false)
   const reg=async()=>{
+    if(!cgu){setErr('Accepte les CGU pour continuer');return}
     if(pass.length<6){setErr('Minimum 6 caractères');return}
     setLoading(true);setErr('')
     const {data,error}=await supabase.auth.signUp({email,password:pass})
@@ -231,8 +271,8 @@ function Register({ go, setUser }: any) {
     setLoading(false)
   }
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'32px 24px', gap:24, background:C.bg }}>
-      <button onClick={()=>go('splash')} style={{ background:'none', border:'none', color:C.textMid, fontSize:22, cursor:'pointer', alignSelf:'flex-start' }}>←</button>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'32px 24px', gap:20, background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <button onClick={()=>go('splash')} style={{ background:'none', border:'none', color:C.textMid, fontSize:22, cursor:'pointer', alignSelf:'flex-start', flexShrink:0 }}>←</button>
       <div><h2 style={{ color:C.text, fontSize:26, fontWeight:800 }}>Rejoins Clutch ✦</h2><p style={{ color:C.textMid, fontSize:14, marginTop:6 }}>2 min pour créer ton profil.</p></div>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
         <Input label="Email" type="email" value={email} onChange={(e:any)=>setEmail(e.target.value)} placeholder="ton@email.com" autoFocus />
@@ -241,8 +281,17 @@ function Register({ go, setUser }: any) {
       <div style={{ background:C.sageLight, border:`1px solid ${C.sage}44`, borderRadius:12, padding:'10px 14px' }}>
         <span style={{ color:C.sage, fontSize:13, fontWeight:600 }}>💜 Toujours gratuit pour les femmes.</span>
       </div>
+      {/* CGU */}
+      <button onClick={()=>setCgu(v=>!v)} style={{ display:'flex', gap:10, alignItems:'flex-start', background:'none', border:'none', cursor:'pointer', padding:0, textAlign:'left' }}>
+        <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${cgu?C.primary:C.border}`, background:cgu?C.primary:'transparent', flexShrink:0, marginTop:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          {cgu&&<span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>✓</span>}
+        </div>
+        <span style={{ fontSize:12, color:C.textMid, lineHeight:1.5 }}>
+          J'accepte les <a href="/legal" target="_blank" onClick={e=>e.stopPropagation()} style={{ color:C.primary, fontWeight:600 }}>Conditions d'utilisation</a> et la <a href="/legal" target="_blank" onClick={e=>e.stopPropagation()} style={{ color:C.primary, fontWeight:600 }}>Politique de confidentialité</a>. J'ai 18 ans ou plus.
+        </span>
+      </button>
       <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', gap:12 }}>
-        <Btn onClick={reg} loading={loading} disabled={!email||!pass}>Créer mon compte →</Btn>
+        <Btn onClick={reg} loading={loading} disabled={!email||!pass||!cgu}>Créer mon compte →</Btn>
         <button onClick={()=>go('login')} style={{ background:'none', border:'none', color:C.textMid, fontSize:13, cursor:'pointer' }}>Déjà un compte ? <span style={{ color:C.primary, fontWeight:700 }}>Se connecter</span></button>
       </div>
     </div>
@@ -383,7 +432,7 @@ function ObInterests({ go, user, save }: any) {
         <h2 style={{ color:C.text, fontSize:22, fontWeight:800 }}>Tes passions <span style={{ fontSize:13, color:C.textLight, fontWeight:500 }}>({sel.length}/5)</span></h2>
         <p style={{ color:C.textMid, fontSize:13, marginTop:2 }}>Choisis 3 à 5 passions.</p>
       </div>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch' as any, display:'flex', flexDirection:'column', gap:12, minHeight:0 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', display:'flex', flexDirection:'column', gap:12, minHeight:0 }}>
         {INTERESTS_CATS.map(cat=>(
           <div key={cat.label}>
             <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em', padding:'0 4px 8px' }}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -460,7 +509,7 @@ function Discover({ profiles, user, onSelect, go }: any) {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 12px' }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px' }}>
         {displayed.length === 0 ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:20, textAlign:'center', padding:32 }}>
             <div style={{ fontSize:56 }}>🌿</div>
@@ -471,39 +520,62 @@ function Discover({ profiles, user, onSelect, go }: any) {
             {showAll && <a href="/demo" style={{ display:'block', padding:'12px 24px', borderRadius:14, background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, color:'#fff', fontWeight:700, fontSize:14, textDecoration:'none' }}>👁 Voir la démo →</a>}
           </div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
-            {displayed.map((p: Profile) => (
-              <button key={p.id} onClick={()=>{ onSelect(p); go('profile-detail') }}
-                style={{ width:'100%', padding:'12px 16px', background:'none', border:'none',
-                  borderBottom:`1px solid ${C.border}`, display:'flex', gap:12, alignItems:'center',
-                  cursor:'pointer', textAlign:'left' }}>
-                <div style={{ position:'relative', flexShrink:0 }}>
-                  {p.photo_url
-                    ? <img src={p.photo_url} alt="" style={{ width:56, height:56, borderRadius:'50%', objectFit:'cover' }}/>
-                    : <div style={{ width:56, height:56, borderRadius:'50%', background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24 }}>☕</div>
-                  }
-                  {p.is_available&&<div style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:'50%', background:C.sage, border:'2px solid #fff' }}/>}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontWeight:700, fontSize:15, color:C.text }}>{p.name}{p.age?`, ${p.age}`:''}</span>
-                    <span style={{ fontSize:10, fontWeight:700, color:C.sage }}>{p.reliability_score||100}%</span>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {displayed.map((p: Profile) => {
+              // Compatibility score: passions communes + disponibilité overlap
+              const myInterests: string[] = user?.interests || []
+              const common = (p.interests||[]).filter((i:string)=>myInterests.includes(i)).length
+              const compatScore = Math.min(100, 60 + common * 10 + (p.reliability_score||100) * 0.1)
+              const isAvailNow = p.is_available && (!p.available_from || new Date(p.available_from) <= new Date())
+              return (
+                <button key={p.id} onClick={()=>{ onSelect(p); go('profile-detail') }}
+                  style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, borderRadius:16,
+                    display:'flex', gap:0, cursor:'pointer', textAlign:'left', overflow:'hidden',
+                    boxShadow:`0 1px 6px ${C.shadow}` }}>
+                  {/* Photo */}
+                  <div style={{ position:'relative', width:88, height:100, flexShrink:0 }}>
+                    {p.photo_url
+                      ? <img src={p.photo_url} alt="" style={{ width:88, height:100, objectFit:'cover' }}/>
+                      : <div style={{ width:88, height:100, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30 }}>☕</div>
+                    }
+                    {isAvailNow && (
+                      <div style={{ position:'absolute', bottom:7, right:7, width:12, height:12, borderRadius:'50%', background:'#22c55e', border:'2px solid #fff', boxShadow:'0 0 0 3px #22c55e33' }}/>
+                    )}
+                    {(p as any).certified && (
+                      <div style={{ position:'absolute', top:6, left:6, background:'#fff', borderRadius:10, padding:'1px 5px', fontSize:10, fontWeight:700, color:C.gold }}>✓</div>
+                    )}
                   </div>
-                  <p style={{ fontSize:12, color:C.textLight, margin:'2px 0 4px' }}>📍 {p.neighborhood||'Lausanne'}{p.available_from&&fmtIsoTime(p.available_from)?` · dès ${fmtIsoTime(p.available_from)}`:''}{p.available_until&&fmtIsoTime(p.available_until)?`→${fmtIsoTime(p.available_until)}`:''}</p>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:3 }}>
-                    {(p.available_modes||[]).map((m:string)=>{
-                      const mode=AVAIL_MODES.find(x=>x.id===m)
-                      return mode?<span key={m} style={{ fontSize:10, background:m==='rencontre'?C.primaryLight:m==='professionnel'?'#E8F0FE':C.sageLight, color:m==='rencontre'?C.primary:m==='professionnel'?'#1a73e8':C.sage, padding:'1px 6px', borderRadius:6, fontWeight:600 }}>{mode.label}</span>:null
-                    })}
+                  {/* Contenu */}
+                  <div style={{ flex:1, padding:'10px 12px', minWidth:0, display:'flex', flexDirection:'column', gap:3 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                      <span style={{ fontWeight:800, fontSize:16, color:C.text, lineHeight:1.2 }}>{p.name}{p.age?`, ${p.age}`:''}</span>
+                      <div style={{ textAlign:'right', flexShrink:0, marginLeft:8 }}>
+                        <div style={{ fontSize:14, fontWeight:800, color:C.primary }}>{Math.round(compatScore)}%</div>
+                        <div style={{ fontSize:9, color:C.textLight, fontWeight:600 }}>compat.</div>
+                      </div>
+                    </div>
+                    <p style={{ fontSize:11, color:C.textLight, lineHeight:1.3 }}>
+                      📍 {p.neighborhood||'Lausanne'}
+                      {p.available_from&&fmtIsoTime(p.available_from)?` · ${fmtIsoTime(p.available_from)}`:isAvailNow?' · maintenant':''}
+                      {p.available_until&&fmtIsoTime(p.available_until)?`→${fmtIsoTime(p.available_until)}`:''}
+                    </p>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {(p.available_modes||[]).map((m:string)=>{
+                        const mode=AVAIL_MODES.find(x=>x.id===m)
+                        return mode?<span key={m} style={{ fontSize:10, background:m==='rencontre'?C.primaryLight:m==='professionnel'?'#E8F0FE':C.sageLight, color:m==='rencontre'?C.primary:m==='professionnel'?'#1a73e8':C.sage, padding:'1px 6px', borderRadius:6, fontWeight:700 }}>{mode.label}</span>:null
+                      })}
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:2 }}>
+                      {(p.interests||[]).slice(0,3).map((i:string)=>{
+                        const isCommon = myInterests.includes(i)
+                        return <span key={i} style={{ fontSize:10, background:isCommon?C.primaryLight:C.bgDeep, color:isCommon?C.primary:C.textMid, padding:'2px 7px', borderRadius:7, fontWeight:isCommon?700:400 }}>{i}</span>
+                      })}
+                      {common > 0 && <span style={{ fontSize:10, color:C.primary, fontWeight:700 }}>+{common} en commun</span>}
+                    </div>
                   </div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                    {(p.interests||[]).slice(0,3).map((i:string)=>(
-                      <span key={i} style={{ fontSize:10, background:C.bgDeep, color:C.textMid, padding:'2px 7px', borderRadius:7 }}>{i}</span>
-                    ))}
-                  </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -512,17 +584,30 @@ function Discover({ profiles, user, onSelect, go }: any) {
 }
 
 // ─── PROFILE DETAIL ───────────────────────────────────────────────────────────
-function ProfileDetail({ profile, go }: { profile: Profile|null; go:(s:Screen)=>void }) {
+function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go:(s:Screen)=>void; currentUser:any }) {
+  const [reporting, setReporting] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportDone, setReportDone] = useState(false)
+
+  const sendReport = async () => {
+    if (!reportReason || !profile?.id || !currentUser?.id) return
+    await supabase.from('reports').insert({ reported_id: profile.id, reporter_id: currentUser.id, reason: reportReason })
+    setReportDone(true)
+  }
+
   if (!profile) return null
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
       <div style={{ position:'relative' }}>
         {profile.photo_url
           ? <img src={profile.photo_url} alt="" style={{ width:'100%', height:280, objectFit:'cover' }}/>
           : <div style={{ width:'100%', height:200, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:72 }}>☕</div>
         }
         <button onClick={()=>go('discover')} style={{ position:'absolute', top:16, left:16, width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>←</button>
-        <button onClick={()=>shareIt({ title:`${profile.name} sur Clutch`, text:`Regarde le profil de ${profile.name} sur Clutch Lausanne — l'app des rencontres spontanées ☕`, url:APP_URL+'/app' })} style={{ position:'absolute', top:16, right:16, width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↗</button>
+        <div style={{ position:'absolute', top:16, right:16, display:'flex', gap:8 }}>
+          <button onClick={()=>shareIt({ title:`${profile.name} sur Clutch`, text:`Regarde le profil de ${profile.name} sur Clutch Lausanne ☕`, url:APP_URL+'/app' })} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↗</button>
+          <button onClick={()=>setReporting(true)} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Signaler">🚩</button>
+        </div>
       </div>
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -560,6 +645,37 @@ function ProfileDetail({ profile, go }: { profile: Profile|null; go:(s:Screen)=>
         }
         <Btn variant="ghost" onClick={()=>go('discover')}>← Retour à la liste</Btn>
       </div>
+
+      {/* Modal signalement */}
+      {reporting && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={()=>{if(!reportDone)setReporting(false)}}>
+          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 20px 36px', width:'100%', maxWidth:390 }} onClick={e=>e.stopPropagation()}>
+            {reportDone ? (
+              <div style={{ textAlign:'center', padding:'16px 0' }}>
+                <p style={{ fontSize:32, marginBottom:12 }}>✅</p>
+                <p style={{ fontWeight:700, color:C.text, fontSize:16 }}>Signalement envoyé</p>
+                <p style={{ color:C.textMid, fontSize:13, marginTop:6 }}>L'équipe Clutch examinera le profil sous 24h.</p>
+                <button onClick={()=>{setReporting(false);setReportDone(false)}} style={{ marginTop:16, padding:'10px 24px', borderRadius:12, border:'none', background:C.bgDeep, color:C.textMid, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ width:36, height:4, borderRadius:2, background:'#ddd', margin:'0 auto 20px' }}/>
+                <p style={{ fontWeight:800, color:C.text, fontSize:16, marginBottom:4 }}>🚩 Signaler ce profil</p>
+                <p style={{ color:C.textMid, fontSize:13, marginBottom:16 }}>Quelle est la raison ?</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {['Photo inappropriée ou fausse','Comportement harcelant','Profil fake / bot','Contenu offensant','Mineur·e','Autre raison'].map(r=>(
+                    <button key={r} onClick={()=>setReportReason(r)} style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${reportReason===r?C.red:C.border}`, background:reportReason===r?C.redLight:'transparent', color:reportReason===r?C.red:C.textMid, fontSize:13, fontWeight:reportReason===r?700:400, textAlign:'left', cursor:'pointer', fontFamily:'inherit' }}>{r}</button>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:10, marginTop:16 }}>
+                  <button onClick={()=>setReporting(false)} style={{ flex:1, padding:12, borderRadius:12, border:`1px solid ${C.border}`, background:'none', color:C.textMid, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Annuler</button>
+                  <button onClick={sendReport} disabled={!reportReason} style={{ flex:2, padding:12, borderRadius:12, border:'none', background:reportReason?C.red:C.bgDeep, color:reportReason?'#fff':C.textLight, fontSize:13, fontWeight:700, cursor:reportReason?'pointer':'not-allowed', fontFamily:'inherit' }}>Envoyer le signalement</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -570,7 +686,7 @@ function Propose({ profile, go, setVenue, setVenueInput, venueInput, selectedVen
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title={`Clutcher ${profile?.name||''}`} onBack={()=>go('profile-detail')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 20px' }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <p style={{ fontWeight:700, color:C.text, marginBottom:10 }}>📍 Où se retrouver ?</p>
         <input value={venueInput} onChange={e=>{setVenueInput(e.target.value);setVenue('');setVenueSafety('safe')}} placeholder="Tape le nom d'un café…"
           style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.card, fontSize:14, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
@@ -607,7 +723,7 @@ function Propose2({ profile, go, selectedTime, setSelectedTime, venueInput }: an
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Quelle heure ?" onBack={()=>go('propose')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 20px' }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12, marginBottom:16 }}>
           <p style={{ fontSize:12, color:C.textLight }}>📍 {venueInput}</p>
         </div>
@@ -635,7 +751,7 @@ function Propose3({ profile, go, venueInput, selectedTime, message, setMessage, 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Ton message" onBack={()=>go('propose2')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12 }}>
           <p style={{ fontSize:12, color:C.textLight, marginBottom:3 }}>Récap</p>
           <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>📍 {venueInput} · 🕐 {selectedTime?.split(' (')[0]}</p>
@@ -710,7 +826,7 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
   const badgeLabel = (type:string) => type==='clutch'?'✦ Clutch':type==='partner'?'🤝 Partenaire':'👥 Communauté'
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflow:'hidden' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll' }}>
       <div style={{ padding:'12px 16px 8px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <h2 style={{ fontSize:19, fontWeight:800, color:C.text }}>Événements <span style={{ fontSize:10, background:C.bgDeep, color:C.textLight, padding:'2px 7px', borderRadius:7, fontWeight:600 }}>Lausanne</span></h2>
@@ -725,7 +841,7 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
           ))}
         </div>
       </div>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
         {filtered.map((ev,i)=>(
           <div key={`${ev.id}-${i}`} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', boxShadow:`0 1px 6px ${C.shadow}`, display:'flex', minHeight:76 }}>
             {ev.photo
@@ -811,7 +927,7 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Type */}
         <div>
           <p style={{ fontWeight:700, color:C.text, marginBottom:8, fontSize:13 }}>Type d'événement</p>
@@ -901,7 +1017,7 @@ function MyEvents({ user, go }: { user:any; go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Mes événements" onBack={()=>go('events')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
         {loading&&<p style={{ color:C.textLight, textAlign:'center', marginTop:32 }}>Chargement…</p>}
         {!loading&&events.length===0&&(
           <div style={{ textAlign:'center', marginTop:40 }}>
@@ -945,7 +1061,7 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
       <div style={{ padding:'14px 20px 10px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
         <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Messages</h2>
       </div>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
         {clutches.map((c:any)=>{
           const other=c.sender_id===user.id?c.receiver:c.sender
           const isReceived=c.receiver_id===user.id
@@ -1054,7 +1170,7 @@ function MyProfile({ user, go, signOut, save }: any) {
   const saveInterests=async()=>{setSaving(true);await supabase.from('profiles').update({interests:selInterests}).eq('id',user.id);save({interests:selInterests});setSaving(false);setEditInterests(false)}
   const toggleInterest=(i:string)=>setSelInterests(p=>p.includes(i)?p.filter(x=>x!==i):p.length<5?[...p,i]:p)
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
       <div style={{ background:`linear-gradient(160deg,${C.primaryLight},${C.peachLight})`, padding:'28px 20px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:12, flexShrink:0 }}>
         <Avatar p={user||{}} size={80}/>
         <div style={{ textAlign:'center' }}>
@@ -1191,6 +1307,11 @@ function MyProfile({ user, go, signOut, save }: any) {
             </button>
           </div>
         </div>
+        {/* Certification */}
+        <button onClick={()=>go('get-certified')} style={{ padding:13, borderRadius:14, background:user?.certified?C.sageLight:C.bgDeep, border:`1.5px solid ${user?.certified?C.sage:C.border}`, cursor:'pointer', color:user?.certified?C.sage:C.textMid, fontWeight:700, fontSize:13, textAlign:'left' }}>
+          {user?.certified?'✅ Profil certifié':'✓ Certifier mon profil — boostez vos clutches'}
+          {user?.certif_status==='pending'&&!user?.certified&&<span style={{ color:C.peach, marginLeft:6, fontSize:12 }}>· en attente de vérification</span>}
+        </button>
         <button onClick={()=>go('sos')} style={{ padding:13, borderRadius:14, background:C.redLight, border:`1.5px solid ${C.red}33`, cursor:'pointer', color:C.red, fontWeight:700, fontSize:14 }}>🆘 SOS & Sécurité</button>
         <button onClick={signOut} style={{ padding:12, borderRadius:14, background:'none', border:`1.5px solid ${C.border}`, cursor:'pointer', color:C.textLight, fontSize:13 }}>Se déconnecter</button>
       </div>
@@ -1219,7 +1340,7 @@ function ClutchReceived({ clutch, user, go, refresh }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Clutch reçu ☕" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Sender card */}
         <div style={{ background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, borderRadius:20, padding:20, display:'flex', gap:14, alignItems:'center' }}>
           <Avatar p={sender||{}} size={60}/>
@@ -1283,9 +1404,13 @@ function Chat({ clutch, user, go }: any) {
 
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[messages])
 
+  const [inputErr, setInputErr] = useState('')
   const send = async () => {
     if(!input.trim()||messages.length>=MSG_LIMIT) return
-    const text=input.trim(); setInput('')
+    const text=input.trim()
+    const lower=text.toLowerCase()
+    if(BANNED_WORDS.some(w=>lower.includes(w))){setInputErr('Message inapproprié — merci de rester respectueux·se');setTimeout(()=>setInputErr(''),3000);return}
+    setInput('');setInputErr('')
     await supabase.from('messages').insert({clutch_id:clutch.id,sender_id:user.id,content:text})
   }
 
@@ -1295,7 +1420,7 @@ function Chat({ clutch, user, go }: any) {
       <div style={{ padding:'6px 16px', background:C.bgDeep, fontSize:11, color:C.textMid, textAlign:'center' }}>
         📍 {clutch.venue} · {MSG_LIMIT - messages.length} message{MSG_LIMIT - messages.length > 1?'s':''} restant{MSG_LIMIT - messages.length > 1?'s':''}
       </div>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
         {messages.map(m=>{
           const isMine = m.sender_id === user.id
           return (
@@ -1312,10 +1437,13 @@ function Chat({ clutch, user, go }: any) {
         ? <div style={{ padding:'12px 16px 20px', textAlign:'center', fontSize:12, color:C.textLight, background:C.bgDeep }}>
             Limite de {MSG_LIMIT} messages atteinte — le café est pour bientôt ☕
           </div>
-        : <div style={{ padding:'10px 16px 24px', display:'flex', gap:8, background:C.bg, borderTop:`1px solid ${C.border}` }}>
-            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ton message…"
-              style={{ flex:1, padding:'11px 14px', borderRadius:20, border:`1.5px solid ${C.border}`, background:C.bgDeep, fontSize:14, outline:'none', color:C.text, fontFamily:'inherit' }}/>
-            <button onClick={send} disabled={!input.trim()} style={{ padding:'11px 18px', borderRadius:20, border:'none', background:input.trim()?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:`${C.bgDeep}`, color:input.trim()?'#fff':C.textLight, fontWeight:700, fontSize:14, cursor:input.trim()?'pointer':'not-allowed', fontFamily:'inherit' }}>→</button>
+        : <div style={{ background:C.bg, borderTop:`1px solid ${C.border}` }}>
+            {inputErr&&<p style={{ fontSize:11, color:C.red, padding:'4px 16px 0', textAlign:'center' }}>{inputErr}</p>}
+            <div style={{ padding:'10px 16px 24px', display:'flex', gap:8 }}>
+              <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ton message…"
+                style={{ flex:1, padding:'11px 14px', borderRadius:20, border:`1.5px solid ${inputErr?C.red:C.border}`, background:C.bgDeep, fontSize:14, outline:'none', color:C.text, fontFamily:'inherit' }}/>
+              <button onClick={send} disabled={!input.trim()} style={{ padding:'11px 18px', borderRadius:20, border:'none', background:input.trim()?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:input.trim()?'#fff':C.textLight, fontWeight:700, fontSize:14, cursor:input.trim()?'pointer':'not-allowed', fontFamily:'inherit' }}>→</button>
+            </div>
           </div>
       }
     </div>
@@ -1347,14 +1475,14 @@ function RdvActive({ clutch, user, go, refresh }: any) {
   }
   const checkin = async () => {
     const field = clutch.sender_id===user.id ? 'checked_in_sender' : 'checked_in_receiver'
-    await supabase.from('clutches').update({ [field]:true }).eq('id', clutch.id)
-    refresh(); go('inbox')
+    await supabase.from('clutches').update({ [field]:true, status:'completed' }).eq('id', clutch.id)
+    refresh(); go('feedback')
   }
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="RDV confirmé ✓" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         <div style={{ background:`linear-gradient(135deg,${C.sageLight},${C.bgDeep})`, borderRadius:20, padding:20, textAlign:'center' }}>
           <div style={{ fontSize:48, marginBottom:8 }}>☕</div>
           <p style={{ fontWeight:800, fontSize:17, color:C.text, marginBottom:4 }}>RDV avec {other?.name}</p>
@@ -1386,6 +1514,186 @@ function RdvActive({ clutch, user, go, refresh }: any) {
     </div>
   )
 }
+// ─── FEEDBACK APRÈS RDV ───────────────────────────────────────────────────────
+function FeedbackRdv({ clutch, user, go }: any) {
+  const [rating, setRating] = useState<string|null>(null)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
+  const other = clutch ? (clutch.sender_id===user?.id ? clutch.receiver : clutch.sender) : null
+
+  const submit = async () => {
+    if (!rating || !clutch?.id) { go('discover'); return }
+    setLoading(true)
+    await supabase.from('feedback').insert({ clutch_id: clutch.id, given_by: user.id, rating })
+    // Mettre à jour le score de fiabilité de l'autre personne
+    if (other?.id) {
+      const otherId = clutch.sender_id===user.id ? clutch.receiver_id : clutch.sender_id
+      if (rating === 'ghost' || rating === 'rabbit') {
+        const { data: p } = await supabase.from('profiles').select('reliability_score').eq('id', otherId).single()
+        const newScore = Math.max(0, (p?.reliability_score||100) - 15)
+        await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', otherId)
+      } else if (rating === 'super') {
+        const { data: p } = await supabase.from('profiles').select('reliability_score').eq('id', otherId).single()
+        const newScore = Math.min(100, (p?.reliability_score||100) + 3)
+        await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', otherId)
+      }
+    }
+    setDone(true); setLoading(false)
+  }
+
+  if (done) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:`linear-gradient(160deg,${C.bg},${C.sageLight})`, padding:40, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>{rating==='super'?'⭐':rating==='ok'?'😊':rating==='rabbit'?'🐇':'👻'}</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>Merci pour ton retour !</h2>
+      <p style={{ color:C.textMid, fontSize:14, lineHeight:1.6 }}>Ça aide à maintenir une communauté de qualité sur Clutch.</p>
+      <Btn onClick={()=>go('discover')}>Retour à la liste ✦</Btn>
+    </div>
+  )
+
+  const opts = [
+    { id:'super', emoji:'⭐', label:'Super RDV !', desc:'On s\'est bien vus, c\'était génial', color:C.gold },
+    { id:'ok', emoji:'😊', label:'RDV correct', desc:'Rien d\'extraordinaire mais c\'était bien', color:C.sage },
+    { id:'rabbit', emoji:'🐇', label:'Lapin partiel', desc:'En retard ou pas tout à fait comme prévu', color:C.peach },
+    { id:'ghost', emoji:'👻', label:'Fantôme / No-show', desc:'La personne n\'est pas venue sans prévenir', color:C.red },
+  ]
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
+      <TopBar title="Comment s'est passé le RDV ?" onBack={()=>go('discover')}/>
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'20px 20px' }}>
+        {other && (
+          <div style={{ display:'flex', alignItems:'center', gap:12, background:C.bgDeep, borderRadius:14, padding:'12px 16px', marginBottom:20 }}>
+            <Avatar p={other} size={44}/>
+            <div>
+              <p style={{ fontWeight:700, color:C.text, fontSize:15 }}>RDV avec {other.name}</p>
+              <p style={{ fontSize:12, color:C.textLight }}>📍 {clutch?.venue}</p>
+            </div>
+          </div>
+        )}
+        <p style={{ fontWeight:700, color:C.text, fontSize:14, marginBottom:12 }}>Comment s'est passé votre rencontre ?</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {opts.map(o => (
+            <button key={o.id} onClick={()=>setRating(o.id)} style={{ padding:'14px 16px', borderRadius:14, border:`2px solid ${rating===o.id?o.color:C.border}`, background:rating===o.id?`${o.color}18`:C.card, textAlign:'left', cursor:'pointer', display:'flex', gap:14, alignItems:'center' }}>
+              <span style={{ fontSize:28 }}>{o.emoji}</span>
+              <div>
+                <p style={{ fontWeight:700, color:rating===o.id?o.color:C.text, fontSize:14 }}>{o.label}</p>
+                <p style={{ fontSize:12, color:C.textLight, marginTop:2 }}>{o.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize:11, color:C.textLight, textAlign:'center', marginTop:16, lineHeight:1.5 }}>Ton retour est anonyme. Il influe sur le score de fiabilité de l'autre personne.</p>
+      </div>
+      <div style={{ padding:'12px 20px 28px', display:'flex', flexDirection:'column', gap:10 }}>
+        <Btn onClick={submit} loading={loading} disabled={!rating}>Envoyer mon retour →</Btn>
+        <button onClick={()=>go('discover')} style={{ background:'none', border:'none', color:C.textLight, fontSize:13, cursor:'pointer' }}>Passer</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── PROFIL CERTIFIÉ ──────────────────────────────────────────────────────────
+function GetCertified({ user, go, save }: any) {
+  const [step, setStep] = useState<'intro'|'selfie'|'done'>(user?.certified?'done':'intro')
+  const [preview, setPreview] = useState<string|null>(null)
+  const [loading, setLoading] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    const r = new FileReader(); r.onload = ev => setPreview(ev.target?.result as string); r.readAsDataURL(f)
+  }
+
+  const submit = async () => {
+    if (!preview || !ref.current?.files?.[0]) return
+    setLoading(true)
+    try {
+      const file = ref.current.files[0]
+      const path = `${user.id}/selfie_certif.${file.name.split('.').pop()}`
+      await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+      await supabase.from('profiles').update({ certif_selfie: publicUrl, certif_status: 'pending' }).eq('id', user.id)
+      save({ certif_status: 'pending' })
+      setStep('done')
+    } catch(e) { console.error(e) }
+    setLoading(false)
+  }
+
+  if (user?.certified) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:40, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>✅</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>Profil certifié !</h2>
+      <div style={{ background:C.sageLight, borderRadius:16, padding:16 }}><p style={{ color:C.sage, fontWeight:600 }}>✓ Ton badge de certification est actif</p></div>
+      <Btn variant="secondary" onClick={()=>go('myprofile')}>← Retour au profil</Btn>
+    </div>
+  )
+
+  if (step === 'done') return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:`linear-gradient(160deg,${C.bg},${C.sageLight})`, padding:40, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>⏳</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>Selfie envoyé !</h2>
+      <p style={{ color:C.textMid, fontSize:14, lineHeight:1.7 }}>L'équipe Clutch vérifie ton selfie sous <strong>24h</strong>.<br/>Tu recevras une confirmation par email.</p>
+      <div style={{ background:C.card, borderRadius:14, padding:16, width:'100%', border:`1px solid ${C.border}`, fontSize:13, color:C.textMid, lineHeight:1.6 }}>
+        ✅ Une fois certifié·e :<br/>
+        📌 Badge <strong>✓ Certifié</strong> sur ton profil<br/>
+        🔝 Priorité dans la liste de découverte<br/>
+        💜 3× plus de clutches reçus
+      </div>
+      <Btn onClick={()=>go('myprofile')}>← Retour au profil</Btn>
+    </div>
+  )
+
+  if (step === 'selfie') return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'32px 24px', gap:20, background:C.bg }}>
+      <button onClick={()=>setStep('intro')} style={{ background:'none', border:'none', fontSize:22, color:C.textMid, cursor:'pointer', alignSelf:'flex-start' }}>←</button>
+      <div>
+        <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>Selfie de vérification</h2>
+        <p style={{ color:C.textMid, fontSize:14, marginTop:6 }}>Tiens ton téléphone devant toi, sourire obligatoire 😊</p>
+      </div>
+      <div style={{ background:C.bgDeep, borderRadius:14, padding:'12px 16px', display:'flex', flexDirection:'column', gap:6 }}>
+        <p style={{ fontSize:13, fontWeight:700, color:C.text }}>📋 Instructions :</p>
+        {['Prends un selfie clair de ton visage','Pas de filtre, pas de photo de photo','Même visage que ta photo de profil'].map(t=><p key={t} style={{ fontSize:13, color:C.textMid }}>• {t}</p>)}
+      </div>
+      <input ref={ref} type="file" accept="image/*" capture="user" onChange={onChange} style={{ display:'none' }}/>
+      <div onClick={()=>ref.current?.click()} style={{ alignSelf:'center', width:160, height:160, borderRadius:'50%', background:preview?`url(${preview}) center/cover no-repeat`:C.bgDeep, border:`3px dashed ${preview?C.sage:C.border}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer', overflow:'hidden' }}>
+        {!preview&&<><span style={{ fontSize:44 }}>🤳</span><span style={{ color:C.textLight, fontSize:12 }}>Prendre un selfie</span></>}
+      </div>
+      {preview&&<p style={{ textAlign:'center', color:C.sage, fontWeight:600 }}>✓ Parfait ! On dirait bien toi 😄</p>}
+      <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', gap:10 }}>
+        <Btn loading={loading} disabled={!preview} onClick={submit}>Envoyer pour vérification →</Btn>
+      </div>
+    </div>
+  )
+
+  // step = 'intro'
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', padding:'32px 24px', gap:20, background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <button onClick={()=>go('myprofile')} style={{ background:'none', border:'none', fontSize:22, color:C.textMid, cursor:'pointer', alignSelf:'flex-start' }}>←</button>
+      <div style={{ textAlign:'center', paddingTop:8 }}>
+        <div style={{ fontSize:56, marginBottom:12 }}>✓</div>
+        <h2 style={{ fontSize:24, fontWeight:800, color:C.text }}>Fais certifier ton profil</h2>
+        <p style={{ color:C.textMid, fontSize:14, marginTop:8, lineHeight:1.7 }}>Un selfie rapide suffit. L'équipe Clutch vérifie que c'est bien toi sous 24h.</p>
+      </div>
+      {[
+        { icon:'🔝', title:'Priorité dans la liste', desc:'Les profils certifiés apparaissent en premier' },
+        { icon:'💌', title:'3× plus de clutches', desc:'Les gens font + confiance aux profils vérifiés' },
+        { icon:'🛡', title:'Badge visible', desc:'✓ Certifié sur ta fiche — rassurant pour tous' },
+      ].map(b=>(
+        <div key={b.title} style={{ background:C.card, borderRadius:14, padding:'14px 16px', border:`1px solid ${C.border}`, display:'flex', gap:14, alignItems:'center' }}>
+          <span style={{ fontSize:28 }}>{b.icon}</span>
+          <div><p style={{ fontWeight:700, color:C.text, fontSize:14 }}>{b.title}</p><p style={{ color:C.textLight, fontSize:12, marginTop:2 }}>{b.desc}</p></div>
+        </div>
+      ))}
+      <div style={{ background:C.bgDeep, borderRadius:12, padding:'12px 16px', fontSize:12, color:C.textLight, lineHeight:1.6 }}>
+        🔒 Ton selfie est utilisé uniquement pour la vérification et supprimé après. Jamais partagé publiquement.
+      </div>
+      <div style={{ marginTop:'auto' }}>
+        <Btn onClick={()=>setStep('selfie')}>Commencer la vérification → (30 sec)</Btn>
+      </div>
+    </div>
+  )
+}
+
 // hack ref pour chat depuis RdvActive (pas de closure propre sans refactor)
 let setSelectedClutch_HACK: (c:any)=>void = ()=>{}
 
@@ -1425,7 +1733,7 @@ function Sos({ go }: { go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Sécurité" onBack={()=>go('myprofile')}/>
-      <div style={{ flex:1, padding:'12px 20px', display:'flex', flexDirection:'column', gap:14, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+      <div style={{ flex:1, padding:'12px 20px', display:'flex', flexDirection:'column', gap:14, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
         <div style={{ padding:16, background:C.redLight, borderRadius:16, border:`1.5px solid ${C.red}33`, textAlign:'center' }}>
           <p style={{ fontSize:32 }}>🆘</p>
           <p style={{ fontWeight:700, color:C.red, fontSize:16 }}>Besoin d'aide ?</p>
@@ -1553,9 +1861,9 @@ export default function App() {
     }).catch(e => { clearTimeout(timeout); console.error('getSession error', e); setLoading(false) })
   }, [])
 
+  // Auto-expiry check (separate so it doesn't block profile/clutch loading)
   useEffect(() => {
     if (!user?.id || !user?.name) return
-    // Auto-deactivate: check on load AND every minute
     const checkExpiry = () => {
       if (user.is_available && user.available_until) {
         const until = new Date(user.available_until)
@@ -1568,7 +1876,11 @@ export default function App() {
     checkExpiry()
     const expiryTimer = setInterval(checkExpiry, 60000)
     return () => clearInterval(expiryTimer)
-    // Request notification permission
+  }, [user?.id, user?.name, user?.is_available, user?.available_until])
+
+  // Load profiles, clutches, setup realtime
+  useEffect(() => {
+    if (!user?.id || !user?.name) return
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission()
     }
@@ -1579,9 +1891,8 @@ export default function App() {
         if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => c.receiver_id===user.id&&c.status==='pending').length) }
       })
     loadClutches()
-    // Realtime: new clutch received
     const channel = supabase.channel('notif-'+user.id)
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, payload => {
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, () => {
         setPendingBadge(b => b+1)
         loadClutches()
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -1596,7 +1907,15 @@ export default function App() {
   const sendClutch = async () => {
     if (!user?.id || !selectedProfile?.id || !venueInput || !selectedTime || message.trim().length < 10) return
     setSending(true)
-    const proposedTime = new Date(Date.now() + 60*60*1000).toISOString()
+    // Rate limiting : max 3 clutches envoyés par jour
+    const today = new Date(); today.setHours(0,0,0,0)
+    const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true})
+      .eq('sender_id',user.id).gte('created_at',today.toISOString())
+    if ((count||0) >= 3) {
+      alert('Tu as atteint la limite de 3 clutches par jour. Reviens demain !')
+      setSending(false); return
+    }
+    const proposedTime = new Date(selectedTime).toISOString()
     const { error } = await supabase.from('clutches').insert({
       sender_id: user.id, receiver_id: selectedProfile.id,
       venue: venueInput, venue_safety: venueSafety,
@@ -1623,7 +1942,7 @@ export default function App() {
 
   // Mobile: plein écran sans frame. Desktop: frame centré.
   const frameStyle: React.CSSProperties = isMobile
-    ? { width:'100%', height:'100dvh', background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }
+    ? { width:'100%', height:'100dvh', background:C.bg, display:'flex', flexDirection:'column', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', position:'relative' as const }
     : { width:390, maxWidth:'100%', background:C.bg, borderRadius:44, overflow:'hidden', boxShadow:'0 28px 70px rgba(0,0,0,0.18)', display:'flex', flexDirection:'column', height:'min(844px,85vh)', position:'relative' as const }
 
   return (
@@ -1643,10 +1962,11 @@ export default function App() {
         </div>}
 
         {/* Content */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0, overflow:isMobile?'visible':'hidden' }}>
           {screen==='splash' && <Splash go={go}/>}
           {screen==='login' && <Login go={go} setUser={setUser}/>}
           {screen==='register' && <Register go={go} setUser={setUser}/>}
+          {screen==='forgot-password' && <ForgotPassword go={go}/>}
           {screen==='ob-name' && <ObName go={go} user={user} save={save}/>}
           {screen==='ob-gender' && <ObGender go={go} user={user} save={save}/>}
           {screen==='ob-age' && <ObAge go={go} user={user} save={save}/>}
@@ -1654,7 +1974,7 @@ export default function App() {
           {screen==='ob-interests' && <ObInterests go={go} user={user} save={save}/>}
           {screen==='ob-done' && <ObDone go={go} user={user}/>}
           {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go}/>}
-          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go}/>}
+          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user}/>}
           {screen==='events' && <Events user={user} go={go}/>}
           {screen==='create-event' && <CreateEvent user={user} go={go}/>}
           {screen==='my-events' && <MyEvents user={user} go={go}/>}
@@ -1668,6 +1988,8 @@ export default function App() {
           {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go}/>}
           {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches}/>}
           {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches}/>}
+          {screen==='feedback' && <FeedbackRdv clutch={selectedClutch} user={user} go={go}/>}
+          {screen==='get-certified' && <GetCertified user={user} go={go} save={save}/>}
           {showTabBar && <TabBar tab={tab} setTab={setTab} badge={pendingBadge}/>}
         </div>
 

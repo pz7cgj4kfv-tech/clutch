@@ -232,7 +232,7 @@ export default function Landing() {
                 + Accéder à l'app réelle
               </a>
             </div>
-            <div style={{ color:C.textLight, fontSize:11, marginTop:24 }}>Lausanne · Suisse romande · 2025</div>
+            <div style={{ color:C.textLight, fontSize:11, marginTop:24 }}>Lausanne · Suisse romande · 2026</div>
           </div>
         </section>
 

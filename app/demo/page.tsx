@@ -348,7 +348,7 @@ export default function Demo() {
   // ── SCENARIOS ─────────────────────────────────────────────────────────────
   if(screen==='scenarios') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch' as any}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
         <div style={{padding:'20px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
             <div style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text}}>CLU<span style={{color:C.primary}}>TCH</span></div>
@@ -456,7 +456,7 @@ export default function Demo() {
             <p style={{fontSize:13,color:C.primary,fontWeight:600,letterSpacing:'0.1em',marginBottom:6,paddingLeft:8}}>ÉTAPE 3 / 5</p>
             <h2 style={{fontSize:24,fontWeight:800,color:C.text,paddingLeft:8}}>Tes passions <span style={{fontSize:15,color:C.textLight,fontWeight:500}}>({selectedInterests.length}/5)</span></h2>
           </div>
-          <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',display:'flex',flexDirection:'column',gap:16}}>
             {INTERESTS_CATS.map(cat=>(
               <div key={cat.label}>
                 <p style={{fontSize:12,fontWeight:700,color:C.textLight,letterSpacing:'0.08em',padding:'0 8px 8px'}}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -548,7 +548,7 @@ export default function Demo() {
             <button onClick={()=>go('sos')} style={{background:C.redLight,border:'none',borderRadius:14,padding:'5px 11px',cursor:'pointer',color:C.red,fontWeight:700,fontSize:12}}>SOS</button>
           </div>
         </div>
-        <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch' as any}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
           {PROFILES.map((p,i)=>(
             <button key={p.id} onClick={()=>{setProfileIdx(i);go('profile-detail')}} style={{width:'100%',padding:'12px 16px',background:'none',border:'none',borderBottom:`1px solid ${C.border}`,display:'flex',gap:12,alignItems:'center',cursor:'pointer',textAlign:'left'}}>
               <div style={{position:'relative',flexShrink:0}}>
@@ -578,7 +578,7 @@ export default function Demo() {
   // ── PROFILE DETAIL ────────────────────────────────────────────────────────
   if(screen==='profile-detail') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'auto'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
         <div style={{position:'relative'}}>
           <img src={profile.photo} alt="" style={{width:'100%',height:300,objectFit:'cover'}}/>
           <button onClick={()=>go('discover')} style={{position:'absolute',top:16,left:16,width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.9)',border:'none',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
@@ -623,7 +623,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title={`Clutch avec ${profile.name}`} onBack={()=>go('profile-detail')}/>
-        <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0 20px'}}>
             <Avatar src={profile.photo} size={48}/>
             <div><p style={{fontWeight:700,color:C.text}}>{profile.name}</p><ReliabilityBar score={profile.score} badge={profile.badge}/></div>
@@ -664,7 +664,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Quelle heure ?" onBack={()=>go('propose')}/>
-        <div style={{flex:1,padding:'0 20px',overflowY:'auto'}}>
+        <div style={{flex:1,padding:'0 20px',overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
           <p style={{color:C.textMid,fontSize:14,marginBottom:20,lineHeight:1.6}}>RDV dans les <strong>18h max</strong>. Tu proposes :</p>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {['Dans 30 min','Dans 1h','Dans 2h','Ce soir 18h','Ce soir 19h','Ce soir 20h','Demain matin 9h','Demain midi 12h30'].map(t=>(
@@ -688,7 +688,7 @@ export default function Demo() {
       <Frame>
         <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
           <TopBar title="Ton message" onBack={()=>go('propose2')}/>
-          <div style={{flex:1,padding:'0 20px',display:'flex',flexDirection:'column',gap:16,overflowY:'auto',WebkitOverflowScrolling:'touch' as any}}>
+          <div style={{flex:1,padding:'0 20px',display:'flex',flexDirection:'column',gap:16,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
             <div style={{padding:14,background:C.bgDeep,borderRadius:14}}>
               <p style={{fontSize:12,color:C.textLight,marginBottom:4}}>Récap</p>
               <p style={{fontWeight:700,color:C.text}}>📍 {venueInput} · ⏰ {selectedTime}</p>
@@ -828,7 +828,7 @@ export default function Demo() {
           <h2 style={{fontSize:22,fontWeight:800,color:C.text}}>Messages</h2>
           <span style={{background:C.primary,color:'#fff',width:22,height:22,borderRadius:'50%',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>2</span>
         </div>
-        <div style={{flex:1,overflowY:'auto'}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
           {[
             {p:PROFILES[0],last:"Parfait ! À tout à l'heure ✨",time:'14:32',unread:1,status:'accepted'},
             {p:PROFILES[4],last:'Demande de clutch envoyée',time:'12:10',unread:0,status:'pending'},
@@ -873,7 +873,7 @@ export default function Demo() {
             {Array.from({length:MSG_LIMIT}).map((_,i)=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<chatMessages.length?C.primary:C.border}}/>)}
           </div>
         </div>
-        <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:16,display:'flex',flexDirection:'column',gap:10}}>
+        <div ref={chatRef} style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:16,display:'flex',flexDirection:'column',gap:10}}>
           {chatMessages.map((msg,i)=>(
             <div key={i} style={{display:'flex',justifyContent:msg.from==='me'?'flex-end':'flex-start'}}>
               <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:msg.from==='me'?'18px 18px 4px 18px':'18px 18px 18px 4px',background:msg.from==='me'?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.card,border:msg.from==='me'?'none':`1px solid ${C.border}`,color:msg.from==='me'?'#fff':C.text,fontSize:14,lineHeight:1.5}}>
@@ -921,7 +921,7 @@ export default function Demo() {
           <p style={{fontSize:32,fontWeight:800,fontVariantNumeric:'tabular-nums',letterSpacing:'-0.02em'}}>{fmt(countdown)}</p>
           <p style={{fontSize:12,opacity:0.8}}>avant que le créneau soit libéré</p>
         </div>
-        <div style={{flex:1,padding:20,display:'flex',flexDirection:'column',gap:14,overflowY:'auto'}}>
+        <div style={{flex:1,padding:20,display:'flex',flexDirection:'column',gap:14,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
           <Card>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
               <Avatar src={PROFILES[0].photo} size={48}/>
@@ -1091,7 +1091,7 @@ export default function Demo() {
               <Pill key={f.id} active={eventFilter===f.id} onClick={()=>setEventFilter(f.id)}>{f.label}</Pill>
             ))}
           </div>
-          <div style={{flex:1,overflowY:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
             {filtered.map(ev=>(
               <button key={ev.id} onClick={()=>{setSelectedEvent(ev);go('event-detail')}} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',textAlign:'left',cursor:'pointer',display:'flex',boxShadow:`0 1px 6px ${C.shadow}`,minHeight:76}}>
                 <img src={ev.photo} alt="" style={{width:76,height:76,objectFit:'cover',flexShrink:0}}/>
@@ -1124,7 +1124,7 @@ export default function Demo() {
 
   if(screen==='event-detail'&&selectedEvent) return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'auto'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
         <div style={{position:'relative'}}>
           <img src={selectedEvent.photo} alt="" style={{width:'100%',height:220,objectFit:'cover'}}/>
           <button onClick={()=>go('events')} style={{position:'absolute',top:16,left:16,width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.9)',border:'none',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
@@ -1162,7 +1162,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-        <div style={{flex:1,overflowY:'auto',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
           <div>
             <p style={{fontWeight:700,color:C.text,marginBottom:8,fontSize:13}}>Type d'événement</p>
             {demoAccountType==='user'&&<p style={{fontSize:11,color:C.peach,marginBottom:8}}>👥 Compte standard — tu peux créer des activités communautaires uniquement.</p>}
@@ -1221,7 +1221,7 @@ export default function Demo() {
   // ── MY PROFILE ────────────────────────────────────────────────────────────
   if(screen==='myprofile') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'auto'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
         <div style={{background:`linear-gradient(160deg,${C.primaryLight},${C.peachLight})`,padding:'32px 20px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:12,flexShrink:0}}>
           <div style={{position:'relative'}}>
             <Avatar src={ME.photo} size={80} border={`3px solid ${C.primary}`}/>
@@ -1299,7 +1299,7 @@ export default function Demo() {
   // ── PREMIUM ───────────────────────────────────────────────────────────────
   if(screen==='premium') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'auto'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
         <TopBar title="Premium" onBack={()=>go('myprofile')}/>
         <div style={{padding:'0 20px 32px',display:'flex',flexDirection:'column',gap:16}}>
           <div style={{background:`linear-gradient(135deg,${C.gold}22,${C.gold}44)`,borderRadius:20,padding:24,textAlign:'center',border:`1.5px solid ${C.gold}`}}>
@@ -1335,7 +1335,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Sécurité" onBack={()=>go(prevScreen)}/>
-        <div style={{flex:1,padding:'0 20px',display:'flex',flexDirection:'column',gap:14,overflowY:'auto'}}>
+        <div style={{flex:1,padding:'0 20px',display:'flex',flexDirection:'column',gap:14,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
           <div style={{padding:16,background:C.redLight,borderRadius:16,border:`1.5px solid ${C.red}33`,textAlign:'center'}}>
             <p style={{fontSize:36}}>🆘</p>
             <p style={{fontWeight:700,color:C.red,fontSize:16}}>Besoin d'aide immédiate ?</p>
@@ -1389,7 +1389,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Ma disponibilité" onBack={()=>go('myprofile')}/>
-        <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch' as any,padding:'12px 20px',display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,padding:'12px 20px',display:'flex',flexDirection:'column',gap:16}}>
           <div style={{background:isAvailable?C.sageLight:C.bgDeep,border:`1.5px solid ${isAvailable?C.sage:C.border}`,borderRadius:16,padding:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
               <p style={{fontWeight:700,color:isAvailable?C.sage:C.text}}>{isAvailable?'● Je suis disponible':'○ Pas disponible'}</p>
@@ -1416,7 +1416,7 @@ export default function Demo() {
           </div>
           <div>
             <p style={{fontWeight:700,color:C.text,fontSize:13,marginBottom:8}}>⏰ Disponible à partir de</p>
-            <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:160,overflowY:'auto',WebkitOverflowScrolling:'touch' as any}}>
+            <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:160,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
               {timeSlots.slice(0,12).map(t=>(
                 <button key={t} onClick={()=>setAvailFrom(availFrom===t?'':t)} style={{padding:'9px 14px',borderRadius:12,border:`1.5px solid ${availFrom===t?C.sage:C.border}`,background:availFrom===t?C.sageLight:'none',color:availFrom===t?C.sage:C.text,fontSize:13,fontWeight:availFrom===t?700:400,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>{t}</button>
               ))}
@@ -1425,7 +1425,7 @@ export default function Demo() {
           <div>
             <p style={{fontWeight:700,color:C.text,fontSize:13,marginBottom:8}}>⏰ Jusqu'à (optionnel)</p>
             <p style={{fontSize:11,color:C.textLight,marginBottom:8}}>Laisse vide = tu désactives manuellement</p>
-            <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:120,overflowY:'auto',WebkitOverflowScrolling:'touch' as any}}>
+            <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:120,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
               {timeSlots.slice(2,12).map(t=>(
                 <button key={t} onClick={()=>setAvailUntil(availUntil===t?'':t)} style={{padding:'9px 14px',borderRadius:12,border:`1.5px solid ${availUntil===t?C.peach:C.border}`,background:availUntil===t?C.peachLight:'none',color:availUntil===t?C.peach:C.text,fontSize:13,fontWeight:availUntil===t?700:400,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>{t}</button>
               ))}

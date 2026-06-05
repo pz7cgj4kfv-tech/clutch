@@ -1445,7 +1445,7 @@ export default function Demo() {
 // ─── PHONE FRAME ──────────────────────────────────────────────────────────────
 function Frame({ children }: { children: React.ReactNode }) {
   const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => { setIsMobile(window.innerWidth < 768) }, [])
+  useEffect(() => { setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0) }, [])
   if (isMobile) {
     return (
       <div style={{width:'100%',height:'100dvh',background:C.bg,display:'flex',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',position:'relative'}}>

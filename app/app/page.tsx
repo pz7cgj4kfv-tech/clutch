@@ -432,7 +432,7 @@ function ObInterests({ go, user, save }: any) {
         <h2 style={{ color:C.text, fontSize:22, fontWeight:800 }}>Tes passions <span style={{ fontSize:13, color:C.textLight, fontWeight:500 }}>({sel.length}/5)</span></h2>
         <p style={{ color:C.textMid, fontSize:13, marginTop:2 }}>Choisis 3 à 5 passions.</p>
       </div>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', display:'flex', flexDirection:'column', gap:12, minHeight:0 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', display:'flex', flexDirection:'column', gap:12, minHeight:0 }}>
         {INTERESTS_CATS.map(cat=>(
           <div key={cat.label}>
             <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em', padding:'0 4px 8px' }}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -509,7 +509,7 @@ function Discover({ profiles, user, onSelect, go }: any) {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px' }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px' }}>
         {displayed.length === 0 ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:20, textAlign:'center', padding:32 }}>
             <div style={{ fontSize:56 }}>🌿</div>
@@ -686,7 +686,7 @@ function Propose({ profile, go, setVenue, setVenueInput, venueInput, selectedVen
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title={`Clutcher ${profile?.name||''}`} onBack={()=>go('profile-detail')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <p style={{ fontWeight:700, color:C.text, marginBottom:10 }}>📍 Où se retrouver ?</p>
         <input value={venueInput} onChange={e=>{setVenueInput(e.target.value);setVenue('');setVenueSafety('safe')}} placeholder="Tape le nom d'un café…"
           style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.card, fontSize:14, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
@@ -723,7 +723,7 @@ function Propose2({ profile, go, selectedTime, setSelectedTime, venueInput }: an
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Quelle heure ?" onBack={()=>go('propose')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12, marginBottom:16 }}>
           <p style={{ fontSize:12, color:C.textLight }}>📍 {venueInput}</p>
         </div>
@@ -751,7 +751,7 @@ function Propose3({ profile, go, venueInput, selectedTime, message, setMessage, 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Ton message" onBack={()=>go('propose2')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12 }}>
           <p style={{ fontSize:12, color:C.textLight, marginBottom:3 }}>Récap</p>
           <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>📍 {venueInput} · 🕐 {selectedTime?.split(' (')[0]}</p>
@@ -841,7 +841,7 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
           ))}
         </div>
       </div>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
         {filtered.map((ev,i)=>(
           <div key={`${ev.id}-${i}`} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', boxShadow:`0 1px 6px ${C.shadow}`, display:'flex', minHeight:76 }}>
             {ev.photo
@@ -927,7 +927,7 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Type */}
         <div>
           <p style={{ fontWeight:700, color:C.text, marginBottom:8, fontSize:13 }}>Type d'événement</p>
@@ -1017,7 +1017,7 @@ function MyEvents({ user, go }: { user:any; go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Mes événements" onBack={()=>go('events')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
         {loading&&<p style={{ color:C.textLight, textAlign:'center', marginTop:32 }}>Chargement…</p>}
         {!loading&&events.length===0&&(
           <div style={{ textAlign:'center', marginTop:40 }}>
@@ -1061,7 +1061,7 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
       <div style={{ padding:'14px 20px 10px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
         <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Messages</h2>
       </div>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
         {clutches.map((c:any)=>{
           const other=c.sender_id===user.id?c.receiver:c.sender
           const isReceived=c.receiver_id===user.id
@@ -1340,7 +1340,7 @@ function ClutchReceived({ clutch, user, go, refresh }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Clutch reçu ☕" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Sender card */}
         <div style={{ background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, borderRadius:20, padding:20, display:'flex', gap:14, alignItems:'center' }}>
           <Avatar p={sender||{}} size={60}/>
@@ -1420,7 +1420,7 @@ function Chat({ clutch, user, go }: any) {
       <div style={{ padding:'6px 16px', background:C.bgDeep, fontSize:11, color:C.textMid, textAlign:'center' }}>
         📍 {clutch.venue} · {MSG_LIMIT - messages.length} message{MSG_LIMIT - messages.length > 1?'s':''} restant{MSG_LIMIT - messages.length > 1?'s':''}
       </div>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
         {messages.map(m=>{
           const isMine = m.sender_id === user.id
           return (
@@ -1482,7 +1482,7 @@ function RdvActive({ clutch, user, go, refresh }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="RDV confirmé ✓" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         <div style={{ background:`linear-gradient(135deg,${C.sageLight},${C.bgDeep})`, borderRadius:20, padding:20, textAlign:'center' }}>
           <div style={{ fontSize:48, marginBottom:8 }}>☕</div>
           <p style={{ fontWeight:800, fontSize:17, color:C.text, marginBottom:4 }}>RDV avec {other?.name}</p>
@@ -1560,7 +1560,7 @@ function FeedbackRdv({ clutch, user, go }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Comment s'est passé le RDV ?" onBack={()=>go('discover')}/>
-      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'20px 20px' }}>
+      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'20px 20px' }}>
         {other && (
           <div style={{ display:'flex', alignItems:'center', gap:12, background:C.bgDeep, borderRadius:14, padding:'12px 16px', marginBottom:20 }}>
             <Avatar p={other} size={44}/>

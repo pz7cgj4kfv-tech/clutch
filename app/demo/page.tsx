@@ -1452,7 +1452,7 @@ function Frame({ children }: { children: React.ReactNode }) {
       <div style={{width:'100%',height:'100dvh',background:C.bg,display:'flex',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',position:'relative'}}>
         <div style={{position:'fixed',top:10,left:'50%',transform:'translateX(-50%)',zIndex:100,display:'flex',gap:6,alignItems:'center'}}>
           <a href="/" style={{background:'rgba(255,255,255,0.9)',backdropFilter:'blur(10px)',padding:'5px 10px',borderRadius:20,fontSize:11,color:C.text,textDecoration:'none',fontWeight:600,border:`1px solid ${C.border}`}}>← Site</a>
-          <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'4px 10px',fontSize:10,fontWeight:800,color:'#8B6000'}}>🎬 DÉMO</div>
+          <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'4px 10px',fontSize:10,fontWeight:800,color:'#8B6000'}}>🎬 v06.06-B</div>
           <a href="/app" style={{background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`,padding:'5px 10px',borderRadius:20,fontSize:11,color:'#fff',textDecoration:'none',fontWeight:700}}>Vraie app →</a>
         </div>
         <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0,paddingTop:44}}>
@@ -1465,7 +1465,7 @@ function Frame({ children }: { children: React.ReactNode }) {
     <div style={{minHeight:'100vh',background:`linear-gradient(135deg,#F5E6DC 0%,#EDE0F0 50%,#DCE8F5 100%)`,display:'flex',alignItems:'center',justifyContent:'center',padding:20,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
       <div style={{position:'fixed',top:14,left:'50%',transform:'translateX(-50%)',zIndex:100,display:'flex',gap:8,alignItems:'center'}}>
         <a href="/" style={{background:'rgba(255,255,255,0.9)',backdropFilter:'blur(10px)',padding:'6px 14px',borderRadius:20,fontSize:12,color:C.text,textDecoration:'none',fontWeight:600,border:`1px solid ${C.border}`}}>← Site</a>
-        <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'5px 12px',fontSize:11,fontWeight:800,color:'#8B6000',letterSpacing:'0.05em'}}>🎬 DÉMO INTERACTIVE</div>
+        <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'5px 12px',fontSize:11,fontWeight:800,color:'#8B6000',letterSpacing:'0.05em'}}>🎬 DÉMO · <span style={{fontWeight:500,fontSize:10}}>v06.06-B</span></div>
         <a href="/app" style={{background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`,padding:'6px 14px',borderRadius:20,fontSize:12,color:'#fff',textDecoration:'none',fontWeight:700}}>Vraie app →</a>
       </div>
       <div style={{width:390,maxWidth:'100%',background:C.bg,borderRadius:44,overflow:'hidden',boxShadow:'0 32px 80px rgba(0,0,0,0.2)',display:'flex',flexDirection:'column',height:'min(844px, calc(100vh - 120px))',position:'relative'}}>

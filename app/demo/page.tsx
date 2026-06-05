@@ -457,7 +457,7 @@ export default function Demo() {
             <p style={{fontSize:13,color:C.primary,fontWeight:600,letterSpacing:'0.1em',marginBottom:6,paddingLeft:8}}>ÉTAPE 3 / 5</p>
             <h2 style={{fontSize:24,fontWeight:800,color:C.text,paddingLeft:8}}>Tes passions <span style={{fontSize:15,color:C.textLight,fontWeight:500}}>({selectedInterests.length}/5)</span></h2>
           </div>
-          <div style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',display:'flex',flexDirection:'column',gap:16}}>
             {INTERESTS_CATS.map(cat=>(
               <div key={cat.label}>
                 <p style={{fontSize:12,fontWeight:700,color:C.textLight,letterSpacing:'0.08em',padding:'0 8px 8px'}}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -624,7 +624,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title={`Clutch avec ${profile.name}`} onBack={()=>go('profile-detail')}/>
-        <div style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px'}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0 20px'}}>
             <Avatar src={profile.photo} size={48}/>
             <div><p style={{fontWeight:700,color:C.text}}>{profile.name}</p><ReliabilityBar score={profile.score} badge={profile.badge}/></div>
@@ -829,7 +829,7 @@ export default function Demo() {
           <h2 style={{fontSize:22,fontWeight:800,color:C.text}}>Messages</h2>
           <span style={{background:C.primary,color:'#fff',width:22,height:22,borderRadius:'50%',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>2</span>
         </div>
-        <div style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
           {[
             {p:PROFILES[0],last:"Parfait ! À tout à l'heure ✨",time:'14:32',unread:1,status:'accepted'},
             {p:PROFILES[4],last:'Demande de clutch envoyée',time:'12:10',unread:0,status:'pending'},
@@ -874,7 +874,7 @@ export default function Demo() {
             {Array.from({length:MSG_LIMIT}).map((_,i)=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<chatMessages.length?C.primary:C.border}}/>)}
           </div>
         </div>
-        <div ref={chatRef} style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:16,display:'flex',flexDirection:'column',gap:10}}>
+        <div ref={chatRef} style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:16,display:'flex',flexDirection:'column',gap:10}}>
           {chatMessages.map((msg,i)=>(
             <div key={i} style={{display:'flex',justifyContent:msg.from==='me'?'flex-end':'flex-start'}}>
               <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:msg.from==='me'?'18px 18px 4px 18px':'18px 18px 18px 4px',background:msg.from==='me'?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.card,border:msg.from==='me'?'none':`1px solid ${C.border}`,color:msg.from==='me'?'#fff':C.text,fontSize:14,lineHeight:1.5}}>
@@ -1092,7 +1092,7 @@ export default function Demo() {
               <Pill key={f.id} active={eventFilter===f.id} onClick={()=>setEventFilter(f.id)}>{f.label}</Pill>
             ))}
           </div>
-          <div style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
             {filtered.map(ev=>(
               <button key={ev.id} onClick={()=>{setSelectedEvent(ev);go('event-detail')}} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',textAlign:'left',cursor:'pointer',display:'flex',boxShadow:`0 1px 6px ${C.shadow}`,minHeight:76}}>
                 <img src={ev.photo} alt="" style={{width:76,height:76,objectFit:'cover',flexShrink:0}}/>
@@ -1163,7 +1163,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-        <div style={{flex:1,height:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
           <div>
             <p style={{fontWeight:700,color:C.text,marginBottom:8,fontSize:13}}>Type d'événement</p>
             {demoAccountType==='user'&&<p style={{fontSize:11,color:C.peach,marginBottom:8}}>👥 Compte standard — tu peux créer des activités communautaires uniquement.</p>}

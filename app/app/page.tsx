@@ -1942,7 +1942,7 @@ export default function App() {
 
   // Mobile: plein écran sans frame. Desktop: frame centré.
   const frameStyle: React.CSSProperties = isMobile
-    ? { width:'100%', height:'100dvh', background:C.bg, display:'flex', flexDirection:'column', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', position:'relative' as const }
+    ? { position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:C.bg, display:'flex', flexDirection:'column', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', overflow:'hidden' }
     : { width:390, maxWidth:'100%', background:C.bg, borderRadius:44, overflow:'hidden', boxShadow:'0 28px 70px rgba(0,0,0,0.18)', display:'flex', flexDirection:'column', height:'min(844px,85vh)', position:'relative' as const }
 
   return (
@@ -1950,7 +1950,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP RÉELLE</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v06.06-C</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -1962,7 +1962,7 @@ export default function App() {
         </div>}
 
         {/* Content */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0, position:'relative' }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
           {screen==='splash' && <Splash go={go}/>}
           {screen==='login' && <Login go={go} setUser={setUser}/>}
           {screen==='register' && <Register go={go} setUser={setUser}/>}

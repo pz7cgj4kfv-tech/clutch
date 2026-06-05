@@ -222,6 +222,22 @@ function lsSet(k:string,v:any){try{localStorage.setItem(k,JSON.stringify(v))}cat
 const LAUSANNE_ZONES = ['Lausanne-Centre','Flon','Ouchy','Lausanne-Ouest','Pully','Renens','Prilly','Chailly','Sallaz','Épalinges','Montriond']
 const SWISS_CITIES = ['Genève','Zurich','Berne','Fribourg','Neuchâtel','Sion','Lugano','Basel','Montreux']
 
+function applyOffset(baseTime: string, offset: string): string {
+  if(offset==='Comme proposé') return baseTime
+  const offsets: Record<string,number> = {'-2h':-120,'-1h':-60,'-30 min':-30,'+30 min':30,'+1h':60,'+2h':120}
+  const mins = offsets[offset]
+  if(!mins) return baseTime
+  // Parse hours from strings like "Ce soir 19h", "Dans 1h", "Demain matin 9h", "19h30 (dans 45min)"
+  const match = baseTime.match(/(\d{1,2})h(\d{0,2})/)
+  if(!match) return baseTime
+  let h = parseInt(match[1])
+  let m = match[2] ? parseInt(match[2])||0 : 0
+  const total = h*60 + m + mins
+  const nh = Math.floor(((total%1440)+1440)%1440/60)
+  const nm = ((total%1440)+1440)%1440%60
+  return `${nh}h${nm===0?'00':String(nm).padStart(2,'0')}`
+}
+
 function genTimeSlots(){
   const now=new Date(), slots:string[]=[]
   const start=new Date(now)
@@ -760,11 +776,16 @@ export default function Demo() {
           <p style={{color:C.textMid,fontSize:14}}>Ajuste l'heure ou le lieu — <strong>1 seule contre-prop possible</strong>.</p>
           <div>
             <p style={{fontWeight:700,color:C.text,marginBottom:8}}>Ajuster l'heure</p>
-            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:10}}>
               {['-2h','-1h','-30 min','Comme proposé','+30 min','+1h','+2h'].map(t=>(
                 <Pill key={t} active={selectedTime===t} onClick={()=>setSelectedTime(t)}>{t}</Pill>
               ))}
             </div>
+            {selectedTime&&selectedTime!=='Comme proposé'&&(
+              <div style={{background:C.primaryLight,border:`1px solid ${C.primary}44`,borderRadius:10,padding:'8px 14px',fontSize:13,color:C.primary,fontWeight:700}}>
+                ⏰ RDV prévu à : <strong>{applyOffset('Ce soir 19h', selectedTime)}</strong>
+              </div>
+            )}
           </div>
           <div>
             <p style={{fontWeight:700,color:C.text,marginBottom:8}}>Changer le lieu (optionnel)</p>

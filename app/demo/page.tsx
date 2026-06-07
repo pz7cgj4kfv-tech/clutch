@@ -193,7 +193,7 @@ function TabBar({ tab, setScreen }: { tab:string; setScreen:(s:Screen)=>void }) 
     {id:'profile',icon:'◉',label:'Profil',screen:'myprofile' as Screen},
   ]
   return (
-    <div style={{display:'flex',borderTop:`1px solid ${C.border}`,background:C.bg,flexShrink:0}}>
+    <div style={{display:'flex',borderTop:`1px solid ${C.border}`,background:C.bg,flexShrink:0,position:'sticky',bottom:0,zIndex:10}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>setScreen(t.screen)} style={{flex:1,padding:'10px 4px 12px',border:'none',background:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:tab===t.id?C.primary:C.textLight}}>
           <span style={{fontSize:20,lineHeight:1}}>{t.icon}</span>
@@ -352,7 +352,7 @@ export default function Demo() {
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
         <div style={{padding:'20px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <div style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text}}>CLU<span style={{color:C.primary}}>TCH</span></div>
+            <a href="/" style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text,textDecoration:'none'}}>CLU<span style={{color:C.primary}}>TCH</span></a>
             <p style={{fontSize:12,color:C.textLight}}>Bonjour {obName} 👋 Que veux-tu explorer ?</p>
           </div>
           <button onClick={()=>{lsSet('demo_done',false);setScreen('splash')}} style={{fontSize:11,color:C.textLight,background:'none',border:`1px solid ${C.border}`,borderRadius:10,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>Réinitialiser</button>
@@ -457,7 +457,7 @@ export default function Demo() {
             <p style={{fontSize:13,color:C.primary,fontWeight:600,letterSpacing:'0.1em',marginBottom:6,paddingLeft:8}}>ÉTAPE 3 / 5</p>
             <h2 style={{fontSize:24,fontWeight:800,color:C.text,paddingLeft:8}}>Tes passions <span style={{fontSize:15,color:C.textLight,fontWeight:500}}>({selectedInterests.length}/5)</span></h2>
           </div>
-          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',display:'flex',flexDirection:'column',gap:16}}>
             {INTERESTS_CATS.map(cat=>(
               <div key={cat.label}>
                 <p style={{fontSize:12,fontWeight:700,color:C.textLight,letterSpacing:'0.08em',padding:'0 8px 8px'}}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -538,10 +538,10 @@ export default function Demo() {
   // ── DISCOVER ──────────────────────────────────────────────────────────────
   if(screen==='discover') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bgDeep,minHeight:0}}>
-        <div style={{padding:'12px 16px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',background:C.bg,flexShrink:0}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bgDeep,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
+        <div style={{padding:'12px 16px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',background:C.bg,position:'sticky',top:0,zIndex:5}}>
           <div>
-            <div style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text}}>CLU<span style={{color:C.primary}}>TCH</span></div>
+            <a href="/" style={{fontSize:18,fontWeight:900,letterSpacing:'-0.05em',color:C.text,textDecoration:'none'}}>CLU<span style={{color:C.primary}}>TCH</span></a>
             <p style={{fontSize:10,color:C.textLight,fontWeight:600}}>{PROFILES.filter(p=>p.is_available).length} disponibles · {PROFILES.length} profils</p>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -549,7 +549,7 @@ export default function Demo() {
             <button onClick={()=>go('sos')} style={{background:C.redLight,border:'none',borderRadius:14,padding:'5px 11px',cursor:'pointer',color:C.red,fontWeight:700,fontSize:12}}>SOS</button>
           </div>
         </div>
-        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any}}>
+        <div>
           {PROFILES.map((p,i)=>(
             <button key={p.id} onClick={()=>{setProfileIdx(i);go('profile-detail')}} style={{width:'100%',padding:'12px 16px',background:'none',border:'none',borderBottom:`1px solid ${C.border}`,display:'flex',gap:12,alignItems:'center',cursor:'pointer',textAlign:'left'}}>
               <div style={{position:'relative',flexShrink:0}}>
@@ -624,7 +624,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title={`Clutch avec ${profile.name}`} onBack={()=>go('profile-detail')}/>
-        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px'}}>
+        <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0 20px'}}>
             <Avatar src={profile.photo} size={48}/>
             <div><p style={{fontWeight:700,color:C.text}}>{profile.name}</p><ReliabilityBar score={profile.score} badge={profile.badge}/></div>
@@ -824,12 +824,12 @@ export default function Demo() {
   // ── INBOX ─────────────────────────────────────────────────────────────────
   if(screen==='inbox') return (
     <Frame>
-      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
-        <div style={{padding:'16px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
+        <div style={{padding:'16px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:C.bg,zIndex:5}}>
           <h2 style={{fontSize:22,fontWeight:800,color:C.text}}>Messages</h2>
           <span style={{background:C.primary,color:'#fff',width:22,height:22,borderRadius:'50%',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>2</span>
         </div>
-        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
+        <div>
           {[
             {p:PROFILES[0],last:"Parfait ! À tout à l'heure ✨",time:'14:32',unread:1,status:'accepted'},
             {p:PROFILES[4],last:'Demande de clutch envoyée',time:'12:10',unread:0,status:'pending'},
@@ -874,7 +874,7 @@ export default function Demo() {
             {Array.from({length:MSG_LIMIT}).map((_,i)=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<chatMessages.length?C.primary:C.border}}/>)}
           </div>
         </div>
-        <div ref={chatRef} style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:16,display:'flex',flexDirection:'column',gap:10}}>
+        <div ref={chatRef} style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:16,display:'flex',flexDirection:'column',gap:10}}>
           {chatMessages.map((msg,i)=>(
             <div key={i} style={{display:'flex',justifyContent:msg.from==='me'?'flex-end':'flex-start'}}>
               <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:msg.from==='me'?'18px 18px 4px 18px':'18px 18px 18px 4px',background:msg.from==='me'?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.card,border:msg.from==='me'?'none':`1px solid ${C.border}`,color:msg.from==='me'?'#fff':C.text,fontSize:14,lineHeight:1.5}}>
@@ -1082,17 +1082,17 @@ export default function Demo() {
     const filtered=EVENTS.filter(e=>eventFilter==='all'||e.type===eventFilter)
     return (
       <Frame>
-        <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
-          <div style={{padding:'16px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+        <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y'}}>
+          <div style={{padding:'16px 20px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:C.bg,zIndex:5}}>
             <h2 style={{fontSize:22,fontWeight:800,color:C.text}}>Événements</h2>
             <button onClick={()=>go('create-event')} style={{background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`,border:'none',borderRadius:20,padding:'6px 14px',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'}}>+ Créer</button>
           </div>
-          <div style={{padding:'0 20px 8px',display:'flex',gap:8,overflowX:'auto',flexShrink:0}}>
+          <div style={{padding:'0 20px 8px',display:'flex',gap:8,overflowX:'auto',position:'sticky',top:52,background:C.bg,zIndex:4}}>
             {[{id:'all',label:'Tout'},{id:'clutch',label:'✦ Clutch'},{id:'partner',label:'🤝 Partenaires'},{id:'user',label:'👥 Communauté'}].map(f=>(
               <Pill key={f.id} active={eventFilter===f.id} onClick={()=>setEventFilter(f.id)}>{f.label}</Pill>
             ))}
           </div>
-          <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
             {filtered.map(ev=>(
               <button key={ev.id} onClick={()=>{setSelectedEvent(ev);go('event-detail')}} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',textAlign:'left',cursor:'pointer',display:'flex',boxShadow:`0 1px 6px ${C.shadow}`,minHeight:76}}>
                 <img src={ev.photo} alt="" style={{width:76,height:76,objectFit:'cover',flexShrink:0}}/>
@@ -1163,7 +1163,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,touchAction:'pan-y',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
           <div>
             <p style={{fontWeight:700,color:C.text,marginBottom:8,fontSize:13}}>Type d'événement</p>
             {demoAccountType==='user'&&<p style={{fontSize:11,color:C.peach,marginBottom:8}}>👥 Compte standard — tu peux créer des activités communautaires uniquement.</p>}
@@ -1390,7 +1390,7 @@ export default function Demo() {
     <Frame>
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg}}>
         <TopBar title="Ma disponibilité" onBack={()=>go('myprofile')}/>
-        <div style={{flex:1,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,padding:'12px 20px',display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch' as any,padding:'12px 20px',display:'flex',flexDirection:'column',gap:16}}>
           <div style={{background:isAvailable?C.sageLight:C.bgDeep,border:`1.5px solid ${isAvailable?C.sage:C.border}`,borderRadius:16,padding:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
               <p style={{fontWeight:700,color:isAvailable?C.sage:C.text}}>{isAvailable?'● Je suis disponible':'○ Pas disponible'}</p>
@@ -1446,16 +1446,30 @@ export default function Demo() {
 // ─── PHONE FRAME ──────────────────────────────────────────────────────────────
 function Frame({ children }: { children: React.ReactNode }) {
   const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => { setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0) }, [])
+  const [frameH, setFrameH] = useState('100dvh')
+  useEffect(() => {
+    const mobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    setIsMobile(mobile)
+    if (mobile) {
+      const updateH = () => setFrameH(window.innerHeight + 'px')
+      updateH()
+      window.addEventListener('resize', updateH)
+      document.body.style.overflow = 'hidden'
+      return () => {
+        window.removeEventListener('resize', updateH)
+        document.body.style.overflow = ''
+      }
+    }
+  }, [])
   if (isMobile) {
     return (
-      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',overflow:'hidden'}}>
+      <div style={{height:frameH,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',overflow:'hidden'}}>
         <div style={{flexShrink:0,height:44,display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:C.bg,borderBottom:`1px solid ${C.border}`,zIndex:100}}>
           <a href="/" style={{background:'rgba(255,255,255,0.9)',backdropFilter:'blur(10px)',padding:'5px 10px',borderRadius:20,fontSize:11,color:C.text,textDecoration:'none',fontWeight:600,border:`1px solid ${C.border}`}}>← Site</a>
-          <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'4px 10px',fontSize:10,fontWeight:800,color:'#8B6000'}}>🎬 v06.06-C</div>
+          <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'4px 10px',fontSize:10,fontWeight:800,color:'#8B6000'}}>🎬 v06.06-W</div>
           <a href="/app" style={{background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`,padding:'5px 10px',borderRadius:20,fontSize:11,color:'#fff',textDecoration:'none',fontWeight:700}}>Vraie app →</a>
         </div>
-        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0,overflow:'hidden'}}>
           {children}
         </div>
       </div>
@@ -1465,7 +1479,7 @@ function Frame({ children }: { children: React.ReactNode }) {
     <div style={{minHeight:'100vh',background:`linear-gradient(135deg,#F5E6DC 0%,#EDE0F0 50%,#DCE8F5 100%)`,display:'flex',alignItems:'center',justifyContent:'center',padding:20,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
       <div style={{position:'fixed',top:14,left:'50%',transform:'translateX(-50%)',zIndex:100,display:'flex',gap:8,alignItems:'center'}}>
         <a href="/" style={{background:'rgba(255,255,255,0.9)',backdropFilter:'blur(10px)',padding:'6px 14px',borderRadius:20,fontSize:12,color:C.text,textDecoration:'none',fontWeight:600,border:`1px solid ${C.border}`}}>← Site</a>
-        <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'5px 12px',fontSize:11,fontWeight:800,color:'#8B6000',letterSpacing:'0.05em'}}>🎬 DÉMO · <span style={{fontWeight:500,fontSize:10}}>v06.06-C</span></div>
+        <div style={{background:'rgba(255,165,0,0.15)',border:'1.5px solid orange',borderRadius:20,padding:'5px 12px',fontSize:11,fontWeight:800,color:'#8B6000',letterSpacing:'0.05em'}}>🎬 DÉMO · <span style={{fontWeight:500,fontSize:10}}>v06.06-W</span></div>
         <a href="/app" style={{background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`,padding:'6px 14px',borderRadius:20,fontSize:12,color:'#fff',textDecoration:'none',fontWeight:700}}>Vraie app →</a>
       </div>
       <div style={{width:390,maxWidth:'100%',background:C.bg,borderRadius:44,overflow:'hidden',boxShadow:'0 32px 80px rgba(0,0,0,0.2)',display:'flex',flexDirection:'column',height:'min(844px, calc(100vh - 120px))',position:'relative'}}>

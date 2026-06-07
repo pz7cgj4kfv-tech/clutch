@@ -1,0 +1,27 @@
+{
+  "name": "Clutch — Rencontres spontanées",
+  "short_name": "Clutch",
+  "description": "Un vrai café dans les 18h. Réponds en 2h ou c'est libéré.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#FDFAF7",
+  "theme_color": "#5D1048",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "lifestyle"],
+  "lang": "fr-CH",
+  "scope": "/"
+}

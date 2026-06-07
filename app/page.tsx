@@ -57,11 +57,14 @@ export default function Landing() {
         <div style={{ position:'fixed', bottom:'15%', left:'-8%', width:280, height:280, borderRadius:'50%', background:`${C.peach}12`, filter:'blur(60px)', animation:'drift 18s ease-in-out infinite reverse', pointerEvents:'none', zIndex:0 }} />
 
         {/* NAV */}
-        <nav style={{ padding:'16px 28px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:`${C.bg}EE`, backdropFilter:'blur(20px)', zIndex:10 }}>
-          <div style={{ fontSize:22, fontWeight:900, letterSpacing:'-0.05em' }}>CLU<span style={{ color:C.primary }}>TCH</span></div>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <a href="/app" style={{ border:`1.5px solid ${C.primary}`, borderRadius:20, padding:'7px 16px', color:C.primary, fontSize:12, fontWeight:700 }}>+ App réelle</a>
-            <a href="/demo" style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'8px 18px', color:'white', fontSize:12, fontWeight:700 }}>Démo →</a>
+        <nav style={{ padding:'12px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:`${C.bg}EE`, backdropFilter:'blur(20px)', zIndex:10 }}>
+          <div style={{ fontSize:20, fontWeight:900, letterSpacing:'-0.05em' }}>CLU<span style={{ color:C.primary }}>TCH</span></div>
+          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+            <a href="/demo" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>🎬 Démo</a>
+            <a href="/app" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>📱 App</a>
+            <a href="/flyer" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>📄 Flyer</a>
+            <a href="/hq" style={{ padding:'6px 14px', borderRadius:20, border:`1px solid ${C.border}`, color:C.textLight, fontSize:12, fontWeight:600 }}>⚙️ QG</a>
+            <a href="/app" style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'8px 18px', color:'white', fontSize:12, fontWeight:700 }}>Rejoindre →</a>
           </div>
         </nav>
 
@@ -233,6 +236,7 @@ export default function Landing() {
               </a>
             </div>
             <div style={{ color:C.textLight, fontSize:11, marginTop:24 }}>Lausanne · Suisse romande · 2026</div>
+            <a href="/hq" style={{ display:'inline-block', marginTop:16, color:'transparent', fontSize:8, userSelect:'none' }}>·</a>
           </div>
         </section>
 

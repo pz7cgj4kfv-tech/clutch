@@ -43,12 +43,29 @@ export default function Admin() {
   const [filter, setFilter] = useState<'pending'|'approved'|'rejected'>('pending')
   const [updating, setUpdating] = useState<string|null>(null)
   const [stats, setStats] = useState({ pending:0, approved:0, rejected:0 })
+  const [tab, setTab] = useState<'events'|'reports'>('events')
+  const [reports, setReports] = useState<any[]>([])
+  const [banning, setBanning] = useState<string|null>(null)
+
+  const loadReports = async () => {
+    const { data } = await supabase.from('reports')
+      .select('*,reporter:profiles!reports_reporter_id_fkey(name,photo_url),reported:profiles!reports_reported_id_fkey(name,photo_url,is_banned)')
+      .order('created_at',{ascending:false})
+    if(data) setReports(data)
+  }
+
+  const banUser = async (userId: string, ban: boolean) => {
+    setBanning(userId)
+    await supabase.from('profiles').update({ is_banned: ban }).eq('id', userId)
+    await loadReports()
+    setBanning(null)
+  }
 
   useEffect(()=>{
     supabase.auth.getSession().then(async ({data:{session}})=>{
       setUserEmail(session?.user?.email||null)
       if(session?.user?.email&&ADMIN_EMAILS.includes(session.user.email)){
-        await loadEvents()
+        await Promise.all([loadEvents(), loadReports(), loadStats()])
       }
       setLoading(false)
     })
@@ -81,6 +98,41 @@ export default function Admin() {
       }))
     }
     setUpdating(null)
+  }
+
+  const [appStats, setAppStats] = useState<any>(null)
+
+  const loadStats = async () => {
+    const [usersRes, clutchesRes, rdvRes, premiumRes] = await Promise.all([
+      supabase.from('profiles').select('id,gender,is_premium,created_at',{count:'exact'}),
+      supabase.from('clutches').select('id,status,created_at',{count:'exact'}),
+      supabase.from('clutches').select('id').eq('status','completed'),
+      supabase.from('profiles').select('id').eq('is_premium',true),
+    ])
+    const today = new Date(); today.setHours(0,0,0,0)
+    const users = usersRes.data||[]
+    const clutches = clutchesRes.data||[]
+    setAppStats({
+      totalUsers: usersRes.count||0,
+      usersToday: users.filter(u=>new Date(u.created_at)>=today).length,
+      males: users.filter(u=>u.gender==='male').length,
+      females: users.filter(u=>u.gender==='female').length,
+      premium: premiumRes.data?.length||0,
+      totalClutches: clutchesRes.count||0,
+      clutchesToday: clutches.filter(c=>new Date(c.created_at)>=today).length,
+      rdvCompleted: rdvRes.data?.length||0,
+    })
+  }
+
+  const [resetMsg, setResetMsg] = useState('')
+  const resetTestProfiles = async () => {
+    setResetMsg('⏳ En cours…')
+    const until = new Date(Date.now() + 18 * 3600000).toISOString()
+    const from = new Date().toISOString()
+    const { error } = await supabase.rpc('admin_reset_test_availability', { until_iso: until, from_iso: from })
+    if (!error) { setResetMsg('✅ Tous les profils sont disponibles 18h !') }
+    else { setResetMsg('❌ Erreur RPC — utilise SQL Editor') }
+    setTimeout(() => setResetMsg(''), 5000)
   }
 
   const filtered = events.filter(e=>e.status===filter)
@@ -121,11 +173,77 @@ export default function Admin() {
         </div>
         <div style={{display:'flex',gap:12,alignItems:'center'}}>
           <a href="/app" style={{color:C.textMid,fontSize:13,textDecoration:'none'}}>← App</a>
+          <button onClick={()=>{setTab('events');loadEvents()}} style={{background:tab==='events'?C.primaryLight:'none',border:`1.5px solid ${tab==='events'?C.primary:C.border}`,borderRadius:10,padding:'6px 14px',cursor:'pointer',color:tab==='events'?C.primary:C.textMid,fontSize:12,fontFamily:'inherit',fontWeight:700}}>🗓 Événements</button>
+          <button onClick={()=>{setTab('reports');loadReports()}} style={{background:tab==='reports'?C.redLight:'none',border:`1.5px solid ${tab==='reports'?C.red:C.border}`,borderRadius:10,padding:'6px 14px',cursor:'pointer',color:tab==='reports'?C.red:C.textMid,fontSize:12,fontFamily:'inherit',fontWeight:700}}>🚩 Signalements {reports.length>0?`(${reports.length})`:''}</button>
+          <button onClick={resetTestProfiles} style={{background:C.sageLight,border:`1.5px solid ${C.sage}`,borderRadius:10,padding:'6px 14px',cursor:'pointer',color:C.sage,fontSize:12,fontFamily:'inherit',fontWeight:700}}>🧪 Reset dispo test</button>
+          {resetMsg && <span style={{fontSize:12,color:C.sage,fontWeight:600}}>{resetMsg}</span>}
           <button onClick={()=>supabase.auth.signOut().then(()=>window.location.href='/')} style={{background:'none',border:`1.5px solid ${C.border}`,borderRadius:10,padding:'6px 12px',cursor:'pointer',color:C.textLight,fontSize:12,fontFamily:'inherit'}}>Déconnexion</button>
         </div>
       </div>
 
       <div style={{maxWidth:900,margin:'0 auto',padding:32}}>
+
+        {/* ── APP STATS ── */}
+        {appStats&&(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:28}}>
+            {[
+              {label:'Utilisateurs',value:appStats.totalUsers,sub:`+${appStats.usersToday} aujourd'hui`,color:C.primary,bg:C.primaryLight},
+              {label:'Hommes / Femmes',value:`${appStats.males} / ${appStats.females}`,sub:`${appStats.premium} premium 💎`,color:C.gold,bg:C.peachLight},
+              {label:'Clutches envoyés',value:appStats.totalClutches,sub:`${appStats.clutchesToday} aujourd'hui`,color:C.sage,bg:C.sageLight},
+              {label:'RDV complétés',value:appStats.rdvCompleted,sub:appStats.totalClutches>0?`${Math.round(appStats.rdvCompleted/appStats.totalClutches*100)}% taux conversion`:'—',color:'#8b5cf6',bg:'#ede9fe'},
+            ].map(s=>(
+              <div key={s.label} style={{background:s.bg,border:`1.5px solid ${s.color}33`,borderRadius:16,padding:'14px 16px'}}>
+                <div style={{fontSize:24,fontWeight:900,color:s.color}}>{s.value}</div>
+                <div style={{fontSize:12,color:C.textMid,fontWeight:700,marginTop:2}}>{s.label}</div>
+                <div style={{fontSize:11,color:C.textLight,marginTop:4}}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── REPORTS TAB ── */}
+        {tab==='reports'&&(
+          <div>
+            <h2 style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:20}}>🚩 Signalements utilisateurs</h2>
+            {reports.length===0&&(
+              <div style={{textAlign:'center',padding:48,background:C.bg,borderRadius:20,border:`1px solid ${C.border}`}}>
+                <p style={{fontSize:32,marginBottom:12}}>✨</p>
+                <p style={{color:C.textMid}}>Aucun signalement pour l'instant.</p>
+              </div>
+            )}
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              {reports.map((r:any)=>(
+                <div key={r.id} style={{background:C.card,borderRadius:16,padding:20,border:`1px solid ${r.reported?.is_banned?C.red:C.border}`}}>
+                  <div style={{display:'flex',gap:16,alignItems:'flex-start'}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                        <span style={{fontSize:13,fontWeight:700,color:C.red}}>🚩 Signalement</span>
+                        {r.reported?.is_banned&&<span style={{fontSize:11,background:C.redLight,color:C.red,padding:'2px 8px',borderRadius:6,fontWeight:700}}>BANNI</span>}
+                      </div>
+                      <p style={{fontSize:14,color:C.text,marginBottom:4}}><strong>Signalé :</strong> {r.reported?.name||r.reported_id}</p>
+                      <p style={{fontSize:14,color:C.text,marginBottom:4}}><strong>Par :</strong> {r.reporter?.name||r.reporter_id}</p>
+                      <p style={{fontSize:14,color:C.text,marginBottom:4}}><strong>Raison :</strong> {r.reason}</p>
+                      <p style={{fontSize:12,color:C.textLight}}>{new Date(r.created_at).toLocaleDateString('fr-CH',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</p>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      {!r.reported?.is_banned?(
+                        <button onClick={()=>banUser(r.reported_id,true)} disabled={banning===r.reported_id} style={{padding:'8px 16px',borderRadius:10,border:'none',background:C.red,color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit',opacity:banning===r.reported_id?.6:1}}>
+                          {banning===r.reported_id?'…':'🚫 Bannir'}
+                        </button>
+                      ):(
+                        <button onClick={()=>banUser(r.reported_id,false)} disabled={banning===r.reported_id} style={{padding:'8px 16px',borderRadius:10,border:`1.5px solid ${C.sage}`,background:'none',color:C.sage,fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+                          ✓ Débannir
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab==='events'&&<>
         {/* Stats */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:28}}>
           {[
@@ -209,6 +327,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        </>}
       </div>
     </div>
   )

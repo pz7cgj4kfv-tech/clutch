@@ -17,7 +17,8 @@ const C = {
 type Screen =
   | 'splash' | 'login' | 'register' | 'forgot-password'
   | 'ob-name' | 'ob-gender' | 'ob-age' | 'ob-photo' | 'ob-interests' | 'ob-done'
-  | 'discover' | 'events' | 'inbox' | 'myprofile'
+  | 'set-avail'
+  | 'discover' | 'events' | 'inbox' | 'myprofile' | 'edit-profile'
   | 'profile-detail'
   | 'propose' | 'propose2' | 'propose3' | 'sent'
   | 'clutch-received' | 'chat' | 'rdv' | 'rdv-active' | 'sos'
@@ -25,6 +26,7 @@ type Screen =
   | 'feedback' | 'get-certified'
 
 const BANNED_WORDS = ['salope','pute','fdp','enculé','nique','bite','chier','merde ta gueule','ta gueule']
+const SUPABASE_FUNCTIONS_URL = 'https://fnucdicfcjoxbozpfdau.supabase.co/functions/v1'
 
 const INTERESTS_CATS = [
   { label:'Sport', icon:'🏃', items:['Randonnée','Yoga','Tennis','Natation','Cyclisme','Course','Escalade','Ski','Fitness'] },
@@ -33,16 +35,95 @@ const INTERESTS_CATS = [
   { label:'Loisirs', icon:'🎲', items:['Voyages','Jeux de société','Concerts','Stand-up','Gaming','Nature'] },
 ]
 
+// ─── VENUES curatés Lausanne ──────────────────────────────────────────────────
 const VENUES = [
-  { name:'Café du Grütli', safety:'safe', emoji:'☕' },
-  { name:'Brasserie de Montbenon', safety:'safe', emoji:'🍺' },
-  { name:'Blackbird Coffee', safety:'safe', emoji:'☕' },
-  { name:'Quai d\'Ouchy', safety:'safe', emoji:'🌊' },
-  { name:'Place de la Palud', safety:'safe', emoji:'⛲' },
-  { name:'Café de l\'Évêché', safety:'safe', emoji:'🎵' },
-  { name:'Jardin de Valency', safety:'neutral', emoji:'🌳' },
-  { name:'Parc Mon-Repos', safety:'neutral', emoji:'🌿' },
+  // Cafés (🟢 sûr)
+  { name:'Café du Grütli', safety:'safe', emoji:'☕', type:'café', neighborhood:'Flon' },
+  { name:'Blackbird Coffee', safety:'safe', emoji:'☕', type:'café', neighborhood:'Centre' },
+  { name:'Café de l\'Évêché', safety:'safe', emoji:'☕', type:'café', neighborhood:'Vieille Ville' },
+  { name:'Café Romand', safety:'safe', emoji:'☕', type:'café', neighborhood:'Centre' },
+  { name:'Café du Tunnel', safety:'safe', emoji:'☕', type:'café', neighborhood:'Flon' },
+  { name:'Flon Café', safety:'safe', emoji:'☕', type:'café', neighborhood:'Flon' },
+  { name:'Starbucks Flon', safety:'safe', emoji:'☕', type:'café', neighborhood:'Flon' },
+  { name:'Holy Cow! Lausanne', safety:'safe', emoji:'🍔', type:'café', neighborhood:'Centre' },
+  { name:'Café Bel-Air', safety:'safe', emoji:'☕', type:'café', neighborhood:'Bel-Air' },
+  { name:'Caribana', safety:'safe', emoji:'☕', type:'café', neighborhood:'Ouchy' },
+  { name:'Café du Pont', safety:'safe', emoji:'☕', type:'café', neighborhood:'Pully' },
+  { name:'Café du Marché', safety:'safe', emoji:'☕', type:'café', neighborhood:'Palud' },
+  { name:'Les Grandes Roches', safety:'safe', emoji:'☕', type:'café', neighborhood:'Sallaz' },
+  { name:'Café de Chailly', safety:'safe', emoji:'☕', type:'café', neighborhood:'Chailly' },
+  // Bars & Brasseries (🟢 sûr)
+  { name:'Brasserie de Montbenon', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Montbenon' },
+  { name:'Mad – Le Club', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Flon' },
+  { name:'Le Bleu Lézard', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Flon' },
+  { name:'Brasserie du Château', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Vieille Ville' },
+  { name:'Le Bourg Plage', safety:'safe', emoji:'🍹', type:'bar', neighborhood:'Bourg' },
+  { name:'Café du Centre', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Centre' },
+  { name:'L\'Éléphant', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Flon' },
+  { name:'Bar du Flon', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Flon' },
+  { name:'Le Bellevue', safety:'safe', emoji:'🍹', type:'bar', neighborhood:'Ouchy' },
+  { name:'Café de la Paix', safety:'safe', emoji:'🍺', type:'bar', neighborhood:'Flon' },
+  // Restaurants (🟢 sûr)
+  { name:'Le Jardin d\'Ete', safety:'safe', emoji:'🍽️', type:'restaurant', neighborhood:'Ouchy' },
+  { name:'Café du Grütli', safety:'safe', emoji:'🍽️', type:'restaurant', neighborhood:'Vieille Ville' },
+  { name:'Brasserie Lipp', safety:'safe', emoji:'🍽️', type:'restaurant', neighborhood:'Centre' },
+  { name:'Le Nomade', safety:'safe', emoji:'🍜', type:'restaurant', neighborhood:'Flon' },
+  { name:'La Punaise', safety:'safe', emoji:'🍕', type:'restaurant', neighborhood:'Centre' },
+  { name:'Sushi Shop Flon', safety:'safe', emoji:'🍱', type:'restaurant', neighborhood:'Flon' },
+  // Lieux publics (🟡 neutre)
+  { name:'Quai d\'Ouchy', safety:'neutral', emoji:'🌊', type:'parc', neighborhood:'Ouchy' },
+  { name:'Place de la Palud', safety:'neutral', emoji:'⛲', type:'place', neighborhood:'Vieille Ville' },
+  { name:'Place St-François', safety:'neutral', emoji:'🕍', type:'place', neighborhood:'Centre' },
+  { name:'Esplanade de Montbenon', safety:'neutral', emoji:'🌿', type:'parc', neighborhood:'Montbenon' },
+  { name:'Parc Mon-Repos', safety:'neutral', emoji:'🌿', type:'parc', neighborhood:'Mon-Repos' },
+  { name:'Jardin de Valency', safety:'neutral', emoji:'🌳', type:'parc', neighborhood:'Valency' },
+  { name:'Parc de Beaulieu', safety:'neutral', emoji:'🌳', type:'parc', neighborhood:'Beaulieu' },
+  { name:'Parc de l\'Hermitage', safety:'neutral', emoji:'🌳', type:'parc', neighborhood:'Pully' },
+  { name:'Bord du Lac (Vidy)', safety:'neutral', emoji:'🌊', type:'parc', neighborhood:'Vidy' },
+  { name:'Place du Tunnel', safety:'neutral', emoji:'🏙️', type:'place', neighborhood:'Tunnel' },
+  // Lieux culturels (🟢 sûr)
+  { name:'Musée de l\'Élysée', safety:'safe', emoji:'📷', type:'culture', neighborhood:'Montriond' },
+  { name:'MUDAC – Mudac', safety:'safe', emoji:'🎨', type:'culture', neighborhood:'Plateforme 10' },
+  { name:'Musée Cantonal des Beaux-Arts', safety:'safe', emoji:'🖼️', type:'culture', neighborhood:'Plateforme 10' },
+  { name:'Cinéma Pathé Flon', safety:'safe', emoji:'🎬', type:'culture', neighborhood:'Flon' },
+  { name:'Théâtre de Vidy', safety:'safe', emoji:'🎭', type:'culture', neighborhood:'Vidy' },
+  { name:'Opéra de Lausanne', safety:'safe', emoji:'🎶', type:'culture', neighborhood:'Centre' },
 ]
+
+// ─── OVERPASS / OpenStreetMap venue search ────────────────────────────────────
+async function searchOSMVenues(query: string): Promise<typeof VENUES> {
+  if (query.length < 2) return []
+  try {
+    const overpassQuery = `
+      [out:json][timeout:8];
+      (
+        node["amenity"~"cafe|bar|restaurant|pub|fast_food"]["name"~"${query}",i](around:6000,46.5197,6.6323);
+        node["leisure"~"park"]["name"~"${query}",i](around:6000,46.5197,6.6323);
+        node["tourism"~"museum|gallery"]["name"~"${query}",i](around:6000,46.5197,6.6323);
+      );
+      out 8;
+    `.trim()
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: overpassQuery,
+      signal: AbortSignal.timeout(6000),
+    })
+    const data = await res.json()
+    return (data.elements || []).slice(0, 6).map((el: any) => {
+      const amenity = el.tags?.amenity || el.tags?.leisure || el.tags?.tourism || ''
+      const isCafe = ['cafe', 'fast_food'].includes(amenity)
+      const isBar = ['bar', 'pub'].includes(amenity)
+      const isPark = ['park'].includes(amenity)
+      const isCulture = ['museum', 'gallery'].includes(amenity)
+      const emoji = isCafe ? '☕' : isBar ? '🍺' : isPark ? '🌿' : isCulture ? '🎨' : '📍'
+      const safety = isPark ? 'neutral' : 'safe'
+      const type = isCafe ? 'café' : isBar ? 'bar' : isPark ? 'parc' : isCulture ? 'culture' : 'lieu'
+      return { name: el.tags?.name || 'Lieu inconnu', safety, emoji, type, neighborhood: 'Lausanne' }
+    })
+  } catch {
+    return []
+  }
+}
 
 // ─── SHARE HELPERS ────────────────────────────────────────────────────────────
 const APP_URL = 'https://clutch-mel.netlify.app'
@@ -80,14 +161,14 @@ function ShareSheet({ options, onClose }: { options:{icon:string;label:string;on
 // Génère des créneaux exacts à partir de l'heure actuelle
 function getTimeSlots() {
   const now = new Date()
-  const slots: { label: string; time: Date }[] = []
+  const slots: { label: string; time: Date; iso: string }[] = []
   const intervals = [30, 60, 90, 120, 150, 180, 240, 300, 360]
   intervals.forEach(mins => {
     const t = new Date(now.getTime() + mins * 60000)
     const h = t.getHours(), m = t.getMinutes()
     const mStr = m === 0 ? '00' : String(m).padStart(2,'0')
     const diff = mins < 60 ? `${mins} min` : `${mins/60}h`
-    slots.push({ label: `${h}h${mStr} (dans ${diff})`, time: t })
+    slots.push({ label: `${h}h${mStr} (dans ${diff})`, time: t, iso: t.toISOString() })
   })
   return slots
 }
@@ -138,9 +219,9 @@ function ProgressBar({ step, total }: { step:number; total:number }) {
 
 function TabBar({ tab, setTab, badge=0 }: { tab:string; setTab:(t:string)=>void; badge?:number }) {
   return (
-    <div style={{ display:'flex', borderTop:`1px solid ${C.border}`, background:C.bg, flexShrink:0 }}>
+    <div style={{ display:'flex', borderTop:`1px solid ${C.border}`, background:C.bg, flexShrink:0, position:'sticky', bottom:0, zIndex:10 }}>
       {[{id:'discover',icon:'✦',label:'Discover'},{id:'events',icon:'🗓',label:'Événements'},{id:'inbox',icon:'💬',label:'Messages',b:badge},{id:'myprofile',icon:'◉',label:'Profil'}].map(t=>(
-        <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px 14px', position:'relative' }}>
+        <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px env(safe-area-inset-bottom,14px)', position:'relative' }}>
           <span style={{ fontSize:20, lineHeight:1, color:tab===t.id?C.primary:C.textLight }}>{t.icon}</span>
           <span style={{ fontSize:10, fontWeight:tab===t.id?700:500, color:tab===t.id?C.primary:C.textLight }}>{t.label}</span>
           {(t as any).b>0&&<div style={{ position:'absolute', top:6, right:'14%', width:16, height:16, borderRadius:'50%', background:C.primary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:700 }}>{(t as any).b}</div>}
@@ -162,24 +243,150 @@ function TopBar({ title, onBack, right }: any) {
 
 function SafetyBadge({ safety }: { safety:string }) {
   const m: Record<string,{icon:string;label:string;bg:string;color:string}> = {
-    safe:{icon:'🟢',label:'Lieu sûr',bg:C.sageLight,color:C.sage},
-    neutral:{icon:'🟡',label:'Lieu neutre',bg:'#FFF8DC',color:'#B8860B'},
-    alert:{icon:'🔴',label:'Prudence',bg:C.redLight,color:C.red},
+    safe:   { icon:'🛡', label:'Lieu certifié sûr', bg:C.sageLight,  color:C.sage },
+    neutral:{ icon:'👁', label:'Lieu public',        bg:'#FFF8DC',    color:'#B8860B' },
+    alert:  { icon:'⚠️', label:'Prudence',           bg:C.redLight,   color:C.red },
   }
   const s = m[safety]||m.safe
-  return <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:s.bg, color:s.color, fontWeight:600 }}>{s.icon} {s.label}</span>
+  return <span style={{ fontSize:11, padding:'3px 9px', borderRadius:10, background:s.bg, color:s.color, fontWeight:700 }}>{s.icon} {s.label}</span>
+}
+
+function ReliabilityStars({ score, light }: { score:number; light?:boolean }) {
+  const stars = Math.round((score / 100) * 5)
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+      {[1,2,3,4,5].map(i => (
+        <span key={i} style={{ fontSize:12, color: i<=stars ? (light?'#FFD700':C.primary) : (light?'rgba(255,255,255,0.35)':C.border), lineHeight:1 }}>
+          {i <= stars ? '★' : '☆'}
+        </span>
+      ))}
+      <span style={{ fontSize:10, color:light?'rgba(255,255,255,0.7)':C.textLight, marginLeft:3, fontWeight:600 }}>{score}%</span>
+    </div>
+  )
+}
+
+// ─── CLUTCH LOGO SVG ─────────────────────────────────────────────────────────
+// Deux chevrons (> et <) qui se croisent au centre, inclinés à 45°
+// Vert = moi qui part vers l'autre. Rose = l'autre qui vient vers moi.
+// Ensemble = deux personnes qui se rejoignent. Concept Clutch pur.
+function CclutchLogo({ size = 40, glow = false }: { size?: number; glow?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none"
+      style={{ display:'block', filter: glow ? 'drop-shadow(0 0 12px #7DC840) drop-shadow(0 0 24px #E82060)' : undefined }}>
+      <rect width="100" height="100" rx="22" fill="#5D1048"/>
+      {/* Reflet haut-gauche */}
+      <ellipse cx="22" cy="20" rx="26" ry="18" fill="white" opacity="0.07"/>
+
+      {/* Chevron 1 — pointe vers haut-droit, accent vert au sommet */}
+      <g transform="rotate(-45 50 50)">
+        <polyline points="22,30 58,50 22,70"
+          stroke="white" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        <circle cx="59" cy="50" r="9" fill="#7DC840"/>
+      </g>
+
+      {/* Chevron 2 — pointe vers bas-gauche, accent rose au sommet */}
+      <g transform="rotate(135 50 50)">
+        <polyline points="22,30 58,50 22,70"
+          stroke="white" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        <circle cx="59" cy="50" r="9" fill="#E82060"/>
+      </g>
+    </svg>
+  )
+}
+
+// ─── PROXIMITY METER ─────────────────────────────────────────────────────────
+// Les deux flèches Clutch qui se rapprochent en temps réel via GPS
+function ProximityMeter({ distance, merged }: { distance: number|null; merged: boolean }) {
+  const MAX_DIST = 2000
+  const progress = distance == null ? 0 : Math.max(0, 1 - Math.min(distance, MAX_DIST) / MAX_DIST)
+  const clr = progress < 0.3 ? '#6B7280' : progress < 0.6 ? '#F59E0B' : progress < 0.85 ? '#10B981' : '#22C55E'
+  const distLabel = distance == null ? 'Activation GPS…' :
+    distance > 2000 ? 'Encore loin…' :
+    distance > 500 ? 'Tu approches !' :
+    distance > 100 ? '⚡ Presque là !' :
+    distance > 50 ? '🔥 Tout près !' : '✅ Tu y es !'
+  const distStr = distance == null ? '' : distance > 1000 ? ` · ${(distance/1000).toFixed(1)}km` : ` · ${Math.round(distance)}m`
+  // Décalage des flèches : 0% = fusionnées, 100% = aux extrémités
+  const spread = (1 - progress) * 36 // % de chaque côté du centre
+
+  const ArrowRight = () => (
+    <svg width="64" height="46" viewBox="0 0 64 46" fill="none">
+      <polygon points="0,8 42,8 60,23 42,38 0,38 18,23"
+        fill="#0A0A0A" stroke={clr} strokeWidth="3.5" strokeLinejoin="round"/>
+      <polygon points="44,11 59,23 44,35" fill="#7DC840"/>
+    </svg>
+  )
+  const ArrowLeft = () => (
+    <svg width="64" height="46" viewBox="0 0 64 46" fill="none">
+      <polygon points="64,8 22,8 4,23 22,38 64,38 46,23"
+        fill="#0A0A0A" stroke={clr} strokeWidth="3.5" strokeLinejoin="round"/>
+      <polygon points="20,11 5,23 20,35" fill="#E82060"/>
+    </svg>
+  )
+
+  if (merged) return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14 }}>
+      <CclutchLogo size={90} glow/>
+      <p style={{ color:'#22C55E', fontWeight:900, fontSize:20, textAlign:'center', letterSpacing:'-0.02em' }}>
+        🔒 Verrou GPS — vous y êtes !
+      </p>
+    </div>
+  )
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16, alignItems:'center' }}>
+      {/* Label distance */}
+      <div style={{ background:`${clr}18`, border:`1px solid ${clr}44`, borderRadius:12, padding:'7px 20px', color:clr, fontWeight:700, fontSize:14 }}>
+        {distLabel}<span style={{ color:'#6B7280', fontSize:12, fontWeight:500 }}>{distStr}</span>
+      </div>
+      {/* Les deux flèches animées */}
+      <div style={{ position:'relative', width:'100%', height:60, display:'flex', alignItems:'center' }}>
+        <div style={{
+          position:'absolute',
+          left:`${50 - spread}%`,
+          transform:'translateX(-100%)',
+          transition:'left 1.2s cubic-bezier(.34,1.56,.64,1)',
+          filter: progress > 0.6 ? `drop-shadow(0 0 ${progress*6}px ${clr})` : undefined
+        }}>
+          <ArrowRight/>
+        </div>
+        <div style={{
+          position:'absolute',
+          right:`${50 - spread}%`,
+          transform:'translateX(100%)',
+          transition:'right 1.2s cubic-bezier(.34,1.56,.64,1)',
+          filter: progress > 0.6 ? `drop-shadow(0 0 ${progress*6}px ${clr})` : undefined
+        }}>
+          <ArrowLeft/>
+        </div>
+      </div>
+      {/* Barre de progression */}
+      <div style={{ width:'100%', height:3, background:'#222', borderRadius:2, overflow:'hidden' }}>
+        <div style={{
+          width:`${progress*100}%`, height:'100%',
+          background:`linear-gradient(90deg,#444,${clr})`,
+          borderRadius:2, transition:'width 1.2s ease-out, background 1.2s ease-out'
+        }}/>
+      </div>
+      {distance == null && (
+        <p style={{ fontSize:12, color:'#6B7280', textAlign:'center', lineHeight:1.5 }}>
+          Active ton GPS pour voir la position de l'autre personne en temps réel
+        </p>
+      )}
+    </div>
+  )
 }
 
 // ─── AUTH SCREENS ──────────────────────────────────────────────────────────────
 function Splash({ go }: { go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:`linear-gradient(160deg,#FDF6F0,${C.primaryLight})`, padding:'0 32px', gap:28 }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:58, fontWeight:900, letterSpacing:'-0.05em', color:C.text, lineHeight:.9 }}>CLU<span style={{ color:C.primary }}>TCH</span></div>
-        <div style={{ color:C.primary, fontSize:11, letterSpacing:'0.3em', textTransform:'uppercase', marginTop:10, fontWeight:600 }}>be spontaneous · bêta lausanne</div>
-        <div style={{ color:C.textMid, fontSize:14, lineHeight:1.7, marginTop:16 }}>Un vrai café dans les 18h.<br/>Réponds en 2h ou c'est libéré.</div>
+      <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:14 }}>
+        <CclutchLogo size={82}/>
+        <div style={{ fontSize:46, fontWeight:900, letterSpacing:'-0.05em', color:C.text, lineHeight:.9 }}>CLU<span style={{ color:C.primary }}>TCH</span></div>
+        <div style={{ color:C.primary, fontSize:11, letterSpacing:'0.3em', textTransform:'uppercase', fontWeight:600 }}>be spontaneous · bêta lausanne</div>
+        <div style={{ color:C.textMid, fontSize:14, lineHeight:1.7, marginTop:4 }}>Un vrai café dans les 18h.<br/>Réponds en 2h ou c'est libéré.</div>
       </div>
-      <div style={{ width:80, height:80, borderRadius:'50%', background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>☕</div>
       <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:12 }}>
         <Btn onClick={()=>go('register')}>Créer mon compte →</Btn>
         <Btn variant="secondary" onClick={()=>go('login')}>J'ai déjà un compte</Btn>
@@ -201,8 +408,18 @@ function Login({ go, setUser }: any) {
     if(data.user){
       const {data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single()
       setUser(p||{id:data.user.id,email})
-      if(p?.name&&p.name!=='Utilisateur'&&p.gender&&p.age){go('discover')}
-      else{go('ob-name')}
+      const obKey='ob_'+data.user.id
+      if(p?.name&&p.name!=='Utilisateur'){
+        localStorage.setItem(obKey,'1')
+        const isPrem=['premium','partner','admin'].includes(p?.account_type||'')
+        const now=new Date()
+        const until=p?.available_until?new Date(p.available_until):null
+        const isReallyAvail=p?.is_available&&until&&until>now
+        if(!isPrem&&!isReallyAvail) go('set-avail')
+        else go('discover')
+      } else if(localStorage.getItem(obKey)){
+        go('discover')
+      } else{go('ob-name')}
     }
     setLoading(false)
   }
@@ -432,7 +649,7 @@ function ObInterests({ go, user, save }: any) {
         <h2 style={{ color:C.text, fontSize:22, fontWeight:800 }}>Tes passions <span style={{ fontSize:13, color:C.textLight, fontWeight:500 }}>({sel.length}/5)</span></h2>
         <p style={{ color:C.textMid, fontSize:13, marginTop:2 }}>Choisis 3 à 5 passions.</p>
       </div>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', display:'flex', flexDirection:'column', gap:12, minHeight:0 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', display:'flex', flexDirection:'column', gap:12 }}>
         {INTERESTS_CATS.map(cat=>(
           <div key={cat.label}>
             <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em', padding:'0 4px 8px' }}>{cat.icon} {cat.label.toUpperCase()}</p>
@@ -460,48 +677,50 @@ function ObDone({ go, user }: any) {
       <div style={{ background:C.sageLight, border:`1px solid ${C.sage}44`, borderRadius:16, padding:16, width:'100%' }}>
         <p style={{ fontSize:13, color:C.sage, fontWeight:600 }}>✓ Profil créé avec succès dans la bêta Lausanne</p>
       </div>
-      <Btn onClick={()=>go('discover')}>Explorer les profils ✦</Btn>
+      {/* Gate : nouveaux utilisateurs doivent se mettre disponibles avant Discover */}
+      <Btn onClick={()=>go('set-avail')}>Me mettre disponible ✦</Btn>
     </div>
   )
 }
 
 // ─── DISCOVER = GRILLE 2 COLONNES ─────────────────────────────────────────────
-function Discover({ profiles, user, onSelect, go }: any) {
+function Discover({ profiles, user, onSelect, go, refresh }: any) {
   const [showAll, setShowAll] = useState(false)
+  const [kmFilter, setKmFilter] = useState<number>(25) // 25km = pas de filtre en beta
+  const hasGPS = !!(user?.lat && user?.lng)
   const now = new Date()
-  // Auto-expire: profiles whose available_until is in the past
   const activeProfiles = profiles.filter((p: Profile) => {
     if (!p.is_available) return false
     if (p.available_until) {
       const until = new Date(p.available_until)
       if (!isNaN(until.getTime()) && until < now) return false
     }
+    // Filtre distance GPS
+    if (hasGPS && (p as any).lat && (p as any).lng && kmFilter < 25) {
+      const d = distKm(user.lat, user.lng, (p as any).lat, (p as any).lng)
+      if (d > kmFilter) return false
+    }
     return true
   })
-  // Overlap matching: only show profiles whose window overlaps mine
-  const myFrom = user?.available_from ? new Date(user.available_from) : null
-  const myUntil = user?.available_until ? new Date(user.available_until) : null
-  const myFromValid = myFrom && !isNaN(myFrom.getTime())
-  const myUntilValid = myUntil && !isNaN(myUntil.getTime())
-  const withOverlap = activeProfiles.filter((p: Profile) => {
-    if (!myFromValid && !myUntilValid) return true // I have no window → show all available
-    const theirFrom = p.available_from ? new Date(p.available_from) : now
-    const theirUntil = p.available_until ? new Date(p.available_until) : new Date(now.getTime()+18*3600*1000)
-    if (isNaN(theirFrom.getTime())) return true // old format → include
-    const iStart = myFromValid ? myFrom! : now
-    const iEnd = myUntilValid ? myUntil! : new Date(now.getTime()+18*3600*1000)
-    return theirFrom < iEnd && theirUntil > iStart
-  })
-  const displayed = showAll ? profiles : withOverlap
+  const displayed = showAll ? profiles : activeProfiles
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, minHeight:0 }}>
-      <div style={{ padding:'12px 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div style={{ padding:'12px 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center', background:C.bg, borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, zIndex:5 }}>
         <div>
-          <div style={{ fontSize:18, fontWeight:900, letterSpacing:'-0.05em', color:C.text }}>CLUTCH <span style={{ fontSize:10, background:C.primaryLight, color:C.primary, padding:'2px 7px', borderRadius:7, fontWeight:700, letterSpacing:0 }}>BÊTA</span></div>
-          <p style={{ fontSize:10, color:C.textLight, fontWeight:600, marginTop:1 }}>{displayed.length} profil{displayed.length>1?'s':''} {showAll?'au total':withOverlap.length<activeProfiles.length?'dans ta fenêtre':'disponible'}{displayed.length>1&&!showAll?'s':''}</p>
+          <a href="/" style={{ fontSize:18, fontWeight:900, letterSpacing:'-0.05em', color:C.text, textDecoration:'none' }}>CLUTCH <span style={{ fontSize:10, background:C.primaryLight, color:C.primary, padding:'2px 7px', borderRadius:7, fontWeight:700, letterSpacing:0 }}>BÊTA</span></a>
+          <p style={{ fontSize:10, color:C.textLight, fontWeight:600, marginTop:1 }}>{displayed.length} profil{displayed.length>1?'s':''} {showAll?'au total':'disponible'}{displayed.length>1&&!showAll?'s':''}</p>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <button onClick={()=>{refresh&&refresh()}} style={{ fontSize:14, background:'none', border:'none', cursor:'pointer', color:C.textLight, padding:'4px 6px' }} title="Rafraîchir">↻</button>
+          {hasGPS && (
+            <div style={{ display:'flex', alignItems:'center', gap:5, background:C.bgDeep, borderRadius:10, padding:'4px 8px' }}>
+              <span style={{ fontSize:10, color:C.textLight }}>📍</span>
+              <input type="range" min={1} max={25} value={kmFilter} onChange={e=>setKmFilter(Number(e.target.value))}
+                style={{ width:56, accentColor:C.primary, cursor:'pointer' }}/>
+              <span style={{ fontSize:10, fontWeight:700, color:C.primary, minWidth:28 }}>{kmFilter<25?`${kmFilter}km`:'∞'}</span>
+            </div>
+          )}
           <button onClick={()=>setShowAll(s=>!s)} style={{ fontSize:11, background:showAll?C.bgDeep:C.primaryLight, color:showAll?C.textLight:C.primary, padding:'5px 10px', borderRadius:10, border:'none', cursor:'pointer', fontWeight:600, fontFamily:'inherit' }}>
             {showAll?'Tous':'Disponibles'}
           </button>
@@ -509,63 +728,72 @@ function Discover({ profiles, user, onSelect, go }: any) {
         </div>
       </div>
 
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px' }}>
+      <div style={{ padding:'10px 12px 12px' }}>
         {displayed.length === 0 ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:20, textAlign:'center', padding:32 }}>
             <div style={{ fontSize:56 }}>🌿</div>
             <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Pas encore de profils {showAll?'':'disponibles'}</h2>
             <p style={{ color:C.textMid, lineHeight:1.6, fontSize:14 }}>
-              {showAll ? 'Soyez les premiers bêta-testeurs à Lausanne !' : withOverlap.length===0&&activeProfiles.length>0 ? 'Personne ne correspond à ta fenêtre horaire. Modifie ta dispo ou clique "Tous".' : 'Personne n\'est dispo. Active "Tous" pour voir tous les profils.'}
+              {showAll ? 'Soyez les premiers bêta-testeurs à Lausanne !' : 'Personne n\'est dispo pour l\'instant. Reviens plus tard ou active "Tous".'}
             </p>
             {showAll && <a href="/demo" style={{ display:'block', padding:'12px 24px', borderRadius:14, background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, color:'#fff', fontWeight:700, fontSize:14, textDecoration:'none' }}>👁 Voir la démo →</a>}
           </div>
         ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {displayed.map((p: Profile) => {
-              // Compatibility score: passions communes + disponibilité overlap
               const myInterests: string[] = user?.interests || []
               const common = (p.interests||[]).filter((i:string)=>myInterests.includes(i)).length
-              const compatScore = Math.min(100, 60 + common * 10 + (p.reliability_score||100) * 0.1)
+              const relScore = p.reliability_score || 100
+              const relStars = Math.round((relScore / 100) * 5)
               const isAvailNow = p.is_available && (!p.available_from || new Date(p.available_from) <= new Date())
+              const hasEvent = (p as any).has_event || false
               return (
                 <button key={p.id} onClick={()=>{ onSelect(p); go('profile-detail') }}
-                  style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, borderRadius:16,
+                  style={{ width:'100%', background:C.card, border:`1px solid ${hasEvent ? C.peach : C.border}`, borderRadius:16,
                     display:'flex', gap:0, cursor:'pointer', textAlign:'left', overflow:'hidden',
-                    boxShadow:`0 1px 6px ${C.shadow}` }}>
+                    boxShadow: hasEvent ? `0 2px 12px ${C.peach}44` : `0 1px 6px ${C.shadow}` }}>
                   {/* Photo */}
-                  <div style={{ position:'relative', width:88, height:100, flexShrink:0 }}>
+                  <div style={{ position:'relative', width:88, height:108, flexShrink:0 }}>
                     {p.photo_url
-                      ? <img src={p.photo_url} alt="" style={{ width:88, height:100, objectFit:'cover' }}/>
-                      : <div style={{ width:88, height:100, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30 }}>☕</div>
+                      ? <img src={p.photo_url} alt="" style={{ width:88, height:108, objectFit:'cover' }}/>
+                      : <div style={{ width:88, height:108, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30 }}>☕</div>
                     }
                     {isAvailNow && (
                       <div style={{ position:'absolute', bottom:7, right:7, width:12, height:12, borderRadius:'50%', background:'#22c55e', border:'2px solid #fff', boxShadow:'0 0 0 3px #22c55e33' }}/>
                     )}
                     {(p as any).certified && (
-                      <div style={{ position:'absolute', top:6, left:6, background:'#fff', borderRadius:10, padding:'1px 5px', fontSize:10, fontWeight:700, color:C.gold }}>✓</div>
+                      <div style={{ position:'absolute', top:6, left:6, background:'rgba(255,255,255,0.95)', borderRadius:8, padding:'1px 5px', fontSize:9, fontWeight:700, color:C.gold }}>✓ certifié</div>
+                    )}
+                    {hasEvent && (
+                      <div style={{ position:'absolute', bottom:7, left:7, background:C.peach, borderRadius:8, padding:'2px 5px', fontSize:10, fontWeight:800, color:'#fff' }}>🗓</div>
                     )}
                   </div>
                   {/* Contenu */}
                   <div style={{ flex:1, padding:'10px 12px', minWidth:0, display:'flex', flexDirection:'column', gap:3 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                      <span style={{ fontWeight:800, fontSize:16, color:C.text, lineHeight:1.2 }}>{p.name}{p.age?`, ${p.age}`:''}</span>
-                      <div style={{ textAlign:'right', flexShrink:0, marginLeft:8 }}>
-                        <div style={{ fontSize:14, fontWeight:800, color:C.primary }}>{Math.round(compatScore)}%</div>
-                        <div style={{ fontSize:9, color:C.textLight, fontWeight:600 }}>compat.</div>
-                      </div>
+                      <span style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1.2 }}>{p.name}{p.age?`, ${p.age}`:''}</span>
+                      {hasEvent && <span style={{ fontSize:9, background:C.peachLight, color:C.peach, padding:'2px 6px', borderRadius:6, fontWeight:700, flexShrink:0 }}>🗓 Propose un event</span>}
                     </div>
                     <p style={{ fontSize:11, color:C.textLight, lineHeight:1.3 }}>
                       📍 {p.neighborhood||'Lausanne'}
-                      {p.available_from&&fmtIsoTime(p.available_from)?` · ${fmtIsoTime(p.available_from)}`:isAvailNow?' · maintenant':''}
-                      {p.available_until&&fmtIsoTime(p.available_until)?`→${fmtIsoTime(p.available_until)}`:''}
+                      {user?.lat&&user?.lng&&(p as any).lat&&(p as any).lng ? ` · ${fmtDist(distKm(user.lat,user.lng,(p as any).lat,(p as any).lng))}` : ''}
+                      {isAvailNow ? ' · maintenant' : p.available_from ? ` · dès ${fmtDate(p.available_from)}` : ''}
+                      {p.available_until ? ` → ${fmtIsoTime(p.available_until, true)}` : ''}
                     </p>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                    {/* Étoiles fiabilité */}
+                    <div style={{ display:'flex', alignItems:'center', gap:2 }}>
+                      {[1,2,3,4,5].map(i=>(
+                        <span key={i} style={{ fontSize:11, color: i<=relStars ? C.primary : C.border }}>{i<=relStars?'★':'☆'}</span>
+                      ))}
+                      <span style={{ fontSize:9, color:C.textLight, marginLeft:3 }}>fiabilité</span>
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:1 }}>
                       {(p.available_modes||[]).map((m:string)=>{
                         const mode=AVAIL_MODES.find(x=>x.id===m)
                         return mode?<span key={m} style={{ fontSize:10, background:m==='rencontre'?C.primaryLight:m==='professionnel'?'#E8F0FE':C.sageLight, color:m==='rencontre'?C.primary:m==='professionnel'?'#1a73e8':C.sage, padding:'1px 6px', borderRadius:6, fontWeight:700 }}>{mode.label}</span>:null
                       })}
                     </div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:2 }}>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                       {(p.interests||[]).slice(0,3).map((i:string)=>{
                         const isCommon = myInterests.includes(i)
                         return <span key={i} style={{ fontSize:10, background:isCommon?C.primaryLight:C.bgDeep, color:isCommon?C.primary:C.textMid, padding:'2px 7px', borderRadius:7, fontWeight:isCommon?700:400 }}>{i}</span>
@@ -588,6 +816,7 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
   const [reporting, setReporting] = useState(false)
   const [reportReason, setReportReason] = useState('')
   const [reportDone, setReportDone] = useState(false)
+  const [blocked, setBlocked] = useState(false)
 
   const sendReport = async () => {
     if (!reportReason || !profile?.id || !currentUser?.id) return
@@ -595,13 +824,20 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
     setReportDone(true)
   }
 
+  const blockUser = async () => {
+    if (!profile?.id || !currentUser?.id) return
+    await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }).select()
+    setBlocked(true)
+    setTimeout(() => go('discover'), 1500)
+  }
+
   if (!profile) return null
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
       <div style={{ position:'relative' }}>
         {profile.photo_url
-          ? <img src={profile.photo_url} alt="" style={{ width:'100%', height:280, objectFit:'cover' }}/>
-          : <div style={{ width:'100%', height:200, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:72 }}>☕</div>
+          ? <img src={profile.photo_url} alt="" style={{ width:'100%', height:300, objectFit:'cover', objectPosition:(profile as any).photo_pos||'center top' }}/>
+          : <div style={{ width:'100%', height:220, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:72 }}>☕</div>
         }
         <button onClick={()=>go('discover')} style={{ position:'absolute', top:16, left:16, width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>←</button>
         <div style={{ position:'absolute', top:16, right:16, display:'flex', gap:8 }}>
@@ -619,10 +855,9 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
             {profile.is_available?'● Disponible':'○ Pas dispo'}
           </span>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ flex:1, height:4, background:C.border, borderRadius:2 }}><div style={{ width:`${profile.reliability_score||100}%`, height:'100%', background:C.sage, borderRadius:2 }}/></div>
-          <span style={{ fontSize:12, color:C.sage, fontWeight:700 }}>{profile.reliability_score||100}%</span>
-          <span style={{ fontSize:12, color:C.textLight }}>{profile.badge||'Nouveau'}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <ReliabilityStars score={profile.reliability_score||100}/>
+          <span style={{ fontSize:11, background:C.bgDeep, color:C.textLight, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>{profile.badge||'Nouveau'}</span>
         </div>
         {profile.bio&&<p style={{ color:C.textMid, lineHeight:1.65, fontSize:14 }}>{profile.bio}</p>}
         {(profile.interests||[]).length>0&&(
@@ -671,6 +906,9 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
                   <button onClick={()=>setReporting(false)} style={{ flex:1, padding:12, borderRadius:12, border:`1px solid ${C.border}`, background:'none', color:C.textMid, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Annuler</button>
                   <button onClick={sendReport} disabled={!reportReason} style={{ flex:2, padding:12, borderRadius:12, border:'none', background:reportReason?C.red:C.bgDeep, color:reportReason?'#fff':C.textLight, fontSize:13, fontWeight:700, cursor:reportReason?'pointer':'not-allowed', fontFamily:'inherit' }}>Envoyer le signalement</button>
                 </div>
+                <button onClick={blockUser} style={{ width:'100%', marginTop:8, padding:'11px', borderRadius:12, border:`1.5px solid ${C.border}`, background:'none', color:C.textLight, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                  {blocked ? '✓ Utilisateur·ice bloqué·e' : '🚫 Bloquer cet·te utilisateur·ice'}
+                </button>
               </>
             )}
           </div>
@@ -680,39 +918,360 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
   )
 }
 
+// ─── ÉCRAN DISPO OBLIGATOIRE — avec carte interactive ────────────────────────
+// Justification : force l'engagement actif, réduit les voyeurs, différencie le premium
+// GPS auto-detect → carte Leaflet → épingle déplaçable → rayon d'action
+function SetAvail({ user, go, save, fromProfile }: any) {
+  const [saving, setSaving] = useState(false)
+  const [modes, setModes] = useState<string[]>(['rencontre'])
+  const [fromTime, setFromTime] = useState('')   // '' = maintenant
+  const [untilTime, setUntilTime] = useState('') // obligatoire
+  const [lat, setLat] = useState(46.5197)
+  const [lng, setLng] = useState(6.6323)
+  const [cityLabel, setCityLabel] = useState('')
+  const [radius, setRadius] = useState(1) // Audit: défaut 1km — spontanéité locale, user peut augmenter
+  const [gpsLoading, setGpsLoading] = useState(true)
+  const [citySearch, setCitySearch] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+  const mapDivRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
+  const circleRef = useRef<any>(null)
+  const timeSlots = genTimeSlotsAvail()
+  const isPremium = ['premium','partner','admin'].includes(user?.account_type||'')
+  const canConfirm = modes.length > 0 && !!untilTime && !saving
+
+  const reverseGeocode = async (rlat: number, rlng: number) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${rlat}&lon=${rlng}&accept-language=fr`)
+      const data = await res.json()
+      const addr = data.address || {}
+      const city = addr.city || addr.town || addr.village || 'Lausanne'
+      const suburb = addr.suburb || addr.neighbourhood || addr.district || ''
+      setCityLabel(suburb ? `${city} (${suburb})` : city)
+    } catch { setCityLabel('') }
+  }
+
+  const initMap = (initLat: number, initLng: number) => {
+    if (!mapDivRef.current || mapRef.current) return
+    const L = (window as any).L
+    const map = L.map(mapDivRef.current, { zoomControl: false }).setView([initLat, initLng], 14)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OSM © CartoDB', maxZoom: 19, subdomains: 'abcd'
+    }).addTo(map)
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+    // Marqueur personnalisé rose
+    const icon = (L as any).divIcon({
+      html: `<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:#C4748A;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);transform:rotate(-45deg)"></div>`,
+      iconSize: [22, 22], iconAnchor: [11, 22], className: ''
+    })
+
+    const marker = L.marker([initLat, initLng], { draggable: true, icon }).addTo(map)
+    const circle = L.circle([initLat, initLng], {
+      radius: 5000, color: '#C4748A', fillColor: '#C4748A', fillOpacity: 0.12, weight: 2, dashArray: '5,5'
+    }).addTo(map)
+
+    const onMove = (newLat: number, newLng: number) => {
+      setLat(newLat); setLng(newLng)
+      circle.setLatLng([newLat, newLng])
+      reverseGeocode(newLat, newLng)
+    }
+
+    marker.on('dragend', () => { const p = marker.getLatLng(); onMove(p.lat, p.lng) })
+    map.on('click', (e: any) => { marker.setLatLng(e.latlng); onMove(e.latlng.lat, e.latlng.lng) })
+
+    mapRef.current = map; markerRef.current = marker; circleRef.current = circle
+  }
+
+  // Charger Leaflet + GPS au montage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const loadLeaflet = (cb: () => void) => {
+      if ((window as any).L) { cb(); return }
+      if (!document.querySelector('link[href*="leaflet"]')) {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+        document.head.appendChild(link)
+      }
+      const script = document.createElement('script')
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      script.onload = cb
+      document.body.appendChild(script)
+    }
+    loadLeaflet(() => {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords
+          setLat(latitude); setLng(longitude); setGpsLoading(false)
+          initMap(latitude, longitude)
+          reverseGeocode(latitude, longitude)
+        },
+        () => { setGpsLoading(false); initMap(46.5197, 6.6323); setCityLabel('Lausanne') },
+        { timeout: 7000, enableHighAccuracy: false }
+      )
+    })
+    return () => {
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; circleRef.current = null }
+    }
+  }, [])
+
+  // Mettre à jour le rayon + adapter la vue exactement au cercle via fitBounds
+  useEffect(() => {
+    if (!circleRef.current || !mapRef.current) return
+    circleRef.current.setRadius(radius * 1000)
+    // fitBounds > setZoom : s'adapte précisément au cercle dessiné
+    setTimeout(() => {
+      if (circleRef.current && mapRef.current)
+        mapRef.current.fitBounds(circleRef.current.getBounds(), { padding: [20, 20], animate: false })
+    }, 50)
+  }, [radius])
+
+  const searchCity = async () => {
+    if (citySearch.length < 2) return
+    setSearching(true); setSearchResults([])
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(citySearch)}&countrycodes=ch,fr,de,it,be&limit=5&accept-language=fr`)
+      setSearchResults(await res.json())
+    } catch {}
+    setSearching(false)
+  }
+
+  const selectResult = (r: any) => {
+    const rlat = parseFloat(r.lat), rlng = parseFloat(r.lon)
+    setLat(rlat); setLng(rlng)
+    setCityLabel(r.display_name.split(',').slice(0,2).join(',').trim())
+    setCitySearch(''); setSearchResults([])
+    if (mapRef.current && markerRef.current && circleRef.current) {
+      markerRef.current.setLatLng([rlat, rlng])
+      circleRef.current.setLatLng([rlat, rlng])
+      mapRef.current.setView([rlat, rlng], 14)
+    }
+  }
+
+  const confirm = async () => {
+    if (!canConfirm) return
+    setSaving(true)
+    const fromIso = fromTime || new Date().toISOString()
+    const maxUntil = new Date(Date.now() + 18 * 3600000).toISOString()
+    const untilIso = untilTime < maxUntil ? untilTime : maxUntil
+    await supabase.from('profiles').update({
+      is_available: true, available_city: cityLabel || 'Lausanne',
+      available_from: fromIso, available_until: untilIso,
+      available_modes: modes, lat, lng, available_radius: radius
+    }).eq('id', user.id)
+    save({ is_available: true, available_city: cityLabel || 'Lausanne', available_from: fromIso, available_until: untilIso, available_modes: modes, lat, lng, available_radius: radius })
+    setSaving(false)
+    go(fromProfile ? 'myprofile' : 'discover')
+  }
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+
+      {/* En-tête avec explication */}
+      <div style={{ background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, flexShrink:0 }}>
+        <div style={{ padding:'14px 16px 10px', display:'flex', alignItems:'flex-start', gap:12 }}>
+          <button onClick={()=>go('myprofile')} style={{ background:'rgba(255,255,255,0.7)', border:'none', borderRadius:'50%', width:34, height:34, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>←</button>
+          <div>
+            <h2 style={{ fontSize:18, fontWeight:900, color:C.text, letterSpacing:'-0.03em' }}>📍 Où veux-tu te retrouver ?</h2>
+            <p style={{ fontSize:12, color:C.textMid, marginTop:2 }}>Déplace l'épingle et choisis ton rayon et tes horaires.</p>
+          </div>
+        </div>
+        {/* Explication du principe Clutch */}
+        <div style={{ margin:'0 14px 10px', background:'rgba(255,255,255,0.75)', borderRadius:12, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start', backdropFilter:'blur(8px)' }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>☕</span>
+          <p style={{ fontSize:12, color:C.textMid, lineHeight:1.5 }}>
+            <strong style={{ color:C.text }}>Clutch fonctionne par réciprocité.</strong> Pour voir qui est disponible autour de toi, tu dois d'abord te montrer disponible toi aussi. Pas de voyeurs — que des gens vraiment là.
+          </p>
+        </div>
+      </div>
+
+      {/* Recherche ville */}
+      <div style={{ padding:'10px 14px 6px', display:'flex', gap:8 }}>
+        <input value={citySearch} onChange={e => setCitySearch(e.target.value)}
+          onKeyDown={e => e.key==='Enter' && searchCity()}
+          placeholder="Rechercher une ville, quartier…"
+          style={{ flex:1, padding:'9px 13px', borderRadius:12, border:`1.5px solid ${C.border}`, fontSize:13, color:C.text, background:C.bg, outline:'none', fontFamily:'inherit' }}/>
+        <button onClick={searchCity} disabled={searching} style={{ padding:'9px 14px', borderRadius:12, border:'none', background:C.primary, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+          {searching?'⏳':'🔍'}
+        </button>
+      </div>
+
+      {/* Résultats recherche */}
+      {searchResults.length>0 && (
+        <div style={{ margin:'0 14px 6px', background:C.card, borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden', zIndex:100, position:'relative' }}>
+          {searchResults.map((r:any, i:number) => (
+            <button key={i} onClick={()=>selectResult(r)} style={{ width:'100%', padding:'9px 13px', textAlign:'left', background:'none', border:'none', borderTop:i>0?`1px solid ${C.border}`:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.text }}>
+              📍 {r.display_name.split(',').slice(0,3).join(',')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Carte */}
+      <div style={{ position:'relative', margin:'0 14px 0' }}>
+        {gpsLoading && (
+          <div style={{ position:'absolute', inset:0, zIndex:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,240,234,0.9)', borderRadius:14 }}>
+            <p style={{ fontSize:13, color:C.textMid, fontWeight:600 }}>📍 Localisation en cours…</p>
+          </div>
+        )}
+        <div ref={mapDivRef} style={{ height:200, borderRadius:14, overflow:'hidden', border:`1px solid ${C.border}` }}/>
+        {cityLabel && (
+          <div style={{ position:'absolute', bottom:8, left:8, right:8, background:'rgba(255,255,255,0.95)', borderRadius:10, padding:'5px 10px', fontSize:12, fontWeight:700, color:C.text, boxShadow:'0 2px 8px rgba(0,0,0,0.12)', pointerEvents:'none' }}>
+            📍 {cityLabel}
+          </div>
+        )}
+      </div>
+
+      {/* Rayon */}
+      <div style={{ padding:'10px 14px 0' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+          <p style={{ fontSize:12, fontWeight:700, color:C.text }}>Rayon d'action</p>
+          <span style={{ fontSize:14, fontWeight:900, color:C.primary }}>{radius} km</span>
+        </div>
+        <input type="range" min={1} max={25} value={radius} onChange={e=>setRadius(Number(e.target.value))}
+          style={{ width:'100%', accentColor:C.primary, cursor:'pointer' }}/>
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:-2 }}>
+          <span style={{ fontSize:10, color:C.textLight }}>1 km</span>
+          <span style={{ fontSize:10, color:C.textLight }}>25 km</span>
+        </div>
+      </div>
+
+      {/* Horaires (côte à côte) */}
+      <div style={{ padding:'10px 14px 0', display:'flex', gap:10 }}>
+        <div style={{ flex:1 }}>
+          <p style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:5 }}>⏰ À partir de</p>
+          <select value={fromTime} onChange={e=>setFromTime(e.target.value)}
+            style={{ width:'100%', padding:'8px 9px', borderRadius:10, border:`1.5px solid ${C.border}`, background:C.bg, color:C.text, fontSize:12, fontFamily:'inherit', outline:'none' }}>
+            <option value="">Maintenant</option>
+            {timeSlots.map(t=><option key={t.iso} value={t.iso}>{t.label}</option>)}
+          </select>
+        </div>
+        <div style={{ flex:1 }}>
+          <p style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:5 }}>🔚 Jusqu'à <span style={{ color:C.red }}>*</span></p>
+          <select value={untilTime} onChange={e=>setUntilTime(e.target.value)}
+            style={{ width:'100%', padding:'8px 9px', borderRadius:10, border:`1.5px solid ${untilTime?C.border:C.red+'88'}`, background:C.bg, color:untilTime?C.text:C.textLight, fontSize:12, fontFamily:'inherit', outline:'none' }}>
+            <option value="">Choisir…</option>
+            {timeSlots.filter(t=>!fromTime||t.iso>fromTime).map(t=><option key={t.iso} value={t.iso}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Modes */}
+      <div style={{ padding:'10px 14px 0' }}>
+        <p style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:7 }}>🤝 Je suis là pour</p>
+        <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+          {AVAIL_MODES.map(m=>(
+            <button key={m.id} onClick={()=>setModes(p=>p.includes(m.id)?p.filter(x=>x!==m.id):[...p,m.id])}
+              style={{ padding:'7px 13px', borderRadius:20, border:`1.5px solid ${modes.includes(m.id)?C.primary:C.border}`, background:modes.includes(m.id)?C.primaryLight:'none', color:modes.includes(m.id)?C.primary:C.textMid, fontSize:12, fontWeight:modes.includes(m.id)?700:400, cursor:'pointer', fontFamily:'inherit' }}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding:'14px 14px 36px', marginTop:'auto' }}>
+        <button onClick={canConfirm?confirm:undefined} disabled={!canConfirm}
+          style={{ width:'100%', padding:'15px', borderRadius:16, border:'none', background:canConfirm?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.border, color:'#fff', fontWeight:800, fontSize:16, cursor:canConfirm?'pointer':'not-allowed', fontFamily:'inherit', boxShadow:canConfirm?`0 4px 20px ${C.primary}44`:'none', transition:'all 0.2s' }}>
+          {saving?'⏳ Activation…':'✦ Je suis disponible'}
+        </button>
+        {!untilTime&&<p style={{ textAlign:'center', fontSize:11, color:C.red, marginTop:6 }}>Choisis une heure de fin pour continuer</p>}
+        {isPremium&&(
+          <button onClick={()=>go('discover')} style={{ display:'block', width:'100%', marginTop:10, background:'none', border:'none', color:C.textLight, fontSize:11, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+            💎 Passer (premium) →
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── PROPOSE FLOW ─────────────────────────────────────────────────────────────
 function Propose({ profile, go, setVenue, setVenueInput, venueInput, selectedVenue, venueSafety, setVenueSafety }: any) {
-  const pick=(v:typeof VENUES[0])=>{setVenueInput(v.name);setVenue(v.name);setVenueSafety(v.safety as any)}
+  const [osmResults, setOsmResults] = useState<typeof VENUES>([])
+  const [searching, setSearching] = useState(false)
+  const searchTimer = useRef<any>(null)
+
+  const pick = (v: typeof VENUES[0]) => {
+    setVenueInput(v.name); setVenue(v.name); setVenueSafety(v.safety as any); setOsmResults([])
+  }
+
+  const handleInput = (val: string) => {
+    setVenueInput(val); setVenue(''); setVenueSafety('safe'); setOsmResults([])
+    clearTimeout(searchTimer.current)
+    if (val.length >= 2) {
+      setSearching(true)
+      searchTimer.current = setTimeout(async () => {
+        const local = VENUES.filter(v => v.name.toLowerCase().includes(val.toLowerCase()))
+        const osm = local.length < 3 ? await searchOSMVenues(val) : []
+        // merge, deduplicate by name
+        const merged = [...local, ...osm.filter(o => !local.find(l => l.name === o.name))]
+        setOsmResults(merged.slice(0, 6))
+        setSearching(false)
+      }, 400)
+    }
+  }
+
+  const suggestions = venueInput.length < 1 ? VENUES.slice(0, 6) : osmResults
+
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title={`Clutcher ${profile?.name||''}`} onBack={()=>go('profile-detail')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <p style={{ fontWeight:700, color:C.text, marginBottom:10 }}>📍 Où se retrouver ?</p>
-        <input value={venueInput} onChange={e=>{setVenueInput(e.target.value);setVenue('');setVenueSafety('safe')}} placeholder="Tape le nom d'un café…"
+
+        {/* Légende sécurité */}
+        <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8, background:C.sageLight, color:C.sage, fontWeight:600 }}>🛡 Certifié sûr</span>
+          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8, background:'#FFF8DC', color:'#B8860B', fontWeight:600 }}>👁 Lieu public</span>
+          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8, background:C.redLight, color:C.red, fontWeight:600 }}>⚠️ Prudence</span>
+        </div>
+
+        <input value={venueInput} onChange={e => handleInput(e.target.value)}
+          placeholder="Tape le nom d'un café, bar, parc…"
           style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.card, fontSize:14, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
-        {venueInput&&!selectedVenue&&(
+
+        {searching && <p style={{ fontSize:12, color:C.textLight, marginTop:6 }}>🔍 Recherche sur OpenStreetMap…</p>}
+
+        {venueInput && !selectedVenue && suggestions.length > 0 && (
           <div style={{ marginTop:8, borderRadius:12, overflow:'hidden', border:`1px solid ${C.border}` }}>
-            {VENUES.filter(v=>v.name.toLowerCase().includes(venueInput.toLowerCase())).slice(0,4).map(v=>(
-              <button key={v.name} onClick={()=>pick(v)} style={{ width:'100%', padding:'10px 14px', background:C.card, border:'none', borderBottom:`1px solid ${C.border}`, textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontWeight:600, color:C.text, fontSize:13 }}>{v.emoji} {v.name}</span>
+            {suggestions.map((v, i) => (
+              <button key={`${v.name}-${i}`} onClick={() => pick(v)} style={{ width:'100%', padding:'10px 14px', background:C.card, border:'none', borderBottom: i < suggestions.length-1 ? `1px solid ${C.border}` : 'none', textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                <div>
+                  <span style={{ fontWeight:600, color:C.text, fontSize:13 }}>{v.emoji} {v.name}</span>
+                  {v.neighborhood && <span style={{ fontSize:10, color:C.textLight, marginLeft:6 }}>{v.neighborhood}</span>}
+                </div>
                 <SafetyBadge safety={v.safety}/>
               </button>
             ))}
           </div>
         )}
-        {selectedVenue&&<div style={{ marginTop:8, padding:'10px 14px', background:C.sageLight, borderRadius:12, display:'flex', justifyContent:'space-between', alignItems:'center' }}><span style={{ fontWeight:600, color:C.text, fontSize:13 }}>✓ {selectedVenue}</span><SafetyBadge safety={venueSafety}/></div>}
-        <p style={{ fontWeight:700, color:C.text, margin:'20px 0 10px' }}>Suggestions</p>
+
+        {selectedVenue && (
+          <div style={{ marginTop:8, padding:'10px 14px', background:C.sageLight, borderRadius:12, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontWeight:600, color:C.text, fontSize:13 }}>✓ {selectedVenue}</span>
+            <SafetyBadge safety={venueSafety}/>
+          </div>
+        )}
+
+        <p style={{ fontWeight:700, color:C.text, margin:'20px 0 10px' }}>Suggestions rapides</p>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {VENUES.slice(0,5).map(v=>(
-            <button key={v.name} onClick={()=>pick(v)} style={{ padding:'11px 14px', background:C.card, border:`1.5px solid ${selectedVenue===v.name?C.primary:C.border}`, borderRadius:12, textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{v.emoji} {v.name}</span>
+          {VENUES.slice(0, 6).map(v => (
+            <button key={v.name} onClick={() => pick(v)} style={{ padding:'11px 14px', background:C.card, border:`1.5px solid ${selectedVenue===v.name ? C.primary : C.border}`, borderRadius:12, textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+              <div>
+                <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{v.emoji} {v.name}</span>
+                <span style={{ fontSize:10, color:C.textLight, marginLeft:6 }}>{v.neighborhood}</span>
+              </div>
               <SafetyBadge safety={v.safety}/>
             </button>
           ))}
         </div>
       </div>
       <div style={{ padding:'12px 20px 28px' }}>
-        <Btn onClick={()=>go('propose2')} disabled={!venueInput}>Choisir l'heure →</Btn>
+        <Btn onClick={() => go('propose2')} disabled={!venueInput}>Choisir l'heure →</Btn>
       </div>
     </div>
   )
@@ -723,15 +1282,15 @@ function Propose2({ profile, go, selectedTime, setSelectedTime, venueInput }: an
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Quelle heure ?" onBack={()=>go('propose')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12, marginBottom:16 }}>
           <p style={{ fontSize:12, color:C.textLight }}>📍 {venueInput}</p>
         </div>
         <p style={{ color:C.textMid, fontSize:13, marginBottom:14, lineHeight:1.5 }}>RDV dans les <strong>18h max</strong>. Heure proposée :</p>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {slots.map((s,i)=>(
-            <button key={i} onClick={()=>setSelectedTime(s.label)} style={{ padding:'13px 16px', borderRadius:13, border:`2px solid ${selectedTime===s.label?C.primary:C.border}`, background:selectedTime===s.label?C.primaryLight:C.card, textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontWeight:selectedTime===s.label?700:500, color:C.text, fontSize:15 }}>🕐 {s.label.split(' (')[0]}</span>
+            <button key={i} onClick={()=>setSelectedTime(s.iso)} style={{ padding:'13px 16px', borderRadius:13, border:`2px solid ${selectedTime===s.iso?C.primary:C.border}`, background:selectedTime===s.iso?C.primaryLight:C.card, textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontWeight:selectedTime===s.iso?700:500, color:C.text, fontSize:15 }}>🕐 {s.label.split(' (')[0]}</span>
               <span style={{ fontSize:12, color:C.textLight }}>{s.label.split('(')[1]?.replace(')','')}</span>
             </button>
           ))}
@@ -751,15 +1310,15 @@ function Propose3({ profile, go, venueInput, selectedTime, message, setMessage, 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Ton message" onBack={()=>go('propose2')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12 }}>
           <p style={{ fontSize:12, color:C.textLight, marginBottom:3 }}>Récap</p>
-          <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>📍 {venueInput} · 🕐 {selectedTime?.split(' (')[0]}</p>
+          <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>📍 {venueInput} · 🕐 {fmtIsoTime(selectedTime||'')}</p>
         </div>
         <div>
           <p style={{ fontWeight:700, color:C.text, marginBottom:8 }}>Message pour {profile?.name}</p>
           <textarea value={message} onChange={e=>setMessage(e.target.value)}
-            placeholder={`"Salut ${profile?.name||''} ! J'adorerais prendre un café — j'ai vu qu'on partage des intérêts communs. Tu es dispo ${selectedTime?.split(' (')[0]||''} ?"`}
+            placeholder={`"Salut ${profile?.name||''} ! J'adorerais prendre un café — j'ai vu qu'on partage des intérêts communs. Tu es dispo ${fmtIsoTime(selectedTime||'')||''} ?"`}
             rows={5} maxLength={280}
             style={{ width:'100%', border:`1.5px solid ${C.border}`, borderRadius:14, padding:14, fontSize:14, background:C.card, color:C.text, fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.6, boxSizing:'border-box' }}/>
           <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
@@ -791,7 +1350,7 @@ function Sent({ profile, go, venueInput, selectedTime }: any) {
       <div style={{ fontSize:64 }}>☕</div>
       <div><h2 style={{ fontSize:24, fontWeight:800, color:C.text }}>Clutch envoyé !</h2><p style={{ color:C.textMid, marginTop:8, lineHeight:1.6 }}>{profile?.name} a <strong>2h</strong> pour répondre.</p></div>
       <div style={{ background:C.card, borderRadius:18, padding:20, width:'100%', border:`1px solid ${C.border}` }}>
-        <p style={{ fontSize:12, color:C.textLight, marginBottom:4 }}>📍 {venueInput} · {selectedTime?.split(' (')[0]}</p>
+        <p style={{ fontSize:12, color:C.textLight, marginBottom:4 }}>📍 {venueInput} · {fmtIsoTime(selectedTime||'')}</p>
         <p style={{ fontSize:12, color:C.textLight, marginBottom:8 }}>Expire dans</p>
         <p style={{ fontSize:26, fontWeight:800, color:C.primary }}>{fmt(countdown)}</p>
       </div>
@@ -808,15 +1367,42 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
   const [filter, setFilter] = useState('all')
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [myPending, setMyPending] = useState<any[]>([])
+  const [registrations, setRegistrations] = useState<Record<string,number>>({}) // eventId → count
+  const [myRegs, setMyRegs] = useState<Set<string>>(new Set()) // eventIds où je suis inscrit
+  const [regLoading, setRegLoading] = useState<string|null>(null)
+
+  const loadRegs = async () => {
+    const { data } = await supabase.from('event_registrations').select('event_id,user_id')
+    if (!data) return
+    const counts: Record<string,number> = {}
+    const mine = new Set<string>()
+    data.forEach((r:any) => {
+      counts[r.event_id] = (counts[r.event_id]||0) + 1
+      if (r.user_id === user?.id) mine.add(r.event_id)
+    })
+    setRegistrations(counts)
+    setMyRegs(mine)
+  }
+
+  const toggleReg = async (eventId: string) => {
+    if (!user?.id) return
+    setRegLoading(eventId)
+    if (myRegs.has(eventId)) {
+      await supabase.from('event_registrations').delete().eq('event_id',eventId).eq('user_id',user.id)
+    } else {
+      await supabase.from('event_registrations').insert({ event_id:eventId, user_id:user.id })
+    }
+    await loadRegs()
+    setRegLoading(null)
+  }
 
   useEffect(()=>{
-    // Approved events from Supabase
     supabase.from('events').select('*,creator:profiles(name,photo_url)')
       .eq('status','approved').order('created_at',{ascending:false})
       .then(({data})=>{ if(data) setDbEvents(data) })
-    // My own pending events
     if(user?.id) supabase.from('events').select('*').eq('created_by',user.id).eq('status','pending')
       .then(({data})=>{ if(data) setMyPending(data) })
+    loadRegs()
   },[user?.id])
 
   const allEvents = dbEvents.map(e=>({...e, color:e.type==='clutch'?C.primary:e.type==='partner'?C.sage:C.peach}))
@@ -826,13 +1412,17 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
   const badgeLabel = (type:string) => type==='clutch'?'✦ Clutch':type==='partner'?'🤝 Partenaire':'👥 Communauté'
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
-      <div style={{ padding:'12px 16px 8px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div style={{ padding:'12px 16px 8px', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:C.bg, zIndex:5 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <h2 style={{ fontSize:19, fontWeight:800, color:C.text }}>Événements <span style={{ fontSize:10, background:C.bgDeep, color:C.textLight, padding:'2px 7px', borderRadius:7, fontWeight:600 }}>Lausanne</span></h2>
           <div style={{ display:'flex', gap:6 }}>
             {myPending.length>0&&<button onClick={()=>go('my-events')} style={{ background:C.peachLight, border:`1px solid ${C.peach}44`, borderRadius:14, padding:'5px 10px', color:C.peach, fontWeight:700, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>⏳ {myPending.length} en attente</button>}
-            <button onClick={()=>go('create-event')} style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, border:'none', borderRadius:14, padding:'5px 12px', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>+ Créer</button>
+            <button onClick={()=>{
+              const canCreate = user?.certified || ['partner','admin'].includes(user?.account_type||'')
+              if(!canCreate){ alert('🔒 Seuls les profils certifiés peuvent créer des événements.\n\nVa dans ton profil → "Me faire certifier" pour vérifier ton identité.'); return }
+              go('create-event')
+            }} style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, border:'none', borderRadius:14, padding:'5px 12px', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>+ Créer</button>
           </div>
         </div>
         <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2 }}>
@@ -841,7 +1431,7 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
           ))}
         </div>
       </div>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ padding:'10px 12px 12px', display:'flex', flexDirection:'column', gap:8 }}>
         {filtered.map((ev,i)=>(
           <div key={`${ev.id}-${i}`} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', boxShadow:`0 1px 6px ${C.shadow}`, display:'flex', minHeight:76 }}>
             {ev.photo
@@ -855,7 +1445,13 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
               </div>
               <div style={{ fontSize:11, color:C.textLight, marginBottom:4 }}>📍 {ev.venue}</div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:11, color:C.textMid }}>⏰ {ev.date||ev.date_label||'—'}</span>
+                <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:11, color:C.textMid }}>⏰ {ev.date||ev.date_label||'—'}</span>
+                  {ev.flexible
+                    ? <span style={{ fontSize:9, background:'#FFF8DC', color:'#B8860B', padding:'1px 6px', borderRadius:6, fontWeight:700 }}>🔄 Flexible</span>
+                    : <span style={{ fontSize:9, background:C.bgDeep, color:C.textLight, padding:'1px 6px', borderRadius:6, fontWeight:700 }}>📌 Fixe</span>
+                  }
+                </div>
                 <div style={{ display:'flex', gap:6, alignItems:'center' }}>
                   <span style={{ fontSize:12, fontWeight:700, color:badgeColor(ev.type) }}>{ev.price||'—'}</span>
                   <button onClick={()=>shareIt({
@@ -865,7 +1461,13 @@ function Events({ user, go }: { user:any; go:(s:Screen)=>void }) {
                   })} style={{ background:'none', border:'none', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>↗</button>
                 </div>
               </div>
-              {ev.creator&&<div style={{ fontSize:10, color:C.textLight, marginTop:2 }}>par {ev.creator.name}</div>}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:4 }}>
+                {ev.creator&&<div style={{ fontSize:10, color:C.textLight }}>par {ev.creator.name}</div>}
+                <button onClick={e=>{e.stopPropagation();toggleReg(ev.id)}} disabled={regLoading===ev.id}
+                  style={{ padding:'4px 10px', borderRadius:10, border:`1.5px solid ${myRegs.has(ev.id)?C.sage:C.primary}`, background:myRegs.has(ev.id)?C.sageLight:C.primaryLight, color:myRegs.has(ev.id)?C.sage:C.primary, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+                  {regLoading===ev.id?'…':myRegs.has(ev.id)?`✓ Je viens (${registrations[ev.id]||1})`:`Je viens ${registrations[ev.id]?`(${registrations[ev.id]})`:''}`.trim()}
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -884,7 +1486,10 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
   const [priceCustom, setPriceCustom] = useState('')
   const [spots, setSpots] = useState('6')
   const [dateTime, setDateTime] = useState('')
+  const [dateVal, setDateVal] = useState('')
+  const [timeVal, setTimeVal] = useState('')
   const [emoji, setEmoji] = useState('📅')
+  const [flexible, setFlexible] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
 
@@ -901,8 +1506,9 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
       price: finalPrice,
       spots: parseInt(spots)||6,
       type,
+      flexible,
       date_label: new Date(dateTime).toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),
-      status: type==='user' ? 'pending' : 'pending', // tous pending, admin approuve
+      status: 'pending',
       created_by: user.id,
     })
     setSaving(false)
@@ -925,9 +1531,9 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
   )
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
+    <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Créer un événement" onBack={()=>go('events')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Type */}
         <div>
           <p style={{ fontWeight:700, color:C.text, marginBottom:8, fontSize:13 }}>Type d'événement</p>
@@ -979,7 +1585,10 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
           <div>
             <p style={{ fontWeight:700, color:C.text, marginBottom:6, fontSize:13 }}>Date & heure *</p>
-            <input type="datetime-local" value={dateTime} onChange={e=>setDateTime(e.target.value)} style={{ width:'100%', padding:'9px 11px', borderRadius:12, border:`1.5px solid ${dateTime?C.primary:C.border}`, background:C.card, fontSize:12, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
+            <div style={{ display:'flex', gap:8 }}>
+              <input type="date" value={dateVal} onChange={e=>{ setDateVal(e.target.value); if(e.target.value&&timeVal) setDateTime(`${e.target.value}T${timeVal}`) }} style={{ flex:1, padding:'9px 11px', borderRadius:12, border:`1.5px solid ${dateVal?C.primary:C.border}`, background:C.card, fontSize:13, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit', WebkitAppearance:'none' }}/>
+              <input type="time" value={timeVal} onChange={e=>{ setTimeVal(e.target.value); if(dateVal&&e.target.value) setDateTime(`${dateVal}T${e.target.value}`) }} style={{ width:100, padding:'9px 11px', borderRadius:12, border:`1.5px solid ${timeVal?C.primary:C.border}`, background:C.card, fontSize:13, color:C.text, outline:'none', boxSizing:'border-box', fontFamily:'inherit', WebkitAppearance:'none' }}/>
+            </div>
           </div>
           <div>
             <p style={{ fontWeight:700, color:C.text, marginBottom:6, fontSize:13 }}>Places</p>
@@ -987,13 +1596,28 @@ function CreateEvent({ user, go }: { user:any; go:(s:Screen)=>void }) {
           </div>
         </div>
 
+        {/* Flexible toggle */}
+        <button onClick={()=>setFlexible(f=>!f)} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${flexible?C.gold:C.border}`, background:flexible?'#FFF8DC':C.card, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:'inherit' }}>
+          <div style={{ textAlign:'left' }}>
+            <div style={{ fontSize:13, fontWeight:700, color: flexible ? '#7A6020' : C.text }}>
+              {flexible ? '🔄 Événement flexible' : '📌 Événement fixe'}
+            </div>
+            <div style={{ fontSize:11, color:C.textLight, marginTop:2 }}>
+              {flexible ? 'Lieu/heure peuvent changer via contre-proposition' : 'Heure et lieu fixes, pas de négociation'}
+            </div>
+          </div>
+          <div style={{ width:40, height:22, borderRadius:11, background:flexible?C.gold:C.border, position:'relative', flexShrink:0, transition:'background 0.2s' }}>
+            <div style={{ position:'absolute', top:3, left:flexible?20:3, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
+          </div>
+        </button>
+
         {/* Moderation note */}
         <div style={{ padding:'12px 14px', background:'#FFF8DC', borderRadius:12, border:'1px solid #D4A01733', fontSize:12, color:'#7A6020', lineHeight:1.55 }}>
-          ⚠️ {type==='user' ? "Ton événement sera examiné par l'équipe Clutch avant publication (sous 24h). Les contenus inappropriés sont refusés." : "Les événements Clutch et Partenaire sont validés en priorité."}
+          ⚠️ {type==='user' ? "Ton événement sera examiné par l'équipe Clutch avant publication (sous 24h)." : "Les événements Clutch et Partenaire sont validés en priorité."}
         </div>
-      </div>
-      <div style={{ padding:'12px 20px 28px' }}>
-        <button onClick={saving?undefined:submit} disabled={!title||!venue||!dateTime} style={{ borderRadius:14, padding:'14px 20px', fontSize:15, fontWeight:700, cursor:(title&&venue&&dateTime&&!saving)?'pointer':'not-allowed', border:'none', width:'100%', fontFamily:'inherit', background:(title&&venue&&dateTime)?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:(title&&venue&&dateTime)?'#fff':C.textLight, opacity:saving?.7:1 }}>
+
+        {/* Bouton dans le scroll pour iOS */}
+        <button onClick={saving?undefined:submit} disabled={!title||!venue||!dateTime} style={{ borderRadius:14, padding:'16px 20px', fontSize:15, fontWeight:700, cursor:(title&&venue&&dateTime&&!saving)?'pointer':'not-allowed', border:'none', width:'100%', fontFamily:'inherit', background:(title&&venue&&dateTime)?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:(title&&venue&&dateTime)?'#fff':C.textLight, opacity:saving?.7:1, marginBottom:16 }}>
           {saving?'Envoi…':'Publier l\'événement 🎉'}
         </button>
       </div>
@@ -1017,7 +1641,7 @@ function MyEvents({ user, go }: { user:any; go:(s:Screen)=>void }) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Mes événements" onBack={()=>go('events')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
         {loading&&<p style={{ color:C.textLight, textAlign:'center', marginTop:32 }}>Chargement…</p>}
         {!loading&&events.length===0&&(
           <div style={{ textAlign:'center', marginTop:40 }}>
@@ -1046,6 +1670,7 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
   const open = (c:any) => {
     setSelectedClutch(c)
     if (c.receiver_id === user.id && c.status === 'pending') go('clutch-received')
+    else if (c.status === 'counter' && c.sender_id === user.id) go('clutch-received') // sender voit la contre-prop
     else if (c.status === 'accepted') go('rdv-active')
     else go('chat')
   }
@@ -1057,30 +1682,42 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
     </div>
   )
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
-      <div style={{ padding:'14px 20px 10px', borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div style={{ padding:'14px 20px 10px', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:C.bg, zIndex:5 }}>
         <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Messages</h2>
       </div>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div>
         {clutches.map((c:any)=>{
           const other=c.sender_id===user.id?c.receiver:c.sender
           const isReceived=c.receiver_id===user.id
           const isPending=c.status==='pending'
+          const isCounter=c.status==='counter'
           const isAccepted=c.status==='accepted'
+          const isExpired=isPending&&c.expires_at&&new Date(c.expires_at)<new Date()
+          if(isExpired) return null
+          const isCounterForMe = isCounter && c.sender_id===user.id // sender reçoit la contre-prop
+          const displayTime = isCounterForMe&&c.counter_time ? c.counter_time : c.proposed_time
+          const timeLabel=displayTime?fmtDate(displayTime):''
           return (
-            <button key={c.id} onClick={()=>open(c)} style={{ width:'100%', padding:'14px 20px', background:'none', border:'none', borderBottom:`1px solid ${C.border}`, display:'flex', gap:12, alignItems:'center', cursor:'pointer', textAlign:'left' }}>
+            <button key={c.id} onClick={()=>open(c)} style={{ width:'100%', padding:'14px 20px', background:isCounterForMe?C.purpleLight:'none', border:'none', borderBottom:`1px solid ${C.border}`, display:'flex', gap:12, alignItems:'center', cursor:'pointer', textAlign:'left' }}>
               <Avatar p={other||{}} size={46}/>
               <div style={{ flex:1 }}>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
                   <span style={{ fontWeight:700, color:C.text }}>{other?.name||'Utilisateur'}</span>
-                  <span style={{ fontSize:11, color:C.textLight }}>{new Date(c.created_at).toLocaleDateString('fr')}</span>
+                  <span style={{ fontSize:11, color:C.textLight }}>{timeLabel}</span>
                 </div>
-                <p style={{ fontSize:13, color:C.textMid, marginTop:2 }}>📍 {c.venue}</p>
+                <p style={{ fontSize:13, color:C.textMid, marginTop:2 }}>📍 {isCounterForMe&&c.counter_venue?c.counter_venue:c.venue}</p>
+                {isPending&&c.expires_at&&!isExpired&&(
+                  <p style={{ fontSize:11, color:C.peach, marginTop:2 }}>⏱ Expire {fmtDate(c.expires_at)}</p>
+                )}
+                {isCounter&&!isCounterForMe&&(
+                  <p style={{ fontSize:11, color:C.purple, marginTop:2 }}>🔄 Contre-proposition envoyée — en attente</p>
+                )}
               </div>
               <span style={{ fontSize:11, padding:'3px 8px', borderRadius:8, fontWeight:600, whiteSpace:'nowrap',
-                background:isAccepted?C.sageLight:isPending&&isReceived?C.primaryLight:C.bgDeep,
-                color:isAccepted?C.sage:isPending&&isReceived?C.primary:C.textLight }}>
-                {isAccepted?'✓ RDV':isPending&&isReceived?'⚡ Répondre':isPending?'En attente':'Terminé'}
+                background:isAccepted?C.sageLight:isCounterForMe?C.purple:isPending&&isReceived?C.primaryLight:C.bgDeep,
+                color:isAccepted?C.sage:isCounterForMe?'#fff':isPending&&isReceived?C.primary:C.textLight }}>
+                {isAccepted?'✓ RDV':isCounterForMe?'🔄 Répondre':isPending&&isReceived?'⚡ Répondre':isPending?'En attente':'Terminé'}
               </span>
             </button>
           )
@@ -1102,29 +1739,112 @@ function genTimeSlotsAvail() {
   const now=new Date(), slots:{label:string;iso:string}[]=[]
   const start=new Date(now); start.setSeconds(0,0)
   const m=start.getMinutes()
-  start.setMinutes(m<30?30:60)
-  if(m>=30) start.setHours(start.getHours()+1)
-  for(let i=0;i<=36;i++){
-    const t=new Date(start.getTime()+i*30*60000)
-    const h=t.getHours(), mn=t.getMinutes()
+  // Round UP to next 15-min mark without double-incrementing
+  const rem = 15 - (m % 15)
+  start.setMinutes(m + rem, 0, 0) // JS handles overflow automatically
+  for(let i=0;i<=72;i++){
+    const t=new Date(start.getTime()+i*15*60000)
     const diff=Math.round((t.getTime()-now.getTime())/60000)
-    if(diff>1080) break
-    slots.push({label:`${h}h${mn===0?'00':'30'} (dans ${diff<60?`${diff}min`:`${Math.floor(diff/60)}h`})`,iso:t.toISOString()})
+    if(diff>18*60) break
+    const h=t.getHours(), mn=t.getMinutes()
+    const diffLabel=diff<60?`+${diff}min`:`+${Math.floor(diff/60)}h${diff%60>0?String(diff%60).padStart(2,'0'):''}`
+    slots.push({label:`${h}h${String(mn).padStart(2,'0')} (${diffLabel})`,iso:t.toISOString()})
   }
   return slots
 }
-function fmtIsoTime(iso:string|null){
+function distKm(lat1:number,lng1:number,lat2:number,lng2:number){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+}
+function fmtDist(km:number){ return km<1?`${Math.round(km*1000)}m`:km<10?`${km.toFixed(1)}km`:`${Math.round(km)}km` }
+
+function fmtIsoTime(iso:string|null, showDate=false){
   if(!iso)return ''
   const d=new Date(iso); if(isNaN(d.getTime()))return ''
-  return `${d.getHours()}h${String(d.getMinutes()).padStart(2,'0')}`
+  const now=new Date()
+  const isToday=d.toDateString()===now.toDateString()
+  const tomorrow=new Date(now); tomorrow.setDate(now.getDate()+1)
+  const isTomorrow=d.toDateString()===tomorrow.toDateString()
+  const time=`${d.getHours()}h${String(d.getMinutes()).padStart(2,'0')}`
+  if(!showDate||isToday) return time
+  if(isTomorrow) return `Dem. ${time}`
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${time}`
+}
+function fmtDate(iso:string){
+  const d=new Date(iso); if(isNaN(d.getTime()))return ''
+  const now=new Date()
+  const isToday=d.toDateString()===now.toDateString()
+  const tomorrow=new Date(now); tomorrow.setDate(now.getDate()+1)
+  const isTomorrow=d.toDateString()===tomorrow.toDateString()
+  const time=`${d.getHours()}h${String(d.getMinutes()).padStart(2,'0')}`
+  if(isToday) return `Auj. ${time}`
+  if(isTomorrow) return `Dem. ${time}`
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${time}`
 }
 
 function MyProfile({ user, go, signOut, save }: any) {
   const [editBio,setEditBio]=useState(false); const [bio,setBio]=useState(user?.bio||''); const [saving,setSaving]=useState(false)
+  const [premiumLoading,setPremiumLoading]=useState(false)
+
+  const goPremium=async()=>{
+    setPremiumLoading(true)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch(`${SUPABASE_FUNCTIONS_URL}/create-checkout`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token}`}
+      })
+      const data=await res.json()
+      if(data.url) window.location.href=data.url
+      else alert(data.error||'Erreur Stripe')
+    }catch(e:any){alert('Erreur réseau: '+e?.message)}
+    setPremiumLoading(false)
+  }
   const [isAvailable,setIsAvailable]=useState(user?.is_available||false)
   const [editInterests,setEditInterests]=useState(false)
+  const [editProfile,setEditProfile]=useState(true)
   const [selInterests,setSelInterests]=useState<string[]>(user?.interests||[])
   const [editAvail,setEditAvail]=useState(false)
+  const [editInfo,setEditInfo]=useState(false)
+  const [job,setJob]=useState(user?.job||'')
+  const [neighborhood,setNeighborhood]=useState(user?.neighborhood||'')
+  const [photoPos,setPhotoPos]=useState<string>(user?.photo_pos||'center center')
+  const savePhotoPos=async(pos:string)=>{
+    setPhotoPos(pos)
+    await supabase.from('profiles').update({photo_pos:pos}).eq('id',user.id)
+    save({photo_pos:pos})
+  }
+  const [uploadingPhoto,setUploadingPhoto]=useState(false)
+  const photoRef=useRef<HTMLInputElement>(null)
+
+  const [photoErr,setPhotoErr]=useState('')
+  const uploadPhoto=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0]; if(!file||!user?.id) return
+    if(file.size>5*1024*1024){setPhotoErr('Image trop lourde (max 5MB)');setTimeout(()=>setPhotoErr(''),4000);return}
+    setUploadingPhoto(true);setPhotoErr('')
+    try{
+      const ext=file.name.split('.').pop()||'jpg'
+      const path=`${user.id}/avatar.${ext}`
+      const {error:upErr}=await supabase.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type})
+      if(upErr){setPhotoErr('Erreur upload: '+upErr.message);setUploadingPhoto(false);return}
+      const {data:{publicUrl}}=supabase.storage.from('avatars').getPublicUrl(path)
+      const {error:dbErr}=await supabase.from('profiles').update({photo_url:publicUrl+'?t='+Date.now()}).eq('id',user.id)
+      if(dbErr){setPhotoErr('Erreur profil: '+dbErr.message);setUploadingPhoto(false);return}
+      save({photo_url:publicUrl+'?t='+Date.now()})
+      setPhotoErr('✓ Photo mise à jour !')
+      setTimeout(()=>setPhotoErr(''),3000)
+    }catch(err:any){setPhotoErr('Erreur: '+(err?.message||'inconnue'));console.error(err)}
+    setUploadingPhoto(false)
+    if(photoRef.current) photoRef.current.value='' // reset pour permettre re-upload
+  }
+
+  const saveInfo=async()=>{
+    setSaving(true)
+    await supabase.from('profiles').update({job:job.trim(),neighborhood:neighborhood.trim()}).eq('id',user.id)
+    save({job:job.trim(),neighborhood:neighborhood.trim()})
+    setSaving(false);setEditInfo(false)
+  }
   const [availZone,setAvailZone]=useState(user?.available_city?.includes('(')?user.available_city.match(/\(([^)]+)\)/)?.[1]||'Centre':'Centre')
   const [availCity,setAvailCity]=useState(user?.available_city?.startsWith('Lausanne')?'Lausanne':user?.available_city||'Lausanne')
   const [availFrom,setAvailFrom]=useState('')  // ISO string from dropdown
@@ -1153,177 +1873,344 @@ function MyProfile({ user, go, signOut, save }: any) {
     },()=>{alert('Accès GPS refusé. Active la localisation dans les réglages.');setLocLoading(false)},{timeout:10000,enableHighAccuracy:true})
   }
   const saveBio=async()=>{setSaving(true);await supabase.from('profiles').update({bio}).eq('id',user.id);save({bio});setSaving(false);setEditBio(false)}
-  const toggleAvail=async()=>{const n=!isAvailable;setIsAvailable(n);await supabase.from('profiles').update({is_available:n}).eq('id',user.id);save({is_available:n})}
+  const toggleAvail=async()=>{
+    if(isAvailable){
+      // Désactivation → effacer toutes les données de dispo
+      setIsAvailable(false)
+      await supabase.from('profiles').update({is_available:false,available_from:null,available_until:null,available_city:null,available_modes:null}).eq('id',user.id)
+      save({is_available:false,available_from:null,available_until:null,available_city:null,available_modes:null})
+    } else {
+      // Activation → aller sur SetAvail avec la carte GPS (jamais juste toggle sans localisation)
+      go('set-avail')
+    }
+  }
   const saveAvail=async()=>{
     if(availModes.length===0){alert('Choisis au moins un type de rencontre');return}
     setSaving(true)
     const city=availCity==='Lausanne'?`Lausanne (${availZone})`:availCity
-    // Store as ISO timestamps (or empty = "maintenant")
     const fromIso = availFrom || new Date().toISOString()
-    // Auto-expire: available_until = min(chosen until, now + 18h)
     const maxUntil = new Date(Date.now()+18*60*60*1000).toISOString()
     const untilIso = availUntil && availUntil < maxUntil ? availUntil : maxUntil
-    await supabase.from('profiles').update({is_available:true,available_city:city,available_from:fromIso,available_until:untilIso,available_modes:availModes}).eq('id',user.id)
-    save({is_available:true,available_city:city,available_from:fromIso,available_until:untilIso,available_modes:availModes})
+    // Géolocalisation GPS
+    let geoUpdate: {lat?:number;lng?:number} = {}
+    try {
+      if (navigator.geolocation) {
+        const pos = await new Promise<GeolocationPosition>((res,rej)=>
+          navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000,enableHighAccuracy:false})
+        )
+        geoUpdate = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      }
+    } catch {}
+    await supabase.from('profiles').update({is_available:true,available_city:city,available_from:fromIso,available_until:untilIso,available_modes:availModes,...geoUpdate}).eq('id',user.id)
+    save({is_available:true,available_city:city,available_from:fromIso,available_until:untilIso,available_modes:availModes,...geoUpdate})
     setIsAvailable(true);setSaving(false);setEditAvail(false)
   }
   const saveInterests=async()=>{setSaving(true);await supabase.from('profiles').update({interests:selInterests}).eq('id',user.id);save({interests:selInterests});setSaving(false);setEditInterests(false)}
   const toggleInterest=(i:string)=>setSelInterests(p=>p.includes(i)?p.filter(x=>x!==i):p.length<5?[...p,i]:p)
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
-      <div style={{ background:`linear-gradient(160deg,${C.primaryLight},${C.peachLight})`, padding:'28px 20px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:12, flexShrink:0 }}>
-        <Avatar p={user||{}} size={80}/>
-        <div style={{ textAlign:'center' }}>
-          <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>{user?.name||'Mon profil'}{user?.age?`, ${user.age}`:''}</h2>
-          <p style={{ fontSize:13, color:C.textMid }}>📍 {user?.neighborhood||'Lausanne'}{user?.job?` · ${user.job}`:''}</p>
-        </div>
-        {/* Disponibilité toggle */}
-        <button onClick={toggleAvail} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 20px', borderRadius:20, border:`1.5px solid ${isAvailable?C.sage:C.border}`, background:isAvailable?C.sageLight:C.bgDeep, cursor:'pointer' }}>
-          <div style={{ width:36, height:20, borderRadius:10, background:isAvailable?C.sage:C.border, position:'relative', transition:'background 0.3s' }}>
-            <div style={{ width:16, height:16, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:isAvailable?18:2, transition:'left 0.3s' }}/>
-          </div>
-          <span style={{ fontSize:13, fontWeight:700, color:isAvailable?C.sage:C.textLight }}>{isAvailable?'● Je suis disponible':'○ Pas disponible'}</span>
-        </button>
-        <p style={{ fontSize:11, color:C.textLight, textAlign:'center' }}>Activé = tu apparais dans la liste des profils disponibles</p>
-        {/* Availability detail */}
-        <div style={{ width:'100%', padding:'0 4px' }}>
-          {!editAvail ? (
-            <button onClick={()=>setEditAvail(true)} style={{ width:'100%', padding:'10px 14px', borderRadius:12, border:`1px dashed ${C.border}`, background:'none', cursor:'pointer', color:C.primary, fontSize:13, fontWeight:600, fontFamily:'inherit', textAlign:'left' }}>
-              📍 {user?.available_city||'Lausanne'}
-              {user?.available_from&&fmtIsoTime(user.available_from)&&` · dès ${fmtIsoTime(user.available_from)}`}
-              {user?.available_until&&fmtIsoTime(user.available_until)&&` → ${fmtIsoTime(user.available_until)}`}
-              {' '}— Modifier
-              {(user?.available_modes||[]).length>0&&<><br/><span style={{fontSize:11,color:C.textLight}}>{(user.available_modes as string[]).map((m:string)=>AVAIL_MODES.find(x=>x.id===m)?.label||m).join(' · ')}</span></>}
-            </button>
-          ) : (
-            <div style={{ background:C.card, borderRadius:14, padding:14, border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', gap:10 }}>
-              <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>🤝 Je cherche à rencontrer</p>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {AVAIL_MODES.map(m=>(
-                  <button key={m.id} onClick={()=>toggleMode(m.id)} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, border:`1.5px solid ${availModes.includes(m.id)?C.primary:C.border}`, background:availModes.includes(m.id)?C.primaryLight:'none', cursor:'pointer', textAlign:'left' }}>
-                    <span style={{ fontSize:20 }}>{m.label.split(' ')[0]}</span>
-                    <div>
-                      <div style={{ fontWeight:700, color:availModes.includes(m.id)?C.primary:C.text, fontSize:13 }}>{m.label.split(' ').slice(1).join(' ')}</div>
-                      <div style={{ fontSize:11, color:C.textLight }}>{m.desc}</div>
-                    </div>
-                    {availModes.includes(m.id)&&<span style={{ marginLeft:'auto', color:C.primary }}>✓</span>}
-                  </button>
-                ))}
-              </div>
-              <button onClick={getGPS} disabled={locLoading} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.primary}`, background:C.primaryLight, color:C.primary, fontWeight:700, fontSize:13, cursor:locLoading?'not-allowed':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                {locLoading?'⏳ Localisation en cours…':'📍 Utiliser ma position GPS'}
-              </button>
-              {locLabel&&<p style={{ fontSize:12, color:C.sage, fontWeight:600, textAlign:'center' }}>✓ Position détectée : {locLabel}</p>}
-              <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>🏙️ Ou choisis manuellement</p>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {(['Lausanne',...SWISS_CITIES]).map(c=>(
-                  <button key={c} onClick={()=>setAvailCity(c)} style={{ padding:'5px 12px', borderRadius:20, border:`1.5px solid ${availCity===c?C.primary:C.border}`, background:availCity===c?C.primaryLight:'none', color:availCity===c?C.primary:C.textMid, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{c}</button>
-                ))}
-              </div>
-              {availCity==='Lausanne'&&<>
-                <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>📍 Quartier</p>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                  {LAUSANNE_ZONES.map(z=>(
-                    <button key={z} onClick={()=>setAvailZone(z)} style={{ padding:'5px 12px', borderRadius:20, border:`1.5px solid ${availZone===z?C.primary:C.border}`, background:availZone===z?C.primaryLight:'none', color:availZone===z?C.primary:C.textMid, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{z}</button>
-                  ))}
-                </div>
-              </>}
-              <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>⏰ Disponible à partir de</p>
-              <select value={availFrom} onChange={e=>setAvailFrom(e.target.value)} style={{ width:'100%', padding:'8px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13, fontFamily:'inherit', outline:'none' }}>
-                <option value="">Maintenant</option>
-                {timeSlots.map(t=><option key={t.iso} value={t.iso}>{t.label}</option>)}
-              </select>
-              <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>🔚 Jusqu'à (max 18h)</p>
-              <select value={availUntil} onChange={e=>setAvailUntil(e.target.value)} style={{ width:'100%', padding:'8px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13, fontFamily:'inherit', outline:'none' }}>
-                <option value="">18h max (auto)</option>
-                {timeSlots.map(t=><option key={t.iso} value={t.iso}>{t.label}</option>)}
-              </select>
-              <p style={{ fontSize:11, color:C.textLight }}>⚡ La disponibilité s'éteint automatiquement au bout de 18h max</p>
-              <div style={{ display:'flex', gap:8 }}>
-                <button onClick={saveAvail} disabled={saving} style={{ flex:1, padding:10, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.sage},#5A8A6A)`, color:'#fff', fontWeight:700, fontSize:13, cursor:saving?'not-allowed':'pointer', fontFamily:'inherit' }}>{saving?'…':'✓ Je suis dispo !'}</button>
-                <button onClick={()=>setEditAvail(false)} style={{ padding:'10px 14px', borderRadius:10, border:`1px solid ${C.border}`, background:'none', color:C.textMid, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Annuler</button>
-              </div>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', minHeight:0 }}>
+
+      {/* ── HEADER PHOTO compact ── */}
+      <div style={{ position:'relative', flexShrink:0, height:180 }}>
+        {user?.photo_url
+          ? <img src={user.photo_url} alt="" style={{ width:'100%', height:180, objectFit:'cover', objectPosition:photoPos, display:'block' }}/>
+          : <div style={{ width:'100%', height:180, background:`linear-gradient(160deg,${C.primaryLight},${C.peachLight})`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span style={{ fontSize:56, opacity:0.3 }}>☕</span>
             </div>
-          )}
+        }
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 55%)' }}/>
+        <div style={{ position:'absolute', bottom:12, left:14, right:52 }}>
+          <p style={{ fontSize:20, fontWeight:900, color:'#fff', letterSpacing:'-0.02em' }}>
+            {user?.name||'Mon profil'}{user?.age?`, ${user.age}`:''}
+          </p>
+          <p style={{ fontSize:11, color:'rgba(255,255,255,0.75)', marginTop:2 }}>
+            {user?.neighborhood||''}{user?.job?` · ${user.job}`:''}{!user?.neighborhood&&!user?.job?'Lausanne':''}
+          </p>
+          <div style={{ marginTop:4 }}><ReliabilityStars score={user?.reliability_score||100} light/></div>
         </div>
+        <button onClick={()=>photoRef.current?.click()}
+          style={{ position:'absolute', bottom:10, right:10, width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.18)', backdropFilter:'blur(8px)', border:'1.5px solid rgba(255,255,255,0.4)', color:'#fff', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+          {uploadingPhoto?'⏳':'📷'}
+        </button>
+        <input ref={photoRef} type="file" accept="image/*" onChange={uploadPhoto} style={{ display:'none' }}/>
+        {photoErr&&<div style={{ position:'absolute', top:10, left:'50%', transform:'translateX(-50%)', whiteSpace:'nowrap', background:photoErr.startsWith('✓')?C.sage:C.red, color:'#fff', fontSize:12, fontWeight:700, padding:'4px 14px', borderRadius:20, zIndex:10 }}>{photoErr}</div>}
       </div>
-      <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ background:C.card, borderRadius:16, padding:16, border:`1px solid ${C.border}` }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>À propos</p>
-            <button onClick={()=>setEditBio(!editBio)} style={{ background:'none', border:'none', color:C.primary, fontSize:13, cursor:'pointer', fontWeight:600 }}>{editBio?'Annuler':'Modifier'}</button>
-          </div>
-          {editBio
-            ? <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <textarea value={bio} onChange={e=>setBio(e.target.value)} rows={3} maxLength={140} style={{ width:'100%', border:`1.5px solid ${C.primary}`, borderRadius:10, padding:10, fontSize:14, fontFamily:'inherit', resize:'none', outline:'none', color:C.text, background:C.bgDeep, boxSizing:'border-box' }}/>
-                <Btn onClick={saveBio} loading={saving}>Sauvegarder</Btn>
-              </div>
-            : <p style={{ color:C.textMid, fontSize:14, lineHeight:1.6 }}>{user?.bio||'Ajoute une bio pour te présenter…'}</p>
-          }
-        </div>
-        <div style={{ background:C.card, borderRadius:16, padding:16, border:`1px solid ${C.border}` }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-            <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>Mes passions ({selInterests.length}/5)</p>
-            <button onClick={()=>setEditInterests(!editInterests)} style={{ background:'none', border:'none', color:C.primary, fontSize:13, cursor:'pointer', fontWeight:600, fontFamily:'inherit' }}>{editInterests?'Annuler':'Modifier'}</button>
-          </div>
-          {editInterests ? (
+
+      <div style={{ padding:'10px 14px 32px', display:'flex', flexDirection:'column', gap:10 }}>
+
+        {/* ── DISPONIBILITÉ ── Toggle SEUL — off→on = SetAvail */}
+        <div style={{ background:C.card, borderRadius:16, border:`1px solid ${C.border}` }}>
+          <button onClick={toggleAvail} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:16, background:'none', border:'none', cursor:'pointer', width:'100%', textAlign:'left' }}>
+            {/* Toggle pill */}
+            <div style={{ width:48, height:26, borderRadius:13, background:isAvailable?C.sage:C.border, position:'relative', transition:'background 0.25s', flexShrink:0 }}>
+              <div style={{ width:22, height:22, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:isAvailable?24:2, transition:'left 0.25s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
+            </div>
             <div>
-              {INTERESTS_CATS.map(cat=>(
-                <div key={cat.label} style={{ marginBottom:10 }}>
-                  <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em', marginBottom:6 }}>{cat.icon} {cat.label.toUpperCase()}</p>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                    {cat.items.map(item=>{const active=selInterests.includes(item);const disabled=!active&&selInterests.length>=5;return(
-                      <button key={item} onClick={()=>toggleInterest(item)} style={{ padding:'5px 12px', borderRadius:20, fontSize:12, border:'none', cursor:disabled?'not-allowed':'pointer', background:active?C.primary:C.bgDeep, color:active?'#fff':C.textMid, opacity:disabled?.4:1, fontFamily:'inherit', fontWeight:500 }}>{item}</button>
-                    )})}
-                  </div>
-                </div>
-              ))}
-              <Btn loading={saving} disabled={selInterests.length<3} onClick={saveInterests}>Sauvegarder les passions</Btn>
+              <p style={{ fontSize:15, fontWeight:800, color:isAvailable?C.sage:C.text }}>
+                {isAvailable ? '● Je suis disponible' : '○ Pas disponible'}
+              </p>
+              <p style={{ fontSize:11, color:C.textLight, marginTop:1 }}>
+                {isAvailable ? 'Visible dans Discover ✓' : 'Appuie pour te mettre dispo →'}
+              </p>
             </div>
-          ) : (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-              {selInterests.length>0
-                ? selInterests.map((i:string)=><span key={i} style={{ padding:'5px 13px', borderRadius:20, fontSize:13, background:C.primaryLight, color:C.primaryDark }}>{i}</span>)
-                : <p style={{ color:C.textLight, fontSize:13 }}>Ajoute tes passions pour apparaître dans les résultats.</p>
-              }
-            </div>
+          </button>
+          {isAvailable && (
+            <button onClick={()=>go('set-avail')} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 16px', margin:'0 8px 8px', borderRadius:12, background:C.sageLight, border:`1px solid ${C.sage}33`, cursor:'pointer', width:'calc(100% - 16px)' }}>
+              <div>
+                <p style={{ fontSize:12, color:C.sage, fontWeight:700 }}>
+                  📍 {user?.available_city||'Lausanne'}
+                  {user?.available_from&&fmtIsoTime(user.available_from)&&` · ${fmtIsoTime(user.available_from)}`}
+                  {user?.available_until&&fmtIsoTime(user.available_until)&&` → ${fmtIsoTime(user.available_until)}`}
+                </p>
+                {(user?.available_modes||[]).length>0&&<p style={{ fontSize:11, color:C.sage, marginTop:1 }}>
+                  {(user.available_modes as string[]).map((m:string)=>AVAIL_MODES.find(x=>x.id===m)?.label||m).join(' · ')}
+                </p>}
+              </div>
+              <span style={{ color:C.sage, fontWeight:700, fontSize:13, flexShrink:0, marginLeft:8 }}>Modifier →</span>
+            </button>
           )}
         </div>
-        {/* Share */}
-        <div style={{ background:C.card, borderRadius:16, padding:16, border:`1px solid ${C.border}` }}>
-          <p style={{ fontWeight:700, color:C.text, fontSize:14, marginBottom:12 }}>📤 Partager</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <button onClick={()=>shareIt({ title:'Mon profil Clutch', text:`Je suis sur Clutch, l'app des rencontres spontanées à Lausanne ! Rejoins-moi ☕`, url:APP_URL+'/app' })}
-              style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.bgDeep, cursor:'pointer', color:C.text, fontSize:13, fontWeight:600, textAlign:'left', fontFamily:'inherit' }}>
-              👤 Partager mon profil
+
+        {/* ── MODIFIER MON PROFIL — page dédiée ── */}
+        <button onClick={()=>go('edit-profile')}
+          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 18px', background:C.card, borderRadius:16, border:`1px solid ${C.border}`, cursor:'pointer', width:'100%', textAlign:'left' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            {user?.photo_url
+              ? <img src={user.photo_url} alt="" style={{ width:44, height:44, borderRadius:'50%', objectFit:'cover', objectPosition:photoPos, flexShrink:0 }}/>
+              : <div style={{ width:44, height:44, borderRadius:'50%', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span style={{ color:'#fff', fontSize:16, fontWeight:700 }}>{(user?.name||'?').slice(0,1)}</span>
+                </div>
+            }
+            <div>
+              <p style={{ fontWeight:800, color:C.text, fontSize:14 }}>Modifier mon profil</p>
+              <p style={{ fontSize:12, color:C.textLight, marginTop:1 }}>
+                {[user?.bio?'Bio':'', (user?.interests||[]).length>0?`${user.interests.length} passions`:''].filter(Boolean).join(' · ')||'Bio, passions, infos…'}
+              </p>
+            </div>
+          </div>
+          <span style={{ color:C.primary, fontSize:20, fontWeight:300 }}>›</span>
+        </button>
+
+        {/* ── ACTIONS ── */}
+        <button onClick={()=>go('get-certified')}
+          style={{ padding:'13px 16px', borderRadius:14, background:user?.certified?C.sageLight:C.bgDeep, border:`1.5px solid ${user?.certified?C.sage:C.border}`, cursor:'pointer', color:user?.certified?C.sage:C.textMid, fontWeight:700, fontSize:13, textAlign:'left', width:'100%' }}>
+          {user?.certified?'✅ Profil certifié':'✓ Certifier mon profil'}
+          {user?.certif_status==='pending'&&!user?.certified&&<span style={{ color:C.peach, marginLeft:6, fontSize:12 }}>· en attente</span>}
+        </button>
+        {/* ── PREMIUM (hommes seulement) ── */}
+        {user?.gender!=='female' && (
+          user?.is_premium ? (
+            <div style={{ padding:'13px 16px', borderRadius:14, background:'linear-gradient(135deg,#1a1a2e,#16213e)', border:'1.5px solid #C9A96E', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:20 }}>💎</span>
+              <div>
+                <p style={{ fontWeight:800, color:'#C9A96E', fontSize:13 }}>Premium actif</p>
+                <p style={{ fontSize:11, color:'#888', marginTop:1 }}>
+                  {user?.premium_until?`Valide jusqu'au ${new Date(user.premium_until).toLocaleDateString('fr-CH',{day:'numeric',month:'short'})}`:' '}
+                </p>
+              </div>
+              <span style={{ marginLeft:'auto', fontSize:11, color:'#C9A96E', fontWeight:700 }}>✓</span>
+            </div>
+          ) : (
+            <button onClick={goPremium} disabled={premiumLoading}
+              style={{ padding:'13px 16px', borderRadius:14, background:'linear-gradient(135deg,#1a1a2e,#2d1b69)', border:'1.5px solid #8B7CB8', cursor:'pointer', width:'100%', textAlign:'left', display:'flex', alignItems:'center', gap:10, opacity:premiumLoading?0.7:1 }}>
+              <span style={{ fontSize:20 }}>💎</span>
+              <div style={{ flex:1 }}>
+                <p style={{ fontWeight:800, color:'#C4B5F4', fontSize:13 }}>{premiumLoading?'Chargement…':'Passer Premium'}</p>
+                <p style={{ fontSize:11, color:'#8B7CB8', marginTop:1 }}>CHF 19.90/mois · Clutches illimités</p>
+              </div>
+              <span style={{ color:'#8B7CB8', fontSize:18 }}>›</span>
             </button>
-            <button onClick={()=>shareIt({ title:'Rejoins Clutch !', text:`Viens sur Clutch — l'app pour se retrouver en vrai dans les 18h à Lausanne ☕`, url:APP_URL })}
-              style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.primary}44`, background:C.primaryLight, cursor:'pointer', color:C.primary, fontSize:13, fontWeight:600, textAlign:'left', fontFamily:'inherit' }}>
-              ✉️ Inviter un(e) ami(e)
+          )
+        )}
+
+        <button onClick={()=>go('sos')}
+          style={{ padding:'13px 16px', borderRadius:14, background:C.redLight, border:`1.5px solid ${C.red}22`, cursor:'pointer', color:C.red, fontWeight:700, fontSize:14, textAlign:'left', width:'100%' }}>
+          🆘 SOS & Sécurité
+        </button>
+        <button onClick={signOut}
+          style={{ padding:'12px 16px', borderRadius:14, background:'none', border:`1.5px solid ${C.border}`, cursor:'pointer', color:C.textLight, fontSize:13, width:'100%' }}>
+          Se déconnecter
+        </button>
+        <a href="/" style={{ display:'block', textAlign:'center', padding:10, color:C.textLight, fontSize:12, textDecoration:'none' }}>← Retour au site</a>
+        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v06.06-AQ</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── EDIT PROFILE — page dédiée ──────────────────────────────────────────────
+function EditProfile({ user, go, save }: any) {
+  const [bio,setBio]=useState(user?.bio||'')
+  const [job,setJob]=useState(user?.job||'')
+  const [neighborhood,setNeighborhood]=useState(user?.neighborhood||'')
+  const [selInterests,setSelInterests]=useState<string[]>(user?.interests||[])
+  const [photoPos,setPhotoPos]=useState<string>(user?.photo_pos||'center center')
+  const [saving,setSaving]=useState(false)
+  const [saved,setSaved]=useState('')
+  const photoRef=useRef<HTMLInputElement>(null)
+  const [uploadingPhoto,setUploadingPhoto]=useState(false)
+  const [photoErr,setPhotoErr]=useState('')
+
+  const uploadPhoto=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0]; if(!file||!user?.id) return
+    if(file.size>5*1024*1024){setPhotoErr('Image trop lourde (max 5MB)');return}
+    setUploadingPhoto(true);setPhotoErr('')
+    try{
+      const ext=file.name.split('.').pop()||'jpg'
+      const path=`${user.id}/avatar.${ext}`
+      const {error:upErr}=await supabase.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type})
+      if(upErr){setPhotoErr('Erreur upload');setUploadingPhoto(false);return}
+      const {data:{publicUrl}}=supabase.storage.from('avatars').getPublicUrl(path)
+      const url=publicUrl+'?t='+Date.now()
+      await supabase.from('profiles').update({photo_url:url}).eq('id',user.id)
+      save({photo_url:url})
+      setSaved('✓ Photo mise à jour')
+      setTimeout(()=>setSaved(''),3000)
+    }catch(err:any){setPhotoErr('Erreur')}
+    setUploadingPhoto(false)
+    if(photoRef.current) photoRef.current.value=''
+  }
+  const savePhotoPos=async(pos:string)=>{
+    setPhotoPos(pos)
+    await supabase.from('profiles').update({photo_pos:pos}).eq('id',user.id)
+    save({photo_pos:pos})
+  }
+  const saveAll=async()=>{
+    setSaving(true)
+    await supabase.from('profiles').update({bio:bio.trim(),job:job.trim(),neighborhood:neighborhood.trim(),interests:selInterests}).eq('id',user.id)
+    save({bio:bio.trim(),job:job.trim(),neighborhood:neighborhood.trim(),interests:selInterests})
+    setSaving(false)
+    go('myprofile')
+  }
+  const toggleInterest=(i:string)=>setSelInterests(p=>p.includes(i)?p.filter(x=>x!==i):p.length<5?[...p,i]:p)
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bgDeep, minHeight:0 }}>
+      <TopBar title="Mon profil" onBack={()=>go('myprofile')}
+        right={saved?<span style={{ fontSize:12, color:C.sage, fontWeight:700 }}>{saved}</span>:undefined}/>
+
+      <div style={{ flex:1, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 14px 40px', display:'flex', flexDirection:'column', gap:14 }}>
+
+        {/* Photo */}
+        <div style={{ background:C.card, borderRadius:18, overflow:'hidden', border:`1px solid ${C.border}` }}>
+          <div style={{ position:'relative', height:200 }}>
+            {user?.photo_url
+              ? <img src={user.photo_url} alt="" style={{ width:'100%', height:200, objectFit:'cover', objectPosition:photoPos, display:'block' }}/>
+              : <div style={{ height:200, background:`linear-gradient(160deg,${C.primaryLight},${C.peachLight})`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <span style={{ fontSize:64, opacity:0.3 }}>📷</span>
+                </div>
+            }
+            <button onClick={()=>photoRef.current?.click()}
+              style={{ position:'absolute', bottom:12, right:12, padding:'8px 16px', borderRadius:20, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,0.3)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+              {uploadingPhoto?'Envoi…':'📷 Changer la photo'}
             </button>
-            <button onClick={()=>shareIt({ title:'Clutch — rencontres spontanées', text:`Essaie la démo Clutch — l'app des RDV physiques dans les 18h à Lausanne ☕`, url:APP_URL+'/demo' })}
-              style={{ padding:'11px 14px', borderRadius:12, border:`1.5px solid ${C.border}`, background:C.bgDeep, cursor:'pointer', color:C.textMid, fontSize:13, fontWeight:600, textAlign:'left', fontFamily:'inherit' }}>
-              🎬 Partager la démo
-            </button>
+            <input ref={photoRef} type="file" accept="image/*" onChange={uploadPhoto} style={{ display:'none' }}/>
+          </div>
+          {user?.photo_url && (
+            <div style={{ padding:'12px 14px', display:'flex', gap:8 }}>
+              <p style={{ fontSize:11, color:C.textLight, fontWeight:700, letterSpacing:'0.06em', alignSelf:'center', marginRight:4 }}>CADRAGE</p>
+              {[{v:'center top',l:'🔝 Haut'},{v:'center center',l:'🎯 Centre'},{v:'center bottom',l:'⬇️ Bas'}].map(opt=>(
+                <button key={opt.v} onClick={()=>savePhotoPos(opt.v)}
+                  style={{ flex:1, padding:'7px 4px', borderRadius:10, border:`1.5px solid ${photoPos===opt.v?C.primary:C.border}`, background:photoPos===opt.v?C.primaryLight:'transparent', color:photoPos===opt.v?C.primary:C.textMid, fontSize:11, fontWeight:photoPos===opt.v?700:400, cursor:'pointer', fontFamily:'inherit' }}>
+                  {opt.l}
+                </button>
+              ))}
+            </div>
+          )}
+          {photoErr&&<p style={{ padding:'0 14px 10px', color:C.red, fontSize:12 }}>{photoErr}</p>}
+        </div>
+
+        {/* Infos de base */}
+        <div style={{ background:C.card, borderRadius:18, padding:'16px 16px', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', gap:12 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em' }}>INFOS</p>
+          <div>
+            <p style={{ fontSize:11, color:C.textLight, marginBottom:6 }}>Prénom · {user?.age?`${user.age} ans`:'âge'}</p>
+            <div style={{ padding:'10px 14px', borderRadius:12, background:C.bgDeep, border:`1px solid ${C.border}`, color:C.textMid, fontSize:14 }}>
+              {user?.name||'—'}{user?.age?`, ${user.age} ans`:''}
+              <span style={{ fontSize:11, color:C.textLight, marginLeft:8 }}>(modifiable depuis les réglages du compte)</span>
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize:11, color:C.textLight, marginBottom:6 }}>Métier</p>
+            <input value={job} onChange={e=>setJob(e.target.value)} placeholder="Ex: Designer, Étudiant, Barista…"
+              style={{ width:'100%', padding:'10px 14px', borderRadius:12, border:`1.5px solid ${job?C.primary:C.border}`, background:C.bg, fontSize:14, color:C.text, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}/>
+          </div>
+          <div>
+            <p style={{ fontSize:11, color:C.textLight, marginBottom:6 }}>Quartier / Ville</p>
+            <input value={neighborhood} onChange={e=>setNeighborhood(e.target.value)} placeholder="Ex: Flon, Lausanne, Genève…"
+              style={{ width:'100%', padding:'10px 14px', borderRadius:12, border:`1.5px solid ${neighborhood?C.primary:C.border}`, background:C.bg, fontSize:14, color:C.text, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}/>
           </div>
         </div>
-        {/* Certification */}
-        <button onClick={()=>go('get-certified')} style={{ padding:13, borderRadius:14, background:user?.certified?C.sageLight:C.bgDeep, border:`1.5px solid ${user?.certified?C.sage:C.border}`, cursor:'pointer', color:user?.certified?C.sage:C.textMid, fontWeight:700, fontSize:13, textAlign:'left' }}>
-          {user?.certified?'✅ Profil certifié':'✓ Certifier mon profil — boostez vos clutches'}
-          {user?.certif_status==='pending'&&!user?.certified&&<span style={{ color:C.peach, marginLeft:6, fontSize:12 }}>· en attente de vérification</span>}
+
+        {/* Bio */}
+        <div style={{ background:C.card, borderRadius:18, padding:'16px', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', gap:10 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em' }}>À PROPOS DE MOI</p>
+          <textarea value={bio} onChange={e=>setBio(e.target.value.slice(0,140))} rows={4}
+            placeholder="Décris-toi en quelques mots. Ce qui te rend unique. Pourquoi tu es sur Clutch."
+            style={{ width:'100%', border:`1.5px solid ${bio?C.primary:C.border}`, borderRadius:12, padding:'10px 14px', fontSize:14, fontFamily:'inherit', resize:'none', outline:'none', color:C.text, background:C.bg, boxSizing:'border-box', lineHeight:1.6 }}/>
+          <p style={{ fontSize:11, color:C.textLight, textAlign:'right' }}>{bio.length}/140</p>
+        </div>
+
+        {/* Passions */}
+        <div style={{ background:C.card, borderRadius:18, padding:'16px', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <p style={{ fontSize:11, fontWeight:700, color:C.textLight, letterSpacing:'0.08em' }}>MES PASSIONS</p>
+            <span style={{ fontSize:12, color:selInterests.length>=5?C.primary:C.textLight }}>{selInterests.length}/5 sélectionnées</span>
+          </div>
+          {selInterests.length>0&&(
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {selInterests.map(i=>(
+                <button key={i} onClick={()=>toggleInterest(i)}
+                  style={{ padding:'5px 14px', borderRadius:20, fontSize:12, border:`1.5px solid ${C.primary}`, background:C.primaryLight, color:C.primaryDark, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                  {i} ×
+                </button>
+              ))}
+            </div>
+          )}
+          {INTERESTS_CATS.map(cat=>(
+            <div key={cat.label}>
+              <p style={{ fontSize:11, fontWeight:700, color:C.textLight, marginBottom:6 }}>{cat.icon} {cat.label}</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {cat.items.map(item=>{
+                  const active=selInterests.includes(item)
+                  const disabled=!active&&selInterests.length>=5
+                  return(
+                    <button key={item} onClick={()=>toggleInterest(item)}
+                      style={{ padding:'5px 12px', borderRadius:20, fontSize:12, border:'none', cursor:disabled?'not-allowed':'pointer', background:active?C.primary:C.bgDeep, color:active?'#fff':C.textMid, opacity:disabled?.35:1, fontFamily:'inherit' }}>
+                      {item}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bouton sauvegarder */}
+        <button onClick={saveAll} disabled={saving}
+          style={{ padding:'15px', borderRadius:16, border:'none', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, color:'#fff', fontWeight:800, fontSize:16, cursor:saving?'not-allowed':'pointer', fontFamily:'inherit', boxShadow:`0 4px 20px ${C.primary}44` }}>
+          {saving?'Sauvegarde…':'✓ Sauvegarder mon profil'}
         </button>
-        <button onClick={()=>go('sos')} style={{ padding:13, borderRadius:14, background:C.redLight, border:`1.5px solid ${C.red}33`, cursor:'pointer', color:C.red, fontWeight:700, fontSize:14 }}>🆘 SOS & Sécurité</button>
-        <button onClick={signOut} style={{ padding:12, borderRadius:14, background:'none', border:`1.5px solid ${C.border}`, cursor:'pointer', color:C.textLight, fontSize:13 }}>Se déconnecter</button>
       </div>
     </div>
   )
 }
 
 // ─── CLUTCH RECEIVED ──────────────────────────────────────────────────────────
-function ClutchReceived({ clutch, user, go, refresh }: any) {
+function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
   const [loading, setLoading] = useState<string|null>(null)
+  const [countering, setCountering] = useState(false)
+  const [counterTime, setCounterTime] = useState('')
+  const [counterVenue, setCounterVenue] = useState('')
+  const [counterSlots] = useState(()=>genTimeSlotsAvail())
   if (!clutch) return null
-  const sender = clutch.sender
+
+  // Mode counter-reçu : l'expéditeur original voit la contre-proposition
+  const isCounterMode = clutch.status === 'counter' && clutch.sender_id === user?.id
+  const sender = isCounterMode ? clutch.receiver : clutch.sender
+  const displayTime = isCounterMode && clutch.counter_time ? clutch.counter_time : clutch.proposed_time
+  const displayVenue = isCounterMode && clutch.counter_venue ? clutch.counter_venue : clutch.venue
+
   const expires = clutch.expires_at ? new Date(clutch.expires_at) : null
   const msLeft = expires ? expires.getTime() - Date.now() : 0
   const hLeft = Math.max(0, Math.floor(msLeft/3600000))
@@ -1331,18 +2218,44 @@ function ClutchReceived({ clutch, user, go, refresh }: any) {
 
   const respond = async (status: 'accepted'|'declined') => {
     setLoading(status)
-    await supabase.from('clutches').update({ status }).eq('id', clutch.id)
+    const update: any = { status }
+    if (status === 'accepted' && isCounterMode && clutch.counter_time) {
+      // Accepter la contre-prop → mettre à jour proposed_time avec le counter
+      update.proposed_time = clutch.counter_time
+      if (clutch.counter_venue) update.venue = clutch.counter_venue
+    }
+    await supabase.from('clutches').update(update).eq('id', clutch.id)
     refresh()
-    if (status === 'accepted') go('rdv-active')
-    else go('inbox')
+    if (status === 'accepted') {
+      const notifTarget = isCounterMode ? clutch.receiver_id : clutch.sender_id
+      const notifName = isCounterMode ? clutch.receiver?.name : clutch.sender?.name
+      sendPush?.(notifTarget, `🔒 Verrou confirmé avec ${user.name} !`, `RDV au ${displayVenue}. À tout de suite ☕`)
+      go('rdv-active')
+    } else { go('inbox') }
     setLoading(null)
   }
+
+  const sendCounter = async () => {
+    if (!counterTime) return
+    setLoading('counter')
+    await supabase.from('clutches').update({
+      status: 'counter',
+      counter_time: counterTime,
+      counter_venue: counterVenue || clutch.venue,
+      counter_by: user.id,
+    }).eq('id', clutch.id)
+    sendPush?.(clutch.sender_id, `🔄 Contre-proposition de ${user.name}`, `Nouveau créneau proposé — réponds vite !`)
+    refresh()
+    go('inbox')
+    setLoading(null)
+  }
+
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
-      <TopBar title="Clutch reçu ☕" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+      <TopBar title={isCounterMode ? '🔄 Contre-proposition reçue' : 'Tu as été clutché·e ☕'} onBack={()=>go('inbox')}/>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Sender card */}
-        <div style={{ background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, borderRadius:20, padding:20, display:'flex', gap:14, alignItems:'center' }}>
+        <div style={{ background:`linear-gradient(135deg,${isCounterMode?C.purpleLight:C.primaryLight},${C.peachLight})`, borderRadius:20, padding:20, display:'flex', gap:14, alignItems:'center' }}>
           <Avatar p={sender||{}} size={60}/>
           <div>
             <p style={{ fontWeight:800, fontSize:18, color:C.text }}>{sender?.name||'?'}</p>
@@ -1350,31 +2263,68 @@ function ClutchReceived({ clutch, user, go, refresh }: any) {
             {sender?.reliability_score!=null&&<p style={{ fontSize:12, color:C.sage, fontWeight:600 }}>✓ Fiabilité {sender.reliability_score}%</p>}
           </div>
         </div>
+
         {/* RDV details */}
-        <div style={{ background:C.card, borderRadius:16, padding:16, border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ background:C.card, borderRadius:16, padding:16, border:`1px solid ${isCounterMode?C.purple:C.border}`, display:'flex', flexDirection:'column', gap:8 }}>
+          {isCounterMode && <p style={{ fontSize:12, color:C.purple, fontWeight:700 }}>🔄 Nouveau créneau proposé par {sender?.name}</p>}
           <div style={{ display:'flex', gap:12 }}>
             <span style={{ fontSize:20 }}>📍</span>
-            <div><p style={{ fontWeight:700, fontSize:14, color:C.text }}>{clutch.venue}</p><SafetyBadge safety={clutch.venue_safety||'safe'}/></div>
+            <div><p style={{ fontWeight:700, fontSize:14, color:C.text }}>{displayVenue}</p><SafetyBadge safety={clutch.venue_safety||'safe'}/></div>
           </div>
           <div style={{ display:'flex', gap:12 }}>
             <span style={{ fontSize:20 }}>🕐</span>
-            <p style={{ fontSize:14, color:C.text, fontWeight:600 }}>{new Date(clutch.proposed_time).toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+            <p style={{ fontSize:14, color:C.text, fontWeight:600 }}>{new Date(displayTime).toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
           </div>
+          {isCounterMode && clutch.proposed_time !== clutch.counter_time && (
+            <p style={{ fontSize:11, color:C.textLight, textDecoration:'line-through' }}>Ancienne heure : {new Date(clutch.proposed_time).toLocaleString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</p>
+          )}
         </div>
+
         {/* Message */}
-        <div style={{ background:C.bgDeep, borderRadius:14, padding:'14px 16px', borderLeft:`3px solid ${C.primary}` }}>
-          <p style={{ fontSize:12, color:C.textLight, marginBottom:6 }}>Message de {sender?.name}</p>
-          <p style={{ fontSize:14, color:C.text, lineHeight:1.6, fontStyle:'italic' }}>"{clutch.message}"</p>
-        </div>
+        {!isCounterMode && (
+          <div style={{ background:C.bgDeep, borderRadius:14, padding:'14px 16px', borderLeft:`3px solid ${C.primary}` }}>
+            <p style={{ fontSize:12, color:C.textLight, marginBottom:6 }}>Message de {sender?.name}</p>
+            <p style={{ fontSize:14, color:C.text, lineHeight:1.6, fontStyle:'italic' }}>"{clutch.message}"</p>
+          </div>
+        )}
+
         {/* Countdown */}
         {msLeft > 0 && <div style={{ background:C.primaryLight, borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
           <p style={{ fontSize:12, color:C.primary, fontWeight:700 }}>⏳ Tu as {hLeft}h{String(mLeft).padStart(2,'0')} pour répondre</p>
         </div>}
+
+        {/* Counter-propose panel */}
+        {countering && !isCounterMode && (
+          <div style={{ background:C.purpleLight, borderRadius:16, padding:16, border:`1px solid ${C.purple}44` }}>
+            <p style={{ fontWeight:700, color:C.purple, fontSize:14, marginBottom:12 }}>🔄 Propose une autre heure</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:200, overflowY:'scroll', marginBottom:12 }}>
+              {counterSlots.map(s=>(
+                <button key={s.iso} onClick={()=>setCounterTime(s.iso)} style={{ padding:'10px 14px', borderRadius:10, border:`1.5px solid ${counterTime===s.iso?C.purple:C.border}`, background:counterTime===s.iso?C.purple:'#fff', color:counterTime===s.iso?'#fff':C.text, fontSize:13, fontWeight:counterTime===s.iso?700:400, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <input value={counterVenue} onChange={e=>setCounterVenue(e.target.value)} placeholder={`Lieu (défaut: ${clutch.venue})`}
+              style={{ width:'100%', padding:'10px 14px', borderRadius:10, border:`1px solid ${C.border}`, background:'#fff', fontSize:13, color:C.text, fontFamily:'inherit', outline:'none', boxSizing:'border-box', marginBottom:10 }}/>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setCountering(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${C.border}`, background:'none', color:C.textMid, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Annuler</button>
+              <button onClick={sendCounter} disabled={!counterTime||loading==='counter'} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:counterTime?C.purple:C.bgDeep, color:counterTime?'#fff':C.textLight, fontWeight:700, fontSize:13, cursor:counterTime?'pointer':'not-allowed', fontFamily:'inherit' }}>
+                {loading==='counter'?'…':'Envoyer la contre-prop →'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
       <div style={{ padding:'12px 20px 28px', display:'flex', flexDirection:'column', gap:10 }}>
         <button onClick={()=>respond('accepted')} disabled={!!loading} style={{ padding:'15px', borderRadius:14, border:'none', background:loading?C.bgDeep:`linear-gradient(135deg,${C.sage},#5A8A6A)`, color:loading?C.textLight:'#fff', fontWeight:800, fontSize:16, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit' }}>
-          {loading==='accepted'?'…':'✓ Accepter le RDV'}
+          {loading==='accepted'?'…':'🔒 Verrouiller le RDV'}
         </button>
+        {!isCounterMode && !countering && (
+          <button onClick={()=>setCountering(true)} style={{ padding:'12px', borderRadius:14, border:`1.5px solid ${C.purple}44`, background:C.purpleLight, color:C.purple, fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+            🔄 Contre-proposer une heure
+          </button>
+        )}
         <button onClick={()=>respond('declined')} disabled={!!loading} style={{ padding:'12px', borderRadius:14, border:`1.5px solid ${C.red}33`, background:C.redLight, color:C.red, fontWeight:700, fontSize:14, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit' }}>
           {loading==='declined'?'…':'✕ Refuser'}
         </button>
@@ -1388,7 +2338,9 @@ function Chat({ clutch, user, go }: any) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
-  const MSG_LIMIT = 8
+  // Freemium: femmes + premium = 20 msgs, hommes free = 5 msgs (pousse au vrai RDV)
+  const isPremiumUser = user?.is_premium || user?.gender === 'female' || ['premium','partner','admin'].includes(user?.account_type||'')
+  const MSG_LIMIT = isPremiumUser ? 20 : 5
   if (!clutch) return null
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
 
@@ -1418,9 +2370,10 @@ function Chat({ clutch, user, go }: any) {
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title={other?.name||'Chat'} onBack={()=>go('inbox')}/>
       <div style={{ padding:'6px 16px', background:C.bgDeep, fontSize:11, color:C.textMid, textAlign:'center' }}>
-        📍 {clutch.venue} · {MSG_LIMIT - messages.length} message{MSG_LIMIT - messages.length > 1?'s':''} restant{MSG_LIMIT - messages.length > 1?'s':''}
+        📍 {clutch.venue} · {Math.max(0, MSG_LIMIT - messages.length)} message{Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''} restant{Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''}
+        {!isPremiumUser && <span style={{ color:C.purple, marginLeft:6 }}>· 💎 Premium = 20 msgs</span>}
       </div>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
         {messages.map(m=>{
           const isMine = m.sender_id === user.id
           return (
@@ -1453,63 +2406,157 @@ function Chat({ clutch, user, go }: any) {
 // ─── RDV ACTIVE ───────────────────────────────────────────────────────────────
 function RdvActive({ clutch, user, go, refresh }: any) {
   const [countdown, setCountdown] = useState(0)
+  const [myPos, setMyPos] = useState<{lat:number;lng:number}|null>(null)
+  const [otherPos, setOtherPos] = useState<{lat:number;lng:number}|null>(null)
+  const [distance, setDistance] = useState<number|null>(null)
+  const [merged, setMerged] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   if (!clutch) return null
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
   const meetTime = new Date(clutch.proposed_time)
 
+  // Countdown
   useEffect(()=>{
     const update = () => setCountdown(Math.max(0, meetTime.getTime() - Date.now()))
-    update()
-    const t = setInterval(update, 1000)
-    return ()=>clearInterval(t)
+    update(); const t = setInterval(update, 1000); return ()=>clearInterval(t)
   },[])
 
+  const isNow = countdown <= 0
   const h = Math.floor(countdown/3600000)
   const m = Math.floor((countdown%3600000)/60000)
   const s = Math.floor((countdown%60000)/1000)
-  const isNow = countdown <= 0
 
-  const cancel = async () => {
-    await supabase.from('clutches').update({ status:'cancelled' }).eq('id', clutch.id)
+  // GPS Realtime — s'active à l'heure du RDV
+  useEffect(()=>{
+    if (!isNow) return
+    const ch = supabase.channel(`prox-${clutch.id}`)
+      .on('broadcast',{event:'pos'},({payload})=>{
+        if(payload.uid!==user.id) setOtherPos({lat:payload.lat,lng:payload.lng})
+      })
+      .subscribe()
+    const wid = navigator.geolocation?.watchPosition(pos=>{
+      const {latitude:lat,longitude:lng} = pos.coords
+      setMyPos({lat,lng})
+      ch.send({type:'broadcast',event:'pos',payload:{lat,lng,uid:user.id}})
+    },null,{enableHighAccuracy:true,maximumAge:8000})
+    return ()=>{ supabase.removeChannel(ch); navigator.geolocation?.clearWatch(wid) }
+  },[isNow])
+
+  // Haversine distance
+  useEffect(()=>{
+    if(!myPos||!otherPos) return
+    const R=6371000
+    const φ1=myPos.lat*Math.PI/180, φ2=otherPos.lat*Math.PI/180
+    const Δφ=(otherPos.lat-myPos.lat)*Math.PI/180, Δλ=(otherPos.lng-myPos.lng)*Math.PI/180
+    const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
+    const d=Math.round(2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)))
+    setDistance(d)
+    if(d<=50&&!merged){
+      setMerged(true)
+      const field=clutch.sender_id===user.id?'checked_in_sender':'checked_in_receiver'
+      supabase.from('clutches').update({[field]:true,status:'completed'}).eq('id',clutch.id)
+      refresh()
+      setTimeout(()=>setShowFeedback(true),3500)
+    }
+  },[myPos,otherPos])
+
+  const cancel = async()=>{
+    await supabase.from('clutches').update({status:'cancelled'}).eq('id',clutch.id)
     refresh(); go('inbox')
   }
-  const checkin = async () => {
-    const field = clutch.sender_id===user.id ? 'checked_in_sender' : 'checked_in_receiver'
-    await supabase.from('clutches').update({ [field]:true, status:'completed' }).eq('id', clutch.id)
+  const manualCheckin = async()=>{
+    const field=clutch.sender_id===user.id?'checked_in_sender':'checked_in_receiver'
+    await supabase.from('clutches').update({[field]:true,status:'completed'}).eq('id',clutch.id)
     refresh(); go('feedback')
   }
 
+  // Dark theme — "mission mode"
+  const D = {bg:'#0A0A0A',card:'#141414',border:'#252525',text:'#FFFFFF',mid:'#9CA3AF',dim:'#6B7280',amber:'#F59E0B',green:'#22C55E'}
+
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
-      <TopBar title="RDV confirmé ✓" onBack={()=>go('inbox')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ background:`linear-gradient(135deg,${C.sageLight},${C.bgDeep})`, borderRadius:20, padding:20, textAlign:'center' }}>
-          <div style={{ fontSize:48, marginBottom:8 }}>☕</div>
-          <p style={{ fontWeight:800, fontSize:17, color:C.text, marginBottom:4 }}>RDV avec {other?.name}</p>
-          <p style={{ fontSize:13, color:C.textMid }}>📍 {clutch.venue}</p>
-          <p style={{ fontSize:13, color:C.textMid, marginTop:4 }}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:D.bg}}>
+      {/* TopBar dark avec logo */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px 10px',background:D.bg,borderBottom:`1px solid ${D.border}`,flexShrink:0}}>
+        <button onClick={()=>go('inbox')} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:D.dim,minWidth:40}}>←</button>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <CclutchLogo size={28}/>
+          <span style={{fontWeight:800,fontSize:15,color:D.text,letterSpacing:'-0.02em'}}>Verrou confirmé</span>
         </div>
-        {!isNow && (
-          <div style={{ background:C.card, border:`1.5px solid ${C.primary}44`, borderRadius:18, padding:20, textAlign:'center' }}>
-            <p style={{ fontSize:12, color:C.textLight, marginBottom:6 }}>Rendez-vous dans</p>
-            <p style={{ fontSize:36, fontWeight:900, color:C.primary, letterSpacing:'-0.03em' }}>
-              {h>0?`${h}h `:''}{String(m).padStart(2,'0')}m {String(s).padStart(2,'0')}s
-            </p>
-          </div>
-        )}
-        {isNow && (
-          <div style={{ background:C.sageLight, borderRadius:18, padding:20, textAlign:'center' }}>
-            <p style={{ fontSize:18, fontWeight:800, color:C.sage }}>C'est l'heure ! 🎉</p>
-            <p style={{ color:C.textMid, fontSize:13, marginTop:6 }}>Tu es arrivé·e ?</p>
-          </div>
-        )}
-        <button onClick={()=>shareIt({ title:'Mon RDV ce soir', text:`Je suis à ${clutch.venue} pour un café avec quelqu'un via Clutch. Je te tiens au courant 😊`, url:`https://maps.google.com/?q=${encodeURIComponent(clutch.venue+' Lausanne')}` })} style={{ padding:'12px', borderRadius:14, background:C.bgDeep, border:`1px solid ${C.border}`, cursor:'pointer', color:C.textMid, fontWeight:600, fontSize:13, fontFamily:'inherit' }}>📤 Partager mon lieu avec un proche</button>
-        <button onClick={()=>go('sos')} style={{ padding:'12px', borderRadius:14, background:C.redLight, border:`1.5px solid ${C.red}33`, cursor:'pointer', color:C.red, fontWeight:700, fontSize:14, fontFamily:'inherit' }}>🆘 SOS · Sécurité</button>
-        <button onClick={()=>{ setSelectedClutch_HACK(clutch); go('chat') }} style={{ padding:12, borderRadius:14, background:C.bgDeep, border:`1px solid ${C.border}`, cursor:'pointer', color:C.textMid, fontSize:13, fontFamily:'inherit' }}>💬 Envoyer un message</button>
+        <div style={{minWidth:40}}/>
       </div>
-      <div style={{ padding:'10px 20px 28px', display:'flex', flexDirection:'column', gap:10 }}>
-        {isNow && <button onClick={checkin} style={{ padding:14, borderRadius:14, border:'none', background:`linear-gradient(135deg,${C.sage},#5A8A6A)`, color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>✓ Je suis arrivé·e (check-in)</button>}
-        <button onClick={cancel} style={{ padding:11, borderRadius:12, background:'none', border:`1.5px solid ${C.border}`, color:C.textLight, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>Annuler le RDV</button>
+
+      <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',padding:'14px 18px 28px',display:'flex',flexDirection:'column',gap:12}}>
+
+        {/* Carte personne */}
+        <div style={{display:'flex',alignItems:'center',gap:14,background:D.card,borderRadius:20,padding:'14px 18px',border:`1px solid ${D.border}`}}>
+          <Avatar p={other||{}} size={50}/>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{fontWeight:900,fontSize:18,color:D.text}}>{other?.name}</p>
+            <p style={{fontSize:12,color:D.mid,marginTop:2}}>📍 {clutch.venue}</p>
+            <p style={{fontSize:12,color:D.mid}}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+          </div>
+          <ReliabilityStars score={other?.reliability_score||100} light/>
+        </div>
+
+        {/* Countdown ou Proximity Meter */}
+        {!isNow ? (
+          <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:24,padding:'28px 20px',textAlign:'center'}}>
+            <p style={{fontSize:11,color:D.dim,letterSpacing:'0.12em',fontWeight:700,marginBottom:14,textTransform:'uppercase'}}>Rendez-vous dans</p>
+            <div style={{fontSize:54,fontWeight:900,color:D.text,letterSpacing:'-0.04em',lineHeight:1,marginBottom:10}}>
+              {h>0&&<><span style={{color:D.amber}}>{h}</span><span style={{fontSize:26,color:D.dim}}>h </span></>}
+              <span style={{color:D.amber}}>{String(m).padStart(2,'0')}</span>
+              <span style={{fontSize:26,color:D.dim}}>m </span>
+              <span style={{color:D.amber}}>{String(s).padStart(2,'0')}</span>
+              <span style={{fontSize:26,color:D.dim}}>s</span>
+            </div>
+            <p style={{fontSize:12,color:D.dim}}>Le proximity meter s'active à l'heure du RDV ↓</p>
+          </div>
+        ) : (
+          <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:24,padding:'22px 18px'}}>
+            <p style={{fontSize:11,color:D.dim,letterSpacing:'0.12em',fontWeight:700,marginBottom:18,textAlign:'center',textTransform:'uppercase'}}>Proximity Meter</p>
+            <ProximityMeter distance={distance} merged={merged}/>
+          </div>
+        )}
+
+        {/* Prompt feedback auto-déclenché */}
+        {showFeedback&&(
+          <div style={{background:'#0D2818',border:'1px solid #166534',borderRadius:18,padding:20,textAlign:'center',animation:'slideUp 0.4s ease-out'}}>
+            <p style={{color:D.green,fontWeight:900,fontSize:17,marginBottom:6}}>🎉 Vous vous êtes trouvés !</p>
+            <p style={{color:D.mid,fontSize:13,marginBottom:16}}>Comment s'est passé votre rencontre ?</p>
+            <button onClick={()=>go('feedback')} style={{padding:'12px 28px',borderRadius:14,border:'none',background:D.green,color:'#000',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
+              Donner mon avis →
+            </button>
+          </div>
+        )}
+
+        {/* Actions secondaires */}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <button onClick={()=>{setSelectedClutch_HACK(clutch);go('chat')}}
+            style={{padding:13,borderRadius:14,background:D.card,border:`1px solid ${D.border}`,cursor:'pointer',color:D.mid,fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>
+            💬 Envoyer un message
+          </button>
+          <button onClick={()=>shareIt({title:'Mon RDV Clutch',text:`Je rencontre quelqu'un via Clutch à ${clutch.venue} !`,url:`https://maps.google.com/?q=${encodeURIComponent(clutch.venue+' Lausanne')}`})}
+            style={{padding:12,borderRadius:14,background:D.card,border:`1px solid ${D.border}`,cursor:'pointer',color:D.mid,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
+            📤 Partager ma position avec un proche
+          </button>
+          <button onClick={()=>go('sos')}
+            style={{padding:12,borderRadius:14,background:'#1A0808',border:'1px solid #7F1D1D',cursor:'pointer',color:'#F87171',fontWeight:700,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
+            🆘 SOS · Sécurité
+          </button>
+        </div>
+
+        {/* Check-in manuel (si GPS indisponible) */}
+        {isNow&&!merged&&(
+          <button onClick={manualCheckin}
+            style={{padding:14,borderRadius:14,border:'none',background:`linear-gradient(135deg,${D.green},#15803D)`,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
+            ✓ Je suis arrivé·e (check-in manuel)
+          </button>
+        )}
+
+        <button onClick={cancel}
+          style={{padding:10,borderRadius:12,background:'none',border:`1px solid ${D.border}`,color:D.dim,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+          Annuler le RDV
+        </button>
       </div>
     </div>
   )
@@ -1560,7 +2607,7 @@ function FeedbackRdv({ clutch, user, go }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title="Comment s'est passé le RDV ?" onBack={()=>go('discover')}/>
-      <div style={{ flex:1, height:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'20px 20px' }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'20px 20px' }}>
         {other && (
           <div style={{ display:'flex', alignItems:'center', gap:12, background:C.bgDeep, borderRadius:14, padding:'12px 16px', marginBottom:20 }}>
             <Avatar p={other} size={44}/>
@@ -1812,11 +2859,23 @@ export default function App() {
   const [selectedProfile, setSelectedProfile] = useState<Profile|null>(null)
   const [selectedClutch, setSelectedClutch] = useState<any>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [frameH, setFrameH] = useState('100dvh')
   useEffect(() => {
-    const check = () => setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
+    const mobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    setIsMobile(mobile)
+    if (mobile) {
+      // window.innerHeight = hauteur visible réelle sur iOS Safari (exclut la barre browser)
+      const updateH = () => { setFrameH(window.innerHeight + 'px') }
+      updateH()
+      // Petit délai pour laisser iOS recalculer après rendu initial
+      setTimeout(updateH, 150)
+      window.addEventListener('resize', updateH)
+      window.visualViewport?.addEventListener('resize', updateH)
+      return () => {
+        window.removeEventListener('resize', updateH)
+        window.visualViewport?.removeEventListener('resize', updateH)
+      }
+    }
   }, [])
   // propose state
   const [venueInput, setVenueInput] = useState('')
@@ -1827,13 +2886,26 @@ export default function App() {
   const [sending, setSending] = useState(false)
 
   const go = (s: Screen) => setScreen(s)
-  const setTab = (t: string) => { setTabState(t); setScreen(t as Screen) }
+  const isUserPremium = ['premium','partner','admin'].includes(user?.account_type||'')
+  const isUserReallyAvail = (() => {
+    if (!user?.is_available) return false
+    const until = user?.available_until ? new Date(user.available_until) : null
+    return until ? until > new Date() : false
+  })()
+  const setTab = (t: string) => {
+    // Gate : Discover et Événements nécessitent d'être disponible (sauf premium)
+    if ((t==='discover'||t==='events') && !isUserReallyAvail && !isUserPremium) {
+      setScreen('set-avail')
+      return
+    }
+    setTabState(t); setScreen(t as Screen)
+  }
   const save = (patch: any) => setUser((u: any) => ({ ...u, ...patch }))
   // Expose setSelectedClutch for RdvActive → Chat navigation
   useEffect(() => { setSelectedClutch_HACK = setSelectedClutch }, [])
   const refreshClutches = () => supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
     .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
-    .then(({ data }) => { if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => c.receiver_id===user?.id&&c.status==='pending').length) } })
+    .then(({ data }) => { if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => (c.receiver_id===user?.id&&c.status==='pending')||(c.sender_id===user?.id&&c.status==='counter')).length) } })
 
   useEffect(() => {
     // Timeout de sécurité : si Supabase ne répond pas en 8s, on affiche quand même l'app
@@ -1842,20 +2914,36 @@ export default function App() {
       clearTimeout(timeout)
       if (session?.user) {
         try {
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-          const u = p || { id: session.user.id }
+          const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+          console.log('[Clutch] profile fetch:', { p, pErr, userId: session.user.id })
+          const u = p || { id: session.user.id, email: session.user.email }
           setUser(u)
-          const obDone = typeof localStorage !== 'undefined' && localStorage.getItem('ob_'+session.user.id)
-          if (obDone && p?.name && p.name !== 'Utilisateur') {
+          const obKey = 'ob_' + session.user.id
+          const obDone = localStorage.getItem(obKey)
+          const hasName = p?.name && p.name !== 'Utilisateur'
+          console.log('[Clutch] routing:', { hasName, obDone, name: p?.name, hasPhoto: !!p?.photo_url })
+          if (hasName) {
+            localStorage.setItem(obKey, '1')
+            // Gate photo : sans photo on ne peut pas accéder à l'app
+            if (!p?.photo_url) { setScreen('ob-photo'); return }
+            const isPremium = ['premium','partner','admin'].includes(p?.account_type||'')
+            const now = new Date()
+            const until = p?.available_until ? new Date(p.available_until) : null
+            const isReallyAvail = p?.is_available && until && until > now
+            // Dispo expirée → reset silencieux en base
+            if (p?.is_available && (!until || until <= now)) {
+              supabase.from('profiles').update({is_available:false,available_from:null,available_until:null}).eq('id', session.user.id)
+              u.is_available = false; u.available_from = null; u.available_until = null
+            }
+            if (!isPremium && !isReallyAvail) setScreen('set-avail')
+            else setScreen('discover')
+          } else if (obDone) {
             setScreen('discover')
           } else {
-            if (!p?.name || p.name === 'Utilisateur') setScreen('ob-name')
-            else if (!p?.gender) setScreen('ob-gender')
-            else if (!p?.age) setScreen('ob-age')
-            else if (!p?.interests || (p.interests as string[]).length === 0) setScreen('ob-interests')
-            else { localStorage.setItem('ob_'+session.user.id,'1'); setScreen('discover') }
+            // Nouveau compte → Onboarding
+            setScreen('ob-name')
           }
-        } catch(e) { console.error('profile load error', e) }
+        } catch(e) { console.error('[Clutch] profile load error', e); setScreen('ob-name') }
       }
       setLoading(false)
     }).catch(e => { clearTimeout(timeout); console.error('getSession error', e); setLoading(false) })
@@ -1878,57 +2966,139 @@ export default function App() {
     return () => clearInterval(expiryTimer)
   }, [user?.id, user?.name, user?.is_available, user?.available_until])
 
-  // Load profiles, clutches, setup realtime
+  // ─── ONESIGNAL PUSH NOTIFICATIONS ───────────────────────────────────────────
+  const ONESIGNAL_APP_ID = '72f8da44-de01-4ad1-b1d8-6d2fbf33daf4'
+
   useEffect(() => {
     if (!user?.id || !user?.name) return
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission()
+    // Lier l'utilisateur Supabase à OneSignal via external_id
+    const linkOneSignal = async () => {
+      try {
+        const win = window as any
+        if (!win.OneSignal) return
+        const initOneSignal = async (OS: any) => {
+          // Login avec l'ID Supabase comme external_id
+          await OS.login(user.id)
+          console.log('[OneSignal] Linked user:', user.id)
+        }
+        if (win.OneSignalDeferred) {
+          win.OneSignalDeferred.push(initOneSignal)
+        }
+      } catch(e) { console.warn('[OneSignal] link failed:', e) }
     }
-    supabase.from('profiles').select('*').neq('id', user.id).then(({ data }) => { if (data) setProfiles(data) })
+    setTimeout(linkOneSignal, 2000)
+  }, [user?.id, user?.name])
+
+  // Envoyer une push notification via OneSignal (Edge Function)
+  const sendPushTo = async (userId: string, title: string, body: string) => {
+    try {
+      const session = (await supabase.auth.getSession()).data.session
+      if (!session) return
+      await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ user_id: userId, title, body })
+      })
+    } catch(e) { console.warn('[Push] send failed:', e) }
+  }
+
+  // Load profiles, clutches, setup realtime
+  const loadProfiles = () => {
+    if (!user?.id) return
+    supabase.from('blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
+      .then(({ data: bdata }) => {
+        const blockedIds = (bdata||[]).map((b:any) => b.blocker_id===user.id ? b.blocked_id : b.blocker_id)
+        let q = supabase.from('profiles').select('*').neq('id', user.id).neq('is_banned', true)
+        blockedIds.forEach((bid:string) => { q = q.neq('id', bid) })
+        q.then(({ data }) => { if (data) setProfiles(data) })
+      })
+  }
+  useEffect(() => {
+    if (!user?.id || !user?.name) return
+
+    // 1) Load profiles + auto-refresh toutes les 60s
+    loadProfiles()
+    const refreshInterval = setInterval(loadProfiles, 60000)
+
+    // 2) Realtime: quand quelqu'un change sa dispo → on recharge les profils
+    const profileChannel = supabase.channel('profiles-avail')
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'profiles' }, () => {
+        loadProfiles()
+      })
+      .subscribe()
+
+    // 3) Clutches: load + realtime
     const loadClutches = () => supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .then(({ data }) => {
-        if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => c.receiver_id===user.id&&c.status==='pending').length) }
+        if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => (c.receiver_id===user.id&&c.status==='pending')||(c.sender_id===user.id&&c.status==='counter')).length) }
       })
     loadClutches()
-    const channel = supabase.channel('notif-'+user.id)
+    const clutchChannel = supabase.channel('notif-'+user.id)
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, () => {
         setPendingBadge(b => b+1)
         loadClutches()
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('☕ Nouveau clutch !', { body: 'Quelqu\'un te propose un café. Tu as 2h pour répondre.' })
+        if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+          navigator.serviceWorker.ready.then(sw => sw.showNotification('☕ Nouveau clutch !', {
+            body: 'Quelqu\'un te propose un café. Tu as 2h pour répondre.',
+            icon: '/icon-192.png', badge: '/icon-192.png' as any,
+            tag: 'clutch-new', data: { url: '/app' }
+          } as any)).catch(() => {
+            if (typeof Notification !== 'undefined') new Notification('☕ Nouveau clutch !', { body: 'Quelqu\'un te propose un café.' })
+          })
         }
       })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`sender_id=eq.${user.id}` }, () => loadClutches())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    return () => {
+      clearInterval(refreshInterval)
+      supabase.removeChannel(profileChannel)
+      supabase.removeChannel(clutchChannel)
+    }
   }, [user?.id, user?.name])
 
   const sendClutch = async () => {
     if (!user?.id || !selectedProfile?.id || !venueInput || !selectedTime || message.trim().length < 10) return
     setSending(true)
-    // Rate limiting : max 3 clutches envoyés par jour
-    const today = new Date(); today.setHours(0,0,0,0)
-    const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true})
-      .eq('sender_id',user.id).gte('created_at',today.toISOString())
-    if ((count||0) >= 3) {
-      alert('Tu as atteint la limite de 3 clutches par jour. Reviens demain !')
-      setSending(false); return
+    try {
+      // Freemium gate : femmes = illimité · premium = 5/jour · free men = 1/jour
+      const isFree = user?.gender !== 'female' && !user?.is_premium && !['premium','partner','admin'].includes(user?.account_type||'')
+      const dailyLimit = user?.gender === 'female' ? 999 : user?.is_premium || ['premium','partner','admin'].includes(user?.account_type||'') ? 5 : 1
+      if (isFree || dailyLimit < 999) {
+        const today = new Date(); today.setHours(0,0,0,0)
+        const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true})
+          .eq('sender_id',user.id).gte('created_at',today.toISOString())
+        if ((count||0) >= dailyLimit) {
+          if (isFree) {
+            alert(`💎 Tu as utilisé ton clutch gratuit du jour !\n\nPasse Premium pour envoyer jusqu'à 5 clutches par jour — CHF 19.90/mois.\n\nVa dans ton Profil → Passer Premium.`)
+          } else {
+            alert(`Tu as atteint la limite de ${dailyLimit} clutches aujourd'hui. Reviens demain !`)
+          }
+          return
+        }
+      }
+      const proposedTime = new Date(selectedTime).toISOString()
+      const { error } = await supabase.from('clutches').insert({
+        sender_id: user.id, receiver_id: selectedProfile.id,
+        venue: venueInput, venue_safety: venueSafety,
+        proposed_time: proposedTime, message: message.trim(),
+        expires_at: new Date(Date.now() + 2*60*60*1000).toISOString()
+      })
+      if (error) { alert(`Erreur envoi: ${error.message}`); return }
+      // Push notif au destinataire
+      sendPushTo(selectedProfile.id, `☕ Nouveau Clutch de ${user.name} !`, `"${message.trim().slice(0,80)}" — Réponds en 2h`)
+      setMessage(''); go('sent')
+    } catch(e:any) {
+      alert(`Erreur réseau: ${e?.message||'réessaie'}`)
+    } finally {
+      setSending(false)
     }
-    const proposedTime = new Date(selectedTime).toISOString()
-    const { error } = await supabase.from('clutches').insert({
-      sender_id: user.id, receiver_id: selectedProfile.id,
-      venue: venueInput, venue_safety: venueSafety,
-      proposed_time: proposedTime, message: message.trim(),
-      expires_at: new Date(Date.now() + 2*60*60*1000).toISOString()
-    })
-    if (!error) { setMessage(''); go('sent') }
-    setSending(false)
   }
 
   const signOut = async () => { await supabase.auth.signOut(); setUser(null); setScreen('splash') }
 
-  const TAB_SCREENS = ['discover','events','inbox','myprofile','create-event','my-events','chat','clutch-received','rdv-active']
+  const TAB_SCREENS = ['set-avail','discover','events','inbox','myprofile','edit-profile','create-event','my-events','chat','clutch-received','rdv-active']
   const showTabBar = TAB_SCREENS.includes(screen) && !!user?.name
 
   if (loading) return (
@@ -1940,7 +3110,7 @@ export default function App() {
     </div>
   )
 
-  // Mobile: plein écran sans frame. Desktop: frame centré.
+  // Mobile: position fixed plein écran. Desktop: frame centré.
   const frameStyle: React.CSSProperties = isMobile
     ? { position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:C.bg, display:'flex', flexDirection:'column', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', overflow:'hidden' }
     : { width:390, maxWidth:'100%', background:C.bg, borderRadius:44, overflow:'hidden', boxShadow:'0 28px 70px rgba(0,0,0,0.18)', display:'flex', flexDirection:'column', height:'min(844px,85vh)', position:'relative' as const }
@@ -1950,7 +3120,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v06.06-C</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v06.06-AK</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -1962,7 +3132,7 @@ export default function App() {
         </div>}
 
         {/* Content */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative', minHeight:0 }}>
           {screen==='splash' && <Splash go={go}/>}
           {screen==='login' && <Login go={go} setUser={setUser}/>}
           {screen==='register' && <Register go={go} setUser={setUser}/>}
@@ -1973,20 +3143,22 @@ export default function App() {
           {screen==='ob-photo' && <ObPhoto go={go} user={user} save={save}/>}
           {screen==='ob-interests' && <ObInterests go={go} user={user} save={save}/>}
           {screen==='ob-done' && <ObDone go={go} user={user}/>}
-          {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go}/>}
+          {screen==='set-avail' && <SetAvail user={user} go={go} save={save} fromProfile={tab==='myprofile'||isUserReallyAvail}/>}
+          {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go} refresh={loadProfiles}/>}
           {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user}/>}
           {screen==='events' && <Events user={user} go={go}/>}
           {screen==='create-event' && <CreateEvent user={user} go={go}/>}
           {screen==='my-events' && <MyEvents user={user} go={go}/>}
           {screen==='inbox' && <Inbox clutches={clutches} user={user} go={go} setSelectedClutch={setSelectedClutch}/>}
           {screen==='myprofile' && <MyProfile user={user} go={go} signOut={signOut} save={save}/>}
+          {screen==='edit-profile' && <EditProfile user={user} go={go} save={save}/>}
           {screen==='sos' && <Sos go={go}/>}
           {screen==='propose' && <Propose profile={selectedProfile} go={go} setVenue={setSelectedVenue} setVenueInput={setVenueInput} venueInput={venueInput} selectedVenue={selectedVenue} venueSafety={venueSafety} setVenueSafety={setVenueSafety}/>}
           {screen==='propose2' && <Propose2 profile={selectedProfile} go={go} selectedTime={selectedTime} setSelectedTime={setSelectedTime} venueInput={venueInput}/>}
           {screen==='propose3' && <Propose3 profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime} message={message} setMessage={setMessage} onSend={sendClutch} sending={sending}/>}
           {screen==='sent' && <Sent profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime}/>}
           {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go}/>}
-          {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches}/>}
+          {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches}/>}
           {screen==='feedback' && <FeedbackRdv clutch={selectedClutch} user={user} go={go}/>}
           {screen==='get-certified' && <GetCertified user={user} go={go} save={save}/>}

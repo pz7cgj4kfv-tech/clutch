@@ -162,14 +162,21 @@ function ShareSheet({ options, onClose }: { options:{icon:string;label:string;on
 function getTimeSlots() {
   const now = new Date()
   const slots: { label: string; time: Date; iso: string }[] = []
-  const intervals = [30, 60, 90, 120, 150, 180, 240, 300, 360]
-  intervals.forEach(mins => {
-    const t = new Date(now.getTime() + mins * 60000)
-    const h = t.getHours(), m = t.getMinutes()
-    const mStr = m === 0 ? '00' : String(m).padStart(2,'0')
-    const diff = mins < 60 ? `${mins} min` : `${mins/60}h`
-    slots.push({ label: `${h}h${mStr} (dans ${diff})`, time: t, iso: t.toISOString() })
-  })
+  // Start at next 30-min mark
+  const start = new Date(now)
+  const m = start.getMinutes()
+  const rem = 30 - (m % 30)
+  start.setMinutes(m + rem, 0, 0)
+  // Generate 8 slots every 30 min
+  for (let i = 0; i < 8; i++) {
+    const t = new Date(start.getTime() + i * 30 * 60000)
+    const diff = Math.round((t.getTime() - now.getTime()) / 60000)
+    if (diff > 18 * 60) break
+    const h = t.getHours(), mn = t.getMinutes()
+    const mStr = mn === 0 ? '00' : String(mn).padStart(2,'0')
+    const diffLabel = diff < 60 ? `dans ${diff} min` : `dans ${Math.floor(diff/60)}h${diff%60>0?String(diff%60).padStart(2,'0'):''}`
+    slots.push({ label: `${h}h${mStr} · ${diffLabel}`, time: t, iso: t.toISOString() })
+  }
   return slots
 }
 
@@ -843,6 +850,7 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
         <div style={{ position:'absolute', top:16, right:16, display:'flex', gap:8 }}>
           <button onClick={()=>shareIt({ title:`${profile.name} sur Clutch`, text:`Regarde le profil de ${profile.name} sur Clutch Lausanne ☕`, url:APP_URL+'/app' })} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↗</button>
           <button onClick={()=>setReporting(true)} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Signaler">🚩</button>
+          <button onClick={async()=>{ if(!confirm(`Bloquer ${profile.name} ? Il/elle ne te verra plus dans Discover.`)) return; await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }).then(()=>{}); go('discover') }} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Bloquer">🚫</button>
         </div>
       </div>
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
@@ -1670,59 +1678,157 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
   const open = (c:any) => {
     setSelectedClutch(c)
     if (c.receiver_id === user.id && c.status === 'pending') go('clutch-received')
-    else if (c.status === 'counter' && c.sender_id === user.id) go('clutch-received') // sender voit la contre-prop
+    else if (c.status === 'counter' && c.sender_id === user.id) go('clutch-received')
     else if (c.status === 'accepted') go('rdv-active')
     else go('chat')
   }
-  if (!clutches.length) return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:32, gap:16, textAlign:'center' }}>
-      <div style={{ fontSize:56 }}>💬</div>
-      <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Pas encore de messages</h2>
-      <p style={{ color:C.textMid, fontSize:14, lineHeight:1.6 }}>Clutche quelqu'un depuis la liste de profils !</p>
+
+  const now = new Date()
+
+  // Catégoriser
+  const urgent = clutches.filter((c:any) => {
+    if (c.status === 'pending' && c.receiver_id === user.id && (!c.expires_at || new Date(c.expires_at) > now)) return true
+    if (c.status === 'counter' && c.sender_id === user.id) return true
+    return false
+  })
+
+  const rdvs = clutches.filter((c:any) => {
+    if (c.status !== 'accepted') return false
+    const t = c.proposed_time ? new Date(c.proposed_time) : null
+    // RDV dans les prochaines 24h ou passé depuis moins de 2h
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+    return !t || t > twoHoursAgo
+  })
+
+  const chats = clutches.filter((c:any) => {
+    if (c.status === 'accepted') {
+      const t = c.proposed_time ? new Date(c.proposed_time) : null
+      const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+      return t && t <= twoHoursAgo
+    }
+    if (c.status === 'pending' && c.sender_id === user.id && (!c.expires_at || new Date(c.expires_at) > now)) return true
+    return false
+  })
+
+  // RDVs annulés dans les 48h — pour que la victime soit notifiée in-app
+  const cancelled = clutches.filter((c:any) => {
+    if (c.status !== 'cancelled') return false
+    const updated = c.updated_at ? new Date(c.updated_at) : null
+    if (!updated) return false
+    return (now.getTime() - updated.getTime()) < 48 * 60 * 60 * 1000
+  })
+
+  const SectionTitle = ({ label, count }: any) => (
+    <div style={{ padding:'10px 20px 6px', display:'flex', alignItems:'center', gap:8 }}>
+      <span style={{ fontSize:11, fontWeight:800, color:C.textLight, letterSpacing:'0.08em', textTransform:'uppercase' }}>{label}</span>
+      {count > 0 && <span style={{ fontSize:10, fontWeight:800, background:C.primary, color:'#fff', borderRadius:10, padding:'1px 6px' }}>{count}</span>}
     </div>
   )
+
+  const ClutchCard = ({ c, type }: any) => {
+    const other = c.sender_id === user.id ? c.receiver : c.sender
+    const isCounter = c.status === 'counter' && c.sender_id === user.id
+    const displayVenue = isCounter && c.counter_venue ? c.counter_venue : c.venue
+    const displayTime = isCounter && c.counter_time ? c.counter_time : c.proposed_time
+    const timeLabel = displayTime ? fmtDate(displayTime) : ''
+    const expiresLabel = c.expires_at ? fmtDate(c.expires_at) : ''
+    const isSentPending = c.status === 'pending' && c.sender_id === user.id
+
+    let badge = null
+    if (type === 'urgent' && !isCounter) badge = <span style={{ fontSize:11, fontWeight:800, background:C.primary, color:'#fff', borderRadius:20, padding:'4px 10px', whiteSpace:'nowrap', flexShrink:0 }}>⚡ Répondre</span>
+    else if (type === 'urgent' && isCounter) badge = <span style={{ fontSize:11, fontWeight:800, background:C.purple, color:'#fff', borderRadius:20, padding:'4px 10px', whiteSpace:'nowrap', flexShrink:0 }}>🔄 Contre-prop</span>
+    else if (type === 'rdv') badge = <span style={{ fontSize:11, fontWeight:700, background:C.sageLight, color:C.sage, borderRadius:20, padding:'4px 10px', whiteSpace:'nowrap', flexShrink:0 }}>✓ RDV</span>
+    else if (isSentPending) badge = <span style={{ fontSize:11, fontWeight:700, background:C.bgDeep, color:C.textLight, borderRadius:20, padding:'4px 10px', whiteSpace:'nowrap', flexShrink:0 }}>En attente</span>
+
+    const cardBg = type === 'urgent' && !isCounter ? '#FFF5F7' : isCounter ? C.purpleLight : C.card
+
+    return (
+      <button key={c.id} onClick={() => open(c)} style={{ width:'100%', padding:'12px 20px', background:cardBg, border:'none', borderBottom:`1px solid ${C.border}`, display:'flex', gap:12, alignItems:'center', cursor:'pointer', textAlign:'left' }}>
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <Avatar p={other || {}} size={48}/>
+          {type === 'urgent' && <div style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:'50%', background:C.primary, border:'2px solid #fff' }}/>}
+          {type === 'rdv' && <div style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:'50%', background:C.sage, border:'2px solid #fff' }}/>}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+            <span style={{ fontWeight:800, color:C.text, fontSize:14 }}>{other?.name || 'Utilisateur'}</span>
+            <span style={{ fontSize:11, color:C.textLight, flexShrink:0 }}>{timeLabel}</span>
+          </div>
+          <p style={{ fontSize:13, color:C.textMid, marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📍 {displayVenue}</p>
+          {type === 'urgent' && !isCounter && expiresLabel && (
+            <p style={{ fontSize:11, color:C.red, marginTop:2, fontWeight:600 }}>⏱ Expire {expiresLabel}</p>
+          )}
+          {isSentPending && expiresLabel && (
+            <p style={{ fontSize:11, color:C.textLight, marginTop:2 }}>⏱ Expire {expiresLabel}</p>
+          )}
+        </div>
+        {badge}
+      </button>
+    )
+  }
+
+  const isEmpty = urgent.length === 0 && rdvs.length === 0 && chats.length === 0 && cancelled.length === 0
+
+  if (isEmpty) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:32, gap:16, textAlign:'center' }}>
+      <div style={{ fontSize:56 }}>☕</div>
+      <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Rien pour l'instant</h2>
+      <p style={{ color:C.textMid, fontSize:14, lineHeight:1.6 }}>Clutche quelqu'un depuis Discover !</p>
+    </div>
+  )
+
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
       <div style={{ padding:'14px 20px 10px', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:C.bg, zIndex:5 }}>
-        <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Messages</h2>
+        <h2 style={{ fontSize:20, fontWeight:800, color:C.text }}>Activité</h2>
       </div>
-      <div>
-        {clutches.map((c:any)=>{
-          const other=c.sender_id===user.id?c.receiver:c.sender
-          const isReceived=c.receiver_id===user.id
-          const isPending=c.status==='pending'
-          const isCounter=c.status==='counter'
-          const isAccepted=c.status==='accepted'
-          const isExpired=isPending&&c.expires_at&&new Date(c.expires_at)<new Date()
-          if(isExpired) return null
-          const isCounterForMe = isCounter && c.sender_id===user.id // sender reçoit la contre-prop
-          const displayTime = isCounterForMe&&c.counter_time ? c.counter_time : c.proposed_time
-          const timeLabel=displayTime?fmtDate(displayTime):''
-          return (
-            <button key={c.id} onClick={()=>open(c)} style={{ width:'100%', padding:'14px 20px', background:isCounterForMe?C.purpleLight:'none', border:'none', borderBottom:`1px solid ${C.border}`, display:'flex', gap:12, alignItems:'center', cursor:'pointer', textAlign:'left' }}>
-              <Avatar p={other||{}} size={46}/>
-              <div style={{ flex:1 }}>
-                <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span style={{ fontWeight:700, color:C.text }}>{other?.name||'Utilisateur'}</span>
-                  <span style={{ fontSize:11, color:C.textLight }}>{timeLabel}</span>
+
+      {urgent.length > 0 && (
+        <div>
+          <SectionTitle label="À répondre" count={urgent.length} />
+          {urgent.map((c:any) => <ClutchCard key={c.id} c={c} type="urgent" />)}
+        </div>
+      )}
+
+      {rdvs.length > 0 && (
+        <div style={{ marginTop: urgent.length > 0 ? 8 : 0 }}>
+          <SectionTitle label="Rendez-vous" count={0} />
+          {rdvs.map((c:any) => <ClutchCard key={c.id} c={c} type="rdv" />)}
+        </div>
+      )}
+
+      {chats.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <SectionTitle label="Discussions" count={0} />
+          {chats.map((c:any) => <ClutchCard key={c.id} c={c} type="chat" />)}
+        </div>
+      )}
+
+      {cancelled.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <div style={{ padding:'10px 20px 6px', display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:11, fontWeight:800, color:C.red, letterSpacing:'0.08em', textTransform:'uppercase' }}>❌ RDV annulé</span>
+          </div>
+          {cancelled.map((c:any) => {
+            const other = c.sender_id === user.id ? c.receiver : c.sender
+            const cancelledByMe = c.sender_id === user.id
+              ? (c.receiver_id !== user.id)
+              : (c.sender_id !== user.id)
+            // Qui a annulé ? On ne stocke pas encore ce champ, donc on infère
+            return (
+              <div key={c.id} style={{ padding:'12px 20px', background:C.redLight, borderBottom:`1px solid ${C.red}22`, display:'flex', gap:12, alignItems:'center' }}>
+                <Avatar p={other || {}} size={44}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <span style={{ fontWeight:800, color:C.text, fontSize:14 }}>{other?.name || '?'}</span>
+                  <p style={{ fontSize:13, color:C.red, marginTop:2, fontWeight:600 }}>RDV annulé · {c.venue}</p>
+                  <p style={{ fontSize:11, color:C.textLight, marginTop:1 }}>Tu peux clutcher à nouveau depuis Discover</p>
                 </div>
-                <p style={{ fontSize:13, color:C.textMid, marginTop:2 }}>📍 {isCounterForMe&&c.counter_venue?c.counter_venue:c.venue}</p>
-                {isPending&&c.expires_at&&!isExpired&&(
-                  <p style={{ fontSize:11, color:C.peach, marginTop:2 }}>⏱ Expire {fmtDate(c.expires_at)}</p>
-                )}
-                {isCounter&&!isCounterForMe&&(
-                  <p style={{ fontSize:11, color:C.purple, marginTop:2 }}>🔄 Contre-proposition envoyée — en attente</p>
-                )}
+                <span style={{ fontSize:20 }}>❌</span>
               </div>
-              <span style={{ fontSize:11, padding:'3px 8px', borderRadius:8, fontWeight:600, whiteSpace:'nowrap',
-                background:isAccepted?C.sageLight:isCounterForMe?C.purple:isPending&&isReceived?C.primaryLight:C.bgDeep,
-                color:isAccepted?C.sage:isCounterForMe?'#fff':isPending&&isReceived?C.primary:C.textLight }}>
-                {isAccepted?'✓ RDV':isCounterForMe?'🔄 Répondre':isPending&&isReceived?'⚡ Répondre':isPending?'En attente':'Terminé'}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -2032,7 +2138,7 @@ function MyProfile({ user, go, signOut, save }: any) {
           Se déconnecter
         </button>
         <a href="/" style={{ display:'block', textAlign:'center', padding:10, color:C.textLight, fontSize:12, textDecoration:'none' }}>← Retour au site</a>
-        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v06.06-AQ</p>
+        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AA</p>
       </div>
     </div>
   )
@@ -2229,7 +2335,7 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
     if (status === 'accepted') {
       const notifTarget = isCounterMode ? clutch.receiver_id : clutch.sender_id
       const notifName = isCounterMode ? clutch.receiver?.name : clutch.sender?.name
-      sendPush?.(notifTarget, `🔒 Verrou confirmé avec ${user.name} !`, `RDV au ${displayVenue}. À tout de suite ☕`)
+      sendPush?.(notifTarget, `🎯 ${user.name} a dit oui !`, `RDV au ${displayVenue}. C'est confirmé ☕`)
       go('rdv-active')
     } else { go('inbox') }
     setLoading(null)
@@ -2251,7 +2357,7 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
   }
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
       <TopBar title={isCounterMode ? '🔄 Contre-proposition reçue' : 'Tu as été clutché·e ☕'} onBack={()=>go('inbox')}/>
       <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'16px 20px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* Sender card */}
@@ -2318,7 +2424,7 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
 
       <div style={{ padding:'12px 20px 28px', display:'flex', flexDirection:'column', gap:10 }}>
         <button onClick={()=>respond('accepted')} disabled={!!loading} style={{ padding:'15px', borderRadius:14, border:'none', background:loading?C.bgDeep:`linear-gradient(135deg,${C.sage},#5A8A6A)`, color:loading?C.textLight:'#fff', fontWeight:800, fontSize:16, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit' }}>
-          {loading==='accepted'?'…':'🔒 Verrouiller le RDV'}
+          {loading==='accepted'?'…':'✅ Oui, je viens !'}
         </button>
         {!isCounterMode && !countering && (
           <button onClick={()=>setCountering(true)} style={{ padding:'12px', borderRadius:14, border:`1.5px solid ${C.purple}44`, background:C.purpleLight, color:C.purple, fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
@@ -2338,9 +2444,10 @@ function Chat({ clutch, user, go }: any) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
-  // Freemium: femmes + premium = 20 msgs, hommes free = 5 msgs (pousse au vrai RDV)
-  const isPremiumUser = user?.is_premium || user?.gender === 'female' || ['premium','partner','admin'].includes(user?.account_type||'')
-  const MSG_LIMIT = isPremiumUser ? 20 : 5
+  // MSG_LIMIT est par conversation (pas par user) — 5 pour tous.
+  // Le but : pousser vers le vrai RDV, pas créer de l'app-comfort.
+  // Premium = plus de clutches par jour, pas plus de messages.
+  const MSG_LIMIT = 5
   if (!clutch) return null
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
 
@@ -2369,9 +2476,21 @@ function Chat({ clutch, user, go }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
       <TopBar title={other?.name||'Chat'} onBack={()=>go('inbox')}/>
-      <div style={{ padding:'6px 16px', background:C.bgDeep, fontSize:11, color:C.textMid, textAlign:'center' }}>
-        📍 {clutch.venue} · {Math.max(0, MSG_LIMIT - messages.length)} message{Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''} restant{Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''}
-        {!isPremiumUser && <span style={{ color:C.purple, marginLeft:6 }}>· 💎 Premium = 20 msgs</span>}
+      {/* Bandeau limite messages — bien visible pour les deux utilisateurs */}
+      <div style={{ padding:'8px 16px', background:messages.length >= MSG_LIMIT ? C.redLight : messages.length >= MSG_LIMIT - 1 ? '#FFF3CD' : C.bgDeep, borderBottom:`1px solid ${messages.length >= MSG_LIMIT ? C.red+'44' : C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+        <span style={{ fontSize:11, color:C.textMid, fontWeight:500 }}>📍 {clutch.venue}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          {messages.length < MSG_LIMIT && (
+            <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+              {[...Array(MSG_LIMIT)].map((_,i) => (
+                <div key={i} style={{ width:8, height:8, borderRadius:'50%', background: i < messages.length ? C.primary : C.border }}/>
+              ))}
+            </div>
+          )}
+          <span style={{ fontSize:12, fontWeight:800, color: messages.length >= MSG_LIMIT ? C.red : messages.length >= MSG_LIMIT - 1 ? '#B45309' : C.textMid }}>
+            {messages.length >= MSG_LIMIT ? '🚫 Max atteint' : `${Math.max(0, MSG_LIMIT - messages.length)} msg restant${Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''}`}
+          </span>
+        </div>
       </div>
       <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
         {messages.map(m=>{
@@ -2387,8 +2506,9 @@ function Chat({ clutch, user, go }: any) {
         <div ref={bottomRef}/>
       </div>
       {messages.length >= MSG_LIMIT
-        ? <div style={{ padding:'12px 16px 20px', textAlign:'center', fontSize:12, color:C.textLight, background:C.bgDeep }}>
-            Limite de {MSG_LIMIT} messages atteinte — le café est pour bientôt ☕
+        ? <div style={{ padding:'16px 20px 24px', textAlign:'center', background:C.redLight, borderTop:`1px solid ${C.red}22` }}>
+            <p style={{ fontSize:15, fontWeight:800, color:C.red, marginBottom:4 }}>🚫 5 messages max</p>
+            <p style={{ fontSize:13, color:C.textMid }}>Clutch limite les messages pour t'encourager à vraiment vous voir ☕</p>
           </div>
         : <div style={{ background:C.bg, borderTop:`1px solid ${C.border}` }}>
             {inputErr&&<p style={{ fontSize:11, color:C.red, padding:'4px 16px 0', textAlign:'center' }}>{inputErr}</p>}
@@ -2404,7 +2524,7 @@ function Chat({ clutch, user, go }: any) {
 }
 
 // ─── RDV ACTIVE ───────────────────────────────────────────────────────────────
-function RdvActive({ clutch, user, go, refresh }: any) {
+function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
   const [countdown, setCountdown] = useState(0)
   const [myPos, setMyPos] = useState<{lat:number;lng:number}|null>(null)
   const [otherPos, setOtherPos] = useState<{lat:number;lng:number}|null>(null)
@@ -2461,7 +2581,11 @@ function RdvActive({ clutch, user, go, refresh }: any) {
   },[myPos,otherPos])
 
   const cancel = async()=>{
+    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité.`)) return
     await supabase.from('clutches').update({status:'cancelled'}).eq('id',clutch.id)
+    // Notifier l'autre personne que le RDV est annulé
+    const otherId = clutch.sender_id === user.id ? clutch.receiver_id : clutch.sender_id
+    sendPush?.(otherId, `❌ RDV annulé par ${user.name}`, `Votre RDV au ${clutch.venue} a été annulé. Tu peux en proposer un nouveau.`)
     refresh(); go('inbox')
   }
   const manualCheckin = async()=>{
@@ -2480,7 +2604,7 @@ function RdvActive({ clutch, user, go, refresh }: any) {
         <button onClick={()=>go('inbox')} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:D.dim,minWidth:40}}>←</button>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <CclutchLogo size={28}/>
-          <span style={{fontWeight:800,fontSize:15,color:D.text,letterSpacing:'-0.02em'}}>Verrou confirmé</span>
+          <span style={{fontWeight:800,fontSize:15,color:D.text,letterSpacing:'-0.02em'}}>C'est parti ! ☕</span>
         </div>
         <div style={{minWidth:40}}/>
       </div>
@@ -2778,9 +2902,9 @@ function Sos({ go }: { go:(s:Screen)=>void }) {
   const mapsUrl=gpsCoords?`https://maps.google.com/?q=${gpsCoords.lat},${gpsCoords.lng}`:''
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
       <TopBar title="Sécurité" onBack={()=>go('myprofile')}/>
-      <div style={{ flex:1, padding:'12px 20px', display:'flex', flexDirection:'column', gap:14, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+      <div style={{ flex:1, minHeight:0, padding:'12px 20px', display:'flex', flexDirection:'column', gap:14, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
         <div style={{ padding:16, background:C.redLight, borderRadius:16, border:`1.5px solid ${C.red}33`, textAlign:'center' }}>
           <p style={{ fontSize:32 }}>🆘</p>
           <p style={{ fontWeight:700, color:C.red, fontSize:16 }}>Besoin d'aide ?</p>
@@ -2925,7 +3049,7 @@ export default function App() {
           if (hasName) {
             localStorage.setItem(obKey, '1')
             // Gate photo : sans photo on ne peut pas accéder à l'app
-            if (!p?.photo_url) { setScreen('ob-photo'); return }
+            if (!p?.photo_url) { setScreen('ob-photo'); setLoading(false); return }
             const isPremium = ['premium','partner','admin'].includes(p?.account_type||'')
             const now = new Date()
             const until = p?.available_until ? new Date(p.available_until) : null
@@ -3062,14 +3186,16 @@ export default function App() {
     if (!user?.id || !selectedProfile?.id || !venueInput || !selectedTime || message.trim().length < 10) return
     setSending(true)
     try {
-      // Freemium gate : femmes = illimité · premium = 5/jour · free men = 1/jour
-      const isFree = user?.gender !== 'female' && !user?.is_premium && !['premium','partner','admin'].includes(user?.account_type||'')
-      const dailyLimit = user?.gender === 'female' ? 999 : user?.is_premium || ['premium','partner','admin'].includes(user?.account_type||'') ? 5 : 1
+      // Freemium gate : femmes = illimité · admin/partner = illimité · premium = 5/jour · free men = 1/jour
+      const isAdmin = ['admin','partner'].includes(user?.account_type||'')
+      const isFree = user?.gender !== 'female' && !isAdmin && !user?.is_premium
+      const dailyLimit = (user?.gender === 'female' || isAdmin) ? 999 : user?.is_premium ? 5 : 1
       if (isFree || dailyLimit < 999) {
         const today = new Date(); today.setHours(0,0,0,0)
         const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true})
           .eq('sender_id',user.id).gte('created_at',today.toISOString())
         if ((count||0) >= dailyLimit) {
+          setSending(false)
           if (isFree) {
             alert(`💎 Tu as utilisé ton clutch gratuit du jour !\n\nPasse Premium pour envoyer jusqu'à 5 clutches par jour — CHF 19.90/mois.\n\nVa dans ton Profil → Passer Premium.`)
           } else {
@@ -3120,7 +3246,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v06.06-AK</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AA</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -3159,7 +3285,7 @@ export default function App() {
           {screen==='sent' && <Sent profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime}/>}
           {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go}/>}
           {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
-          {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches}/>}
+          {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='feedback' && <FeedbackRdv clutch={selectedClutch} user={user} go={go}/>}
           {screen==='get-certified' && <GetCertified user={user} go={go} save={save}/>}
           {showTabBar && <TabBar tab={tab} setTab={setTab} badge={pendingBadge}/>}

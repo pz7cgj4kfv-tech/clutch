@@ -2531,7 +2531,23 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
   const [distance, setDistance] = useState<number|null>(null)
   const [merged, setMerged] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [cancelledByOther, setCancelledByOther] = useState(false)
   if (!clutch) return null
+
+  // Surveillance annulation par l'autre — realtime sur ce clutch précis
+  useEffect(() => {
+    if (!clutch?.id) return
+    const ch = supabase.channel(`rdv-cancel-${clutch.id}`)
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`id=eq.${clutch.id}` },
+        ({ new: updated }) => {
+          if (updated.status === 'cancelled') {
+            setCancelledByOther(true)
+            refresh()
+          }
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [clutch.id])
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
   const meetTime = new Date(clutch.proposed_time)
 
@@ -2596,6 +2612,18 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
 
   // Dark theme — "mission mode"
   const D = {bg:'#0A0A0A',card:'#141414',border:'#252525',text:'#FFFFFF',mid:'#9CA3AF',dim:'#6B7280',amber:'#F59E0B',green:'#22C55E'}
+
+  // Si l'autre a annulé → modal bloquant
+  if (cancelledByOther) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0A0A0A', padding:32, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>❌</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:'#fff' }}>RDV annulé</h2>
+      <p style={{ color:'#9CA3AF', lineHeight:1.6, fontSize:14 }}>{other?.name} a annulé ce RDV.<br/>Ça arrive — tu peux en proposer un nouveau.</p>
+      <button onClick={()=>go('discover')} style={{ padding:'14px 28px', borderRadius:14, border:'none', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
+        Retour à Discover ✦
+      </button>
+    </div>
+  )
 
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',background:D.bg}}>
@@ -3173,6 +3201,8 @@ export default function App() {
         }
       })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`sender_id=eq.${user.id}` }, () => loadClutches())
+      // ⚠️ CRITICAL: le receiver doit aussi recevoir les UPDATE (ex: annulation par le sender)
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, () => loadClutches())
       .subscribe()
 
     return () => {

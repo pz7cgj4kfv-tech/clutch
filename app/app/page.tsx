@@ -1679,7 +1679,8 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
     setSelectedClutch(c)
     if (c.receiver_id === user.id && c.status === 'pending') go('clutch-received')
     else if (c.status === 'counter' && c.sender_id === user.id) go('clutch-received')
-    else if (c.status === 'accepted') go('rdv-active')
+    // ✦ RDV accepté → chat directement (hub central). RdvActive = accessible depuis chat via bouton.
+    else if (c.status === 'accepted') go('chat')
     else go('chat')
   }
 
@@ -2138,7 +2139,7 @@ function MyProfile({ user, go, signOut, save }: any) {
           Se déconnecter
         </button>
         <a href="/" style={{ display:'block', textAlign:'center', padding:10, color:C.textLight, fontSize:12, textDecoration:'none' }}>← Retour au site</a>
-        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AA</p>
+        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AF</p>
       </div>
     </div>
   )
@@ -2439,17 +2440,28 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
   )
 }
 
-// ─── CHAT RÉEL ────────────────────────────────────────────────────────────────
-function Chat({ clutch, user, go }: any) {
+// ─── CHAT RÉEL — HUB CENTRAL pour les RDVs acceptés ─────────────────────────
+// Audit challenger : inbox → clutch → "envoyer un message" = 3 clics. Inacceptable.
+// Fix : chat = hub. RDV info + cancel + proximity en haut. Pas de navigation séparée.
+// MSG_LIMIT = 5 PAR PERSONNE (pas total). Prévisible, équitable, chacun sait ce qu'il a.
+function Chat({ clutch, user, go, refresh, sendPush }: any) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
+  const [inputErr, setInputErr] = useState('')
+  const [showRdvDetail, setShowRdvDetail] = useState(false)
+  const [cancelledByOther, setCancelledByOther] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  // MSG_LIMIT est par conversation (pas par user) — 5 pour tous.
-  // Le but : pousser vers le vrai RDV, pas créer de l'app-comfort.
-  // Premium = plus de clutches par jour, pas plus de messages.
+  // 5 messages PAR PERSONNE — pas total. Chacun connaît sa limite exacte.
   const MSG_LIMIT = 5
   if (!clutch) return null
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
+  const isAccepted = clutch.status === 'accepted'
+  const meetTime = clutch.proposed_time ? new Date(clutch.proposed_time) : null
+
+  // Compte uniquement MES messages
+  const myMsgCount = messages.filter(m => m.sender_id === user.id).length
+  const otherMsgCount = messages.filter(m => m.sender_id !== user.id).length
+  const canSend = myMsgCount < MSG_LIMIT
 
   useEffect(()=>{
     supabase.from('messages').select('*').eq('clutch_id', clutch.id).order('created_at')
@@ -2461,11 +2473,20 @@ function Chat({ clutch, user, go }: any) {
     return ()=>{ supabase.removeChannel(ch) }
   },[clutch.id])
 
+  // Surveillance annulation par l'autre depuis le chat
+  useEffect(()=>{
+    if (!clutch?.id || !isAccepted) return
+    const ch = supabase.channel(`chat-cancel-${clutch.id}`)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'clutches',filter:`id=eq.${clutch.id}`},
+        ({new: updated})=>{ if(updated.status==='cancelled') setCancelledByOther(true) })
+      .subscribe()
+    return ()=>{ supabase.removeChannel(ch) }
+  },[clutch.id])
+
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[messages])
 
-  const [inputErr, setInputErr] = useState('')
   const send = async () => {
-    if(!input.trim()||messages.length>=MSG_LIMIT) return
+    if(!input.trim()||!canSend) return
     const text=input.trim()
     const lower=text.toLowerCase()
     if(BANNED_WORDS.some(w=>lower.includes(w))){setInputErr('Message inapproprié — merci de rester respectueux·se');setTimeout(()=>setInputErr(''),3000);return}
@@ -2473,26 +2494,112 @@ function Chat({ clutch, user, go }: any) {
     await supabase.from('messages').insert({clutch_id:clutch.id,sender_id:user.id,content:text})
   }
 
+  const cancelRdv = async () => {
+    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité.`)) return
+    await supabase.from('clutches').update({status:'cancelled'}).eq('id',clutch.id)
+    const otherId = clutch.sender_id === user.id ? clutch.receiver_id : clutch.sender_id
+    sendPush?.(otherId, `❌ RDV annulé par ${user.name}`, `Votre RDV au ${clutch.venue} a été annulé.`)
+    refresh?.()
+    go('inbox')
+  }
+
+  // Countdown RDV
+  const [countdown, setCountdown] = useState(meetTime ? Math.max(0, meetTime.getTime()-Date.now()) : 0)
+  useEffect(()=>{
+    if(!meetTime) return
+    const t = setInterval(()=>setCountdown(Math.max(0,meetTime.getTime()-Date.now())),1000)
+    return ()=>clearInterval(t)
+  },[])
+  const cdH = Math.floor(countdown/3600000)
+  const cdM = Math.floor((countdown%3600000)/60000)
+  const cdS = Math.floor((countdown%60000)/1000)
+  const isNow = countdown <= 0
+
+  if (cancelledByOther) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:32, gap:20, textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>❌</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>RDV annulé</h2>
+      <p style={{ color:C.textMid, lineHeight:1.6, fontSize:14 }}>{other?.name} a annulé ce RDV.<br/>Tu peux en proposer un nouveau depuis Discover.</p>
+      <Btn onClick={()=>go('discover')}>Retour à Discover ✦</Btn>
+    </div>
+  )
+
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
-      <TopBar title={other?.name||'Chat'} onBack={()=>go('inbox')}/>
-      {/* Bandeau limite messages — bien visible pour les deux utilisateurs */}
-      <div style={{ padding:'8px 16px', background:messages.length >= MSG_LIMIT ? C.redLight : messages.length >= MSG_LIMIT - 1 ? '#FFF3CD' : C.bgDeep, borderBottom:`1px solid ${messages.length >= MSG_LIMIT ? C.red+'44' : C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <span style={{ fontSize:11, color:C.textMid, fontWeight:500 }}>📍 {clutch.venue}</span>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-          {messages.length < MSG_LIMIT && (
-            <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-              {[...Array(MSG_LIMIT)].map((_,i) => (
-                <div key={i} style={{ width:8, height:8, borderRadius:'50%', background: i < messages.length ? C.primary : C.border }}/>
-              ))}
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
+      {/* TopBar */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 8px', background:C.bg, flexShrink:0, borderBottom:`1px solid ${C.border}` }}>
+        <button onClick={()=>go('inbox')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:C.textMid, padding:'0 8px 0 0', minWidth:40 }}>←</button>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Avatar p={other||{}} size={32}/>
+          <div>
+            <p style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1 }}>{other?.name}</p>
+            {isAccepted && meetTime && <p style={{ fontSize:10, color:C.sage, fontWeight:600 }}>☕ RDV confirmé</p>}
+          </div>
+        </div>
+        <button onClick={()=>setShowRdvDetail(v=>!v)} style={{ background:showRdvDetail?C.primaryLight:C.bgDeep, border:'none', borderRadius:12, padding:'6px 10px', cursor:'pointer', fontSize:12, color:showRdvDetail?C.primary:C.textLight, fontWeight:700, fontFamily:'inherit' }}>
+          {showRdvDetail ? '▲ RDV' : '▼ RDV'}
+        </button>
+      </div>
+
+      {/* Panneau RDV (collapsible) — infos + countdown + cancel */}
+      {isAccepted && showRdvDetail && (
+        <div style={{ background:C.bgDeep, borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', flexDirection:'column', gap:10, flexShrink:0 }}>
+          <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+            <div style={{ flex:1 }}>
+              <p style={{ fontWeight:700, fontSize:14, color:C.text }}>📍 {clutch.venue}</p>
+              {meetTime && <p style={{ fontSize:12, color:C.textMid, marginTop:2 }}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>}
             </div>
-          )}
-          <span style={{ fontSize:12, fontWeight:800, color: messages.length >= MSG_LIMIT ? C.red : messages.length >= MSG_LIMIT - 1 ? '#B45309' : C.textMid }}>
-            {messages.length >= MSG_LIMIT ? '🚫 Max atteint' : `${Math.max(0, MSG_LIMIT - messages.length)} msg restant${Math.max(0, MSG_LIMIT - messages.length) > 1?'s':''}`}
+            {meetTime && (
+              <div style={{ background: isNow ? C.sageLight : C.primaryLight, borderRadius:12, padding:'6px 12px', textAlign:'center' }}>
+                {isNow
+                  ? <p style={{ fontSize:12, fontWeight:800, color:C.sage }}>C'est maintenant !</p>
+                  : <><p style={{ fontSize:18, fontWeight:900, color:C.primary, lineHeight:1 }}>{cdH>0?`${cdH}h `:''}{ String(cdM).padStart(2,'0')}m</p>
+                    <p style={{ fontSize:9, color:C.textLight }}>avant le RDV</p></>
+                }
+              </div>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={()=>{go('rdv-active')}} style={{ flex:1, padding:'9px', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:C.sage, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              📡 Proximity Meter
+            </button>
+            <button onClick={cancelRdv} style={{ flex:1, padding:'9px', borderRadius:12, border:`1px solid ${C.red}33`, background:C.redLight, color:C.red, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              ✕ Annuler le RDV
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bandeau msg counter — per person, clair */}
+      <div style={{ padding:'6px 16px', background:!canSend ? C.redLight : myMsgCount >= MSG_LIMIT-1 ? '#FFF8E1' : C.bgDeep, borderBottom:`1px solid ${!canSend?C.red+'33':C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+        <span style={{ fontSize:11, color:C.textMid }}>📍 {clutch.venue}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <div style={{ display:'flex', gap:2 }}>
+            {[...Array(MSG_LIMIT)].map((_,i)=>(
+              <div key={i} style={{ width:6, height:6, borderRadius:'50%', background: i<myMsgCount ? C.primary : C.border }}/>
+            ))}
+          </div>
+          <span style={{ fontSize:11, fontWeight:700, color:!canSend?C.red:C.textMid }}>
+            {!canSend ? '🚫 Limite' : `Toi: ${myMsgCount}/5`}
           </span>
         </div>
       </div>
+
+      {/* Messages */}
       <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+
+        {/* Message initial du clutch — toujours affiché en premier */}
+        {clutch.message && (
+          <div style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
+            <div style={{ maxWidth:'86%', background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, border:`1px solid ${C.primary}33`, borderRadius:16, padding:'10px 14px' }}>
+              <p style={{ fontSize:10, fontWeight:800, color:C.primary, marginBottom:4, letterSpacing:'0.05em', textTransform:'uppercase' }}>
+                ☕ Proposition initiale de {clutch.sender_id===user.id ? 'toi' : other?.name}
+              </p>
+              <p style={{ fontSize:13, color:C.text, lineHeight:1.5, fontStyle:'italic' }}>"{clutch.message}"</p>
+            </div>
+          </div>
+        )}
+
         {messages.map(m=>{
           const isMine = m.sender_id === user.id
           return (
@@ -2505,15 +2612,17 @@ function Chat({ clutch, user, go }: any) {
         })}
         <div ref={bottomRef}/>
       </div>
-      {messages.length >= MSG_LIMIT
-        ? <div style={{ padding:'16px 20px 24px', textAlign:'center', background:C.redLight, borderTop:`1px solid ${C.red}22` }}>
-            <p style={{ fontSize:15, fontWeight:800, color:C.red, marginBottom:4 }}>🚫 5 messages max</p>
-            <p style={{ fontSize:13, color:C.textMid }}>Clutch limite les messages pour t'encourager à vraiment vous voir ☕</p>
+
+      {/* Input */}
+      {!canSend
+        ? <div style={{ padding:'12px 16px 20px', textAlign:'center', background:C.redLight, borderTop:`1px solid ${C.red}22`, flexShrink:0 }}>
+            <p style={{ fontSize:14, fontWeight:800, color:C.red, marginBottom:2 }}>🚫 5 messages envoyés</p>
+            <p style={{ fontSize:12, color:C.textMid }}>Ta limite est atteinte — l'autre peut encore répondre ☕</p>
           </div>
-        : <div style={{ background:C.bg, borderTop:`1px solid ${C.border}` }}>
+        : <div style={{ background:C.bg, borderTop:`1px solid ${C.border}`, flexShrink:0 }}>
             {inputErr&&<p style={{ fontSize:11, color:C.red, padding:'4px 16px 0', textAlign:'center' }}>{inputErr}</p>}
             <div style={{ padding:'10px 16px 24px', display:'flex', gap:8 }}>
-              <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ton message…"
+              <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={`Message à ${other?.name}…`}
                 style={{ flex:1, padding:'11px 14px', borderRadius:20, border:`1.5px solid ${inputErr?C.red:C.border}`, background:C.bgDeep, fontSize:14, outline:'none', color:C.text, fontFamily:'inherit' }}/>
               <button onClick={send} disabled={!input.trim()} style={{ padding:'11px 18px', borderRadius:20, border:'none', background:input.trim()?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:input.trim()?'#fff':C.textLight, fontWeight:700, fontSize:14, cursor:input.trim()?'pointer':'not-allowed', fontFamily:'inherit' }}>→</button>
             </div>
@@ -2610,103 +2719,92 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
     refresh(); go('feedback')
   }
 
-  // Dark theme — "mission mode"
-  const D = {bg:'#0A0A0A',card:'#141414',border:'#252525',text:'#FFFFFF',mid:'#9CA3AF',dim:'#6B7280',amber:'#F59E0B',green:'#22C55E'}
-
+  // Thème clair — cohérence avec le reste de l'app
   // Si l'autre a annulé → modal bloquant
   if (cancelledByOther) return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0A0A0A', padding:32, gap:20, textAlign:'center' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:32, gap:20, textAlign:'center' }}>
       <div style={{ fontSize:64 }}>❌</div>
-      <h2 style={{ fontSize:22, fontWeight:800, color:'#fff' }}>RDV annulé</h2>
-      <p style={{ color:'#9CA3AF', lineHeight:1.6, fontSize:14 }}>{other?.name} a annulé ce RDV.<br/>Ça arrive — tu peux en proposer un nouveau.</p>
-      <button onClick={()=>go('discover')} style={{ padding:'14px 28px', borderRadius:14, border:'none', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
-        Retour à Discover ✦
-      </button>
+      <h2 style={{ fontSize:22, fontWeight:800, color:C.text }}>RDV annulé</h2>
+      <p style={{ color:C.textMid, lineHeight:1.6, fontSize:14 }}>{other?.name} a annulé ce RDV.<br/>Ça arrive — tu peux en proposer un nouveau.</p>
+      <Btn onClick={()=>go('discover')}>Retour à Discover ✦</Btn>
     </div>
   )
 
   return (
-    <div style={{flex:1,display:'flex',flexDirection:'column',background:D.bg}}>
-      {/* TopBar dark avec logo */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px 10px',background:D.bg,borderBottom:`1px solid ${D.border}`,flexShrink:0}}>
-        <button onClick={()=>go('inbox')} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:D.dim,minWidth:40}}>←</button>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <CclutchLogo size={28}/>
-          <span style={{fontWeight:800,fontSize:15,color:D.text,letterSpacing:'-0.02em'}}>C'est parti ! ☕</span>
-        </div>
-        <div style={{minWidth:40}}/>
-      </div>
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,minHeight:0}}>
+      <TopBar title="C'est parti ! ☕" onBack={()=>{setSelectedClutch_HACK(clutch);go('chat')}}
+        right={<CclutchLogo size={26}/>}/>
 
-      <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',padding:'14px 18px 28px',display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{flex:1,minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',padding:'14px 18px 32px',display:'flex',flexDirection:'column',gap:12}}>
 
         {/* Carte personne */}
-        <div style={{display:'flex',alignItems:'center',gap:14,background:D.card,borderRadius:20,padding:'14px 18px',border:`1px solid ${D.border}`}}>
-          <Avatar p={other||{}} size={50}/>
+        <div style={{display:'flex',alignItems:'center',gap:14,background:C.card,borderRadius:20,padding:'14px 18px',border:`1px solid ${C.border}`,boxShadow:`0 2px 12px ${C.shadow}`}}>
+          <Avatar p={other||{}} size={52}/>
           <div style={{flex:1,minWidth:0}}>
-            <p style={{fontWeight:900,fontSize:18,color:D.text}}>{other?.name}</p>
-            <p style={{fontSize:12,color:D.mid,marginTop:2}}>📍 {clutch.venue}</p>
-            <p style={{fontSize:12,color:D.mid}}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+            <p style={{fontWeight:900,fontSize:18,color:C.text}}>{other?.name}</p>
+            <p style={{fontSize:12,color:C.textMid,marginTop:2}}>📍 {clutch.venue}</p>
+            <p style={{fontSize:12,color:C.textMid}}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
           </div>
-          <ReliabilityStars score={other?.reliability_score||100} light/>
+          <ReliabilityStars score={other?.reliability_score||100}/>
         </div>
 
         {/* Countdown ou Proximity Meter */}
         {!isNow ? (
-          <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:24,padding:'28px 20px',textAlign:'center'}}>
-            <p style={{fontSize:11,color:D.dim,letterSpacing:'0.12em',fontWeight:700,marginBottom:14,textTransform:'uppercase'}}>Rendez-vous dans</p>
-            <div style={{fontSize:54,fontWeight:900,color:D.text,letterSpacing:'-0.04em',lineHeight:1,marginBottom:10}}>
-              {h>0&&<><span style={{color:D.amber}}>{h}</span><span style={{fontSize:26,color:D.dim}}>h </span></>}
-              <span style={{color:D.amber}}>{String(m).padStart(2,'0')}</span>
-              <span style={{fontSize:26,color:D.dim}}>m </span>
-              <span style={{color:D.amber}}>{String(s).padStart(2,'0')}</span>
-              <span style={{fontSize:26,color:D.dim}}>s</span>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:'28px 20px',textAlign:'center',boxShadow:`0 2px 12px ${C.shadow}`}}>
+            <p style={{fontSize:11,color:C.textLight,letterSpacing:'0.12em',fontWeight:700,marginBottom:14,textTransform:'uppercase'}}>Rendez-vous dans</p>
+            <div style={{fontSize:54,fontWeight:900,color:C.text,letterSpacing:'-0.04em',lineHeight:1,marginBottom:10}}>
+              {h>0&&<><span style={{color:C.primary}}>{h}</span><span style={{fontSize:26,color:C.textLight}}>h </span></>}
+              <span style={{color:C.primary}}>{String(m).padStart(2,'0')}</span>
+              <span style={{fontSize:26,color:C.textLight}}>m </span>
+              <span style={{color:C.primary}}>{String(s).padStart(2,'0')}</span>
+              <span style={{fontSize:26,color:C.textLight}}>s</span>
             </div>
-            <p style={{fontSize:12,color:D.dim}}>Le proximity meter s'active à l'heure du RDV ↓</p>
+            <p style={{fontSize:12,color:C.textLight}}>Le proximity meter s'active à l'heure du RDV ↓</p>
           </div>
         ) : (
-          <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:24,padding:'22px 18px'}}>
-            <p style={{fontSize:11,color:D.dim,letterSpacing:'0.12em',fontWeight:700,marginBottom:18,textAlign:'center',textTransform:'uppercase'}}>Proximity Meter</p>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:'22px 18px'}}>
+            <p style={{fontSize:11,color:C.textLight,letterSpacing:'0.12em',fontWeight:700,marginBottom:18,textAlign:'center',textTransform:'uppercase'}}>Proximity Meter</p>
             <ProximityMeter distance={distance} merged={merged}/>
           </div>
         )}
 
         {/* Prompt feedback auto-déclenché */}
         {showFeedback&&(
-          <div style={{background:'#0D2818',border:'1px solid #166534',borderRadius:18,padding:20,textAlign:'center',animation:'slideUp 0.4s ease-out'}}>
-            <p style={{color:D.green,fontWeight:900,fontSize:17,marginBottom:6}}>🎉 Vous vous êtes trouvés !</p>
-            <p style={{color:D.mid,fontSize:13,marginBottom:16}}>Comment s'est passé votre rencontre ?</p>
-            <button onClick={()=>go('feedback')} style={{padding:'12px 28px',borderRadius:14,border:'none',background:D.green,color:'#000',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
+          <div style={{background:C.sageLight,border:`1px solid ${C.sage}44`,borderRadius:18,padding:20,textAlign:'center'}}>
+            <p style={{color:C.sage,fontWeight:900,fontSize:17,marginBottom:6}}>🎉 Vous vous êtes trouvés !</p>
+            <p style={{color:C.textMid,fontSize:13,marginBottom:16}}>Comment s'est passé votre rencontre ?</p>
+            <button onClick={()=>go('feedback')} style={{padding:'12px 28px',borderRadius:14,border:'none',background:`linear-gradient(135deg,${C.sage},#5A8A6A)`,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
               Donner mon avis →
             </button>
           </div>
         )}
 
-        {/* Actions secondaires */}
+        {/* Actions */}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           <button onClick={()=>{setSelectedClutch_HACK(clutch);go('chat')}}
-            style={{padding:13,borderRadius:14,background:D.card,border:`1px solid ${D.border}`,cursor:'pointer',color:D.mid,fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>
-            💬 Envoyer un message
+            style={{padding:13,borderRadius:14,background:C.card,border:`1px solid ${C.border}`,cursor:'pointer',color:C.textMid,fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>
+            💬 Messages
           </button>
           <button onClick={()=>shareIt({title:'Mon RDV Clutch',text:`Je rencontre quelqu'un via Clutch à ${clutch.venue} !`,url:`https://maps.google.com/?q=${encodeURIComponent(clutch.venue+' Lausanne')}`})}
-            style={{padding:12,borderRadius:14,background:D.card,border:`1px solid ${D.border}`,cursor:'pointer',color:D.mid,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
+            style={{padding:12,borderRadius:14,background:C.card,border:`1px solid ${C.border}`,cursor:'pointer',color:C.textMid,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
             📤 Partager ma position avec un proche
           </button>
           <button onClick={()=>go('sos')}
-            style={{padding:12,borderRadius:14,background:'#1A0808',border:'1px solid #7F1D1D',cursor:'pointer',color:'#F87171',fontWeight:700,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
+            style={{padding:12,borderRadius:14,background:C.redLight,border:`1px solid ${C.red}33`,cursor:'pointer',color:C.red,fontWeight:700,fontSize:13,fontFamily:'inherit',textAlign:'left'}}>
             🆘 SOS · Sécurité
           </button>
         </div>
 
-        {/* Check-in manuel (si GPS indisponible) */}
+        {/* Check-in manuel */}
         {isNow&&!merged&&(
           <button onClick={manualCheckin}
-            style={{padding:14,borderRadius:14,border:'none',background:`linear-gradient(135deg,${D.green},#15803D)`,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{padding:14,borderRadius:14,border:'none',background:`linear-gradient(135deg,${C.sage},#5A8A6A)`,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit'}}>
             ✓ Je suis arrivé·e (check-in manuel)
           </button>
         )}
 
         <button onClick={cancel}
-          style={{padding:10,borderRadius:12,background:'none',border:`1px solid ${D.border}`,color:D.dim,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+          style={{padding:10,borderRadius:12,background:'none',border:`1px solid ${C.border}`,color:C.textLight,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
           Annuler le RDV
         </button>
       </div>
@@ -3276,7 +3374,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AA</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AF</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -3313,7 +3411,7 @@ export default function App() {
           {screen==='propose2' && <Propose2 profile={selectedProfile} go={go} selectedTime={selectedTime} setSelectedTime={setSelectedTime} venueInput={venueInput}/>}
           {screen==='propose3' && <Propose3 profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime} message={message} setMessage={setMessage} onSend={sendClutch} sending={sending}/>}
           {screen==='sent' && <Sent profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime}/>}
-          {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go}/>}
+          {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='feedback' && <FeedbackRdv clutch={selectedClutch} user={user} go={go}/>}

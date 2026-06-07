@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clutch · v07.06-AF",
+  title: "Clutch · v07.06-AG",
   description: "L'app de rencontres spontanées à Lausanne",
   manifest: "/manifest.json",
   appleWebApp: {

@@ -819,7 +819,7 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
 }
 
 // ─── PROFILE DETAIL ───────────────────────────────────────────────────────────
-function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go:(s:Screen)=>void; currentUser:any }) {
+function ProfileDetail({ profile, go, currentUser, refresh }: { profile: Profile|null; go:(s:Screen)=>void; currentUser:any; refresh?:()=>void }) {
   const [reporting, setReporting] = useState(false)
   const [reportReason, setReportReason] = useState('')
   const [reportDone, setReportDone] = useState(false)
@@ -835,7 +835,8 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
     if (!profile?.id || !currentUser?.id) return
     await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }).select()
     setBlocked(true)
-    setTimeout(() => go('discover'), 1500)
+    refresh?.() // Recharge immédiatement Discover pour exclure la personne bloquée
+    setTimeout(() => go('discover'), 1200)
   }
 
   if (!profile) return null
@@ -850,7 +851,7 @@ function ProfileDetail({ profile, go, currentUser }: { profile: Profile|null; go
         <div style={{ position:'absolute', top:16, right:16, display:'flex', gap:8 }}>
           <button onClick={()=>shareIt({ title:`${profile.name} sur Clutch`, text:`Regarde le profil de ${profile.name} sur Clutch Lausanne ☕`, url:APP_URL+'/app' })} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↗</button>
           <button onClick={()=>setReporting(true)} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Signaler">🚩</button>
-          <button onClick={async()=>{ if(!confirm(`Bloquer ${profile.name} ? Il/elle ne te verra plus dans Discover.`)) return; await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }).then(()=>{}); go('discover') }} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Bloquer">🚫</button>
+          <button onClick={async()=>{ if(!confirm(`Bloquer ${profile.name} ? Il/elle ne te verra plus dans Discover.`)) return; await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }); refresh?.(); go('discover') }} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Bloquer">🚫</button>
         </div>
       </div>
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
@@ -1675,6 +1676,16 @@ function MyEvents({ user, go }: { user:any; go:(s:Screen)=>void }) {
 
 // ─── INBOX ────────────────────────────────────────────────────────────────────
 function Inbox({ clutches, user, go, setSelectedClutch }: any) {
+  // RDV annulés dismissibles — stockés en localStorage pour ne pas revenir
+  const [dismissed, setDismissed] = useState<string[]>(()=>{
+    try { return JSON.parse(localStorage.getItem('dismissed_cancelled')||'[]') } catch { return [] }
+  })
+  const dismissCancelled = (id: string) => {
+    const next = [...dismissed, id]
+    setDismissed(next)
+    localStorage.setItem('dismissed_cancelled', JSON.stringify(next))
+  }
+
   const open = (c:any) => {
     setSelectedClutch(c)
     if (c.receiver_id === user.id && c.status === 'pending') go('clutch-received')
@@ -1711,12 +1722,13 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
     return false
   })
 
-  // RDVs annulés dans les 48h — pour que la victime soit notifiée in-app
+  // RDVs annulés dans les 24h — dismissibles, non-dismissés seulement
   const cancelled = clutches.filter((c:any) => {
     if (c.status !== 'cancelled') return false
+    if (dismissed.includes(c.id)) return false
     const updated = c.updated_at ? new Date(c.updated_at) : null
     if (!updated) return false
-    return (now.getTime() - updated.getTime()) < 48 * 60 * 60 * 1000
+    return (now.getTime() - updated.getTime()) < 24 * 60 * 60 * 1000
   })
 
   const SectionTitle = ({ label, count }: any) => (
@@ -1806,25 +1818,17 @@ function Inbox({ clutches, user, go, setSelectedClutch }: any) {
       )}
 
       {cancelled.length > 0 && (
-        <div style={{ marginTop:8 }}>
-          <div style={{ padding:'10px 20px 6px', display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontSize:11, fontWeight:800, color:C.red, letterSpacing:'0.08em', textTransform:'uppercase' }}>❌ RDV annulé</span>
-          </div>
+        <div style={{ marginTop:8, padding:'0 16px 8px' }}>
           {cancelled.map((c:any) => {
             const other = c.sender_id === user.id ? c.receiver : c.sender
-            const cancelledByMe = c.sender_id === user.id
-              ? (c.receiver_id !== user.id)
-              : (c.sender_id !== user.id)
-            // Qui a annulé ? On ne stocke pas encore ce champ, donc on infère
             return (
-              <div key={c.id} style={{ padding:'12px 20px', background:C.redLight, borderBottom:`1px solid ${C.red}22`, display:'flex', gap:12, alignItems:'center' }}>
-                <Avatar p={other || {}} size={44}/>
+              <div key={c.id} style={{ background:C.redLight, border:`1px solid ${C.red}22`, borderRadius:12, padding:'8px 12px', marginBottom:6, display:'flex', alignItems:'center', gap:10 }}>
+                <Avatar p={other||{}} size={32}/>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <span style={{ fontWeight:800, color:C.text, fontSize:14 }}>{other?.name || '?'}</span>
-                  <p style={{ fontSize:13, color:C.red, marginTop:2, fontWeight:600 }}>RDV annulé · {c.venue}</p>
-                  <p style={{ fontSize:11, color:C.textLight, marginTop:1 }}>Tu peux clutcher à nouveau depuis Discover</p>
+                  <span style={{ fontWeight:700, color:C.text, fontSize:13 }}>{other?.name||'?'} · </span>
+                  <span style={{ fontSize:12, color:C.red, fontWeight:600 }}>RDV annulé à {c.venue}</span>
                 </div>
-                <span style={{ fontSize:20 }}>❌</span>
+                <button onClick={()=>dismissCancelled(c.id)} style={{ background:'none', border:'none', cursor:'pointer', color:C.red, fontSize:18, flexShrink:0, padding:'2px 4px' }}>✕</button>
               </div>
             )
           })}
@@ -2139,7 +2143,7 @@ function MyProfile({ user, go, signOut, save }: any) {
           Se déconnecter
         </button>
         <a href="/" style={{ display:'block', textAlign:'center', padding:10, color:C.textLight, fontSize:12, textDecoration:'none' }}>← Retour au site</a>
-        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AF</p>
+        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AG</p>
       </div>
     </div>
   )
@@ -2441,27 +2445,38 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
 }
 
 // ─── CHAT RÉEL — HUB CENTRAL pour les RDVs acceptés ─────────────────────────
-// Audit challenger : inbox → clutch → "envoyer un message" = 3 clics. Inacceptable.
-// Fix : chat = hub. RDV info + cancel + proximity en haut. Pas de navigation séparée.
-// MSG_LIMIT = 5 PAR PERSONNE (pas total). Prévisible, équitable, chacun sait ce qu'il a.
+// MSG_LIMIT = 5 PAR PERSONNE. Countdown toujours visible. Proximity Meter = modal (pas de navigation).
 function Chat({ clutch, user, go, refresh, sendPush }: any) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [inputErr, setInputErr] = useState('')
-  const [showRdvDetail, setShowRdvDetail] = useState(false)
+  const [showProximity, setShowProximity] = useState(false)
   const [cancelledByOther, setCancelledByOther] = useState(false)
+  // Proximity Meter state (modal)
+  const [myPos, setMyPos] = useState<{lat:number;lng:number}|null>(null)
+  const [otherPos, setOtherPos] = useState<{lat:number;lng:number}|null>(null)
+  const [proxDist, setProxDist] = useState<number|null>(null)
+  const [proxMerged, setProxMerged] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  // 5 messages PAR PERSONNE — pas total. Chacun connaît sa limite exacte.
   const MSG_LIMIT = 5
   if (!clutch) return null
   const other = clutch.sender_id === user.id ? clutch.receiver : clutch.sender
   const isAccepted = clutch.status === 'accepted'
   const meetTime = clutch.proposed_time ? new Date(clutch.proposed_time) : null
-
-  // Compte uniquement MES messages
   const myMsgCount = messages.filter(m => m.sender_id === user.id).length
-  const otherMsgCount = messages.filter(m => m.sender_id !== user.id).length
   const canSend = myMsgCount < MSG_LIMIT
+
+  // Countdown
+  const [countdown, setCountdown] = useState(meetTime ? Math.max(0, meetTime.getTime()-Date.now()) : 0)
+  useEffect(()=>{
+    if(!meetTime) return
+    const t = setInterval(()=>setCountdown(Math.max(0,meetTime.getTime()-Date.now())),1000)
+    return ()=>clearInterval(t)
+  },[])
+  const cdH = Math.floor(countdown/3600000)
+  const cdM = Math.floor((countdown%3600000)/60000)
+  const cdS = Math.floor((countdown%60000)/1000)
+  const isNow = countdown <= 0
 
   useEffect(()=>{
     supabase.from('messages').select('*').eq('clutch_id', clutch.id).order('created_at')
@@ -2473,7 +2488,6 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
     return ()=>{ supabase.removeChannel(ch) }
   },[clutch.id])
 
-  // Surveillance annulation par l'autre depuis le chat
   useEffect(()=>{
     if (!clutch?.id || !isAccepted) return
     const ch = supabase.channel(`chat-cancel-${clutch.id}`)
@@ -2483,13 +2497,42 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
     return ()=>{ supabase.removeChannel(ch) }
   },[clutch.id])
 
+  // GPS Proximity — actif seulement quand modal ouvert ET heure RDV passée
+  useEffect(()=>{
+    if (!showProximity || !isNow || !clutch?.id) return
+    const ch = supabase.channel(`prox-chat-${clutch.id}`)
+      .on('broadcast',{event:'pos'},({payload})=>{
+        if(payload.uid!==user.id) setOtherPos({lat:payload.lat,lng:payload.lng})
+      }).subscribe()
+    const wid = navigator.geolocation?.watchPosition(pos=>{
+      const {latitude:lat,longitude:lng}=pos.coords
+      setMyPos({lat,lng})
+      ch.send({type:'broadcast',event:'pos',payload:{lat,lng,uid:user.id}})
+    },null,{enableHighAccuracy:true,maximumAge:8000})
+    return ()=>{ supabase.removeChannel(ch); navigator.geolocation?.clearWatch(wid) }
+  },[showProximity,isNow])
+
+  useEffect(()=>{
+    if(!myPos||!otherPos) return
+    const R=6371000,φ1=myPos.lat*Math.PI/180,φ2=otherPos.lat*Math.PI/180
+    const Δφ=(otherPos.lat-myPos.lat)*Math.PI/180,Δλ=(otherPos.lng-myPos.lng)*Math.PI/180
+    const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
+    const d=Math.round(2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)))
+    setProxDist(d)
+    if(d<=50&&!proxMerged){
+      setProxMerged(true)
+      const field=clutch.sender_id===user.id?'checked_in_sender':'checked_in_receiver'
+      supabase.from('clutches').update({[field]:true,status:'completed'}).eq('id',clutch.id)
+      refresh?.()
+    }
+  },[myPos,otherPos])
+
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[messages])
 
   const send = async () => {
     if(!input.trim()||!canSend) return
     const text=input.trim()
-    const lower=text.toLowerCase()
-    if(BANNED_WORDS.some(w=>lower.includes(w))){setInputErr('Message inapproprié — merci de rester respectueux·se');setTimeout(()=>setInputErr(''),3000);return}
+    if(BANNED_WORDS.some(w=>text.toLowerCase().includes(w))){setInputErr('Message inapproprié');setTimeout(()=>setInputErr(''),3000);return}
     setInput('');setInputErr('')
     await supabase.from('messages').insert({clutch_id:clutch.id,sender_id:user.id,content:text})
   }
@@ -2503,18 +2546,6 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
     go('inbox')
   }
 
-  // Countdown RDV
-  const [countdown, setCountdown] = useState(meetTime ? Math.max(0, meetTime.getTime()-Date.now()) : 0)
-  useEffect(()=>{
-    if(!meetTime) return
-    const t = setInterval(()=>setCountdown(Math.max(0,meetTime.getTime()-Date.now())),1000)
-    return ()=>clearInterval(t)
-  },[])
-  const cdH = Math.floor(countdown/3600000)
-  const cdM = Math.floor((countdown%3600000)/60000)
-  const cdS = Math.floor((countdown%60000)/1000)
-  const isNow = countdown <= 0
-
   if (cancelledByOther) return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:C.bg, padding:32, gap:20, textAlign:'center' }}>
       <div style={{ fontSize:64 }}>❌</div>
@@ -2527,79 +2558,53 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
       {/* TopBar */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 8px', background:C.bg, flexShrink:0, borderBottom:`1px solid ${C.border}` }}>
-        <button onClick={()=>go('inbox')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:C.textMid, padding:'0 8px 0 0', minWidth:40 }}>←</button>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <Avatar p={other||{}} size={32}/>
-          <div>
-            <p style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1 }}>{other?.name}</p>
-            {isAccepted && meetTime && <p style={{ fontSize:10, color:C.sage, fontWeight:600 }}>☕ RDV confirmé</p>}
-          </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px 8px', background:C.bg, flexShrink:0, borderBottom:`1px solid ${C.border}` }}>
+        <button onClick={()=>go('inbox')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:C.textMid, padding:'0 6px 0 0', flexShrink:0 }}>←</button>
+        <Avatar p={other||{}} size={34}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <p style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1 }}>{other?.name}</p>
+          {isAccepted && <p style={{ fontSize:10, color:C.sage, fontWeight:600 }}>☕ RDV confirmé · {clutch.venue}</p>}
         </div>
-        <button onClick={()=>setShowRdvDetail(v=>!v)} style={{ background:showRdvDetail?C.primaryLight:C.bgDeep, border:'none', borderRadius:12, padding:'6px 10px', cursor:'pointer', fontSize:12, color:showRdvDetail?C.primary:C.textLight, fontWeight:700, fontFamily:'inherit' }}>
-          {showRdvDetail ? '▲ RDV' : '▼ RDV'}
-        </button>
+        {isAccepted && meetTime && (
+          <div style={{ background:isNow?C.sageLight:C.primaryLight, borderRadius:10, padding:'4px 10px', textAlign:'center', flexShrink:0 }}>
+            {isNow
+              ? <p style={{ fontSize:11, fontWeight:800, color:C.sage }}>C'est l'heure !</p>
+              : <p style={{ fontSize:13, fontWeight:900, color:C.primary }}>{cdH>0?`${cdH}h `:''}{ String(cdM).padStart(2,'0')}m</p>
+            }
+          </div>
+        )}
       </div>
 
-      {/* Panneau RDV (collapsible) — infos + countdown + cancel */}
-      {isAccepted && showRdvDetail && (
-        <div style={{ background:C.bgDeep, borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', flexDirection:'column', gap:10, flexShrink:0 }}>
-          <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-            <div style={{ flex:1 }}>
-              <p style={{ fontWeight:700, fontSize:14, color:C.text }}>📍 {clutch.venue}</p>
-              {meetTime && <p style={{ fontSize:12, color:C.textMid, marginTop:2 }}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>}
-            </div>
-            {meetTime && (
-              <div style={{ background: isNow ? C.sageLight : C.primaryLight, borderRadius:12, padding:'6px 12px', textAlign:'center' }}>
-                {isNow
-                  ? <p style={{ fontSize:12, fontWeight:800, color:C.sage }}>C'est maintenant !</p>
-                  : <><p style={{ fontSize:18, fontWeight:900, color:C.primary, lineHeight:1 }}>{cdH>0?`${cdH}h `:''}{ String(cdM).padStart(2,'0')}m</p>
-                    <p style={{ fontSize:9, color:C.textLight }}>avant le RDV</p></>
-                }
-              </div>
-            )}
-          </div>
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={()=>{go('rdv-active')}} style={{ flex:1, padding:'9px', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:C.sage, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-              📡 Proximity Meter
-            </button>
-            <button onClick={cancelRdv} style={{ flex:1, padding:'9px', borderRadius:12, border:`1px solid ${C.red}33`, background:C.redLight, color:C.red, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-              ✕ Annuler le RDV
-            </button>
+      {/* Bandeau RDV compact — toujours visible si accepté */}
+      {isAccepted && (
+        <div style={{ padding:'6px 16px', background:C.bgDeep, borderBottom:`1px solid ${C.border}`, display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
+          <button onClick={()=>setShowProximity(true)} style={{ flex:1, padding:'7px 10px', borderRadius:10, border:`1px solid ${C.border}`, background:C.card, color:C.sage, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            📡 Proximity Meter
+          </button>
+          <button onClick={cancelRdv} style={{ flex:1, padding:'7px 10px', borderRadius:10, border:`1px solid ${C.red}33`, background:C.redLight, color:C.red, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            ✕ Annuler RDV
+          </button>
+          {/* Compteur messages */}
+          <div style={{ display:'flex', gap:3, alignItems:'center', flexShrink:0 }}>
+            {[...Array(MSG_LIMIT)].map((_,i)=>(
+              <div key={i} style={{ width:7, height:7, borderRadius:'50%', background: i<myMsgCount ? C.primary : C.border }}/>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Bandeau msg counter — per person, clair */}
-      <div style={{ padding:'6px 16px', background:!canSend ? C.redLight : myMsgCount >= MSG_LIMIT-1 ? '#FFF8E1' : C.bgDeep, borderBottom:`1px solid ${!canSend?C.red+'33':C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <span style={{ fontSize:11, color:C.textMid }}>📍 {clutch.venue}</span>
-        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-          <div style={{ display:'flex', gap:2 }}>
-            {[...Array(MSG_LIMIT)].map((_,i)=>(
-              <div key={i} style={{ width:6, height:6, borderRadius:'50%', background: i<myMsgCount ? C.primary : C.border }}/>
-            ))}
-          </div>
-          <span style={{ fontSize:11, fontWeight:700, color:!canSend?C.red:C.textMid }}>
-            {!canSend ? '🚫 Limite' : `Toi: ${myMsgCount}/5`}
-          </span>
-        </div>
-      </div>
-
       {/* Messages */}
       <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
-
-        {/* Message initial du clutch — toujours affiché en premier */}
         {clutch.message && (
           <div style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
             <div style={{ maxWidth:'86%', background:`linear-gradient(135deg,${C.primaryLight},${C.peachLight})`, border:`1px solid ${C.primary}33`, borderRadius:16, padding:'10px 14px' }}>
               <p style={{ fontSize:10, fontWeight:800, color:C.primary, marginBottom:4, letterSpacing:'0.05em', textTransform:'uppercase' }}>
-                ☕ Proposition initiale de {clutch.sender_id===user.id ? 'toi' : other?.name}
+                ☕ Proposition initiale {clutch.sender_id===user.id ? '(toi)' : `de ${other?.name}`}
               </p>
               <p style={{ fontSize:13, color:C.text, lineHeight:1.5, fontStyle:'italic' }}>"{clutch.message}"</p>
             </div>
           </div>
         )}
-
         {messages.map(m=>{
           const isMine = m.sender_id === user.id
           return (
@@ -2615,19 +2620,48 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
 
       {/* Input */}
       {!canSend
-        ? <div style={{ padding:'12px 16px 20px', textAlign:'center', background:C.redLight, borderTop:`1px solid ${C.red}22`, flexShrink:0 }}>
-            <p style={{ fontSize:14, fontWeight:800, color:C.red, marginBottom:2 }}>🚫 5 messages envoyés</p>
-            <p style={{ fontSize:12, color:C.textMid }}>Ta limite est atteinte — l'autre peut encore répondre ☕</p>
+        ? <div style={{ padding:'10px 16px 20px', textAlign:'center', background:C.redLight, borderTop:`1px solid ${C.red}22`, flexShrink:0 }}>
+            <p style={{ fontSize:13, fontWeight:800, color:C.red, marginBottom:1 }}>🚫 Tes 5 messages sont envoyés</p>
+            <p style={{ fontSize:11, color:C.textMid }}>L'autre peut encore répondre — puis go le café ☕</p>
           </div>
         : <div style={{ background:C.bg, borderTop:`1px solid ${C.border}`, flexShrink:0 }}>
             {inputErr&&<p style={{ fontSize:11, color:C.red, padding:'4px 16px 0', textAlign:'center' }}>{inputErr}</p>}
-            <div style={{ padding:'10px 16px 24px', display:'flex', gap:8 }}>
+            <div style={{ padding:'8px 14px 20px', display:'flex', gap:8 }}>
               <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={`Message à ${other?.name}…`}
                 style={{ flex:1, padding:'11px 14px', borderRadius:20, border:`1.5px solid ${inputErr?C.red:C.border}`, background:C.bgDeep, fontSize:14, outline:'none', color:C.text, fontFamily:'inherit' }}/>
-              <button onClick={send} disabled={!input.trim()} style={{ padding:'11px 18px', borderRadius:20, border:'none', background:input.trim()?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:input.trim()?'#fff':C.textLight, fontWeight:700, fontSize:14, cursor:input.trim()?'pointer':'not-allowed', fontFamily:'inherit' }}>→</button>
+              <button onClick={send} disabled={!input.trim()} style={{ padding:'11px 16px', borderRadius:20, border:'none', background:input.trim()?`linear-gradient(135deg,${C.primary},${C.primaryDark})`:C.bgDeep, color:input.trim()?'#fff':C.textLight, fontWeight:700, fontSize:14, cursor:input.trim()?'pointer':'not-allowed', fontFamily:'inherit' }}>→</button>
             </div>
           </div>
       }
+
+      {/* Modal Proximity Meter — bottom sheet, pas de navigation */}
+      {showProximity && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:200, display:'flex', alignItems:'flex-end' }} onClick={()=>setShowProximity(false)}>
+          <div style={{ background:C.bg, borderRadius:'24px 24px 0 0', padding:'20px 20px 36px', width:'100%', maxWidth:480, margin:'0 auto' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:C.border, borderRadius:2, margin:'0 auto 16px' }}/>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <p style={{ fontWeight:800, fontSize:16, color:C.text }}>📡 Proximity Meter</p>
+              <button onClick={()=>setShowProximity(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:C.textLight }}>✕</button>
+            </div>
+            <div style={{ background:C.bgDeep, borderRadius:16, padding:'12px 16px', marginBottom:16 }}>
+              <p style={{ fontSize:13, color:C.textMid, fontWeight:600 }}>📍 {clutch.venue}</p>
+              {meetTime && <p style={{ fontSize:12, color:C.textLight, marginTop:2 }}>🗓 {meetTime.toLocaleString('fr-CH',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</p>}
+            </div>
+            {isNow
+              ? <ProximityMeter distance={proxDist} merged={proxMerged}/>
+              : <div style={{ textAlign:'center', padding:'20px 0' }}>
+                  <p style={{ fontSize:36, fontWeight:900, color:C.primary }}>{cdH>0?`${cdH}h `:''}{ String(cdM).padStart(2,'0')}:{String(cdS).padStart(2,'0')}</p>
+                  <p style={{ fontSize:13, color:C.textLight, marginTop:8 }}>Le GPS s'active à l'heure du RDV</p>
+                </div>
+            }
+            {proxMerged && (
+              <button onClick={()=>{refresh?.();go('feedback')}} style={{ width:'100%', marginTop:16, padding:'13px', borderRadius:14, border:'none', background:`linear-gradient(135deg,${C.sage},#5A8A6A)`, color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
+                🎉 Donner mon avis sur le RDV →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3374,7 +3408,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AF</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AG</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -3399,7 +3433,7 @@ export default function App() {
           {screen==='ob-done' && <ObDone go={go} user={user}/>}
           {screen==='set-avail' && <SetAvail user={user} go={go} save={save} fromProfile={tab==='myprofile'||isUserReallyAvail}/>}
           {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go} refresh={loadProfiles}/>}
-          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user}/>}
+          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user} refresh={loadProfiles}/>}
           {screen==='events' && <Events user={user} go={go}/>}
           {screen==='create-event' && <CreateEvent user={user} go={go}/>}
           {screen==='my-events' && <MyEvents user={user} go={go}/>}

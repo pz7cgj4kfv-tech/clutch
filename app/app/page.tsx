@@ -3,15 +3,23 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
+const BUILD_VERSION = 'v08.06-M'
+const BUILD_TIME = (() => {
+  const raw = process.env.NEXT_PUBLIC_BUILD_TIME
+  if (!raw) return ''
+  const d = new Date(raw)
+  return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Zurich'})
+})()
+
 const C = {
-  bg:'#FDFAF7', bgDeep:'#F5F0EA',
-  primary:'#C4748A', primaryDark:'#A85C72', primaryLight:'#F2D4DB',
-  sage:'#7A9E8A', sageLight:'#D4E8DE',
-  peach:'#E8A87C', peachLight:'#FAEBD7',
+  bg:'#FFFFFF', bgDeep:'#F6F3F5',
+  primary:'#8B1A4A', primaryDark:'#6B1238', primaryLight:'#F5E0EA',
+  sage:'#2E9E6B', sageLight:'#D4F0E4',
+  peach:'#E8A87C', peachLight:'#FDF0E6',
   gold:'#C9A96E', purple:'#8B7CB8', purpleLight:'#EAE6F8',
-  text:'#2C1810', textMid:'#6B4C3B', textLight:'#A08878',
-  card:'#FFFFFF', border:'#EDE8E3', shadow:'rgba(44,24,16,0.08)',
-  red:'#D64545', redLight:'#FDEAEA',
+  text:'#111111', textMid:'#555555', textLight:'#999999',
+  card:'#FFFFFF', border:'#EBEBEB', shadow:'rgba(0,0,0,0.07)',
+  red:'#C0392B', redLight:'#FADADF',
 }
 
 type Screen =
@@ -167,8 +175,8 @@ function getTimeSlots() {
   const m = start.getMinutes()
   const rem = 30 - (m % 30)
   start.setMinutes(m + rem, 0, 0)
-  // Generate 8 slots every 30 min
-  for (let i = 0; i < 8; i++) {
+  // Generate slots every 30 min up to 18h
+  for (let i = 0; i < 36; i++) {
     const t = new Date(start.getTime() + i * 30 * 60000)
     const diff = Math.round((t.getTime() - now.getTime()) / 60000)
     if (diff > 18 * 60) break
@@ -228,7 +236,7 @@ function TabBar({ tab, setTab, badge=0 }: { tab:string; setTab:(t:string)=>void;
   return (
     <div style={{ display:'flex', borderTop:`1px solid ${C.border}`, background:C.bg, flexShrink:0, position:'sticky', bottom:0, zIndex:10 }}>
       {[{id:'discover',icon:'✦',label:'Discover'},{id:'events',icon:'🗓',label:'Événements'},{id:'inbox',icon:'💬',label:'Messages',b:badge},{id:'myprofile',icon:'◉',label:'Profil'}].map(t=>(
-        <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px env(safe-area-inset-bottom,14px)', position:'relative' }}>
+        <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px env(safe-area-inset-bottom,14px)', position:'relative', touchAction:'manipulation', WebkitTapHighlightColor:'transparent' } as any}>
           <span style={{ fontSize:20, lineHeight:1, color:tab===t.id?C.primary:C.textLight }}>{t.icon}</span>
           <span style={{ fontSize:10, fontWeight:tab===t.id?700:500, color:tab===t.id?C.primary:C.textLight }}>{t.label}</span>
           {(t as any).b>0&&<div style={{ position:'absolute', top:6, right:'14%', width:16, height:16, borderRadius:'50%', background:C.primary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:700 }}>{(t as any).b}</div>}
@@ -691,17 +699,32 @@ function ObDone({ go, user }: any) {
 }
 
 // ─── DISCOVER = GRILLE 2 COLONNES ─────────────────────────────────────────────
-function Discover({ profiles, user, onSelect, go, refresh }: any) {
+function Discover({ profiles, user, onSelect, go, refresh, onFavorite, favorites, clutches }: any) {
   const [showAll, setShowAll] = useState(false)
   const [kmFilter, setKmFilter] = useState<number>(25) // 25km = pas de filtre en beta
   const hasGPS = !!(user?.lat && user?.lng)
   const now = new Date()
+
+  // IDs des profils actuellement en RDV actif (±90 min autour de proposed_time)
+  const inRdvNow = new Set<string>()
+  ;(clutches||[]).forEach((c: any) => {
+    if (c.status !== 'accepted' || !c.proposed_time) return
+    const t = new Date(c.proposed_time).getTime()
+    const diff = now.getTime() - t
+    if (diff >= -30*60*1000 && diff <= 90*60*1000) {
+      inRdvNow.add(c.sender_id)
+      inRdvNow.add(c.receiver_id)
+    }
+  })
+
   const activeProfiles = profiles.filter((p: Profile) => {
     if (!p.is_available) return false
     if (p.available_until) {
       const until = new Date(p.available_until)
       if (!isNaN(until.getTime()) && until < now) return false
     }
+    // Invisible si en RDV actif en ce moment
+    if (inRdvNow.has(p.id)) return false
     // Filtre distance GPS
     if (hasGPS && (p as any).lat && (p as any).lng && kmFilter < 25) {
       const d = distKm(user.lat, user.lng, (p as any).lat, (p as any).lng)
@@ -716,7 +739,10 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
       <div style={{ padding:'12px 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center', background:C.bg, borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, zIndex:5 }}>
         <div>
           <a href="/" style={{ fontSize:18, fontWeight:900, letterSpacing:'-0.05em', color:C.text, textDecoration:'none' }}>CLUTCH <span style={{ fontSize:10, background:C.primaryLight, color:C.primary, padding:'2px 7px', borderRadius:7, fontWeight:700, letterSpacing:0 }}>BÊTA</span></a>
-          <p style={{ fontSize:10, color:C.textLight, fontWeight:600, marginTop:1 }}>{displayed.length} profil{displayed.length>1?'s':''} {showAll?'au total':'disponible'}{displayed.length>1&&!showAll?'s':''}</p>
+          <p style={{ fontSize:10, color:C.textLight, fontWeight:600, marginTop:1 }}>
+            {user?.name && <span style={{ color:C.primary }}>Bonjour {user.name} · </span>}
+            {displayed.length} profil{displayed.length>1?'s':''} {showAll?'au total':'disponible'}{displayed.length>1&&!showAll?'s':''}
+          </p>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <button onClick={()=>{refresh&&refresh()}} style={{ fontSize:14, background:'none', border:'none', cursor:'pointer', color:C.textLight, padding:'4px 6px' }} title="Rafraîchir">↻</button>
@@ -728,7 +754,7 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
               <span style={{ fontSize:10, fontWeight:700, color:C.primary, minWidth:28 }}>{kmFilter<25?`${kmFilter}km`:'∞'}</span>
             </div>
           )}
-          <button onClick={()=>setShowAll(s=>!s)} style={{ fontSize:11, background:showAll?C.bgDeep:C.primaryLight, color:showAll?C.textLight:C.primary, padding:'5px 10px', borderRadius:10, border:'none', cursor:'pointer', fontWeight:600, fontFamily:'inherit' }}>
+          <button onClick={()=>{ const next=!showAll; setShowAll(next); refresh&&refresh(next) }} style={{ fontSize:11, background:showAll?C.bgDeep:C.primaryLight, color:showAll?C.textLight:C.primary, padding:'5px 10px', borderRadius:10, border:'none', cursor:'pointer', fontWeight:600, fontFamily:'inherit' }}>
             {showAll?'Tous':'Disponibles'}
           </button>
           <button onClick={()=>go('sos')} style={{ background:C.redLight, border:'none', borderRadius:14, padding:'5px 11px', cursor:'pointer', color:C.red, fontWeight:700, fontSize:12, fontFamily:'inherit' }}>SOS</button>
@@ -762,7 +788,7 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
                   {/* Photo */}
                   <div style={{ position:'relative', width:88, height:108, flexShrink:0 }}>
                     {p.photo_url
-                      ? <img src={p.photo_url} alt="" style={{ width:88, height:108, objectFit:'cover' }}/>
+                      ? <img src={p.photo_url} alt="" style={{ width:88, height:108, objectFit:'cover', objectPosition:'top' }}/>
                       : <div style={{ width:88, height:108, background:`linear-gradient(135deg,${C.primary},${C.peach})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30 }}>☕</div>
                     }
                     {isAvailNow && (
@@ -785,7 +811,7 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
                       📍 {p.neighborhood||'Lausanne'}
                       {user?.lat&&user?.lng&&(p as any).lat&&(p as any).lng ? ` · ${fmtDist(distKm(user.lat,user.lng,(p as any).lat,(p as any).lng))}` : ''}
                       {isAvailNow ? ' · maintenant' : p.available_from ? ` · dès ${fmtDate(p.available_from)}` : ''}
-                      {p.available_until ? ` → ${fmtIsoTime(p.available_until, true)}` : ''}
+                      {p.available_until ? ` · jusqu'à ${fmtIsoTime(p.available_until, true)}` : ''}
                     </p>
                     {/* Étoiles fiabilité */}
                     <div style={{ display:'flex', alignItems:'center', gap:2 }}>
@@ -819,11 +845,12 @@ function Discover({ profiles, user, onSelect, go, refresh }: any) {
 }
 
 // ─── PROFILE DETAIL ───────────────────────────────────────────────────────────
-function ProfileDetail({ profile, go, currentUser, refresh }: { profile: Profile|null; go:(s:Screen)=>void; currentUser:any; refresh?:()=>void }) {
+function ProfileDetail({ profile, go, currentUser, refresh, favorites, onFavorite }: { profile: Profile|null; go:(s:Screen)=>void; currentUser:any; refresh?:()=>void; favorites?:string[]; onFavorite?:(id:string)=>void }) {
   const [reporting, setReporting] = useState(false)
   const [reportReason, setReportReason] = useState('')
   const [reportDone, setReportDone] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const isFav = favorites?.includes(profile?.id||'') || false
 
   const sendReport = async () => {
     if (!reportReason || !profile?.id || !currentUser?.id) return
@@ -835,8 +862,20 @@ function ProfileDetail({ profile, go, currentUser, refresh }: { profile: Profile
     if (!profile?.id || !currentUser?.id) return
     await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }).select()
     setBlocked(true)
-    refresh?.() // Recharge immédiatement Discover pour exclure la personne bloquée
+    refresh?.()
     setTimeout(() => go('discover'), 1200)
+  }
+
+  const toggleFavorite = async () => {
+    if (!profile?.id || !currentUser?.id) return
+    // Gate premium pour les hommes
+    const isMan = currentUser.gender !== 'female'
+    const isAdmin = ['admin','partner'].includes(currentUser.account_type||'')
+    if (isMan && !isAdmin && !currentUser.is_premium) {
+      alert('⭐ Les favoris sont réservés aux membres Premium.\n\nPasse Premium (CHF 19.90/mois) dans ton Profil pour sauvegarder tes profils préférés.')
+      return
+    }
+    onFavorite?.(profile.id)
   }
 
   if (!profile) return null
@@ -849,9 +888,9 @@ function ProfileDetail({ profile, go, currentUser, refresh }: { profile: Profile
         }
         <button onClick={()=>go('discover')} style={{ position:'absolute', top:16, left:16, width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>←</button>
         <div style={{ position:'absolute', top:16, right:16, display:'flex', gap:8 }}>
+          <button onClick={toggleFavorite} style={{ width:38, height:38, borderRadius:'50%', background:isFav?'#FFF3CD':'rgba(255,255,255,0.92)', border:`2px solid ${isFav?'#C9A96E':'transparent'}`, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isFav?'Retirer des favoris':'Ajouter aux favoris'}>{isFav?'⭐':'☆'}</button>
           <button onClick={()=>shareIt({ title:`${profile.name} sur Clutch`, text:`Regarde le profil de ${profile.name} sur Clutch Lausanne ☕`, url:APP_URL+'/app' })} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↗</button>
           <button onClick={()=>setReporting(true)} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Signaler">🚩</button>
-          <button onClick={async()=>{ if(!confirm(`Bloquer ${profile.name} ? Il/elle ne te verra plus dans Discover.`)) return; await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: profile.id }); refresh?.(); go('discover') }} style={{ width:38, height:38, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }} title="Bloquer">🚫</button>
         </div>
       </div>
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
@@ -1289,7 +1328,7 @@ function Propose({ profile, go, setVenue, setVenueInput, venueInput, selectedVen
 function Propose2({ profile, go, selectedTime, setSelectedTime, venueInput }: any) {
   const slots = getTimeSlots()
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, minHeight:0 }}>
       <TopBar title="Quelle heure ?" onBack={()=>go('propose')}/>
       <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', touchAction:'pan-y', padding:'12px 20px' }}>
         <div style={{ padding:'10px 14px', background:C.bgDeep, borderRadius:12, marginBottom:16 }}>
@@ -1352,20 +1391,31 @@ function Propose3({ profile, go, venueInput, selectedTime, message, setMessage, 
 
 function Sent({ profile, go, venueInput, selectedTime }: any) {
   const [countdown, setCountdown] = useState(7200)
+  const [pulse, setPulse] = useState(false)
   useEffect(()=>{ const t=setInterval(()=>setCountdown(c=>Math.max(0,c-1)),1000); return ()=>clearInterval(t) },[])
-  const fmt=(s:number)=>`${Math.floor(s/3600)}h ${String(Math.floor((s%3600)/60)).padStart(2,'0')}m`
+  useEffect(()=>{ const t=setInterval(()=>setPulse(p=>!p),1200); return ()=>clearInterval(t) },[])
+  const fmt=(s:number)=>`${Math.floor(s/3600)}h ${String(Math.floor((s%3600)/60)).padStart(2,'0')}m ${String(s%60).padStart(2,'0')}s`
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:`linear-gradient(160deg,${C.bg},${C.primaryLight})`, padding:32, gap:20, textAlign:'center' }}>
-      <div style={{ fontSize:64 }}>☕</div>
-      <div><h2 style={{ fontSize:24, fontWeight:800, color:C.text }}>Clutch envoyé !</h2><p style={{ color:C.textMid, marginTop:8, lineHeight:1.6 }}>{profile?.name} a <strong>2h</strong> pour répondre.</p></div>
-      <div style={{ background:C.card, borderRadius:18, padding:20, width:'100%', border:`1px solid ${C.border}` }}>
-        <p style={{ fontSize:12, color:C.textLight, marginBottom:4 }}>📍 {venueInput} · {fmtIsoTime(selectedTime||'')}</p>
-        <p style={{ fontSize:12, color:C.textLight, marginBottom:8 }}>Expire dans</p>
-        <p style={{ fontSize:26, fontWeight:800, color:C.primary }}>{fmt(countdown)}</p>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:`linear-gradient(160deg,${C.bg},${C.primaryLight})`, padding:32, gap:24, textAlign:'center' }}>
+      {/* Animated coffee cup with pulse rings */}
+      <div style={{ position:'relative', width:120, height:120, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ position:'absolute', inset:0, borderRadius:'50%', border:`2px solid ${C.primary}`, opacity: pulse ? 0 : 0.4, transform: pulse ? 'scale(1.6)' : 'scale(1)', transition:'all 1.2s ease-out' }}/>
+        <div style={{ position:'absolute', inset:12, borderRadius:'50%', border:`2px solid ${C.primary}`, opacity: pulse ? 0.15 : 0.5, transform: pulse ? 'scale(1.3)' : 'scale(1)', transition:'all 1.2s ease-out 0.2s' }}/>
+        <div style={{ width:72, height:72, borderRadius:'50%', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, boxShadow:`0 8px 24px ${C.primary}55` }}>☕</div>
+      </div>
+      <div>
+        <h2 style={{ fontSize:26, fontWeight:900, color:C.text, letterSpacing:'-0.02em' }}>Clutch envoyé !</h2>
+        <p style={{ color:C.textMid, marginTop:8, lineHeight:1.6, fontSize:15 }}>{profile?.name} a <strong>2h</strong> pour accepter.</p>
+      </div>
+      <div style={{ background:'#fff', borderRadius:20, padding:'20px 24px', width:'100%', border:`1px solid ${C.primary}22`, boxShadow:`0 4px 20px ${C.primary}11` }}>
+        <p style={{ fontSize:12, color:C.textLight, marginBottom:2 }}>📍 {venueInput}</p>
+        <p style={{ fontSize:12, color:C.textLight, marginBottom:12 }}>🕐 {fmtIsoTime(selectedTime||'')}</p>
+        <p style={{ fontSize:11, color:C.textLight, marginBottom:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em' }}>Expire dans</p>
+        <p style={{ fontSize:28, fontWeight:900, color: countdown < 1800 ? C.red : C.primary, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.02em' }}>{fmt(countdown)}</p>
       </div>
       <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:10 }}>
         <Btn onClick={()=>go('inbox')}>→ Voir mes messages</Btn>
-        <Btn variant="secondary" onClick={()=>go('discover')}>Retour à la liste</Btn>
+        <Btn variant="secondary" onClick={()=>go('discover')}>Retour à Discover</Btn>
       </div>
     </div>
   )
@@ -1894,9 +1944,25 @@ function fmtDate(iso:string){
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${time}`
 }
 
-function MyProfile({ user, go, signOut, save }: any) {
+function MyProfile({ user, go, signOut, save, favorites, allProfiles, onFavorite }: any) {
   const [editBio,setEditBio]=useState(false); const [bio,setBio]=useState(user?.bio||''); const [saving,setSaving]=useState(false)
   const [premiumLoading,setPremiumLoading]=useState(false)
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([])
+  const [showBlocked, setShowBlocked] = useState(false)
+  const [showFavorites, setShowFavorites] = useState(false)
+  const loadBlocked = async () => {
+    if (!user?.id) return
+    const { data } = await supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id)
+    if (!data) return
+    const ids = data.map((b:any) => b.blocked_id)
+    if (ids.length === 0) { setBlockedUsers([]); return }
+    const { data: profiles } = await supabase.from('profiles').select('id,name,photo_url,age').in('id', ids)
+    setBlockedUsers(profiles||[])
+  }
+  const unblockUser = async (blockedId: string) => {
+    await supabase.from('blocks').delete().eq('blocker_id', user.id).eq('blocked_id', blockedId)
+    setBlockedUsers(prev => prev.filter(u => u.id !== blockedId))
+  }
 
   const goPremium=async()=>{
     setPremiumLoading(true)
@@ -2134,6 +2200,86 @@ function MyProfile({ user, go, signOut, save }: any) {
           )
         )}
 
+        {/* ── FAVORIS ── */}
+        <div style={{ background:C.card, borderRadius:16, border:`1px solid ${C.border}`, overflow:'hidden' }}>
+          <button onClick={()=>{ setShowFavorites(s=>!s) }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'none', border:'none', cursor:'pointer', width:'100%', textAlign:'left' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:18 }}>⭐</span>
+              <div>
+                <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>Mes favoris</p>
+                <p style={{ fontSize:11, color:C.textLight }}>
+                  {(favorites||[]).length > 0 ? `${favorites.length} profil${favorites.length>1?'s':''}` : (user?.gender==='female'||user?.is_premium||['admin','partner'].includes(user?.account_type||'')) ? 'Aucun favori pour l\'instant' : 'Premium · CHF 19.90/mois'}
+                </p>
+              </div>
+            </div>
+            <span style={{ color:C.textLight, fontSize:16 }}>{showFavorites?'▲':'▼'}</span>
+          </button>
+          {showFavorites && (
+            <div style={{ borderTop:`1px solid ${C.border}`, padding:'8px 12px 12px' }}>
+              {(favorites||[]).length === 0 ? (
+                <p style={{ fontSize:13, color:C.textLight, textAlign:'center', padding:'12px 0' }}>
+                  {(user?.gender==='female'||user?.is_premium||['admin','partner'].includes(user?.account_type||''))
+                    ? 'Ajoute des ⭐ sur les profils qui t\'intéressent'
+                    : '⭐ Les favoris sont disponibles avec Premium'}
+                </p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {(allProfiles||[]).filter((p:any)=>(favorites||[]).includes(p.id)).map((p:any)=>(
+                    <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 6px', borderRadius:12, background:C.bgDeep }}>
+                      {p.photo_url
+                        ? <img src={p.photo_url} alt="" style={{ width:40, height:40, borderRadius:'50%', objectFit:'cover' }}/>
+                        : <div style={{ width:40, height:40, borderRadius:'50%', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700 }}>{(p.name||'?')[0]}</div>
+                      }
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>{p.name}{p.age?`, ${p.age}`:''}</p>
+                        <p style={{ fontSize:11, color:p.is_available?C.sage:C.textLight }}>{p.is_available?'● Disponible':'○ Pas dispo'}</p>
+                      </div>
+                      <button onClick={()=>onFavorite?.(p.id)} style={{ padding:'4px 8px', borderRadius:8, border:`1px solid ${C.border}`, background:'none', fontSize:12, cursor:'pointer', color:C.textLight }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── BLOQUÉS ── */}
+        <div style={{ background:C.card, borderRadius:16, border:`1px solid ${C.border}`, overflow:'hidden' }}>
+          <button onClick={()=>{ if(!showBlocked){ loadBlocked() } setShowBlocked(s=>!s) }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'none', border:'none', cursor:'pointer', width:'100%', textAlign:'left' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:18 }}>🚫</span>
+              <div>
+                <p style={{ fontWeight:700, color:C.text, fontSize:14 }}>Utilisateurs bloqués</p>
+                <p style={{ fontSize:11, color:C.textLight }}>Gérer les personnes bloquées</p>
+              </div>
+            </div>
+            <span style={{ color:C.textLight, fontSize:16 }}>{showBlocked?'▲':'▼'}</span>
+          </button>
+          {showBlocked && (
+            <div style={{ borderTop:`1px solid ${C.border}`, padding:'8px 12px 12px' }}>
+              {blockedUsers.length === 0 ? (
+                <p style={{ fontSize:13, color:C.textLight, textAlign:'center', padding:'12px 0' }}>Aucun utilisateur bloqué</p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {blockedUsers.map((bu:any)=>(
+                    <div key={bu.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 6px', borderRadius:12, background:C.bgDeep }}>
+                      {bu.photo_url
+                        ? <img src={bu.photo_url} alt="" style={{ width:40, height:40, borderRadius:'50%', objectFit:'cover' }}/>
+                        : <div style={{ width:40, height:40, borderRadius:'50%', background:C.bgDeep, border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🚫</div>
+                      }
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, color:C.text, fontSize:13 }}>{bu.name}{bu.age?`, ${bu.age}`:''}</p>
+                        <p style={{ fontSize:11, color:C.textLight }}>Bloqué·e</p>
+                      </div>
+                      <button onClick={()=>unblockUser(bu.id)} style={{ padding:'6px 12px', borderRadius:10, border:`1.5px solid ${C.sage}`, background:C.sageLight, color:C.sage, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Débloquer</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <button onClick={()=>go('sos')}
           style={{ padding:'13px 16px', borderRadius:14, background:C.redLight, border:`1.5px solid ${C.red}22`, cursor:'pointer', color:C.red, fontWeight:700, fontSize:14, textAlign:'left', width:'100%' }}>
           🆘 SOS & Sécurité
@@ -2143,7 +2289,7 @@ function MyProfile({ user, go, signOut, save }: any) {
           Se déconnecter
         </button>
         <a href="/" style={{ display:'block', textAlign:'center', padding:10, color:C.textLight, fontSize:12, textDecoration:'none' }}>← Retour au site</a>
-        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v07.06-AG</p>
+        <p style={{ textAlign:'center', fontSize:10, color:C.textLight, opacity:0.4, paddingBottom:4 }}>v08.06-F</p>
       </div>
     </div>
   )
@@ -2308,7 +2454,7 @@ function EditProfile({ user, go, save }: any) {
 }
 
 // ─── CLUTCH RECEIVED ──────────────────────────────────────────────────────────
-function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
+function ClutchReceived({ clutch, user, go, refresh, sendPush, allClutches }: any) {
   const [loading, setLoading] = useState<string|null>(null)
   const [countering, setCountering] = useState(false)
   const [counterTime, setCounterTime] = useState('')
@@ -2328,6 +2474,16 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
   const mLeft = Math.max(0, Math.floor((msLeft%3600000)/60000))
 
   const respond = async (status: 'accepted'|'declined') => {
+    if (status === 'accepted') {
+      const hasActiveRdv = (allClutches||[]).some((c: any) =>
+        c.id !== clutch.id && c.status === 'accepted' &&
+        (c.sender_id === user?.id || c.receiver_id === user?.id)
+      )
+      if (hasActiveRdv) {
+        alert('Tu as déjà un RDV en cours. Termine-le ou annule-le avant d\'en accepter un nouveau.')
+        return
+      }
+    }
     setLoading(status)
     const update: any = { status }
     if (status === 'accepted' && isCounterMode && clutch.counter_time) {
@@ -2339,10 +2495,13 @@ function ClutchReceived({ clutch, user, go, refresh, sendPush }: any) {
     refresh()
     if (status === 'accepted') {
       const notifTarget = isCounterMode ? clutch.receiver_id : clutch.sender_id
-      const notifName = isCounterMode ? clutch.receiver?.name : clutch.sender?.name
       sendPush?.(notifTarget, `🎯 ${user.name} a dit oui !`, `RDV au ${displayVenue}. C'est confirmé ☕`)
       go('rdv-active')
-    } else { go('inbox') }
+    } else {
+      const notifTarget = isCounterMode ? clutch.receiver_id : clutch.sender_id
+      sendPush?.(notifTarget, `😔 ${user.name} n'est pas disponible`, `Ton clutch au ${displayVenue} a été refusé.`)
+      go('inbox')
+    }
     setLoading(null)
   }
 
@@ -2535,10 +2694,14 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
     if(BANNED_WORDS.some(w=>text.toLowerCase().includes(w))){setInputErr('Message inapproprié');setTimeout(()=>setInputErr(''),3000);return}
     setInput('');setInputErr('')
     await supabase.from('messages').insert({clutch_id:clutch.id,sender_id:user.id,content:text})
+    const otherId = clutch.sender_id===user.id ? clutch.receiver_id : clutch.sender_id
+    sendPush?.(otherId, `💬 ${user.name}`, text.length>60 ? text.slice(0,60)+'…' : text)
   }
 
   const cancelRdv = async () => {
-    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité.`)) return
+    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité (-10 points).`)) return
+    const newScore = Math.max(0, (user?.reliability_score ?? 100) - 10)
+    await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', user.id)
     await supabase.from('clutches').update({status:'cancelled'}).eq('id',clutch.id)
     const otherId = clutch.sender_id === user.id ? clutch.receiver_id : clutch.sender_id
     sendPush?.(otherId, `❌ RDV annulé par ${user.name}`, `Votre RDV au ${clutch.venue} a été annulé.`)
@@ -2585,10 +2748,8 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
             ✕ Annuler RDV
           </button>
           {/* Compteur messages */}
-          <div style={{ display:'flex', gap:3, alignItems:'center', flexShrink:0 }}>
-            {[...Array(MSG_LIMIT)].map((_,i)=>(
-              <div key={i} style={{ width:7, height:7, borderRadius:'50%', background: i<myMsgCount ? C.primary : C.border }}/>
-            ))}
+          <div style={{ fontSize:11, fontWeight:700, color: myMsgCount>=MSG_LIMIT ? C.red : C.textMid, flexShrink:0, textAlign:'center' }}>
+            {myMsgCount>=MSG_LIMIT ? '🎯 RDV IRL !' : `${MSG_LIMIT - myMsgCount} msg restant${MSG_LIMIT - myMsgCount > 1 ? 's' : ''}`}
           </div>
         </div>
       )}
@@ -2602,6 +2763,19 @@ function Chat({ clutch, user, go, refresh, sendPush }: any) {
                 ☕ Proposition initiale {clutch.sender_id===user.id ? '(toi)' : `de ${other?.name}`}
               </p>
               <p style={{ fontSize:13, color:C.text, lineHeight:1.5, fontStyle:'italic' }}>"{clutch.message}"</p>
+              {clutch.proposed_time&&<p style={{ fontSize:11, color:C.textLight, marginTop:4 }}>📍 {clutch.venue} · 🕐 {fmtIsoTime(clutch.proposed_time)}</p>}
+            </div>
+          </div>
+        )}
+        {/* Contre-proposition visible dans le chat */}
+        {clutch.counter_time && (
+          <div style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
+            <div style={{ maxWidth:'86%', background:`linear-gradient(135deg,${C.purpleLight},#EDE6F8)`, border:`1px solid ${C.purple}44`, borderRadius:16, padding:'10px 14px' }}>
+              <p style={{ fontSize:10, fontWeight:800, color:C.purple, marginBottom:4, letterSpacing:'0.05em', textTransform:'uppercase' }}>
+                🔄 Contre-proposition de {clutch.receiver_id===user.id ? 'toi' : other?.name}
+              </p>
+              <p style={{ fontSize:12, color:C.text }}>🕐 Nouvelle heure proposée : <strong>{fmtIsoTime(clutch.counter_time)}</strong></p>
+              {clutch.status==='accepted'&&<p style={{ fontSize:11, color:C.sage, marginTop:4, fontWeight:700 }}>✓ Acceptée — RDV confirmé</p>}
             </div>
           </div>
         )}
@@ -2701,13 +2875,14 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
   },[])
 
   const isNow = countdown <= 0
+  const isProxReady = countdown <= 30 * 60 * 1000 // Proximity Meter actif 30 min avant
   const h = Math.floor(countdown/3600000)
   const m = Math.floor((countdown%3600000)/60000)
   const s = Math.floor((countdown%60000)/1000)
 
-  // GPS Realtime — s'active à l'heure du RDV
+  // GPS Realtime — s'active 30 min avant le RDV
   useEffect(()=>{
-    if (!isNow) return
+    if (!isProxReady) return
     const ch = supabase.channel(`prox-${clutch.id}`)
       .on('broadcast',{event:'pos'},({payload})=>{
         if(payload.uid!==user.id) setOtherPos({lat:payload.lat,lng:payload.lng})
@@ -2740,9 +2915,10 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
   },[myPos,otherPos])
 
   const cancel = async()=>{
-    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité.`)) return
+    if (!confirm(`Annuler ce RDV avec ${other?.name} ?\n\nCela affectera ton score de fiabilité (-10 points).`)) return
+    const newScore = Math.max(0, (user?.reliability_score ?? 100) - 10)
+    await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', user.id)
     await supabase.from('clutches').update({status:'cancelled'}).eq('id',clutch.id)
-    // Notifier l'autre personne que le RDV est annulé
     const otherId = clutch.sender_id === user.id ? clutch.receiver_id : clutch.sender_id
     sendPush?.(otherId, `❌ RDV annulé par ${user.name}`, `Votre RDV au ${clutch.venue} a été annulé. Tu peux en proposer un nouveau.`)
     refresh(); go('inbox')
@@ -2783,24 +2959,27 @@ function RdvActive({ clutch, user, go, refresh, sendPush }: any) {
         </div>
 
         {/* Countdown ou Proximity Meter */}
-        {!isNow ? (
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:'28px 20px',textAlign:'center',boxShadow:`0 2px 12px ${C.shadow}`}}>
-            <p style={{fontSize:11,color:C.textLight,letterSpacing:'0.12em',fontWeight:700,marginBottom:14,textTransform:'uppercase'}}>Rendez-vous dans</p>
-            <div style={{fontSize:54,fontWeight:900,color:C.text,letterSpacing:'-0.04em',lineHeight:1,marginBottom:10}}>
-              {h>0&&<><span style={{color:C.primary}}>{h}</span><span style={{fontSize:26,color:C.textLight}}>h </span></>}
-              <span style={{color:C.primary}}>{String(m).padStart(2,'0')}</span>
-              <span style={{fontSize:26,color:C.textLight}}>m </span>
-              <span style={{color:C.primary}}>{String(s).padStart(2,'0')}</span>
-              <span style={{fontSize:26,color:C.textLight}}>s</span>
-            </div>
-            <p style={{fontSize:12,color:C.textLight}}>Le proximity meter s'active à l'heure du RDV ↓</p>
-          </div>
-        ) : (
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:'22px 18px'}}>
-            <p style={{fontSize:11,color:C.textLight,letterSpacing:'0.12em',fontWeight:700,marginBottom:18,textAlign:'center',textTransform:'uppercase'}}>Proximity Meter</p>
-            <ProximityMeter distance={distance} merged={merged}/>
-          </div>
-        )}
+        <div style={{background:C.card,border:`1px solid ${isProxReady?C.primary+'44':C.border}`,borderRadius:24,padding:'22px 20px',textAlign:'center',boxShadow:`0 2px 12px ${C.shadow}`,transition:'border 0.5s'}}>
+          {!isProxReady ? (
+            <>
+              <p style={{fontSize:11,color:C.textLight,letterSpacing:'0.12em',fontWeight:700,marginBottom:14,textTransform:'uppercase'}}>Rendez-vous dans</p>
+              <div style={{fontSize:54,fontWeight:900,color:C.text,letterSpacing:'-0.04em',lineHeight:1,marginBottom:10}}>
+                {h>0&&<><span style={{color:C.primary}}>{h}</span><span style={{fontSize:26,color:C.textLight}}>h </span></>}
+                <span style={{color:C.primary}}>{String(m).padStart(2,'0')}</span>
+                <span style={{fontSize:26,color:C.textLight}}>m </span>
+                <span style={{color:C.primary}}>{String(s).padStart(2,'0')}</span>
+                <span style={{fontSize:26,color:C.textLight}}>s</span>
+              </div>
+              <p style={{fontSize:12,color:C.textLight}}>📡 Proximity Meter s'active 30 min avant le RDV</p>
+            </>
+          ) : (
+            <>
+              <p style={{fontSize:11,color:C.primary,letterSpacing:'0.12em',fontWeight:700,marginBottom:4,textTransform:'uppercase'}}>📡 Proximity Meter</p>
+              {!isNow&&<p style={{fontSize:12,color:C.textLight,marginBottom:14}}>Plus que {String(m).padStart(2,'0')}m {String(s).padStart(2,'0')}s !</p>}
+              <ProximityMeter distance={distance} merged={merged}/>
+            </>
+          )}
+        </div>
 
         {/* Prompt feedback auto-déclenché */}
         {showFeedback&&(
@@ -2856,16 +3035,32 @@ function FeedbackRdv({ clutch, user, go }: any) {
     if (!rating || !clutch?.id) { go('discover'); return }
     setLoading(true)
     await supabase.from('feedback').insert({ clutch_id: clutch.id, given_by: user.id, rating })
-    // Mettre à jour le score de fiabilité de l'autre personne
+    // Score + paliers de suspension automatiques
     if (other?.id) {
       const otherId = clutch.sender_id===user.id ? clutch.receiver_id : clutch.sender_id
-      if (rating === 'ghost' || rating === 'rabbit') {
-        const { data: p } = await supabase.from('profiles').select('reliability_score').eq('id', otherId).single()
-        const newScore = Math.max(0, (p?.reliability_score||100) - 15)
-        await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', otherId)
+      const { data: p } = await supabase.from('profiles').select('reliability_score,account_type').eq('id', otherId).single()
+      const curScore = p?.reliability_score ?? 100
+      const isAdmin = p?.account_type === 'admin' || p?.account_type === 'partner'
+      if ((rating === 'ghost' || rating === 'rabbit') && !isAdmin) {
+        const penalty = rating === 'ghost' ? 15 : 5
+        const newScore = Math.max(0, curScore - penalty)
+        // Paliers de suspension (pas pour admins/partners)
+        // < 60 → pause 3 jours, < 40 → pause 14 jours, < 20 → pause 60 jours, 0 → ban permanent
+        let suspendUntil: string|null = null
+        if (newScore === 0) {
+          // Ban permanent — is_banned = true
+          await supabase.from('profiles').update({ reliability_score: 0, is_banned: true, is_available: false }).eq('id', otherId)
+        } else {
+          const now = new Date()
+          if (newScore < 20) suspendUntil = new Date(now.getTime() + 60*24*60*60*1000).toISOString()
+          else if (newScore < 40) suspendUntil = new Date(now.getTime() + 14*24*60*60*1000).toISOString()
+          else if (newScore < 60) suspendUntil = new Date(now.getTime() + 3*24*60*60*1000).toISOString()
+          const update: any = { reliability_score: newScore, is_available: false }
+          if (suspendUntil) update.available_until = suspendUntil
+          await supabase.from('profiles').update(update).eq('id', otherId)
+        }
       } else if (rating === 'super') {
-        const { data: p } = await supabase.from('profiles').select('reliability_score').eq('id', otherId).single()
-        const newScore = Math.min(100, (p?.reliability_score||100) + 3)
+        const newScore = Math.min(100, curScore + 3)
         await supabase.from('profiles').update({ reliability_score: newScore }).eq('id', otherId)
       }
     }
@@ -3138,6 +3333,9 @@ export default function App() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [clutches, setClutches] = useState<any[]>([])
   const [pendingBadge, setPendingBadge] = useState(0)
+  const [msgBadge, setMsgBadge] = useState(0)
+  const [toast, setToast] = useState<{msg:string,name:string}|null>(null)
+  const toastSwipeY = useRef(0)
   const [tab, setTabState] = useState('discover')
   const [loading, setLoading] = useState(true)
   const [selectedProfile, setSelectedProfile] = useState<Profile|null>(null)
@@ -3161,6 +3359,25 @@ export default function App() {
       }
     }
   }, [])
+  // favorites state
+  const [favorites, setFavorites] = useState<string[]>([])
+  const loadFavorites = async (uid: string) => {
+    try {
+      const { data } = await supabase.from('favorites').select('favorited_id').eq('user_id', uid)
+      if (data) setFavorites(data.map((f:any) => f.favorited_id))
+    } catch {}
+  }
+  const toggleFavorite = async (profileId: string) => {
+    if (!user?.id) return
+    if (favorites.includes(profileId)) {
+      setFavorites(prev => prev.filter(id => id !== profileId))
+      try { await supabase.from('favorites').delete().eq('user_id', user.id).eq('favorited_id', profileId) } catch {}
+    } else {
+      setFavorites(prev => [...prev, profileId])
+      try { await supabase.from('favorites').insert({ user_id: user.id, favorited_id: profileId }) } catch {}
+    }
+  }
+
   // propose state
   const [venueInput, setVenueInput] = useState('')
   const [selectedVenue, setSelectedVenue] = useState('')
@@ -3169,8 +3386,18 @@ export default function App() {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
 
-  const go = (s: Screen) => setScreen(s)
+  const screenRef = useRef<Screen>('splash')
+  const go = (s: Screen) => { screenRef.current = s; setScreen(s) }
   const isUserPremium = ['premium','partner','admin'].includes(user?.account_type||'')
+  // Suspension check — affiché comme banner si le profil est en pause forcée
+  const suspensionUntil = (() => {
+    if (!user?.available_until) return null
+    const u = new Date(user.available_until)
+    const score = user?.reliability_score ?? 100
+    // La suspension forcée est détectée si score < 60 ET available_until est dans le futur
+    if (score < 60 && u > new Date() && !user?.is_available) return u
+    return null
+  })()
   const isUserReallyAvail = (() => {
     if (!user?.is_available) return false
     const until = user?.available_until ? new Date(user.available_until) : null
@@ -3189,7 +3416,14 @@ export default function App() {
   useEffect(() => { setSelectedClutch_HACK = setSelectedClutch }, [])
   const refreshClutches = () => supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
     .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
-    .then(({ data }) => { if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => (c.receiver_id===user?.id&&c.status==='pending')||(c.sender_id===user?.id&&c.status==='counter')).length) } })
+    .then(({ data }) => {
+      if (data) {
+        setClutches(data)
+        setPendingBadge(data.filter((c:any) => (c.receiver_id===user?.id&&c.status==='pending')||(c.sender_id===user?.id&&c.status==='counter')).length)
+        // Sync selectedClutch if open (so cancels/counters show in real time)
+        setSelectedClutch((prev: any) => prev ? (data.find((c:any) => c.id===prev.id) || prev) : prev)
+      }
+    })
 
   useEffect(() => {
     // Timeout de sécurité : si Supabase ne répond pas en 8s, on affiche quand même l'app
@@ -3242,6 +3476,10 @@ export default function App() {
         if (!isNaN(until.getTime()) && until < new Date()) {
           supabase.from('profiles').update({is_available:false,available_from:null,available_until:null}).eq('id',user.id)
           save({is_available:false,available_from:null,available_until:null})
+          // Redirect vers set-avail SEULEMENT si pas en plein flow propose (évite d'interrompre un envoi)
+          const isPrem = ['premium','partner','admin'].includes(user?.account_type||'')
+          const inFlow = ['propose','propose2','propose3','sent'].includes(screenRef.current)
+          if (!isPrem && !inFlow) setScreen('set-avail')
         }
       }
     }
@@ -3287,22 +3525,35 @@ export default function App() {
   }
 
   // Load profiles, clutches, setup realtime
-  const loadProfiles = () => {
+  const loadProfiles = (forceAll = false) => {
     if (!user?.id) return
     supabase.from('blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
       .then(({ data: bdata }) => {
         const blockedIds = (bdata||[]).map((b:any) => b.blocker_id===user.id ? b.blocked_id : b.blocker_id)
         let q = supabase.from('profiles').select('*').neq('id', user.id).neq('is_banned', true)
         blockedIds.forEach((bid:string) => { q = q.neq('id', bid) })
+        // Filtre serveur : seulement les profils is_available=true et available_until non expirée
+        // (le filtre client-side peut rater si le format timestamp Supabase ne parse pas)
+        if (!forceAll) {
+          const nowIso = new Date().toISOString()
+          q = q.eq('is_available', true).or(`available_until.is.null,available_until.gt.${nowIso}`)
+        }
         q.then(({ data }) => { if (data) setProfiles(data) })
       })
   }
   useEffect(() => {
     if (!user?.id || !user?.name) return
 
-    // 1) Load profiles + auto-refresh toutes les 60s
+    // 1) Load profiles + favorites + auto-refresh toutes les 60s
     loadProfiles()
+    loadFavorites(user.id)
     const refreshInterval = setInterval(loadProfiles, 60000)
+    // Poll clutches toutes les 8s en backup si realtime échoue
+    const clutchPoll = setInterval(() => {
+      supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .then(({ data }) => { if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => (c.receiver_id===user.id&&c.status==='pending')||(c.sender_id===user.id&&c.status==='counter')).length) } })
+    }, 8000)
 
     // 2) Realtime: quand quelqu'un change sa dispo → on recharge les profils
     const profileChannel = supabase.channel('profiles-avail')
@@ -3318,34 +3569,130 @@ export default function App() {
         if (data) { setClutches(data); setPendingBadge(data.filter((c:any) => (c.receiver_id===user.id&&c.status==='pending')||(c.sender_id===user.id&&c.status==='counter')).length) }
       })
     loadClutches()
-    const clutchChannel = supabase.channel('notif-'+user.id)
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, () => {
-        setPendingBadge(b => b+1)
-        loadClutches()
-        if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-          navigator.serviceWorker.ready.then(sw => sw.showNotification('☕ Nouveau clutch !', {
-            body: 'Quelqu\'un te propose un café. Tu as 2h pour répondre.',
-            icon: '/icon-192.png', badge: '/icon-192.png' as any,
-            tag: 'clutch-new', data: { url: '/app' }
-          } as any)).catch(() => {
-            if (typeof Notification !== 'undefined') new Notification('☕ Nouveau clutch !', { body: 'Quelqu\'un te propose un café.' })
+    const onNewClutchReceived = (payload: any) => {
+      setPendingBadge(b => b+1)
+      // Recharger avec les joins pour avoir le vrai nom
+      const clutchId = payload?.new?.id
+      if (clutchId) {
+        supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(name),receiver:profiles!clutches_receiver_id_fkey(name)')
+          .eq('id', clutchId).single()
+          .then(({ data: c }) => {
+            const senderName = c?.sender?.name || 'Quelqu\'un'
+            setToast({ msg: `☕ Nouveau Clutch de ${senderName} !`, name: senderName })
+            setTimeout(() => setToast(null), 5000)
           })
-        }
+      } else {
+        setToast({ msg: '☕ Nouveau Clutch reçu !', name: '' })
+        setTimeout(() => setToast(null), 5000)
+      }
+      if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+        navigator.serviceWorker.ready.then(sw => sw.showNotification('☕ Nouveau clutch !', {
+          body: 'Quelqu\'un te propose un café. Tu as 2h pour répondre.',
+          icon: '/icon-192.png', badge: '/icon-192.png' as any,
+          tag: 'clutch-new', data: { url: '/app' }
+        } as any)).catch(() => {
+          if (typeof Notification !== 'undefined') new Notification('☕ Nouveau clutch !', { body: 'Quelqu\'un te propose un café.' })
+        })
+      }
+    }
+    const showClutchToast = (msg: string, name: string) => {
+      setToast({ msg, name })
+      setTimeout(() => setToast(null), 5000)
+    }
+    const onClutchUpdatedAsSender = (payload: any) => {
+      const raw = payload.new
+      if (!raw?.id) { loadClutches(); return }
+      // Recharger avec les joins pour avoir les noms
+      supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
+        .eq('id', raw.id).single()
+        .then(({ data: c }) => {
+          if (!c) { loadClutches(); return }
+          loadClutches()
+          const otherName = c.receiver?.name || '?'
+          if (c.status === 'accepted') {
+            showClutchToast(`🎯 ${otherName} a dit oui ! RDV confirmé ☕`, otherName)
+            if (screenRef.current === 'sent') { setSelectedClutch(c); go('rdv-active') }
+          } else if (c.status === 'declined') {
+            showClutchToast(`😔 ${otherName} n'est pas disponible`, otherName)
+          } else if (c.status === 'counter') {
+            showClutchToast(`🔄 ${otherName} contre-propose un autre créneau`, otherName)
+            setPendingBadge(b => b + 1)
+          } else if (c.status === 'cancelled') {
+            showClutchToast(`❌ RDV annulé par ${otherName}`, otherName)
+          }
+        })
+    }
+    const onClutchUpdatedAsReceiver = (payload: any) => {
+      const raw = payload.new
+      if (!raw?.id) { loadClutches(); return }
+      supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
+        .eq('id', raw.id).single()
+        .then(({ data: c }) => {
+          loadClutches()
+          if (!c) return
+          const otherName = c.sender?.name || '?'
+          if (c.status === 'cancelled') {
+            showClutchToast(`❌ RDV annulé par ${otherName}`, otherName)
+          } else if (c.status === 'accepted') {
+            showClutchToast(`✅ RDV confirmé avec ${otherName} ☕`, otherName)
+          }
+        })
+    }
+    const clutchChannel = supabase.channel('notif-'+user.id)
+      // Receiver : nouveau clutch reçu
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, onNewClutchReceived)
+      // Sender : clutch qu'on vient d'envoyer (confirmation)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clutches', filter:`sender_id=eq.${user.id}` }, () => loadClutches())
+      // Updates côté sender (acceptation, refus, contre-prop, annulation)
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`sender_id=eq.${user.id}` }, onClutchUpdatedAsSender)
+      // Updates côté receiver (annulation par le sender)
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, onClutchUpdatedAsReceiver)
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') console.log('[Clutch] Realtime connected for', user.id)
+        else if (status === 'CHANNEL_ERROR') console.error('[Clutch] Realtime error — fallback to 30s poll')
       })
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`sender_id=eq.${user.id}` }, () => loadClutches())
-      // ⚠️ CRITICAL: le receiver doit aussi recevoir les UPDATE (ex: annulation par le sender)
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clutches', filter:`receiver_id=eq.${user.id}` }, () => loadClutches())
+
+    // 4) Messages: notification si pas dans ce chat
+    const msgChannel = supabase.channel('msgs-'+user.id)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, (payload) => {
+        const msg = payload.new as any
+        if (msg.sender_id === user.id) return // mes propres messages
+        // Vérifier si c'est un de mes clutches (state peut être stale → utiliser closure)
+        const inChat = screenRef.current === 'chat'
+        // Toujours montrer le toast si pas dans le bon chat
+        supabase.from('clutches').select('*,sender:profiles!clutches_sender_id_fkey(name),receiver:profiles!clutches_receiver_id_fkey(name)')
+          .eq('id', msg.clutch_id).single()
+          .then(({ data: c }) => {
+            if (!c) return
+            const isMyClutch = c.sender_id === user.id || c.receiver_id === user.id
+            if (!isMyClutch) return
+            const senderName = msg.sender_id === c.sender_id ? c.sender?.name : c.receiver?.name
+            if (!inChat) {
+              setMsgBadge(b => b+1)
+              setToast({ msg: `💬 ${senderName} : ${String(msg.content).slice(0,45)}${msg.content.length>45?'…':''}`, name: senderName||'' })
+              setTimeout(() => setToast(null), 5000)
+            }
+          })
+      })
       .subscribe()
 
     return () => {
       clearInterval(refreshInterval)
+      clearInterval(clutchPoll)
       supabase.removeChannel(profileChannel)
       supabase.removeChannel(clutchChannel)
+      supabase.removeChannel(msgChannel)
     }
   }, [user?.id, user?.name])
 
   const sendClutch = async () => {
-    if (!user?.id || !selectedProfile?.id || !venueInput || !selectedTime || message.trim().length < 10) return
+    // Debug : vérifier les valeurs avant envoi
+    console.log('[sendClutch]', { userId: user?.id, receiverId: selectedProfile?.id, venue: venueInput, time: selectedTime, msgLen: message.trim().length })
+    if (!user?.id) { alert('Erreur : utilisateur non connecté'); return }
+    if (!selectedProfile?.id) { alert('Erreur : aucun profil sélectionné'); return }
+    if (!venueInput) { alert('Erreur : lieu manquant'); return }
+    if (!selectedTime) { alert('Erreur : heure manquante'); return }
+    if (message.trim().length < 10) { alert(`Message trop court (${message.trim().length} car., min 10)`); return }
     setSending(true)
     try {
       // Freemium gate : femmes = illimité · admin/partner = illimité · premium = 5/jour · free men = 1/jour
@@ -3367,17 +3714,27 @@ export default function App() {
         }
       }
       const proposedTime = new Date(selectedTime).toISOString()
-      const { error } = await supabase.from('clutches').insert({
+      console.log('[sendClutch] inserting...', { sender: user.id, receiver: selectedProfile.id, venue: venueInput, proposedTime })
+      const { data: inserted, error } = await supabase.from('clutches').insert({
         sender_id: user.id, receiver_id: selectedProfile.id,
         venue: venueInput, venue_safety: venueSafety,
         proposed_time: proposedTime, message: message.trim(),
         expires_at: new Date(Date.now() + 2*60*60*1000).toISOString()
-      })
-      if (error) { alert(`Erreur envoi: ${error.message}`); return }
+      }).select()
+      if (error) {
+        console.error('[sendClutch] insert error:', error)
+        alert(`Erreur envoi: ${error.message}\nCode: ${error.code}`)
+        return
+      }
+      console.log('[sendClutch] success:', inserted)
       // Push notif au destinataire
       sendPushTo(selectedProfile.id, `☕ Nouveau Clutch de ${user.name} !`, `"${message.trim().slice(0,80)}" — Réponds en 2h`)
-      setMessage(''); go('sent')
+      setMessage('')
+      // Rafraîchir immédiatement les clutches du sender (le realtime INSERT ne couvre pas le sender)
+      refreshClutches()
+      go('sent')
     } catch(e:any) {
+      console.error('[sendClutch] catch:', e)
       alert(`Erreur réseau: ${e?.message||'réessaie'}`)
     } finally {
       setSending(false)
@@ -3408,7 +3765,7 @@ export default function App() {
       {/* Top nav — desktop only */}
       {!isMobile&&<div style={{ position:'fixed', top:14, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', gap:8, alignItems:'center' }}>
         <a href="/" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.text, textDecoration:'none', fontWeight:600, border:`1px solid ${C.border}` }}>← Accueil</a>
-        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP v07.06-AG</div>
+        <div style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:800, color:'#fff', letterSpacing:'0.05em' }}>✦ APP {BUILD_VERSION}</div>
         <a href="/demo" style={{ background:'rgba(255,255,255,0.88)', backdropFilter:'blur(8px)', padding:'6px 14px', borderRadius:20, fontSize:12, color:C.textMid, textDecoration:'none', fontWeight:500, border:`1px solid ${C.border}` }}>🎬 Démo</a>
       </div>}
 
@@ -3421,6 +3778,21 @@ export default function App() {
 
         {/* Content */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative', minHeight:0 }}>
+          {/* Badge version — coin bas-gauche, discret */}
+          {user && BUILD_TIME && <div style={{ position:'absolute', bottom: showTabBar ? 68 : 8, left:8, zIndex:50, background:'rgba(0,0,0,0.18)', backdropFilter:'blur(4px)', borderRadius:8, padding:'3px 7px', fontSize:9, color:'rgba(255,255,255,0.75)', fontWeight:600, letterSpacing:'0.03em', pointerEvents:'none', fontFamily:'monospace' }}>
+            {BUILD_VERSION} · {BUILD_TIME}
+          </div>}
+
+          {/* Toast in-app — swipe up ou tap × pour fermer */}
+          {toast && <div
+            onTouchStart={e=>{ toastSwipeY.current = e.touches[0].clientY }}
+            onTouchEnd={e=>{ if (toastSwipeY.current - e.changedTouches[0].clientY > 40) setToast(null) }}
+            onClick={()=>setToast(null)}
+            style={{ position:'absolute', top:16, left:16, right:16, zIndex:999, background:C.text, color:'#fff', borderRadius:14, padding:'12px 16px', fontSize:14, fontWeight:700, boxShadow:'0 8px 24px rgba(0,0,0,0.25)', display:'flex', alignItems:'center', gap:10, animation:'slideDown 0.3s ease', cursor:'pointer', userSelect:'none' }}>
+            <span style={{ fontSize:20 }}>☕</span>
+            <span style={{ flex:1 }}>{toast.msg}</span>
+            <span style={{ color:'rgba(255,255,255,0.5)', fontSize:11, fontWeight:400 }}>↑ glisser</span>
+          </div>}
           {screen==='splash' && <Splash go={go}/>}
           {screen==='login' && <Login go={go} setUser={setUser}/>}
           {screen==='register' && <Register go={go} setUser={setUser}/>}
@@ -3432,13 +3804,13 @@ export default function App() {
           {screen==='ob-interests' && <ObInterests go={go} user={user} save={save}/>}
           {screen==='ob-done' && <ObDone go={go} user={user}/>}
           {screen==='set-avail' && <SetAvail user={user} go={go} save={save} fromProfile={tab==='myprofile'||isUserReallyAvail}/>}
-          {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go} refresh={loadProfiles}/>}
-          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user} refresh={loadProfiles}/>}
+          {screen==='discover' && <Discover profiles={profiles} user={user} onSelect={(p:Profile)=>setSelectedProfile(p)} go={go} refresh={(forceAll?:boolean)=>loadProfiles(forceAll)} favorites={favorites} onFavorite={toggleFavorite} clutches={clutches}/>}
+          {screen==='profile-detail' && <ProfileDetail profile={selectedProfile} go={go} currentUser={user} refresh={()=>loadProfiles()} favorites={favorites} onFavorite={toggleFavorite}/>}
           {screen==='events' && <Events user={user} go={go}/>}
           {screen==='create-event' && <CreateEvent user={user} go={go}/>}
           {screen==='my-events' && <MyEvents user={user} go={go}/>}
           {screen==='inbox' && <Inbox clutches={clutches} user={user} go={go} setSelectedClutch={setSelectedClutch}/>}
-          {screen==='myprofile' && <MyProfile user={user} go={go} signOut={signOut} save={save}/>}
+          {screen==='myprofile' && <MyProfile user={user} go={go} signOut={signOut} save={save} favorites={favorites} allProfiles={profiles} onFavorite={toggleFavorite}/>}
           {screen==='edit-profile' && <EditProfile user={user} go={go} save={save}/>}
           {screen==='sos' && <Sos go={go}/>}
           {screen==='propose' && <Propose profile={selectedProfile} go={go} setVenue={setSelectedVenue} setVenueInput={setVenueInput} venueInput={venueInput} selectedVenue={selectedVenue} venueSafety={venueSafety} setVenueSafety={setVenueSafety}/>}
@@ -3446,11 +3818,15 @@ export default function App() {
           {screen==='propose3' && <Propose3 profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime} message={message} setMessage={setMessage} onSend={sendClutch} sending={sending}/>}
           {screen==='sent' && <Sent profile={selectedProfile} go={go} venueInput={venueInput} selectedTime={selectedTime}/>}
           {screen==='chat' && <Chat clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
-          {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
+          {screen==='clutch-received' && <ClutchReceived clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo} allClutches={clutches}/>}
           {screen==='rdv-active' && <RdvActive clutch={selectedClutch} user={user} go={go} refresh={refreshClutches} sendPush={sendPushTo}/>}
           {screen==='feedback' && <FeedbackRdv clutch={selectedClutch} user={user} go={go}/>}
           {screen==='get-certified' && <GetCertified user={user} go={go} save={save}/>}
-          {showTabBar && <TabBar tab={tab} setTab={setTab} badge={pendingBadge}/>}
+          {/* Banner suspension — score trop bas */}
+          {suspensionUntil && <div style={{ background:C.red, color:'#fff', padding:'10px 16px', fontSize:12, fontWeight:700, textAlign:'center', flexShrink:0 }}>
+            ⚠️ Profil suspendu jusqu'au {suspensionUntil.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})} — trop de lapins/fantômes. Score : {user?.reliability_score}%
+          </div>}
+          {showTabBar && <TabBar tab={tab} setTab={(t)=>{ if(t==='inbox') setMsgBadge(0); setTab(t) }} badge={pendingBadge+msgBadge}/>}
         </div>
 
         {/* Home bar desktop seulement */}

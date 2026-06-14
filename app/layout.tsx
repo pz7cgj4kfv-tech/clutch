@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clutch · v07.06-AG",
+  title: "Clutch · v14.06-Q",
   description: "L'app de rencontres spontanées à Lausanne",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  // maximumScale retiré → permet pinch-zoom sur la carte Leaflet
+  // iOS zoom sur inputs évité avec font-size:16px dans globals.css
   viewportFit: 'cover',
 };
 
@@ -45,6 +47,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
         <meta name="apple-mobile-web-app-title" content="Clutch"/>
         <meta name="theme-color" content="#5D1048"/>
+        {/* Plausible Analytics */}
+        <script defer data-domain="pz7cgj4kfv-tech.github.io" src="https://plausible.io/js/script.js"></script>
         {/* OneSignal Web Push SDK */}
         <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
         <script dangerouslySetInnerHTML={{__html:`

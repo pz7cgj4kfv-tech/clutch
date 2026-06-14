@@ -1,10 +1,12 @@
 'use client'
 
+// Identité visuelle v09.06 — Logo option 02
 const C = {
-  bg: '#EDE8E3', bgDeep: '#F5F0EA', card: '#FDFAF7',
-  primary: '#C4748A', primaryDark: '#A85C72', primaryLight: 'rgba(196,116,138,0.12)',
-  text: '#2C1810', textMid: '#6B4C3B', textLight: '#A08878',
-  border: '#E0D8D0', sage: '#7A9E8A', gold: '#C9A96E',
+  bg: '#0E2035', bgDeep: '#132B45', card: '#1C3A58',
+  primary: '#E9B07F', primaryDark: '#C8883A', primaryLight: 'rgba(233,176,127,0.12)',
+  text: '#FAFAFA', textMid: 'rgba(250,250,250,0.7)', textLight: 'rgba(250,250,250,0.4)',
+  border: 'rgba(250,250,250,0.1)', borderStrong: 'rgba(233,176,127,0.3)',
+  sage: '#7AC4A0', gold: '#E9B07F',
 }
 
 export default function Flyer() {
@@ -12,10 +14,10 @@ export default function Flyer() {
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: ${C.bgDeep}; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; color: ${C.text}; }
+        html, body { background: ${C.bgDeep}; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; color: ${C.text}; }
         @media print {
           .no-print { display: none !important; }
-          body { background: white; }
+          html, body { background: ${C.bgDeep} !important; }
           @page { margin: 1.5cm; }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
@@ -24,10 +26,10 @@ export default function Flyer() {
       `}</style>
 
       {/* Barre nav */}
-      <div className="no-print" style={{ background: C.text, padding: '12px 24px', display: 'flex', gap: 12, alignItems: 'center' }}>
-        <a href="/" style={{ color: C.bgDeep, fontSize: 12, fontWeight: 600, textDecoration: 'none', opacity: 0.7 }}>← Accueil</a>
-        <span style={{ color: '#555' }}>·</span>
-        <button onClick={() => window.print()} style={{ background: C.primary, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+      <div className="no-print" style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: '12px 24px', display: 'flex', gap: 12, alignItems: 'center' }}>
+        <a href="/" style={{ color: C.textMid, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>← Accueil</a>
+        <span style={{ color: C.border }}>·</span>
+        <button onClick={() => window.print()} style={{ background: C.primary, color: C.bgDeep, border: 'none', borderRadius: 8, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
           🖨️ Imprimer / PDF
         </button>
       </div>
@@ -35,22 +37,33 @@ export default function Flyer() {
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px 80px' }}>
 
         {/* ── HEADER ── */}
-        <div style={{ background: C.text, borderRadius: 20, padding: '48px 48px 40px', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: -80, right: -80, width: 280, height: 280, borderRadius: '50%', background: `radial-gradient(circle, ${C.primary}33 0%, transparent 70%)` }} />
-          <div style={{ position: 'absolute', bottom: -40, left: -40, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${C.gold}22 0%, transparent 70%)` }} />
+        <div style={{ background: C.bg, borderRadius: 20, padding: '48px 48px 40px', marginBottom: 20, position: 'relative', overflow: 'hidden', border: `1px solid ${C.border}` }}>
+          <div style={{ position: 'absolute', top: -80, right: -80, width: 320, height: 320, borderRadius: '50%', background: `radial-gradient(circle, ${C.primary}22 0%, transparent 70%)`, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: -60, left: -60, width: 220, height: 220, borderRadius: '50%', background: `radial-gradient(circle, rgba(28,58,88,0.8) 0%, transparent 70%)`, pointerEvents: 'none' }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ fontSize: 72, fontWeight: 900, color: '#fff', letterSpacing: '-0.05em', lineHeight: 1 }}>
-              CLUTCH<span style={{ color: C.primary }}>.</span>
+            <div style={{ fontSize: 80, fontWeight: 900, color: C.text, letterSpacing: '-0.06em', lineHeight: 1 }}>
+              CLUT<span style={{ color: C.primary }}>CH</span>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.primary, letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 10 }}>
-              Sois spontané·e
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text, marginTop: 14, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              Quelqu'un t'attend.<br/>
+              <span style={{ color: C.primary }}>Sois là.</span>
             </div>
-            <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 10, lineHeight: 1.6, maxWidth: 480 }}>
-              L'application de rencontres qui transforme chaque connexion en vrai rendez-vous physique — en 18 heures maximum. Conçue pour Lausanne et la Suisse romande.
+            <div style={{ fontSize: 14, color: C.textMid, marginTop: 12, lineHeight: 1.7, maxWidth: 480 }}>
+              L'app de rencontres spontanées qui force l'action. Un Clutch = un RDV proposé dans les 2h. Un vrai café, dans les 18h. Conçue pour Lausanne — et la Suisse romande.
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap' }}>
-              {['Bêta · Juin 2026', 'Lausanne 🇨🇭', 'Freemium', 'Sécurité incluse 🛡'].map(b => (
-                <span key={b} style={{ background: `${C.primary}25`, border: `1px solid ${C.primary}55`, borderRadius: 20, padding: '5px 14px', fontSize: 11, fontWeight: 700, color: C.primary }}>{b}</span>
+            <div style={{ display: 'flex', gap: 8, marginTop: 22, flexWrap: 'wrap' }}>
+              {['Bêta · Juin 2026', 'Lausanne 🇨🇭', 'Freemium · Gratuit femmes', 'Sécurité incluse 🛡'].map(b => (
+                <span key={b} style={{ background: `${C.primary}18`, border: `1px solid ${C.primaryDark}55`, borderRadius: 20, padding: '5px 14px', fontSize: 11, fontWeight: 700, color: C.primary }}>{b}</span>
+              ))}
+            </div>
+            {/* Slogans choc */}
+            <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                '"La présence urbaine à la demande."',
+                '"Disponible. Comme toi."',
+                '"Pas un match de plus. Un vrai rendez-vous."',
+              ].map(s => (
+                <div key={s} style={{ fontSize: 13, color: C.textLight, fontStyle: 'italic', paddingLeft: 14, borderLeft: `2px solid ${C.primaryDark}55` }}>{s}</div>
               ))}
             </div>
           </div>
@@ -64,20 +77,20 @@ export default function Flyer() {
               <div style={{ fontSize: 28, marginBottom: 12 }}>💀</div>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: C.textLight, marginBottom: 8 }}>Le problème</div>
               <p style={{ fontSize: 13, color: C.textMid }}>
-                Les apps de rencontres sont devenues des <strong style={{ color: C.text }}>cimetières de matchs</strong>. On swipe pendant des heures, on engage des conversations qui durent des jours, on partage des photos, des audios, des GIFs — et pourtant, on ne se rencontre <em>jamais vraiment</em>.
+                Les apps de rencontres sont devenues des <strong style={{ color: C.text }}>cimetières de matchs</strong>. On swipe pendant des heures, on engage des conversations qui durent des jours — et pourtant, on ne se rencontre <em>jamais vraiment</em>.
               </p>
               <p style={{ fontSize: 13, color: C.textMid, marginTop: 10 }}>
-                Tinder, Bumble, Hinge : conçus pour maximiser le temps passé sur l'app, pas pour générer de vraies rencontres. Le match n'est que le début d'un tunnel interminable.
+                Tinder, Bumble, Hinge : conçus pour maximiser le temps sur l'app, pas pour générer de vraies rencontres. Le match n'est que le début d'un tunnel interminable.
               </p>
             </div>
-            <div style={{ background: `${C.primary}0D`, border: `1px solid ${C.primary}33`, borderRadius: 14, padding: '20px 22px' }}>
+            <div style={{ background: `${C.primary}12`, border: `1px solid ${C.borderStrong}`, borderRadius: 14, padding: '20px 22px' }}>
               <div style={{ fontSize: 28, marginBottom: 12 }}>⚡</div>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: C.primary, marginBottom: 8 }}>La solution Clutch</div>
               <p style={{ fontSize: 13, color: C.textMid }}>
-                Clutch <strong style={{ color: C.text }}>force l'action</strong>. Pas de messagerie infinie, pas de "on verra". Quand tu clutches quelqu'un, tu proposes immédiatement un lieu, une heure et un message. L'autre a <strong style={{ color: C.text }}>2 heures pour répondre</strong>. Ou le créneau est libéré.
+                Clutch <strong style={{ color: C.text }}>force l'action</strong>. Pas de messagerie infinie, pas de "on verra". Quand tu clutches quelqu'un, tu proposes un lieu, une heure et un message. L'autre a <strong style={{ color: C.text }}>2 heures pour répondre</strong>. Ou ça expire.
               </p>
-              <p style={{ fontSize: 13, color: C.textMid, marginTop: 10 }}>
-                Résultat : des rendez-vous réels dans les 18h. Simple, honnête, local.
+              <p style={{ fontSize: 13, color: C.primary, marginTop: 12, fontWeight: 700, fontStyle: 'italic' }}>
+                "Disponible. Comme toi."
               </p>
             </div>
           </div>
@@ -211,28 +224,26 @@ export default function Flyer() {
               ['2.7 Mrd $', 'marché mondial\ndating apps 2025'],
               ['0', 'app de spontanéité\nen Suisse romande'],
             ].map(([n, l]) => (
-              <div key={n} style={{ background: C.bgDeep, borderRadius: 12, padding: '18px 14px', textAlign: 'center' }}>
+              <div key={n} style={{ background: C.bgDeep, borderRadius: 12, padding: '18px 14px', textAlign: 'center', border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: C.primary, letterSpacing: '-0.02em' }}>{n}</div>
                 <div style={{ fontSize: 11, color: C.textLight, marginTop: 4, lineHeight: 1.4, whiteSpace: 'pre-line' }}>{l}</div>
               </div>
             ))}
           </div>
-          <div style={{ background: `${C.primary}0D`, border: `1px solid ${C.primary}25`, borderRadius: 14, padding: '20px 24px' }}>
+          <div style={{ background: `${C.primary}12`, border: `1px solid ${C.borderStrong}`, borderRadius: 14, padding: '20px 24px' }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: C.primary, marginBottom: 14 }}>Modèle Freemium</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                ['Tout le monde', 'Profil, découverte des disponibles, 3 clutches/jour, bouton SOS', 'Gratuit'],
-                ['Sécurité+', 'Filtres avancés, mode discret, contrôle des clutches reçus, certifications', 'Inclus pour tous'],
-                ['Premium', 'Clutches illimités, boost de visibilité, voir qui a vu ton profil, filtres détaillés', 'CHF 19.90/mois'],
-                ['Femmes', 'Accès complet Premium sans conditions', '100% gratuit'],
-                ['Partenaires événements', 'Commission sur billets et réservations dans les lieux Clutch', 'Commission 10–15%'],
+                ['Tout le monde', 'Profil, découverte des disponibles, clutches quotidiens, bouton SOS', 'Gratuit'],
+                ['Premium', 'Browser sans être disponible, clutches illimités, boost visibilité', 'CHF 19.90/mois'],
+                ['Femmes', 'Accès complet — gratuité permanente par design éthique', '100% gratuit'],
               ].map(([who, what, price]) => (
-                <div key={who} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13, padding: '8px 0', borderBottom: `1px solid ${C.primary}15`, gap: 12 }}>
+                <div key={who} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13, padding: '8px 0', borderBottom: `1px solid ${C.border}`, gap: 12 }}>
                   <div>
                     <span style={{ fontWeight: 700, color: C.text }}>{who}</span>
                     <span style={{ color: C.textMid }}> — {what}</span>
                   </div>
-                  <span style={{ fontWeight: 800, color: price === 'Gratuit' || price === 'Inclus pour tous' || price === '100% gratuit' ? C.sage : C.text, whiteSpace: 'nowrap', flexShrink: 0 }}>{price}</span>
+                  <span style={{ fontWeight: 800, color: price.includes('gratuit') || price === 'Gratuit' ? C.sage : C.primary, whiteSpace: 'nowrap', flexShrink: 0 }}>{price}</span>
                 </div>
               ))}
             </div>
@@ -240,27 +251,31 @@ export default function Flyer() {
         </div>
 
         {/* ── BETA CTA ── */}
-        <div style={{ background: `linear-gradient(135deg, ${C.text}, #4A2E20)`, borderRadius: 20, padding: '36px 40px', marginBottom: 16 }}>
-          <div style={{ fontSize: 24, fontWeight: 900, color: '#fff', marginBottom: 10 }}>On a besoin de toi 🙏</div>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, marginBottom: 24, maxWidth: 480 }}>
-            Clutch est en phase bêta fermée à Lausanne. On cherche des premiers utilisateurs curieux, des gens qui ont envie de sortir de chez eux, de vraiment rencontrer quelqu'un — et qui veulent nous dire honnêtement ce qui marche et ce qui coince.
-          </p>
-          <div style={{ background: 'rgba(196,116,138,0.15)', border: '1px solid rgba(196,116,138,0.3)', borderRadius: 14, padding: '18px 20px', marginBottom: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: C.primary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Ce qu'on te demande</div>
-            {[
-              'Créer un profil sur la vraie app — 2 minutes chrono',
-              'Envoyer au moins 1 clutch à quelqu\'un cette semaine',
-              'Nous dire ce qui t\'a bloqué, ce qui t\'a plu, ce qui manque',
-              'Partager l\'app à 2–3 amis lausannois qui aiment sortir',
-            ].map(item => (
-              <div key={item} style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', padding: '5px 0', paddingLeft: 18, position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 0, color: C.primary }}>→</span>{item}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <a href="/demo" style={{ background: C.primary, color: '#fff', borderRadius: 12, padding: '13px 24px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>🎬 Essaie la démo</a>
-            <a href="/app" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '12px 22px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Créer mon profil →</a>
+        <div style={{ background: C.bg, borderRadius: 20, padding: '36px 40px', marginBottom: 16, border: `1.5px solid ${C.borderStrong}`, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: -60, right: -60, width: 220, height: 220, borderRadius: '50%', background: `radial-gradient(circle, ${C.primary}18 0%, transparent 70%)`, pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: C.text, marginBottom: 6, letterSpacing: '-0.03em' }}>La ville attend.</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.primary, marginBottom: 16, letterSpacing: '-0.02em' }}>Toi aussi ?</div>
+            <p style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7, marginBottom: 24, maxWidth: 480 }}>
+              Clutch est en bêta fermée à Lausanne. On cherche des gens qui ont envie de sortir, de vraiment rencontrer quelqu'un — et qui veulent nous dire honnêtement ce qui marche.
+            </p>
+            <div style={{ background: `${C.primary}10`, border: `1px solid ${C.borderStrong}`, borderRadius: 14, padding: '18px 20px', marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.primary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Ce qu'on te demande</div>
+              {[
+                'Créer un profil sur la vraie app — 2 minutes chrono',
+                'Envoyer au moins 1 clutch à quelqu\'un cette semaine',
+                'Nous dire ce qui t\'a bloqué, ce qui t\'a plu, ce qui manque',
+                'Partager l\'app à 2–3 amis lausannois qui aiment sortir',
+              ].map(item => (
+                <div key={item} style={{ fontSize: 13, color: C.textMid, padding: '5px 0', paddingLeft: 18, position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 0, color: C.primary }}>→</span>{item}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <a href="/demo" style={{ background: C.primary, color: C.bgDeep, borderRadius: 12, padding: '13px 24px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>✦ Essaie la démo</a>
+              <a href="/app" style={{ background: 'rgba(255,255,255,0.07)', color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 22px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Je suis là →</a>
+            </div>
           </div>
         </div>
 

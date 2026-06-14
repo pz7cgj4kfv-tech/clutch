@@ -26,3 +26,8 @@ html, body {
   /* Le scroll de l'app est géré par JS (position:fixed sur le frame mobile) */
   /* Pas d'overflow:hidden global — ça casse le scroll des pages /flyer /legal /hq */
 }
+
+/* Évite le zoom automatique iOS sur focus input sans bloquer le pinch-zoom sur la carte */
+input, textarea, select {
+  font-size: 16px !important;
+}

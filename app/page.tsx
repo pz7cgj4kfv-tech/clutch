@@ -1,246 +1,481 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+/**
+ * CLUTCH — Landing page publique
+ * v11.06-Q — redesign ultra-convaincant
+ */
+import { useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
 
-const C = {
-  bg: '#FDFAF7', bgDeep: '#F5F0EA', primary: '#C4748A', primaryDark: '#A85C72',
-  primaryLight: '#F2D4DB', sage: '#7A9E8A', sageLight: '#D4E8DE', peach: '#E8A87C',
-  peachLight: '#FAEBD7', gold: '#C9A96E', purple: '#8B7CB8', purpleLight: '#EAE6F8',
-  text: '#2C1810', textMid: '#6B4C3B', textLight: '#A08878', border: '#EDE8E3',
-}
-const TARGET = 500
+const V = 'v11.06-V'
 
 export default function Landing() {
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<'idle'|'loading'|'done'|'already'|'error'>('idle')
-  const [count, setCount] = useState<number|null>(null)
+  const [done, setDone] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [count, setCount] = useState<number | null>(null)
+  const waitlistRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     supabase.from('waitlist').select('id', { count: 'exact', head: true })
-      .then(({ count: c }) => { if (c !== null) setCount(c) })
+      .then(({ count: c }) => { if (c != null) setCount(c) }, () => {})
   }, [])
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email.trim()) return
-    setStatus('loading')
-    const { error } = await supabase.from('waitlist').insert({ email: email.trim().toLowerCase() })
-    if (!error) {
-      setStatus('done')
-      setCount(c => (c ?? 0) + 1)
-    } else if (error.code === '23505') {
-      setStatus('already') // duplicate
-    } else {
-      setStatus('error')
-    }
+  const scrollToWaitlist = () => {
+    waitlistRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
-  const pct = count !== null ? Math.min(100, Math.round((count / TARGET) * 100)) : 0
+  const join = async () => {
+    if (!email.trim() || !email.includes('@')) { setErr('Email invalide'); return }
+    setLoading(true); setErr('')
+    const { error } = await supabase.from('waitlist').insert({ email: email.trim().toLowerCase() })
+    setLoading(false)
+    if (error && error.code === '23505') { setDone(true); return }
+    if (error) { setErr('Erreur — réessaie'); return }
+    setDone(true)
+    setCount(c => c != null ? c + 1 : null)
+  }
 
   return (
     <>
       <style>{`
-        *{box-sizing:border-box;margin:0;padding:0;}
-        body{background:${C.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${C.text};overflow-x:hidden;}
-        a{color:inherit;text-decoration:none;}
-        input,button{font-family:inherit;}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes pulse{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
-        @keyframes drift{0%{transform:translate(0,0)}33%{transform:translate(20px,-10px)}66%{transform:translate(-10px,15px)}100%{transform:translate(0,0)}}
-        @keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
-        .fadeup{animation:fadeUp .7s ease forwards;opacity:0;}
-        .d1{animation-delay:.05s}.d2{animation-delay:.2s}.d3{animation-delay:.35s}.d4{animation-delay:.5s}
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+          background: #2a1020;
+          font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+          color: #f5e8de;
+          overflow-x: hidden;
+          -webkit-font-smoothing: antialiased;
+        }
+        input { font-family: inherit; }
+        ::-webkit-scrollbar { width: 0; }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: .3; }
+          50%       { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50%       { transform: scale(1.06); }
+        }
+        @keyframes ticker {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+
+        .anim { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) both; }
+        .d1 { animation-delay: .05s; }
+        .d2 { animation-delay: .18s; }
+        .d3 { animation-delay: .32s; }
+        .d4 { animation-delay: .46s; }
+        .d5 { animation-delay: .60s; }
+
+        .btn-red {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 16px 28px;
+          background: #C8860A; color: #1a0a14;
+          border: none; border-radius: 12px;
+          font-size: 16px; font-weight: 800;
+          cursor: pointer; text-decoration: none;
+          transition: background .15s, transform .15s;
+          letter-spacing: -.02em; line-height: 1;
+          white-space: nowrap;
+        }
+        .btn-red:hover { background: #a06d08; transform: translateY(-1px); }
+        .btn-red:active { transform: scale(.98); }
+
+        .btn-outline {
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 16px 28px;
+          background: transparent; color: #FFBF9E;
+          border: 1px solid rgba(245,232,222,0.25); border-radius: 12px;
+          font-size: 16px; font-weight: 700;
+          cursor: pointer; text-decoration: none;
+          transition: border-color .15s, transform .15s;
+          letter-spacing: -.02em; line-height: 1;
+          white-space: nowrap;
+        }
+        .btn-outline:hover { border-color: rgba(245,232,222,0.6); transform: translateY(-1px); }
+
+        .stat-card {
+          text-align: center;
+          padding: 28px 20px;
+          border: 1px solid rgba(255,191,158,0.08);
+          border-radius: 16px;
+          background: rgba(255,191,158,0.05);
+        }
+
+        .step-dot {
+          width: 40px; height: 40px;
+          border-radius: 50%;
+          background: #C8860A;
+          color: #1a0a14;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .feat-card {
+          padding: 20px;
+          border: 1px solid rgba(255,191,158,0.08);
+          border-radius: 14px;
+          background: rgba(255,191,158,0.05);
+          transition: border-color .2s;
+        }
+        .feat-card:hover { border-color: rgba(200,134,10,0.3); }
+
+        .ticker-wrap {
+          overflow: hidden;
+          padding: 16px 0;
+          background: rgba(255,191,158,0.05);
+          border-top: 1px solid rgba(255,191,158,0.08);
+          border-bottom: 1px solid rgba(255,191,158,0.08);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ticker-inner {
+          display: inline-block;
+          animation: ticker 24s linear infinite;
+        }
+        .ticker-item {
+          display: inline-block;
+          padding: 0 32px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .1em;
+          text-transform: uppercase;
+          color: rgba(245,232,222,0.35);
+        }
+        .ticker-item span { color: #C8860A; margin-right: 32px; }
+
+        .waitlist-input {
+          width: 100%;
+          padding: 15px 18px;
+          background: rgba(255,191,158,0.07);
+          border: 1px solid rgba(255,191,158,0.12);
+          border-radius: 12px;
+          font-size: 16px;
+          color: #f5e8de;
+          outline: none;
+          caret-color: #C8860A;
+          transition: border-color .15s;
+        }
+        .waitlist-input:focus { border-color: rgba(200,134,10,0.5); }
+        .waitlist-input.error { border-color: #C8860A; }
+        .waitlist-input::placeholder { color: rgba(245,232,222,0.3); }
+
+        .pill-nav {
+          display: inline-flex; align-items: center;
+          padding: 7px 14px;
+          border: 1px solid rgba(255,191,158,0.12);
+          border-radius: 999px;
+          font-size: 12px; font-weight: 600;
+          color: rgba(245,232,222,0.5);
+          text-decoration: none;
+          transition: border-color .15s, color .15s;
+        }
+        .pill-nav:hover { border-color: rgba(200,134,10,0.4); color: #C8860A; }
+
+        @media (min-width: 600px) {
+          .hero-title { font-size: 72px !important; }
+          .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .feat-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
       `}</style>
 
-      <div style={{ minHeight:'100vh', background:C.bg, position:'relative' }}>
-        <div style={{ position:'fixed', top:'5%', right:'-8%', width:320, height:320, borderRadius:'50%', background:`${C.primary}12`, filter:'blur(70px)', animation:'drift 14s ease-in-out infinite', pointerEvents:'none', zIndex:0 }} />
-        <div style={{ position:'fixed', bottom:'15%', left:'-8%', width:280, height:280, borderRadius:'50%', background:`${C.peach}12`, filter:'blur(60px)', animation:'drift 18s ease-in-out infinite reverse', pointerEvents:'none', zIndex:0 }} />
+      {/* ── NAV ── */}
+      <nav style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '18px 24px',
+        borderBottom: '1px solid rgba(255,191,158,0.08)',
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(42,16,32,0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-.06em', color: '#f5e8de' }}>
+          CLUTCH<span style={{ color: '#C8860A', marginLeft: 2 }}>.</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <a href="/app2" className="btn-red" style={{ padding: '9px 16px', fontSize: 13 }}>Tester →</a>
+          <a href="/hq" className="pill-nav">QG 🔒</a>
+        </div>
+      </nav>
 
-        {/* NAV */}
-        <nav style={{ padding:'12px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${C.border}`, position:'sticky', top:0, background:`${C.bg}EE`, backdropFilter:'blur(20px)', zIndex:10 }}>
-          <div style={{ fontSize:20, fontWeight:900, letterSpacing:'-0.05em' }}>CLU<span style={{ color:C.primary }}>TCH</span></div>
-          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-            <a href="/demo" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>🎬 Démo</a>
-            <a href="/app" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>📱 App</a>
-            <a href="/flyer" style={{ padding:'6px 14px', borderRadius:20, color:C.textMid, fontSize:12, fontWeight:600 }}>📄 Flyer</a>
-            <a href="/hq" style={{ padding:'6px 14px', borderRadius:20, border:`1px solid ${C.border}`, color:C.textLight, fontSize:12, fontWeight:600 }}>⚙️ QG</a>
-            <a href="/app" style={{ background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:20, padding:'8px 18px', color:'white', fontSize:12, fontWeight:700 }}>Rejoindre →</a>
-          </div>
-        </nav>
+      {/* ── HERO ── */}
+      <section style={{
+        minHeight: 'calc(100svh - 61px)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '64px 24px 48px',
+        textAlign: 'center',
+        maxWidth: 700, margin: '0 auto',
+      }}>
+        {/* Badge */}
+        <div className="anim d1" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '6px 14px',
+          border: '1px solid rgba(200,134,10,0.3)',
+          borderRadius: '999px',
+          fontSize: 12, fontWeight: 700,
+          color: '#C8860A',
+          marginBottom: 32,
+          letterSpacing: '.04em',
+        }}>
+          <span style={{ animation: 'pulse 2s ease-in-out infinite', display: 'inline-block' }}>🇨🇭</span>
+          Lausanne · Beta juin 2026
+        </div>
 
-        {/* HERO */}
-        <section style={{ padding:'60px 28px 52px', maxWidth:520, margin:'0 auto', textAlign:'center', position:'relative', zIndex:1 }}>
-          {/* Promo badge */}
-          <div className="fadeup d1" style={{ display:'inline-flex', alignItems:'center', gap:8, background:`linear-gradient(135deg,${C.gold}22,${C.peachLight})`, border:`1px solid ${C.gold}55`, borderRadius:20, padding:'7px 18px', marginBottom:20 }}>
-            <span style={{ fontSize:14 }}>🎁</span>
-            <span style={{ color:C.gold, fontSize:12, fontWeight:800 }}>6 premiers mois GRATUITS pour les 500 premiers inscrits</span>
-          </div>
+        {/* Titre */}
+        <h1 className="anim d2 hero-title" style={{
+          fontSize: 52, fontWeight: 900,
+          letterSpacing: '-.05em', lineHeight: 1.05,
+          marginBottom: 24,
+        }}>
+          Finis de swiper<br />
+          <span style={{ color: '#C8860A' }}>dans le vide.</span>
+        </h1>
 
-          <div className="fadeup d1" style={{ display:'inline-flex', alignItems:'center', gap:8, background:C.sageLight, border:`1px solid ${C.sage}44`, borderRadius:20, padding:'6px 16px', marginBottom:28 }}>
-            <span style={{ width:7, height:7, borderRadius:'50%', background:C.sage, animation:'pulse 2s ease infinite', display:'inline-block' }} />
-            <span style={{ color:C.sage, fontSize:12, fontWeight:700 }}>Bêta privée · Lausanne</span>
-          </div>
+        {/* Sous-titre */}
+        <p className="anim d3" style={{
+          fontSize: 18, color: 'rgba(245,232,222,0.6)',
+          lineHeight: 1.65, marginBottom: 40,
+          maxWidth: 480,
+        }}>
+          Clutch = un match → un RDV réel → <strong style={{ color: '#f5e8de', fontWeight: 700 }}>dans les 18h</strong>.<br />
+          Ou ça expire.
+        </p>
 
-          <div className="fadeup d2">
-            <div style={{ fontSize:'clamp(52px,14vw,84px)', fontWeight:900, lineHeight:0.9, letterSpacing:'-0.05em', marginBottom:16 }}>
-              CLU<span style={{ color:C.primary }}>TCH</span>
-            </div>
-            <div style={{ color:C.textLight, fontSize:12, letterSpacing:'0.3em', textTransform:'uppercase', marginBottom:32, fontWeight:600 }}>be spontaneous</div>
-          </div>
+        {/* CTA buttons */}
+        <div className="anim d4" style={{
+          display: 'flex', gap: 12, flexWrap: 'wrap',
+          justifyContent: 'center', marginBottom: 20,
+        }}>
+          <a href="/app2" className="btn-red" style={{ fontSize: 17, padding: '17px 32px' }}>
+            Tester la démo →
+          </a>
+          <button className="btn-outline" onClick={scrollToWaitlist} style={{ fontSize: 17, padding: '17px 32px' }}>
+            Rejoindre la beta
+          </button>
+        </div>
 
-          <div className="fadeup d3" style={{ color:C.text, fontSize:'clamp(20px,5vw,28px)', fontWeight:800, lineHeight:1.25, marginBottom:14, letterSpacing:'-0.02em' }}>
-            Un vrai café.<br/>Pas un match de plus.
-          </div>
-          <div className="fadeup d3" style={{ color:C.textMid, fontSize:15, lineHeight:1.8, marginBottom:40, maxWidth:380, margin:'0 auto 40px' }}>
-            Clutch propose un rendez-vous physique dans les 18h. Tu réponds en 2h ou le créneau est libéré. Simple. Honnête. Local.
-          </div>
+        <div className="anim d5" style={{ fontSize: 12, color: 'rgba(245,232,222,0.3)', letterSpacing: '.03em' }}>
+          Gratuit pour les femmes · Toujours
+        </div>
+      </section>
 
-          {/* COMPTEUR */}
-          <div className="fadeup d4" style={{ background:C.bgDeep, border:`1px solid ${C.border}`, borderRadius:18, padding:'18px 20px', marginBottom:20, textAlign:'left' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:10 }}>
-              <span style={{ color:C.text, fontWeight:800, fontSize:15 }}>
-                {count !== null ? count : '…'} <span style={{ color:C.textLight, fontWeight:500, fontSize:13 }}>/ {TARGET} inscrits</span>
-              </span>
-              <span style={{ color:C.primary, fontWeight:800, fontSize:13 }}>{pct}%</span>
-            </div>
-            <div style={{ background:C.border, borderRadius:99, height:8, overflow:'hidden' }}>
-              <div style={{ background:`linear-gradient(90deg,${C.primary},${C.gold})`, height:'100%', width:`${pct}%`, borderRadius:99, transition:'width 1s ease' }} />
-            </div>
-            <div style={{ color:C.textLight, fontSize:11, marginTop:8 }}>
-              {TARGET - (count ?? 0) > 0 ? `Plus que ${TARGET - (count ?? 0)} places pour les 6 mois gratuits` : '🎉 Objectif atteint !'}
-            </div>
-          </div>
-
-          {/* WAITLIST FORM */}
-          <div className="fadeup d4" style={{ display:'flex', flexDirection:'column', gap:12, maxWidth:400, margin:'0 auto' }}>
-            <a href="/demo" style={{ display:'block', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:16, padding:'16px 24px', color:'white', fontSize:15, fontWeight:800, boxShadow:`0 8px 32px ${C.primary}44` }}>
-              ✦ Essaie la démo interactive
-            </a>
-
-            {status === 'done' ? (
-              <div style={{ background:C.sageLight, border:`1px solid ${C.sage}44`, borderRadius:14, padding:'16px', textAlign:'center' }}>
-                <div style={{ fontSize:20, marginBottom:6 }}>✅</div>
-                <div style={{ color:C.sage, fontSize:14, fontWeight:700 }}>Tu es sur la liste !</div>
-                <div style={{ color:C.textLight, fontSize:12, marginTop:4 }}>On te prévient en premier dès l'ouverture.</div>
-              </div>
-            ) : status === 'already' ? (
-              <div style={{ background:C.peachLight, border:`1px solid ${C.peach}44`, borderRadius:14, padding:'16px', textAlign:'center' }}>
-                <div style={{ color:C.peach, fontSize:14, fontWeight:700 }}>👋 Tu es déjà inscrit·e !</div>
-                <div style={{ color:C.textLight, fontSize:12, marginTop:4 }}>On t'a bien en mémoire. On te prévient bientôt.</div>
-              </div>
-            ) : (
-              <form onSubmit={submit} style={{ display:'flex', background:C.bgDeep, border:`1.5px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com" required
-                  style={{ flex:1, background:'none', border:'none', padding:'14px 16px', color:C.text, fontSize:14, outline:'none' }} />
-                <button type="submit" disabled={status==='loading'}
-                  style={{ background:C.text, border:'none', padding:'14px 18px', color:'#fff', fontSize:13, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', opacity:status==='loading'?0.6:1 }}>
-                  {status === 'loading' ? '…' : "M'inscrire →"}
-                </button>
-              </form>
-            )}
-
-            {status === 'error' && <div style={{ color:'#D64545', fontSize:12, textAlign:'center' }}>Erreur — réessaie dans un instant.</div>}
-            <div style={{ color:C.textLight, fontSize:12 }}>Gratuit pour commencer. Tes règles, ton contrôle. 🛡</div>
-          </div>
-        </section>
-
-        {/* COMMENT ÇA MARCHE */}
-        <section style={{ padding:'48px 28px', background:C.bgDeep, borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`, position:'relative', zIndex:1 }}>
-          <div style={{ maxWidth:500, margin:'0 auto' }}>
-            <div style={{ color:C.textLight, fontSize:11, fontWeight:700, letterSpacing:'0.25em', textTransform:'uppercase', textAlign:'center', marginBottom:32 }}>Comment ça marche</div>
-            {[
-              { n:'01', title:'Tu découvres un profil', desc:'Score de compatibilité basé sur tes vraies passions. Pas un algorithme opaque.', color:C.primary },
-              { n:'02', title:'Tu proposes un café', desc:'Un lieu public sûr, une heure précise. Les deux personnes valident le lieu final.', color:C.peach },
-              { n:'03', title:'Elle répond en 2h max', desc:"Passé ce délai, l'invitation expire automatiquement. Fini le ghosting infini.", color:C.sage },
-              { n:'04', title:'Vous vous retrouvez', desc:"RDV réel, dans les 18h. Clutch disparaît ensuite. C'est à vous.", color:C.purple },
-            ].map((s,i,arr)=>(
-              <div key={i} style={{ display:'flex', gap:20, padding:'20px 0', borderBottom:i<arr.length-1?`1px solid ${C.border}`:'none' }}>
-                <div style={{ color:s.color, fontSize:11, fontWeight:900, opacity:0.6, minWidth:28, paddingTop:4, fontFamily:'monospace' }}>{s.n}</div>
-                <div>
-                  <div style={{ color:C.text, fontSize:16, fontWeight:700, marginBottom:5 }}>{s.title}</div>
-                  <div style={{ color:C.textMid, fontSize:13, lineHeight:1.7 }}>{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* VALEURS */}
-        <section style={{ padding:'44px 28px', position:'relative', zIndex:1 }}>
-          <div style={{ maxWidth:500, margin:'0 auto' }}>
-            <div style={{ color:C.textLight, fontSize:11, fontWeight:700, letterSpacing:'0.25em', textTransform:'uppercase', marginBottom:24 }}>Nos engagements</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              {[
-                { icon:'🛡', label:'Sécurité d\'abord', desc:'Lieux publics uniquement. Position partagée optionnelle.', color:C.sage, bg:C.sageLight },
-                { icon:'🛡', label:'Sécurité d\'abord', desc:'Filtres avancés & contrôle total inclus par défaut.', color:C.primary, bg:C.primaryLight },
-                { icon:'⏱', label:'18h maximum', desc:"Un RDV aujourd'hui ou demain.", color:C.peach, bg:C.peachLight },
-                { icon:'◎', label:'Qualité > quantité', desc:'3 invitations/semaine. Chaque message compte.', color:C.purple, bg:C.purpleLight },
-              ].map(v=>(
-                <div key={v.label} style={{ background:v.bg, border:`1px solid ${v.color}33`, borderRadius:18, padding:'16px 14px' }}>
-                  <div style={{ fontSize:24, marginBottom:8 }}>{v.icon}</div>
-                  <div style={{ color:v.color, fontSize:12, fontWeight:700, marginBottom:5 }}>{v.label}</div>
-                  <div style={{ color:C.textMid, fontSize:12, lineHeight:1.5 }}>{v.desc}</div>
-                </div>
+      {/* ── TICKER ── */}
+      <div className="ticker-wrap">
+        <div className="ticker-inner">
+          {[...Array(2)].map((_, i) => (
+            <span key={i}>
+              {['MATCH RÉEL', 'PAS DE GHOSTING', 'RDV EN 18H', 'LAUSANNE FIRST', 'ZÉRO BULLSHIT', '100% GRATUIT ♀', 'SCORE FIABILITÉ', 'BOUTON SOS', 'PROFILS VÉRIFIÉS', 'MATCH RÉEL'].map(t => (
+                <span key={t} className="ticker-item">{t}<span>✦</span></span>
               ))}
-            </div>
-          </div>
-        </section>
-
-        {/* TARIFS */}
-        <section style={{ padding:'44px 28px', background:C.bgDeep, borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`, position:'relative', zIndex:1 }}>
-          <div style={{ maxWidth:500, margin:'0 auto' }}>
-            <div style={{ color:C.textLight, fontSize:11, fontWeight:700, letterSpacing:'0.25em', textTransform:'uppercase', marginBottom:24 }}>Tarifs</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div style={{ background:C.bgDeep, border:`1.5px solid ${C.border}`, borderRadius:20, padding:'20px 16px' }}>
-                <div style={{ color:C.text, fontSize:20, fontWeight:900, marginBottom:3 }}>Gratuit</div>
-                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Pour tout le monde · toujours</div>
-                {['Profil & découverte de profils','3 clutches par jour','Messagerie sécurisée','Bouton SOS intégré','Événements Lausanne'].map(f=>(
-                  <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.border}`, display:'flex', gap:7 }}><span style={{color:C.sage}}>✓</span>{f}</div>
-                ))}
-              </div>
-              <div style={{ background:C.sageLight, border:`1.5px solid ${C.sage}55`, borderRadius:20, padding:'20px 16px' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
-                  <div style={{ color:C.sage, fontSize:18, fontWeight:900 }}>Sécurité+</div>
-                  <span style={{ background:C.sage, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:10 }}>INCLUS</span>
-                </div>
-                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Outils de contrôle & sécurité avancés — disponibles pour qui en a besoin</div>
-                {['Filtres : qui peut te clutcher','Score de fiabilité minimum requis','Mode discret (invisible quand tu veux)','Certifiés uniquement si tu le souhaites'].map(f=>(
-                  <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.sage}33`, display:'flex', gap:7 }}><span style={{color:C.sage}}>✓</span>{f}</div>
-                ))}
-              </div>
-              <div style={{ background:`linear-gradient(160deg,${C.peachLight},${C.purpleLight})`, border:`1.5px solid ${C.gold}55`, borderRadius:20, padding:'20px 16px' }}>
-                <div style={{ color:C.gold, fontSize:20, fontWeight:900, marginBottom:2 }}>CHF 19.90<span style={{ fontSize:12, fontWeight:500, color:C.textMid }}>/mois</span></div>
-                <div style={{ color:C.textMid, fontSize:11, marginBottom:14, fontWeight:500 }}>Premium · pour aller plus loin</div>
-                {['Clutches illimités','Boost de visibilité','Voir qui a vu ton profil','Affinités & filtres détaillés','Badge Premium sur ton profil'].map(f=>(
-                  <div key={f} style={{ color:C.text, fontSize:12, padding:'6px 0', borderBottom:`1px solid ${C.gold}33`, display:'flex', gap:7 }}><span style={{color:C.gold}}>✓</span>{f}</div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA FINAL */}
-        <section style={{ padding:'56px 28px 80px', background:C.primaryLight, borderTop:`1px solid ${C.border}`, textAlign:'center', position:'relative', zIndex:1 }}>
-          <div style={{ maxWidth:440, margin:'0 auto' }}>
-            <div style={{ fontSize:32, marginBottom:14 }}>☕</div>
-            <div style={{ color:C.text, fontSize:24, fontWeight:800, marginBottom:10, letterSpacing:'-0.03em' }}>Prêt(e) à essayer ?</div>
-            <div style={{ color:C.textMid, fontSize:14, marginBottom:32, lineHeight:1.75 }}>
-              La démo montre tous les écrans.<br/>Aucun compte requis.
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10, maxWidth:320, margin:'0 auto' }}>
-              <a href="/demo" style={{ display:'block', background:`linear-gradient(135deg,${C.primary},${C.primaryDark})`, borderRadius:16, padding:'16px 24px', color:'white', fontSize:15, fontWeight:800, boxShadow:`0 8px 32px ${C.primary}44` }}>
-                ✦ Voir la démo
-              </a>
-              <a href="/app" style={{ display:'block', border:`2px solid ${C.primary}`, borderRadius:16, padding:'14px 24px', color:C.primary, fontSize:14, fontWeight:700 }}>
-                + Accéder à l'app réelle
-              </a>
-            </div>
-            <div style={{ color:C.textLight, fontSize:11, marginTop:24 }}>Lausanne · Suisse romande · 2026</div>
-            <a href="/hq" style={{ display:'inline-block', marginTop:16, color:'transparent', fontSize:8, userSelect:'none' }}>·</a>
-          </div>
-        </section>
-
+            </span>
+          ))}
+        </div>
       </div>
+
+      {/* ── STATS ── */}
+      <section style={{ padding: '80px 24px', maxWidth: 900, margin: '0 auto' }}>
+        <div className="stats-grid" style={{
+          display: 'grid', gridTemplateColumns: '1fr',
+          gap: 16,
+        }}>
+          {[
+            { n: '0', label: 'apps de rencontres qui forcent un vrai RDV' },
+            { n: '18h', label: 'max entre le match et le rendez-vous' },
+            { n: 'CHF 0', label: 'pour les femmes — toujours' },
+          ].map(s => (
+            <div key={s.n} className="stat-card">
+              <div style={{
+                fontSize: 56, fontWeight: 900,
+                letterSpacing: '-.04em',
+                color: '#C8860A', lineHeight: 1,
+                marginBottom: 10,
+              }}>{s.n}</div>
+              <div style={{ fontSize: 14, color: 'rgba(245,232,222,0.5)', lineHeight: 1.5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── COMMENT ÇA MARCHE ── */}
+      <section style={{ padding: '0 24px 80px', maxWidth: 640, margin: '0 auto' }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700,
+          letterSpacing: '.14em', textTransform: 'uppercase',
+          color: 'rgba(245,232,222,0.3)',
+          marginBottom: 40, textAlign: 'center',
+        }}>Comment ça marche</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          {[
+            {
+              n: '01',
+              title: 'Tu matches avec quelqu\'un de disponible MAINTENANT',
+              desc: 'Tu indiques que tu es dispo ce soir à Lausanne. Seules les personnes disponibles maintenant apparaissent — pas de profils dormants.',
+            },
+            {
+              n: '02',
+              title: 'Tu proposes : lieu + heure + message (dans les 2h)',
+              desc: 'Tu choisis un endroit réel. Tu envoies une proposition concrète. Pas de "on verra". Dans les 2h, c\'est confirmé ou expiré.',
+            },
+            {
+              n: '03',
+              title: 'Tu y vas — score de fiabilité si tu ne viens pas',
+              desc: 'Le Verrou se referme. RDV réel dans les 18h. Si tu ghostes, ton score de fiabilité chute. Le respect, c\'est un feature.',
+            },
+          ].map((s, i) => (
+            <div key={s.n} style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+              <div style={{ position: 'relative' }}>
+                <div className="step-dot">{s.n}</div>
+                {i < 2 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 1, height: 32,
+                    background: 'linear-gradient(to bottom, rgba(200,134,10,0.4), transparent)',
+                    marginTop: 0,
+                  }}/>
+                )}
+              </div>
+              <div style={{ paddingTop: 8 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6, letterSpacing: '-.02em', lineHeight: 1.3 }}>{s.title}</div>
+                <div style={{ fontSize: 13, color: 'rgba(245,232,222,0.5)', lineHeight: 1.65 }}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FEATURES ── */}
+      <section style={{ padding: '0 24px 80px', maxWidth: 900, margin: '0 auto' }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700,
+          letterSpacing: '.14em', textTransform: 'uppercase',
+          color: 'rgba(245,232,222,0.3)',
+          marginBottom: 32, textAlign: 'center',
+        }}>Ce qui rend Clutch différent</div>
+
+        <div className="feat-grid" style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr',
+          gap: 12,
+        }}>
+          {[
+            { icon: '🔒', title: 'Profils certifiés', desc: 'Score de fiabilité public. Ghosting = pénalité réelle.' },
+            { icon: '⚡', title: 'Disponible maintenant', desc: 'Seules les personnes dispo ce soir apparaissent.' },
+            { icon: '🎯', title: 'Score de compatibilité', desc: 'Pas de scroll infini. Des suggestions pertinentes.' },
+            { icon: '🚨', title: 'Bouton SOS', desc: 'Un contact reçoit ta position en un tap.' },
+            { icon: '📅', title: 'Événements Lausanne', desc: 'Concerts, bars, expos — RDV avec contexte.' },
+            { icon: '♀', title: 'Gratuit pour les femmes', desc: 'Toujours. Par choix éthique, pas marketing.' },
+          ].map(f => (
+            <div key={f.title} className="feat-card">
+              <div style={{ fontSize: 22, marginBottom: 10 }}>{f.icon}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, letterSpacing: '-.02em' }}>{f.title}</div>
+              <div style={{ fontSize: 12, color: 'rgba(245,232,222,0.45)', lineHeight: 1.55 }}>{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── WAITLIST ── */}
+      <section ref={waitlistRef} style={{
+        padding: '80px 24px',
+        background: 'rgba(20,8,16,0.7)',
+        borderTop: '1px solid rgba(255,191,158,0.08)',
+        borderBottom: '1px solid rgba(255,191,158,0.08)',
+      }}>
+        <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: '-.04em', marginBottom: 10, lineHeight: 1.1 }}>
+            Sois parmi les premiers<br />à <span style={{ color: '#C8860A' }}>Lausanne</span>
+          </div>
+          <p style={{ fontSize: 14, color: 'rgba(245,232,222,0.5)', marginBottom: 32, lineHeight: 1.6 }}>
+            On ouvre la beta bientôt. Laisse ton email,<br />on te contacte dès que c'est live.
+            {count != null && (
+              <span style={{ display: 'block', marginTop: 8, color: 'rgba(245,232,222,0.3)', fontSize: 12 }}>
+                <span style={{ animation: 'blink 2s ease-in-out infinite', display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e', marginRight: 6, verticalAlign: 'middle' }}/>
+                {count} personne{count !== 1 ? 's' : ''} déjà inscrite{count !== 1 ? 's' : ''}
+              </span>
+            )}
+          </p>
+
+          {done ? (
+            <div style={{
+              background: 'rgba(34,197,94,0.08)',
+              border: '1px solid rgba(34,197,94,0.25)',
+              borderRadius: 16, padding: '28px 24px',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>✓</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>Tu es sur la liste !</div>
+              <div style={{ fontSize: 13, color: 'rgba(245,232,222,0.5)' }}>
+                On te contacte dès que c'est live. En attendant —
+              </div>
+              <a href="/app2" className="btn-red" style={{ display: 'inline-flex', marginTop: 16, fontSize: 14 }}>
+                Tester la démo →
+              </a>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setErr('') }}
+                  onKeyDown={e => e.key === 'Enter' && join()}
+                  placeholder="ton@email.com"
+                  className={`waitlist-input${err ? ' error' : ''}`}
+                  style={{ flex: 1, minWidth: 220 }}
+                />
+                <button
+                  className="btn-red"
+                  onClick={join}
+                  disabled={loading}
+                  style={{ opacity: loading ? .6 : 1, cursor: loading ? 'default' : 'pointer', width: 'auto', padding: '15px 24px' }}
+                >
+                  {loading ? '…' : 'Je veux accès'}
+                </button>
+              </div>
+              {err && <div style={{ fontSize: 12, color: '#FFBF9E', textAlign: 'left' }}>{err}</div>}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{
+        padding: '28px 24px',
+        borderTop: '1px solid rgba(255,191,158,0.06)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 12,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '-.04em', color: 'rgba(245,232,222,0.4)' }}>
+          CLUTCH<span style={{ color: '#C8860A' }}>.</span>
+        </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          {[
+            { href: '/app2', label: 'App' },
+            { href: '/privacy', label: 'Confidentialité' },
+            { href: '/terms', label: 'CGU' },
+            { href: 'mailto:david.saugy@gmail.com', label: 'Contact' },
+            { href: '/hq', label: 'QG 🔒' },
+          ].map(l => (
+            <a key={l.href} href={l.href} style={{ fontSize: 12, color: 'rgba(245,232,222,0.3)', textDecoration: 'none' }}
+              onMouseOver={e => (e.currentTarget.style.color = 'rgba(245,232,222,0.7)')}
+              onMouseOut={e => (e.currentTarget.style.color = 'rgba(245,232,222,0.3)')}
+            >{l.label}</a>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(245,232,222,0.2)' }}>
+          Construit à Lausanne 🇨🇭 · 2026 · {V}
+        </div>
+      </footer>
     </>
   )
 }

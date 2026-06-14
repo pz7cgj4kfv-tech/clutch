@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLUTCH — Checklist de test v11.06</title>
+<style>
+  :root {
+    --bg: #2a1020;
+    --bg2: #3a1830;
+    --bg3: #4a2040;
+    --gold: #C8860A;
+    --gold-light: #e8a020;
+    --peach: #FFBF9E;
+    --peach-dim: rgba(255,191,158,0.6);
+    --text: #f5e8de;
+    --white: #ffffff;
+    --success: #4ade80;
+    --border: rgba(200,134,10,0.25);
+    --border-hover: rgba(200,134,10,0.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(180deg, #1a0a18 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 16px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .logo-block { display: flex; flex-direction: column; }
+
+  .logo-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--peach-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  .overall-badge {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    text-align: center;
+  }
+
+  .overall-badge .count {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .overall-badge .label {
+    font-size: 9px;
+    color: var(--peach-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    border-radius: 4px;
+    transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+
+  .progress-label {
+    font-size: 11px;
+    color: var(--peach-dim);
+    text-align: right;
+    letter-spacing: 0.5px;
+  }
+
+  /* ACTIONS ROW */
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--peach);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 6px 12px;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(200,134,10,0.08);
+  }
+
+  .btn-reset {
+    border-color: rgba(255,191,158,0.3);
+    color: rgba(255,191,158,0.5);
+  }
+
+  .btn-reset:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: rgba(239,68,68,0.08);
+  }
+
+  /* CONTENT */
+  .content {
+    padding: 12px 12px 0;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* SECTION */
+  .section {
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .section-header {
+    align-items: center;
+    background: linear-gradient(135deg, var(--bg2), var(--bg3));
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    user-select: none;
+    transition: background 0.2s;
+  }
+
+  .section-header:hover {
+    background: linear-gradient(135deg, var(--bg3), #5a2850);
+  }
+
+  .section-emoji {
+    font-size: 18px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .section-title {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+    letter-spacing: 0.2px;
+  }
+
+  .section-badge {
+    background: rgba(200,134,10,0.15);
+    border: 1px solid rgba(200,134,10,0.4);
+    border-radius: 12px;
+    color: var(--gold);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .section-badge.complete {
+    background: rgba(74,222,128,0.15);
+    border-color: rgba(74,222,128,0.5);
+    color: var(--success);
+  }
+
+  .chevron {
+    color: var(--peach-dim);
+    font-size: 12px;
+    transition: transform 0.25s;
+    flex-shrink: 0;
+  }
+
+  .section.collapsed .chevron { transform: rotate(-90deg); }
+
+  .section-body {
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .section.collapsed .section-body {
+    max-height: 0 !important;
+    border-top: none;
+  }
+
+  /* TEST ITEM */
+  .test-item {
+    border-bottom: 1px solid rgba(200,134,10,0.1);
+  }
+
+  .test-item:last-child { border-bottom: none; }
+
+  .test-row {
+    align-items: flex-start;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px;
+    transition: background 0.15s;
+  }
+
+  .test-row:hover { background: rgba(255,255,255,0.03); }
+
+  /* CHECKBOX */
+  .cb-wrap {
+    flex-shrink: 0;
+    margin-top: 1px;
+    position: relative;
+  }
+
+  .cb-wrap input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(200,134,10,0.4);
+    border-radius: 5px;
+    cursor: pointer;
+    height: 18px;
+    transition: all 0.2s;
+    width: 18px;
+    display: block;
+  }
+
+  .cb-wrap input[type="checkbox"]:checked {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .cb-wrap input[type="checkbox"]:checked::after {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 9px;
+    border: 2px solid #1a0a18;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translate(3px, 1px);
+  }
+
+  .test-label {
+    color: var(--white);
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .test-item.checked .test-label {
+    color: var(--peach-dim);
+    text-decoration: line-through;
+    text-decoration-color: rgba(200,134,10,0.4);
+  }
+
+  .expand-btn {
+    background: none;
+    border: none;
+    color: var(--peach-dim);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+    flex-shrink: 0;
+    margin-top: 1px;
+    line-height: 1;
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .expand-btn:hover { opacity: 1; }
+  .expand-btn.open { transform: rotate(180deg); opacity: 1; color: var(--gold); }
+
+  /* NOTES */
+  .notes-wrap {
+    display: none;
+    padding: 0 14px 10px 42px;
+  }
+
+  .notes-wrap.open { display: block; }
+
+  .notes-wrap textarea {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--peach);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    resize: vertical;
+    width: 100%;
+    min-height: 56px;
+    outline: none;
+    transition: border-color 0.2s;
+    placeholder-color: var(--peach-dim);
+  }
+
+  .notes-wrap textarea::placeholder { color: rgba(255,191,158,0.35); }
+
+  .notes-wrap textarea:focus {
+    border-color: var(--gold);
+    background: rgba(255,255,255,0.06);
+  }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255,191,158,0.3);
+    font-size: 11px;
+    letter-spacing: 1px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* PRINT */
+  @media print {
+    body { background: white; color: black; }
+    .header { position: static; background: white; border-bottom: 2px solid black; }
+    .logo-title { color: black; }
+    .logo-sub, .progress-label { color: #666; }
+    .actions { display: none; }
+    .section { border: 1px solid #ccc; break-inside: avoid; }
+    .section.collapsed .section-body { max-height: 10000px !important; border-top: 1px solid #ccc; }
+    .section-header { background: #f5f5f5; }
+    .section-title { color: black; }
+    .test-label { color: black; }
+    .test-row { padding: 8px 14px; }
+    .cb-wrap input[type="checkbox"] { border-color: black; }
+    .notes-wrap { display: block !important; }
+    .notes-wrap textarea { border: 1px solid #ccc; color: #333; background: #fafafa; }
+    .expand-btn { display: none; }
+    .progress-wrap, .section-badge { display: none; }
+    .footer { color: #999; }
+  }
+
+  /* MOBILE TWEAKS */
+  @media (max-width: 400px) {
+    .logo-title { font-size: 22px; letter-spacing: 3px; }
+    .section-title { font-size: 12px; }
+    .test-label { font-size: 12px; }
+  }
+
+  /* Pulse animation for 100% complete */
+  @keyframes goldPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,134,10,0); }
+    50% { box-shadow: 0 0 12px 4px rgba(200,134,10,0.4); }
+  }
+
+  .progress-bar.complete { animation: goldPulse 2s infinite; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo-block">
+      <div class="logo-title">CLUTCH</div>
+      <div class="logo-sub">Checklist de test — v11.06</div>
+    </div>
+    <div class="overall-badge">
+      <div class="count" id="overallCount">0/42</div>
+      <div class="label">tests passés</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+  <div class="progress-label" id="progressLabel">0% complet</div>
+
+  <div class="actions">
+    <button class="btn" onclick="expandAll()">↕ Tout déplier</button>
+    <button class="btn" onclick="collapseAll()">↕ Tout replier</button>
+    <button class="btn btn-reset" onclick="resetAll()">✕ Réinitialiser</button>
+  </div>
+</div>
+
+<div class="content" id="content"></div>
+
+<div class="footer">CLUTCH · Lausanne · v11.06 · Confidentiel</div>
+
+<script>
+const STORAGE_KEY = 'clutch_test_state';
+
+const SECTIONS = [
+  {
+    id: 's1',
+    emoji: '🚀',
+    title: 'Splash & Login',
+    items: [
+      { id: 's1_1', label: 'Splash logo animé s\'affiche (sablier / logo Clutch)' },
+      { id: 's1_2', label: 'Transition vers login après ~2s' },
+      { id: 's1_3', label: 'Connexion avec david.saugy@gmail.com / Clutch2026!' },
+      { id: 's1_4', label: 'Connexion avec melanie@clutch.app / ClutchMel2026!' },
+      { id: 's1_5', label: 'Message d\'erreur si mauvais mot de passe' },
+      { id: 's1_6', label: 'Bouton "Créer un compte" visible' },
+    ]
+  },
+  {
+    id: 's2',
+    emoji: '📍',
+    title: 'Carte & Disponibilité',
+    items: [
+      { id: 's2_1', label: 'Carte Lausanne s\'affiche correctement (pas fragmentée)' },
+      { id: 's2_2', label: 'Étoiles animées visibles sur la carte' },
+      { id: 's2_3', label: 'Étoiles non cliquables (sécurité — positions floutées)' },
+      { id: 's2_4', label: 'Molette heure : sélection "De / À" fonctionne' },
+      { id: 's2_5', label: 'Bouton "Ouvrir ma fenêtre" → profil apparaît sur carte' },
+      { id: 's2_6', label: 'Profil David visible depuis compte Mélanie après ouverture fenêtre' },
+      { id: 's2_7', label: 'Profil Mélanie visible depuis compte David après ouverture fenêtre' },
+      { id: 's2_8', label: '"Fermer ma fenêtre" → profil disparaît de la carte' },
+    ]
+  },
+  {
+    id: 's3',
+    emoji: '💥',
+    title: 'Envoyer un Clutch',
+    items: [
+      { id: 's3_1', label: 'Cliquer sur un profil → fiche profil apparaît' },
+      { id: 's3_2', label: 'Formulaire Clutch : lieu, heure, message' },
+      { id: 's3_3', label: 'Envoi du Clutch → confirmation visuelle' },
+      { id: 's3_4', label: 'Destinataire reçoit notification (ou voit le clutch arriver)' },
+      { id: 's3_5', label: 'Clutch envoyé apparaît dans onglet "Clutchs" côté expéditeur' },
+      { id: 's3_6', label: 'Clutch reçu apparaît dans onglet "Clutchs" côté destinataire' },
+    ]
+  },
+  {
+    id: 's4',
+    emoji: '🔒',
+    title: 'Verrou (acceptation)',
+    items: [
+      { id: 's4_1', label: 'Destinataire voit bouton "Verrouiller"' },
+      { id: 's4_2', label: 'Clic "Verrouiller" → statut passe à confirmed/accepted en DB' },
+      { id: 's4_3', label: 'Expéditeur voit l\'animation Verrou (dans les 8s via polling)' },
+      { id: 's4_4', label: 'Les deux voient le RDV confirmé dans "Clutchs"' },
+      { id: 's4_5', label: 'Créneau verrouillé pour les deux (invisibles pour nouveau clutch sur ce slot)' },
+    ]
+  },
+  {
+    id: 's5',
+    emoji: '💬',
+    title: 'Chat post-Verrou',
+    items: [
+      { id: 's5_1', label: 'Onglet chat accessible après Verrou' },
+      { id: 's5_2', label: 'David peut envoyer un message à Mélanie' },
+      { id: 's5_3', label: 'Mélanie reçoit le message (Realtime ou polling)' },
+      { id: 's5_4', label: 'Limite 5 messages par personne (6ème bloqué)' },
+    ]
+  },
+  {
+    id: 's6',
+    emoji: '❌',
+    title: 'Annulation',
+    items: [
+      { id: 's6_1', label: 'Bouton annuler visible sur un Clutch en cours' },
+      { id: 's6_2', label: 'Confirmation avant annulation' },
+      { id: 's6_3', label: 'Pénalité de score appliquée (visible sur profil)' },
+      { id: 's6_4', label: 'L\'autre personne voit le statut "Annulé"' },
+    ]
+  },
+  {
+    id: 's7',
+    emoji: '👤',
+    title: 'Profil',
+    items: [
+      { id: 's7_1', label: 'Onglet Profil accessible' },
+      { id: 's7_2', label: 'Score ★ visible et correct' },
+      { id: 's7_3', label: 'Modification disponibilité depuis profil' },
+      { id: 's7_4', label: 'Suppression de compte → modal 2 étapes' },
+      { id: 's7_5', label: 'Déconnexion fonctionne' },
+    ]
+  },
+  {
+    id: 's8',
+    emoji: '🔐',
+    title: 'Sécurité',
+    items: [
+      { id: 's8_1', label: 'Positions étoiles floutées (pas la position exacte)' },
+      { id: 's8_2', label: 'Étoiles non cliquables sur la carte' },
+      { id: 's8_3', label: 'Bouton SOS visible et accessible' },
+      { id: 's8_4', label: 'Blocage d\'un utilisateur fonctionne' },
+    ]
+  }
+];
+
+// Load state
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch(e) { return {}; }
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+let state = loadState();
+
+// Calculate totals
+function getTotals() {
+  let total = 0, done = 0;
+  SECTIONS.forEach(s => {
+    s.items.forEach(item => {
+      total++;
+      if (state[item.id]?.checked) done++;
+    });
+  });
+  return { total, done };
+}
+
+function getSectionTotals(section) {
+  let total = section.items.length;
+  let done = section.items.filter(item => state[item.id]?.checked).length;
+  return { total, done };
+}
+
+// Update UI
+function updateProgress() {
+  const { total, done } = getTotals();
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const bar = document.getElementById('progressBar');
+  bar.style.width = pct + '%';
+  bar.classList.toggle('complete', pct === 100);
+  document.getElementById('progressLabel').textContent = pct + '% complet';
+  document.getElementById('overallCount').textContent = done + '/' + total;
+}
+
+function updateSectionBadge(sectionId) {
+  const section = SECTIONS.find(s => s.id === sectionId);
+  if (!section) return;
+  const { total, done } = getSectionTotals(section);
+  const badge = document.querySelector(`[data-section="${sectionId}"] .section-badge`);
+  if (badge) {
+    badge.textContent = done + '/' + total;
+    badge.classList.toggle('complete', done === total);
+  }
+}
+
+// Render
+function render() {
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  SECTIONS.forEach(section => {
+    const { total, done } = getSectionTotals(section);
+    const isCollapsed = state[`__collapsed_${section.id}`] ?? false;
+
+    const sEl = document.createElement('div');
+    sEl.className = 'section' + (isCollapsed ? ' collapsed' : '');
+    sEl.dataset.sectionEl = section.id;
+
+    // Estimate body height for animation
+    const approxBodyHeight = section.items.length * 52 + 10;
+
+    sEl.innerHTML = `
+      <div class="section-header" data-section="${section.id}" onclick="toggleSection('${section.id}')">
+        <span class="section-emoji">${section.emoji}</span>
+        <span class="section-title">${section.title}</span>
+        <span class="section-badge ${done === total ? 'complete' : ''}">${done}/${total}</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" style="max-height:${isCollapsed ? '0' : approxBodyHeight + 'px'}">
+        ${section.items.map(item => {
+          const checked = state[item.id]?.checked || false;
+          const notes = state[item.id]?.notes || '';
+          const notesOpen = state[item.id]?.notesOpen || false;
+          return `
+            <div class="test-item ${checked ? 'checked' : ''}" id="item_${item.id}">
+              <div class="test-row" onclick="handleRowClick(event, '${item.id}')">
+                <div class="cb-wrap">
+                  <input type="checkbox" id="cb_${item.id}" ${checked ? 'checked' : ''}
+                    onchange="toggleCheck('${item.id}', event)"
+                    onclick="event.stopPropagation()">
+                </div>
+                <label class="test-label" for="cb_${item.id}" onclick="event.stopPropagation(); toggleCheck('${item.id}')">${item.label}</label>
+                <button class="expand-btn ${notesOpen ? 'open' : ''}" id="expbtn_${item.id}"
+                  onclick="event.stopPropagation(); toggleNotes('${item.id}')" title="Ajouter une note">▾</button>
+              </div>
+              <div class="notes-wrap ${notesOpen ? 'open' : ''}" id="notes_${item.id}">
+                <textarea placeholder="Notes, observations, bugs constatés…"
+                  oninput="saveNotes('${item.id}', this.value)">${notes}</textarea>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    content.appendChild(sEl);
+  });
+
+  updateProgress();
+}
+
+function toggleSection(sectionId) {
+  const sEl = document.querySelector(`[data-section-el="${sectionId}"]`);
+  if (!sEl) return;
+  const isCollapsed = sEl.classList.contains('collapsed');
+  const body = sEl.querySelector('.section-body');
+  const section = SECTIONS.find(s => s.id === sectionId);
+  const approxBodyHeight = section ? section.items.length * 52 + 10 : 300;
+
+  if (isCollapsed) {
+    sEl.classList.remove('collapsed');
+    body.style.maxHeight = approxBodyHeight + 'px';
+    state[`__collapsed_${sectionId}`] = false;
+  } else {
+    body.style.maxHeight = '0';
+    sEl.classList.add('collapsed');
+    state[`__collapsed_${sectionId}`] = true;
+  }
+  saveState(state);
+}
+
+function handleRowClick(event, itemId) {
+  // Do nothing on row click (checkboxes and expand handled separately)
+}
+
+function toggleCheck(itemId, event) {
+  if (event) event.stopPropagation();
+  const cb = document.getElementById('cb_' + itemId);
+  const checked = cb ? cb.checked : !(state[itemId]?.checked);
+  if (!state[itemId]) state[itemId] = {};
+  state[itemId].checked = checked;
+  if (cb) cb.checked = checked;
+
+  const itemEl = document.getElementById('item_' + itemId);
+  if (itemEl) itemEl.classList.toggle('checked', checked);
+
+  // Find section
+  const section = SECTIONS.find(s => s.items.some(i => i.id === itemId));
+  if (section) updateSectionBadge(section.id);
+
+  saveState(state);
+  updateProgress();
+}
+
+function toggleNotes(itemId) {
+  if (!state[itemId]) state[itemId] = {};
+  const isOpen = !state[itemId].notesOpen;
+  state[itemId].notesOpen = isOpen;
+
+  const notesWrap = document.getElementById('notes_' + itemId);
+  const expBtn = document.getElementById('expbtn_' + itemId);
+  if (notesWrap) notesWrap.classList.toggle('open', isOpen);
+  if (expBtn) expBtn.classList.toggle('open', isOpen);
+
+  saveState(state);
+}
+
+function saveNotes(itemId, value) {
+  if (!state[itemId]) state[itemId] = {};
+  state[itemId].notes = value;
+  saveState(state);
+}
+
+function expandAll() {
+  SECTIONS.forEach(s => {
+    const sEl = document.querySelector(`[data-section-el="${s.id}"]`);
+    if (!sEl) return;
+    const body = sEl.querySelector('.section-body');
+    const approxBodyHeight = s.items.length * 52 + 10;
+    sEl.classList.remove('collapsed');
+    body.style.maxHeight = approxBodyHeight + 'px';
+    state[`__collapsed_${s.id}`] = false;
+  });
+  saveState(state);
+}
+
+function collapseAll() {
+  SECTIONS.forEach(s => {
+    const sEl = document.querySelector(`[data-section-el="${s.id}"]`);
+    if (!sEl) return;
+    const body = sEl.querySelector('.section-body');
+    sEl.classList.add('collapsed');
+    body.style.maxHeight = '0';
+    state[`__collapsed_${s.id}`] = true;
+  });
+  saveState(state);
+}
+
+function resetAll() {
+  if (!confirm('Réinitialiser tous les tests ? Cette action est irréversible.')) return;
+  state = {};
+  saveState(state);
+  render();
+}
+
+// Fix: querySelector needs the data-section-el attribute properly
+document.addEventListener('DOMContentLoaded', () => {});
+
+// Override querySelector to use data-section-el
+const origQuery = document.querySelector.bind(document);
+
+// Patch toggle section to find by data-section-el
+function getSectionEl(sectionId) {
+  return document.querySelector(`[data-section-el="${sectionId}"]`);
+}
+
+// Re-patch toggleSection to use getSectionEl
+window.toggleSection = function(sectionId) {
+  const sEl = getSectionEl(sectionId);
+  if (!sEl) return;
+  const isCollapsed = sEl.classList.contains('collapsed');
+  const body = sEl.querySelector('.section-body');
+  const section = SECTIONS.find(s => s.id === sectionId);
+  const approxBodyHeight = section ? section.items.length * 64 + 20 : 400;
+
+  if (isCollapsed) {
+    sEl.classList.remove('collapsed');
+    body.style.maxHeight = approxBodyHeight + 'px';
+    state[`__collapsed_${sectionId}`] = false;
+  } else {
+    body.style.maxHeight = '0';
+    sEl.classList.add('collapsed');
+    state[`__collapsed_${sectionId}`] = true;
+  }
+  saveState(state);
+};
+
+window.expandAll = function() {
+  SECTIONS.forEach(s => {
+    const sEl = getSectionEl(s.id);
+    if (!sEl) return;
+    const body = sEl.querySelector('.section-body');
+    const approxBodyHeight = s.items.length * 64 + 20;
+    sEl.classList.remove('collapsed');
+    body.style.maxHeight = approxBodyHeight + 'px';
+    state[`__collapsed_${s.id}`] = false;
+  });
+  saveState(state);
+};
+
+window.collapseAll = function() {
+  SECTIONS.forEach(s => {
+    const sEl = getSectionEl(s.id);
+    if (!sEl) return;
+    const body = sEl.querySelector('.section-body');
+    sEl.classList.add('collapsed');
+    body.style.maxHeight = '0';
+    state[`__collapsed_${s.id}`] = true;
+  });
+  saveState(state);
+};
+
+// Also fix updateSectionBadge
+window.updateSectionBadge = function(sectionId) {
+  const section = SECTIONS.find(s => s.id === sectionId);
+  if (!section) return;
+  const { total, done } = getSectionTotals(section);
+  const header = document.querySelector(`[data-section="${sectionId}"]`);
+  if (header) {
+    const badge = header.querySelector('.section-badge');
+    if (badge) {
+      badge.textContent = done + '/' + total;
+      badge.classList.toggle('complete', done === total);
+    }
+  }
+};
+
+// Init
+render();
+</script>
+</body>
+</html>

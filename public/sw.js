@@ -1,14 +1,29 @@
-// Clutch Service Worker — v06.06-AD
-// Push notifications + offline cache basique
+// Clutch Service Worker — v11.06-S
+// Push notifications ONLY — no caching to prevent stale JS chunks
 
-const CACHE = 'clutch-v1'
+const CACHE_VERSION = 'clutch-v11'
 
 self.addEventListener('install', e => {
   self.skipWaiting()
 })
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim())
+  // Purge all old caches on activation to prevent stale JS issues
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(key => {
+        if (key !== CACHE_VERSION) return caches.delete(key)
+      }))
+    ).then(() => clients.claim())
+  )
+})
+
+// Network-first: never serve cached JS/HTML to avoid stale chunk bugs
+self.addEventListener('fetch', e => {
+  // Only handle same-origin requests, pass everything else through
+  if (!e.request.url.startsWith(self.location.origin)) return
+  // Never cache — always go to network
+  e.respondWith(fetch(e.request).catch(() => Response.error()))
 })
 
 // ── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────

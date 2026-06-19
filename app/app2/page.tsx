@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z39'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z40'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -188,6 +188,20 @@ function TabSvg({id, size=22, active, filter}:{id:string; size?:number; active:b
   const src = TAB_ICONS[id]
   if (!src) return null
   return <img src={src} width={size} height={size} alt="" style={{display:'block', filter: filter ?? (active?'none':'brightness(0) invert(1) opacity(0.3)'), transition:'filter .2s'}}/>
+}
+
+// Logo Clutch officiel (SVG) — réutilisable (floating + footer profil)
+function ClutchMark({ size=40 }:{ size?:number }) {
+  return (
+    <svg width={size} height={size*(205/258)} viewBox="103 127 258 205" aria-label="Clutch" style={{display:'block'}}>
+      <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3 "/>
+      <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7 "/>
+      <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+      <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+      <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+      <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+    </svg>
+  )
 }
 
 // ─── i18n — traductions FR/EN ─────────────────────────────────
@@ -3524,6 +3538,7 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
   const [sent, setSent] = useState(false)
   const mrRef = useRef<MediaRecorder|null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const recTimerRef = useRef<ReturnType<typeof setTimeout>|null>(null)
 
   useEffect(() => { if (sent) { const t = setTimeout(onClose, 2200); return () => clearTimeout(t) } }, [sent, onClose])
 
@@ -3541,10 +3556,14 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
       }
       mr.start()
       setRecording(true)
+      // Vocal limité à 5 min (auto-stop)
+      recTimerRef.current = setTimeout(() => {
+        if (mrRef.current?.state === 'recording') { mrRef.current.stop(); setRecording(false); showToast('Vocal limité à 5 min ✓', C.orange) }
+      }, 5*60*1000)
     } catch { showToast('Micro non disponible', C.red) }
   }
 
-  const stopRecording = () => { mrRef.current?.stop(); setRecording(false) }
+  const stopRecording = () => { if (recTimerRef.current) clearTimeout(recTimerRef.current); mrRef.current?.stop(); setRecording(false) }
 
   const send = async () => {
     if (!text.trim() && !audioBlob) return
@@ -4088,12 +4107,12 @@ function FieldRow({ icon, label, value, gk, placeholder, isEditing, onTap, locke
   )
 }
 
-function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable, rdvBlocked }:{
+function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable, rdvBlocked, onFeedback }:{
   user:Profile; flow:AppFlow; setFlow:(f:AppFlow)=>void;
   signOut:()=>void; setShowDelete:(v:boolean)=>void;
   showToast:(m:string,c?:string)=>void; onUserUpdate:(p:Profile)=>void;
   lang:Lang; setLang:(l:Lang)=>void;
-  onSetAvailable?:()=>void; isAvailable?:boolean; rdvBlocked?:boolean;
+  onSetAvailable?:()=>void; isAvailable?:boolean; rdvBlocked?:boolean; onFeedback?:()=>void;
 }) {
   const [profileSubTab, setProfileSubTab] = useState<'profil'|'settings'>('profil')
   const [profilePage, setProfilePage] = useState<string|null>(null)
@@ -4929,6 +4948,19 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             showToast('✅ Reset effectué — recharge l\'app',C.orange)
           }}/>
         </MCard>
+
+        {/* ── Footer pro / business (version + Lausanne 🇨🇭 + feedback bêta) ── */}
+        <div style={{textAlign:'center',padding:'30px 16px 6px'}}>
+          <div style={{display:'flex',justifyContent:'center',marginBottom:10,opacity:.95}}><ClutchMark size={36}/></div>
+          <div style={{fontSize:13,fontWeight:900,letterSpacing:2.5,color:C.salmon}}>CLUTCH <span style={{fontWeight:600,color:`${C.whiteMid}cc`,letterSpacing:1}}>{V}</span></div>
+          <div style={{fontSize:11,color:`${C.whiteMid}aa`,marginTop:7}}>Designed in Lausanne <span style={{fontSize:12}}>🇨🇭</span> · © 2026</div>
+          <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:3,fontStyle:'italic'}}>La vraie vie, maintenant.</div>
+
+          <button onClick={()=>onFeedback?.()} style={{marginTop:20,padding:'13px 22px',borderRadius:14,background:C.orange,border:'none',color:'#fff',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(226,124,0,.4)'}}>
+            💌 Un mot au boss ?
+          </button>
+          <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:9,lineHeight:1.5}}>Vocal (max 5 min) ou texte — ça arrive direct<br/>chez les créateurs ✦ Merci de tester Clutch 🙏</div>
+        </div>
 
         <div style={{height:16}}/>
       </div>
@@ -8229,6 +8261,7 @@ export default function App2() {
                   onSetAvailable={handleOuvrirFenetre}
                   isAvailable={!!(user as any).is_available}
                   rdvBlocked={rdvBlocked}
+                  onFeedback={()=>setShowAppFeedback(true)}
                 />
               )}
 
@@ -8500,16 +8533,21 @@ export default function App2() {
           {slotGoneProfile&&<SlotGoneOverlay name={slotGoneProfile.name||''} avatar={(slotGoneProfile as any).photo_url||undefined} lang={lang} onDone={()=>{setSlotGoneProfile(null);setTab('presences')}}/>}
           {showCelebration&&<ClutchSent onDone={()=>setShowCelebration(false)} name={selProfile?.name||''}/>}
           {showVerrou&&<VerrouExplosion onDone={onVerrouDone} verrou={verrouData}/>}
-          {/* Feedback flottant — visible sur tous les onglets */}
-          {!showAppFeedback && (
-            <button onClick={()=>setShowAppFeedback(true)} style={{
-              position:'fixed', bottom:'calc(env(safe-area-inset-bottom,0px) + 76px)', right:16,
-              zIndex:1200, width:44, height:44, borderRadius:'50%',
-              background:`linear-gradient(135deg,${C.bordeauxLight},${C.bordeaux})`,
-              border:`1px solid ${C.border}`, boxShadow:'0 4px 16px rgba(0,0,0,.4)',
-              fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-            }} title="Donner un feedback">💬</button>
-          )}
+          {/* Logo Clutch flottant animé (verre + battement néon + flottement). Tap → Présences.
+              (L'ancien bouton 💬 feedback est déplacé tout en bas du Profil.) */}
+          <style>{`
+            @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
+            @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 0 0 rgba(226,125,9,0),0 6px 16px rgba(0,0,0,.3)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 20px 6px rgba(226,125,9,.55),0 6px 16px rgba(0,0,0,.3)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 13px 4px rgba(226,125,9,.35),0 6px 16px rgba(0,0,0,.3)}}
+            @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
+            .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
+            @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
+          `}</style>
+          <button className="cl-fab" onClick={()=>{setFlow('app');setTab('presences');activateLive()}} aria-label="Clutch Live — les gens autour de toi" style={{
+            position:'fixed', bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:16,
+            zIndex:1200, width:46, height:46, borderRadius:'50%',
+            background:'rgba(255,255,255,0.13)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+            border:'1px solid rgba(255,191,158,.4)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+          }}><ClutchMark size={32}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (

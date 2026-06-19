@@ -12,7 +12,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'v18.06-Z37'
+const V = 'Z38'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+// Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
+// approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
+// jamais avoir de grands nombres pénibles à lire.
 
 // ─── ID Mel (seuil GPS élargi pour les tests) ────────────────────
 const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'

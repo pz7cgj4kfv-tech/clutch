@@ -14,7 +14,18 @@ export default function Landing() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [count, setCount] = useState<number | null>(null)
+  const [native, setNative] = useState(false)
   const waitlistRef = useRef<HTMLDivElement>(null)
+
+  // Sur l'app native (Capacitor iOS/Android), on saute la landing marketing
+  // et on ouvre directement Clutch. NB : en export statique le fichier réel est
+  // /app2.html (pas /app2), seule forme qui se résout dans le serveur Capacitor.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) {
+      setNative(true)
+      window.location.replace('app2.html')
+    }
+  }, [])
 
   useEffect(() => {
     supabase.from('waitlist').select('id', { count: 'exact', head: true })
@@ -35,6 +46,8 @@ export default function Landing() {
     setDone(true)
     setCount(c => c != null ? c + 1 : null)
   }
+
+  if (native) return null // évite le flash de la landing sur l'app native
 
   return (
     <>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'v18.06-Z36'
+const V = 'v18.06-Z37'
 
 // ─── ID Mel (seuil GPS élargi pour les tests) ────────────────────
 const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'
@@ -4920,6 +4920,21 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           <MRow icon="🗑" label="Supprimer mon compte" danger onTap={()=>setShowDelete(true)}/>
         </MCard>
 
+        {/* 🧪 DEV — Reset test rapide. À RETIRER avant la sortie publique App Store.
+            cf mémoire project_test_features_to_remove. N'agit QUE sur le compte connecté. */}
+        {SH('🧪 Test (dev)')}
+        <MCard>
+          <MRow icon="🔄" label="Reset test" sub="Annule mes clutchs + débloque mon Verrou" onTap={async()=>{
+            if(!user?.id) return
+            if(!confirm('Reset test : annuler tes clutchs actifs et débloquer ton Verrou ?')) return
+            await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
+              .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+              .in('status',['pending','accepted','confirmed','checked_in'])
+            await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
+            showToast('✅ Reset effectué — recharge l\'app',C.orange)
+          }}/>
+        </MCard>
+
         <div style={{height:16}}/>
       </div>
 
@@ -6157,12 +6172,18 @@ export default function App2() {
       new Date(c.proposed_time) < soon
     )
     if (normal) return normal
-    // Retard refusé non encore acquitté → garder le canvas visible
+    // Retard refusé non encore acquitté → garder le canvas visible.
+    // ⚠️ Borne temporelle obligatoire : sans elle, un clutch annulé d'un jour passé
+    // hante l'app indéfiniment (Verrou fantôme en boucle, surtout en nav privée sans
+    // le garde-fou localStorage). On ne garde le canvas que pour un RDV RÉCENT.
     try {
       return (clutches as any[]).find(c =>
         c.status === 'cancelled' &&
         c.retard_by === user.id &&
         c.retard_accepted === false &&
+        c.proposed_time &&
+        new Date(c.proposed_time) > new Date(now.getTime() - 3*3600*1000) &&
+        new Date(c.proposed_time) < soon &&
         !localStorage.getItem(`retard_ack_${c.id}`)
       ) || null
     } catch { return null }
@@ -7971,14 +7992,20 @@ export default function App2() {
                                     // Terminer : condition = J'y suis coché ET heure RDV passée
                                     const isSnd = user.id === c.sender_id
                                     const myArrived = isSnd ? !!c.sender_arrived : !!c.receiver_arrived
+                                    const otherArrived = isSnd ? !!c.receiver_arrived : !!c.sender_arrived
+                                    const bothArrived = myArrived && otherArrived
                                     const rdvMs = c.proposed_time ? new Date(c.proposed_time).getTime() + (c.retard_min||0)*60*1000 : 0
                                     const rdvPast = rdvMs > 0 ? rdvMs < Date.now() : false
-                                    const canTerminer = myArrived && rdvPast
+                                    // Terminer = les DEUX ont cliqué "J'y suis" ET l'heure du RDV est passée.
+                                    // Si l'autre ne vient pas → on passe par le feedback "Lapin", PAS par Terminer.
+                                    const canTerminer = bothArrived && rdvPast
                                     const terminerReason = !myArrived
                                       ? (lang==='en'?"Check in first (J'y suis)":'Clique d\'abord "J\'y suis !"')
-                                      : !rdvPast
-                                        ? (lang==='en'?'Wait for RDV time':'Attends l\'heure du RDV')
-                                        : ''
+                                      : !otherArrived
+                                        ? (lang==='en'?"The other person hasn't confirmed they're here yet":"L'autre n'a pas encore confirmé sa présence")
+                                        : !rdvPast
+                                          ? (lang==='en'?'Wait for RDV time':'Attends l\'heure du RDV')
+                                          : ''
                                     return (
                                       <button onClick={()=>{
                                         if (!canTerminer) {
@@ -8116,8 +8143,17 @@ export default function App2() {
                   'msg.new':'New message',
                 })[k] || k
 
-                // Contacts = clutches avec keep_contact mutuel
-                const contactClutches = (clutches as any[]).filter(c => mutualContactIds.has(c.id))
+                // Contacts = clutches avec keep_contact mutuel, DÉDOUBLONNÉS par personne
+                // (une personne = un seul contact, on garde son RDV le plus récent).
+                const _contactRaw = (clutches as any[]).filter(c => mutualContactIds.has(c.id))
+                const _byPerson = new Map<string, any>()
+                _contactRaw.forEach((c:any) => {
+                  const otherId = c.sender_id === user?.id ? c.receiver_id : c.sender_id
+                  const existing = _byPerson.get(otherId)
+                  const cTime = new Date(c.proposed_time||c.created_at||0).getTime()
+                  if (!existing || cTime > new Date(existing.proposed_time||existing.created_at||0).getTime()) _byPerson.set(otherId, c)
+                })
+                const contactClutches = [..._byPerson.values()]
 
                 return (
                   <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:'#2a1020',display:'flex',flexDirection:'column',overflowY:'auto'}}>
@@ -8162,10 +8198,24 @@ export default function App2() {
                             )}
                             <div style={{color:'rgba(255,255,255,.3)',fontSize:18,flexShrink:0}}>›</div>
                           </button>
+                          <div style={{display:'flex',gap:6}}>
                           <button onClick={()=>setContactClutchTarget({...other,_clutchId:c.id})}
-                            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'10px',borderRadius:12,border:`1px solid ${C.gold}44`,background:`${C.gold}11`,color:C.gold,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation'}}>
+                            style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'10px',borderRadius:12,border:`1px solid ${C.gold}44`,background:`${C.gold}11`,color:C.gold,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation'}}>
                             ✦ Proposer un RDV
                           </button>
+                          {/* Retrait DISCRET : on passe MON keep_contact à false → le contact n'est plus mutuel → disparaît. L'autre n'est PAS notifié. */}
+                          <button onClick={async()=>{
+                            if(!user?.id) return
+                            if(!confirm(`Retirer ${otherName} de tes contacts ?\n(discret — l'autre personne n'est pas prévenue)`)) return
+                            const otherId = c.sender_id===user.id ? c.receiver_id : c.sender_id
+                            const ids = (clutches as any[]).filter(x=>mutualContactIds.has(x.id)&&(x.sender_id===otherId||x.receiver_id===otherId)).map(x=>x.id)
+                            try{ await supabase.from('rdv_feedbacks').update({keep_contact:false}).in('rdv_id',ids).eq('from_id',user.id) }catch{}
+                            setMutualContactIds(prev=>{const n=new Set(prev);ids.forEach((id:string)=>n.delete(id));return n})
+                          }}
+                            style={{padding:'10px 14px',borderRadius:12,border:`1px solid ${C.salmon}33`,background:'transparent',color:`${C.salmon}aa`,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',whiteSpace:'nowrap'}}>
+                            Retirer
+                          </button>
+                          </div>
                           </div>
                         )
                       })}

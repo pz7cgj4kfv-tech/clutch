@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z38'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z39'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -184,10 +184,10 @@ const TAB_ICONS:Record<string,string> = {
   contacts: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFBF9E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E`,
   profil:'/icons/profil_couleur.svg',
 }
-function TabSvg({id, size=22, active}:{id:string; size?:number; active:boolean}) {
+function TabSvg({id, size=22, active, filter}:{id:string; size?:number; active:boolean; filter?:string}) {
   const src = TAB_ICONS[id]
   if (!src) return null
-  return <img src={src} width={size} height={size} alt="" style={{display:'block', filter:active?'none':'brightness(0) invert(1) opacity(0.3)', transition:'filter .2s'}}/>
+  return <img src={src} width={size} height={size} alt="" style={{display:'block', filter: filter ?? (active?'none':'brightness(0) invert(1) opacity(0.3)'), transition:'filter .2s'}}/>
 }
 
 // ─── i18n — traductions FR/EN ─────────────────────────────────
@@ -1403,42 +1403,34 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           <div onClick={()=>setShowAvailTooltip(false)} style={{position:'fixed',inset:0,zIndex:-1}}/>
         </div>
       )}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:`${C.bg}f0`,borderTop:`1px solid ${C.border}`,backdropFilter:'blur(16px)',display:'flex',zIndex:1000}}>
+      {/* Barre d'onglets — design clair (fond blanc cassé + cercles + pastille active violette).
+          Transitoire : le reste de l'app passera au clair avec les couleurs de Mel. */}
+      <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:'rgba(248,243,237,0.97)',borderTop:'1px solid rgba(0,0,0,.06)',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
           const isProfil = id==='profil'
+          const dotBase: React.CSSProperties = {position:'absolute',top:-2,right:-2,width:11,height:11,borderRadius:'50%',border:'2px solid #f8f3ed',zIndex:2}
           return (
             <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
-              {/* Pastille dispo sur Profil — bouton séparé */}
-              {isProfil&&availInfo&&(
-                <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:4,right:'calc(50% - 20px)',width:12,height:12,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(255,255,255,.25)',border:`2px solid ${C.bg}`,zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
-              )}
-              {/* Badge — différencié par type */}
-              {badge && (()=>{
-                const dot: React.CSSProperties = {position:'absolute',top:5,right:'calc(50% - 16px)',width:9,height:9,borderRadius:'50%',border:`2px solid ${C.bg}`,zIndex:2}
-                if(badge.type==='retard') return (
-                  <div style={{...dot,background:'#EF4444',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(239,68,68,.9)'}}/>
-                )
-                if(badge.type==='clutch-new'||badge.type==='urgent') return (
-                  <div style={{...dot,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
-                )
-                if(badge.type==='message') return (
-                  <div style={{...dot,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
-                )
-                if(badge.type==='verrou') return (
-                  <div style={{...dot,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 6px rgba(34,197,94,.6)'}}/>
-                )
-                if(badge.type==='contact-msg') return (
-                  <div style={{...dot,background:'#FF8C00',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(255,140,0,.85)'}}/>
-                )
-                if(badge.type==='contact-new') return (
-                  <div style={{...dot,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 8px rgba(34,197,94,.8)'}}/>
-                )
-                return null
-              })()}
-              <TabSvg id={id} size={32} active={isActive}/>
-              <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?C.salmon:'rgba(255,255,255,0.28)',letterSpacing:'.04em'}}>{label}</div>
+              <div style={{position:'relative',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:isActive?'#542A44':'transparent',border:isActive?'none':'1.5px solid rgba(0,0,0,.13)',boxShadow:isActive?'0 4px 12px rgba(84,42,68,.4)':'none',transition:'all .2s'}}>
+                <TabSvg id={id} size={23} active={isActive} filter={isActive?'brightness(0) invert(1)':'brightness(0) opacity(0.42)'}/>
+                {/* Pastille dispo sur Profil */}
+                {isProfil&&availInfo&&(
+                  <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #f8f3ed',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
+                )}
+                {/* Badge — différencié par type */}
+                {badge && (()=>{
+                  if(badge.type==='retard') return <div style={{...dotBase,background:'#EF4444',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(239,68,68,.9)'}}/>
+                  if(badge.type==='clutch-new'||badge.type==='urgent') return <div style={{...dotBase,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
+                  if(badge.type==='message') return <div style={{...dotBase,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
+                  if(badge.type==='verrou') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 6px rgba(34,197,94,.6)'}}/>
+                  if(badge.type==='contact-msg') return <div style={{...dotBase,background:'#FF8C00',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(255,140,0,.85)'}}/>
+                  if(badge.type==='contact-new') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 8px rgba(34,197,94,.8)'}}/>
+                  return null
+                })()}
+              </div>
+              <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?'#542A44':'rgba(0,0,0,0.4)',letterSpacing:'.04em'}}>{label}</div>
             </button>
           )
         })}

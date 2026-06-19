@@ -1788,6 +1788,26 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
       showToast(lang==='fr'?`Un Clutch existe déjà avec ${to.name?.split(' ')[0]||'cette personne'}`:`Already a Clutch with ${to.name?.split(' ')[0]||'them'}`,C.orange)
       return
     }
+    // Cooldown 48h anti-harcèlement : si cette personne a décliné un de mes Clutchs
+    // récemment, je ne peux pas la re-clutcher avant 48h. Directionnel (ne bloque pas
+    // l'inverse). Protège contre l'insistance. Sécurité femmes — non contournable côté UX.
+    const COOLDOWN_MS = 48*3600*1000
+    const {data:recentDecline}=await supabase.from('clutches')
+      .select('created_at')
+      .eq('sender_id', from.id)
+      .eq('receiver_id', to.id)
+      .eq('status','declined')
+      .gte('created_at', new Date(Date.now()-COOLDOWN_MS).toISOString())
+      .order('created_at',{ascending:false}).limit(1)
+    if (recentDecline&&recentDecline.length>0){
+      setLoading(false)
+      const first=to.name?.split(' ')[0]||(lang==='fr'?'Cette personne':'They')
+      const hoursLeft=Math.max(1,Math.ceil((new Date(recentDecline[0].created_at).getTime()+COOLDOWN_MS-Date.now())/3600000))
+      showToast(lang==='fr'
+        ? `${first} a décliné récemment. Tu pourras reproposer dans ~${hoursLeft}h.`
+        : `${first} recently declined. You can try again in ~${hoursLeft}h.`,C.orange)
+      return
+    }
     // Limite simultanéité : femmes = 20, hommes free = 3, premium = 5
     const senderGender = (from as any).gender
     const senderPlan   = (from as any).account_type || 'free'

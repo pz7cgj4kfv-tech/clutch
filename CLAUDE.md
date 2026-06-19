@@ -39,10 +39,10 @@
 ### Stack technique
 - **Next.js 15** avec `output: 'export'` → ZÉRO code serveur
 - **Supabase** client-side uniquement (RLS, Edge Functions, Realtime)
-- **GitHub Pages** → `out/` → `/Users/uzic/Documents/pz7cgj4kfv-tech.github.io/`
+- **GitHub Pages** → `out/` → `/Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io/`
 - **Capacitor** → `appId: app.clutch.lausanne`, `webDir: out`
-- Source : `/Users/uzic/Documents/clutch`
-- Deploy repo : `/Users/uzic/Documents/pz7cgj4kfv-tech.github.io/`
+- Source : `/Users/saugydavid/Documents/clutch`
+- Deploy repo : `/Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io/`
 
 ---
 
@@ -190,14 +190,14 @@ Appeler `map.invalidateSize()` dans un `requestAnimationFrame` après montage.
 ## 🔁 COMMANDES DEPLOY
 
 ```bash
-# Depuis /Users/uzic/Documents/clutch
+# Depuis /Users/saugydavid/Documents/clutch
 npm run build
 
 # Copier dans le repo GitHub Pages
-cp -r out/. /Users/uzic/Documents/pz7cgj4kfv-tech.github.io/
+cp -r out/. /Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io/
 
 # Commit + push
-cd /Users/uzic/Documents/pz7cgj4kfv-tech.github.io
+cd /Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io
 git add -A && git commit -m "deploy vXX.XX-X" && git push
 ```
 

@@ -91,6 +91,11 @@ const tasks: { cat: string; emoji: string; items: { label: string; status: Statu
       { label: 'Auto-expiration clutchs 18h côté client', status: 'done', note: 'v12.06-C — guard .eq(status,pending) pour éviter double update' },
       { label: 'Auto-reward +5pts après RDV honoré', status: 'done', note: 'v12.06-C — guard localStorage par clutch_id' },
       { label: 'Block double clutch même paire', status: 'done', note: 'v12.06-A — vérifie pending/confirmed/accepted avant insert' },
+      { label: 'Limite simultanéité clutchs (3 free / 5 premium / 20 femmes)', status: 'done', note: 'v16.06-C — guard avant insert, message toast avec suggestion premium' },
+      { label: '💼 Mode Pro / Manoski — filtre par catégorie métier', status: 'done', note: 'v16.06-E — bouton 💼 dans Présences, liste métiers triés par dispo' },
+      { label: 'Activité du moment (status visible 8h sur profil)', status: 'done', note: 'v16.06-E — emoji + texte libre, visible en or sur les cartes présences' },
+      { label: '30 catégories métiers (dont artisan/électricien/menuisier)', status: 'done', note: 'v16.06-E — Setup Wizard step 3 + Mode Pro' },
+      { label: 'Events — compteur dynamique par catégorie', status: 'done', note: 'v16.06-D — badge (N) sur chaque filtre, catégories vides grisées' },
       { label: 'Bannière lieu RDV dans le chat + bouton rappel', status: 'done', note: 'v12.06-B — prérempli le message avec lieu+heure' },
       { label: 'Simulation Clutch entrant (ClutchIncoming modal)', status: 'done', note: 'v14.06 — modal animée CLU/TCH + accepter/refuser wirés' },
       { label: 'Anti-replay animation Verrou au reload', status: 'done', note: 'v14.06 — guard localStorage verrou_shown_{id}' },
@@ -130,7 +135,9 @@ const tasks: { cat: string; emoji: string; items: { label: string; status: Statu
       { label: 'Badges sécurité lieux (🛡/👁/⚠️)', status: 'done' },
       { label: 'Report + Block + Modération admin', status: 'done' },
       { label: 'CGU & Charte éthique (/legal)', status: 'done' },
-      { label: 'SOS — envoi réel SMS/email', status: 'todo', note: 'Edge Function Supabase' },
+      { label: 'SOS contacts urgence + mode réception femmes (UI)', status: 'done', note: 'v16.06-B — Réglages profil, localStorage, 3 modes (ouverte/sélective/pause)' },
+      { label: 'SOS simulation test (appui bouton → alerte test)', status: 'done', note: 'v16.06-B — bouton Tester dans les réglages' },
+      { label: 'SOS — envoi réel SMS/email', status: 'todo', note: 'Edge Function Supabase — Twilio ou Resend' },
     ]
   },
   {
@@ -192,7 +199,8 @@ const tasks: { cat: string; emoji: string; items: { label: string; status: Statu
       { label: 'Compte créateur d\'événements', status: 'todo', note: 'DEMAIN — profil différent, organise événements, pas de clutch direct' },
       { label: 'Préférences de recherche (genre, âge, distance)', status: 'todo', note: 'DEMAIN — filtre qui tu veux voir dans Présences' },
       { label: 'Recadrage photo à l\'upload (pinch/zoom)', status: 'todo', note: 'Évite les photos mal cadrées' },
-      { label: 'Onboarding 3 écrans (1ère connexion)', status: 'todo' },
+      { label: 'Onboarding 4 slides skippables (1ère inscription)', status: 'done', note: 'v16.06-A — slides bienvenue/comment/réputation/sécurité + bouton démo sur landing ?preview=onboarding' },
+      { label: 'Setup Wizard (photo/âge/genre/bio/métier/catégorie)', status: 'done', note: 'v16.06-A — 5 étapes, skippable à partir de step 3' },
       { label: 'Partage de profil /u/david', status: 'todo' },
       { label: 'Mode Incognito (visible par clutchés seulement)', status: 'todo' },
       { label: 'Rapport d\'activité hebdo (RDV, score, stats)', status: 'todo' },
@@ -503,7 +511,147 @@ const stats = {
   total: tasks.flatMap(t => t.items).length,
 }
 
-type Tab = 'todo' | 'audit' | 'timeline' | 'design' | 'vision' | 'questions' | 'principes'
+type Tab = 'todo' | 'audit' | 'timeline' | 'design' | 'vision' | 'questions' | 'principes' | 'tests'
+
+// ─── IDs de test ────────────────────────────────────────────────
+const DAVID_ID = 'bad38f3e-87df-40e0-a2d2-75c03b58d72b'
+const MEL_ID   = '9626a0ba-037f-49dd-9957-ebd37e58a864'
+const TEST_IDS = [DAVID_ID, MEL_ID]
+
+// ─── QUICK RESET PANEL ──────────────────────────────────────────
+function QuickResetPanel() {
+  const [authUser, setAuthUser] = useState<any>(null)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPwd, setLoginPwd] = useState('')
+  const [loginErr, setLoginErr] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [status, setStatus] = useState<Record<string,string>>({})
+
+  // Récupère session existante (partagée avec /app2 via localStorage même domaine)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => { if (data?.user) setAuthUser(data.user) })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setAuthUser(s?.user ?? null))
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  const login = async () => {
+    setLoginLoading(true); setLoginErr('')
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPwd })
+    setLoginLoading(false)
+    if (error) setLoginErr(error.message)
+  }
+
+  const run = async (key: string, fn: () => Promise<void>) => {
+    setStatus(s => ({...s, [key]: '⏳'}))
+    try { await fn(); setStatus(s => ({...s, [key]: '✓ OK'})); setTimeout(() => setStatus(s => ({...s, [key]: ''})), 3000) }
+    catch(e:any) { setStatus(s => ({...s, [key]: '❌ ' + (e.message||'erreur')})) }
+  }
+
+  const userId = authUser?.id
+  const isKnown = userId === DAVID_ID || userId === MEL_ID
+
+  const resetClutches = () => run('clutches', async () => {
+    // L'utilisateur connecté peut modifier les clutchs où il est sender OU receiver (RLS OK)
+    const { error } = await supabase.from('clutches')
+      .update({ status: 'cancelled', sender_arrived: false, receiver_arrived: false })
+      .in('status', ['pending','accepted','confirmed','checked_in'])
+      .or(`sender_id.eq.${DAVID_ID},receiver_id.eq.${DAVID_ID},sender_id.eq.${MEL_ID},receiver_id.eq.${MEL_ID}`)
+    if (error) throw error
+  })
+
+  const resetLock = () => run('lock', async () => {
+    // RLS : chaque user ne peut modifier que son propre profil
+    // → reset uniquement le profil connecté ; Mel doit faire pareil sur son téléphone
+    if (!userId) throw new Error('non connecté')
+    const { error } = await supabase.from('profiles')
+      .update({ rdv_locked_until: null, rdv_locked_from: null })
+      .eq('id', userId)
+    if (error) throw error
+  })
+
+  const resetAll = () => run('all', async () => {
+    await supabase.from('clutches')
+      .update({ status: 'cancelled', sender_arrived: false, receiver_arrived: false })
+      .in('status', ['pending','accepted','confirmed','checked_in'])
+      .or(`sender_id.eq.${DAVID_ID},receiver_id.eq.${DAVID_ID},sender_id.eq.${MEL_ID},receiver_id.eq.${MEL_ID}`)
+    if (!userId) return
+    await supabase.from('profiles')
+      .update({ rdv_locked_until: null, rdv_locked_from: null })
+      .eq('id', userId)
+  })
+
+  const remettreDispo = () => run('dispo', async () => {
+    if (!userId) throw new Error('non connecté')
+    const until = new Date(Date.now() + 4 * 3600 * 1000).toISOString()
+    const { error } = await supabase.from('profiles')
+      .update({ is_available: true, available_until: until })
+      .eq('id', userId)
+    if (error) throw error
+  })
+
+  // Pas connecté → login form bien visible
+  if (!authUser) return (
+    <div style={{maxWidth:380}}>
+      <div style={{background:'rgba(200,134,10,.12)',border:'2px solid rgba(200,134,10,.4)',borderRadius:16,padding:'20px 24px',marginBottom:24}}>
+        <div style={{fontSize:16,fontWeight:900,color:'#C8860A',marginBottom:6}}>🔐 Connexion requise</div>
+        <div style={{fontSize:13,color:C.textMid,lineHeight:1.6}}>
+          Entre ton email et mot de passe Clutch (le même que dans l'app) pour activer les boutons reset.
+        </div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="ton@email.com" type="email"
+          style={{padding:'12px 16px',borderRadius:12,border:`2px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+        <input value={loginPwd} onChange={e=>setLoginPwd(e.target.value)} placeholder="mot de passe" type="password"
+          onKeyDown={e=>e.key==='Enter'&&login()}
+          style={{padding:'12px 16px',borderRadius:12,border:`2px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+        {loginErr && <div style={{fontSize:12,color:C.red,padding:'8px 12px',background:'rgba(239,68,68,.1)',borderRadius:8}}>{loginErr}</div>}
+        <button onClick={login} disabled={loginLoading}
+          style={{padding:'14px',borderRadius:12,border:'none',background:C.primary,color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:.3}}>
+          {loginLoading ? '⏳ Connexion…' : '→ Se connecter'}
+        </button>
+      </div>
+    </div>
+  )
+
+  const btns = [
+    { key:'clutches', label:'Reset Clutchs',   emoji:'🔄', color:'#f59e0b', fn:resetClutches, desc:'Annule tous les clutchs David↔Mel actifs + reset J\'y suis' },
+    { key:'lock',     label:'Reset RDV Lock',  emoji:'🔓', color:'#60a5fa', fn:resetLock,     desc:`Débloque le profil connecté (${authUser.email}) · L'autre doit faire pareil sur son téléphone` },
+    { key:'all',      label:'Reset Tout',      emoji:'⚡', color:'#ef4444', fn:resetAll,      desc:'Clutchs + lock du profil connecté en une fois' },
+    { key:'dispo',    label:'Remettre Dispo',  emoji:'🟢', color:'#2DBD7E', fn:remettreDispo, desc:`is_available=true +4h pour ${authUser.email}` },
+  ]
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'rgba(45,189,126,.1)',border:'1px solid rgba(45,189,126,.3)',borderRadius:12}}>
+        <span style={{fontSize:18}}>✓</span>
+        <div>
+          <div style={{fontSize:13,fontWeight:800,color:C.green}}>Connecté · {authUser.email}</div>
+          {!isKnown && <div style={{fontSize:11,color:C.orange}}>⚠️ Ce compte n'est pas David ni Mel — les resets clutchs fonctionnent quand même si tu es sender/receiver</div>}
+        </div>
+        <button onClick={()=>supabase.auth.signOut()} style={{marginLeft:'auto',fontSize:11,padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.textMid,cursor:'pointer',fontFamily:'inherit'}}>Déconnexion</button>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        {btns.map(b => (
+          <button key={b.key} onClick={b.fn} style={{
+            display:'flex',flexDirection:'column',alignItems:'flex-start',gap:6,
+            padding:'14px 16px',borderRadius:14,border:`2px solid ${b.color}44`,
+            background:`${b.color}11`,color:C.text,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+          }}
+          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background=`${b.color}22`;(e.currentTarget as HTMLButtonElement).style.borderColor=b.color}}
+          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background=`${b.color}11`;(e.currentTarget as HTMLButtonElement).style.borderColor=`${b.color}44`}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
+              <span style={{fontSize:20}}>{b.emoji}</span>
+              <span style={{fontSize:12,fontWeight:900,color:b.color,flex:1}}>{b.label}</span>
+              {status[b.key] && <span style={{fontSize:11,color:status[b.key].startsWith('✓')?C.green:status[b.key].startsWith('❌')?C.red:C.gold,fontWeight:700}}>{status[b.key]}</span>}
+            </div>
+            <div style={{fontSize:11,color:C.textMid,lineHeight:1.5}}>{b.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ─── DANGER BANNER ─────────────────────────────────────────────
 function DangerBanner() {
@@ -1087,7 +1235,7 @@ function EventManager() {
 
 export default function HQ() {
   const [unlocked, setUnlocked] = useState(false)
-  const [tab, setTab] = useState<Tab>('timeline')
+  const [tab, setTab] = useState<Tab>('tests')
   const [filter, setFilter] = useState<Status | 'all'>('all')
   const [auditFilter, setAuditFilter] = useState<Severity | 'all'>('all')
   const [openFeedbacks, setOpenFeedbacks] = useState(true)
@@ -1166,7 +1314,7 @@ export default function HQ() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: '#111', borderRadius: 12, padding: 4, width: 'fit-content', flexWrap:'wrap' }}>
-          {([['timeline', '📅 Plan'], ['todo', '📋 Roadmap'], ['audit', '🔍 Audit'], ['design', '🎨 Design'], ['vision', '✦ Vision'], ['questions', '❓ Questions'], ['principes', '📐 Principes']] as const).map(([t, label]) => (
+          {([['tests', '🧪 Tests'], ['timeline', '📅 Plan'], ['todo', '📋 Roadmap'], ['audit', '🔍 Audit'], ['design', '🎨 Design'], ['vision', '✦ Vision'], ['questions', '❓ Questions'], ['principes', '📐 Principes']] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)} style={{
               padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               background: tab === t ? C.card : 'transparent',
@@ -1178,6 +1326,15 @@ export default function HQ() {
             </button>
           ))}
         </div>
+
+        {/* ── TESTS TAB ── */}
+        {tab === 'tests' && (
+          <div style={{maxWidth:640}}>
+            <div style={{fontSize:20,fontWeight:900,color:C.salmon,marginBottom:6}}>🧪 Reset rapide pour les tests</div>
+            <div style={{fontSize:13,color:C.textMid,marginBottom:24}}>Boutons qui tapent directement en base — aucun SQL à copier-coller.</div>
+            <QuickResetPanel />
+          </div>
+        )}
 
         {/* ── TIMELINE TAB ── */}
         {tab === 'timeline' && (

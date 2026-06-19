@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clutch — Scénarios & Audit</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+body { background: #1a0d14; color: #f5e8de; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── HEADER ── */
+.header { background: #2a1020; border-bottom: 1px solid #C8860A55; padding: 10px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header-title { font-size: 14px; font-weight: 900; color: #FFBF9E; }
+.header-sub { font-size: 10px; color: #FFBF9E44; margin-top: 1px; }
+.badge { background: #2DBD7E22; border: 1px solid #2DBD7E66; color: #2DBD7E; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; letter-spacing: .5px; white-space: nowrap; }
+.persona-chip { display: flex; align-items: center; gap: 5px; background: #FFBF9E11; border: 1px solid #FFBF9E22; border-radius: 20px; padding: 3px 8px; font-size: 10px; }
+.avatar { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex-shrink: 0; }
+
+/* ── MODE TABS ── */
+.tabs { background: #220f1a; border-bottom: 1px solid #FFBF9E11; display: flex; gap: 0; flex-shrink: 0; overflow-x: auto; }
+.tab { padding: 9px 16px; font-size: 11px; font-weight: 700; cursor: pointer; color: #FFBF9E44; border-bottom: 2px solid transparent; white-space: nowrap; transition: all .15s; user-select: none; }
+.tab.active { color: #C8860A; border-bottom-color: #C8860A; }
+.tab:hover:not(.active) { color: #FFBF9E88; }
+
+/* ── MAIN ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+.timeline { flex: 1; overflow-y: auto; padding: 16px 0; display: flex; flex-direction: column; align-items: center; }
+.detail { width: 290px; background: #200e18; border-left: 1px solid #FFBF9E11; overflow-y: auto; flex-shrink: 0; }
+.detail-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #FFBF9E22; font-size: 11px; text-align: center; padding: 20px; line-height: 1.7; }
+
+/* ── NAV ── */
+.nav { background: #2a1020; border-top: 1px solid #FFBF9E11; padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.btn { padding: 7px 14px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; }
+.btn-p { background: #C8860A; color: #fff; }
+.btn-p:hover { background: #E09B1A; }
+.btn-s { background: #FFBF9E11; color: #FFBF9Ecc; border: 1px solid #FFBF9E22; }
+.btn-s:hover { background: #FFBF9E1A; }
+.btn:disabled { opacity: 0.3; cursor: default; }
+.prog { flex: 1; background: #FFBF9E0A; border-radius: 4px; height: 3px; }
+.prog-bar { background: #2DBD7E; height: 100%; border-radius: 4px; transition: width .3s; }
+.prog-label { font-size: 10px; color: #FFBF9E44; min-width: 40px; text-align: right; }
+
+/* ── STEP NODES ── */
+.step-node { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 9px 16px; width: 100%; max-width: 500px; transition: all .15s; border-radius: 10px; }
+.step-node:hover { background: #FFBF9E08; }
+.step-node.active { background: #C8860A0D; }
+.step-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex-shrink: 0; }
+.step-title { font-size: 12px; font-weight: 800; margin-bottom: 2px; }
+.step-sub { font-size: 10px; color: #FFBF9E55; }
+.who-tag { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 20px; white-space: nowrap; }
+.connector { width: 28px; display: flex; justify-content: center; flex-shrink: 0; }
+.conn-line { width: 2px; height: 20px; }
+
+/* ── BRANCH ── */
+.branch-wrap { width: 100%; max-width: 500px; display: flex; gap: 12px; justify-content: center; padding: 0 16px; }
+.branch-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.branch-label { font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 4px; }
+.branch-node { border-radius: 10px; padding: 8px 12px; cursor: pointer; min-width: 120px; text-align: center; border: 1.5px solid; transition: all .15s; }
+.branch-node:hover { opacity: .85; }
+
+/* ── DETAIL ── */
+.d-title { font-size: 13px; font-weight: 900; color: #FFBF9E; border-bottom: 1px solid #FFBF9E11; padding: 12px 14px; position: sticky; top: 0; background: #200e18; z-index: 1; }
+.d-body { padding: 12px 14px; }
+.d-scenario { background: #C8860A0D; border: 1px solid #C8860A33; border-radius: 6px; padding: 7px 9px; font-size: 10px; color: #C8860Acc; line-height: 1.6; margin-bottom: 10px; }
+.d-status { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 20px; margin-bottom: 10px; }
+.s-ok { background: #2DBD7E22; color: #2DBD7E; border: 1px solid #2DBD7E44; }
+.s-warn { background: #C8860A22; color: #C8860A; border: 1px solid #C8860A44; }
+.s-err { background: #ef444422; color: #ef4444; border: 1px solid #ef444444; }
+.d-section { margin-bottom: 11px; }
+.d-sec-label { font-size: 9px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: #FFBF9E44; margin-bottom: 5px; }
+.d-item { display: flex; gap: 5px; font-size: 10px; color: #FFBF9Ecc; line-height: 1.5; margin-bottom: 3px; align-items: flex-start; }
+.icon-ok { color: #2DBD7E; flex-shrink: 0; }
+.icon-warn { color: #C8860A; flex-shrink: 0; }
+.icon-err { color: #ef4444; flex-shrink: 0; }
+.icon-eth { color: #8b5cf6; flex-shrink: 0; }
+.icon-law { color: #38bdf8; flex-shrink: 0; }
+.icon-des { color: #f472b6; flex-shrink: 0; }
+
+/* ── LEGEND ── */
+.legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 16px; background: #220f1a; border-bottom: 1px solid #FFBF9E0A; flex-shrink: 0; }
+.leg { display: flex; align-items: center; gap: 4px; font-size: 9px; color: #FFBF9E55; }
+.leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span style="font-size:20px;opacity:.8">⧗</span>
+  <div>
+    <div class="header-title">Clutch — Scénarios & Audit</div>
+    <div class="header-sub">Carte interactive des parcours utilisateur</div>
+  </div>
+  <div class="badge" id="mode-badge">✓ HAPPY PATH</div>
+  <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+    <div class="persona-chip"><div class="avatar" style="background:#8b5cf622;border:1px solid #8b5cf6;color:#8b5cf6">D</div><span>David ♂ free</span></div>
+    <div class="persona-chip"><div class="avatar" style="background:#FFBF9E22;border:1px solid #FFBF9E66;color:#FFBF9E">M</div><span>Mel ♀ free</span></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="setMode('happy')">✅ Scénario nominal</div>
+  <div class="tab" onclick="setMode('full')">🌳 Arbre complet</div>
+  <div class="tab" onclick="setMode('edge')">⚠️ Cas limites</div>
+  <div class="tab" onclick="setMode('security')">🛡️ Sécurité femmes</div>
+  <div class="tab" onclick="setMode('legal')">⚖️ Légal LPD</div>
+  <div class="tab" onclick="setMode('fiabilite')">⭐ Fiabilité</div>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:#2DBD7E"></div>Implémenté & testé</div>
+  <div class="leg"><div class="leg-dot" style="background:#C8860A"></div>Partiel / à vérifier</div>
+  <div class="leg"><div class="leg-dot" style="background:#ef4444"></div>Non implémenté</div>
+  <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div>Question ouverte</div>
+  <div class="leg"><div class="leg-dot" style="background:#7a3d65"></div>David seul</div>
+  <div class="leg"><div class="leg-dot" style="background:#FFBF9E88"></div>Mel seule</div>
+  <div class="leg"><div class="leg-dot" style="background:#2DBD7E"></div>Les deux</div>
+</div>
+
+<div class="main">
+  <div class="timeline" id="timeline"></div>
+  <div class="detail" id="detail">
+    <div class="detail-empty">← Clique sur une étape<br>pour voir l'audit complet<br><br>✅ vert = ok<br>⚠️ orange = à vérifier<br>🔴 rouge = manque<br>◈ violet = éthique<br>⚖️ bleu = légal LPD</div>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="btn btn-s" id="btn-prev" onclick="prev()" disabled>←</button>
+  <div class="prog"><div class="prog-bar" id="prog-bar"></div></div>
+  <span class="prog-label" id="prog-label"></span>
+  <button class="btn btn-p" id="btn-next" onclick="next()">Suivant →</button>
+</div>
+
+<script>
+const D = '#8b5cf6', M = '#FFBF9E99', B = '#2DBD7E';
+const GRN = '#1a3a2a', ORG = '#2a1f0a', RED = '#2a1015', PUR = '#1a1a2a';
+
+// ── HAPPY PATH ──────────────────────────────────────────────────
+const HAPPY = [
+  { id:1, emoji:'📱', title:'Ouverture de l\'app', sub:'Splash sablier → session détectée', who:'both',
+    detail:{ scenario:'David et Mel ouvrent Clutch. Session déjà active → skip login.', status:'ok', label:'✅ Implémenté',
+      checks:['Splash sablier animé ~1.5s','Détection session → skip login','Redirect auto /app2'],
+      verify:['Vitesse sur iPhone réel (pas simulateur)','Safe area iPhone 16 Pro (Dynamic Island)','Couleurs logo = charte Mel ?'],
+    }},
+  { id:2, emoji:'🔓', title:'Connexion', sub:'Email + password → session Supabase', who:'both',
+    detail:{ scenario:'Si pas de session : David et Mel se connectent. Session persistée.', status:'ok', label:'✅ Implémenté',
+      checks:['Login Supabase Auth email/password','Session persistée localStorage','Redirect auto si session active'],
+      verify:['Test logout + re-login complet','Mot de passe oublié → flux fonctionnel ?'],
+      ethique:['Pas de login social (moins de tracking tiers)'],
+    }},
+  { id:3, emoji:'⧗', title:'Ouvrir une fenêtre', sub:'Zone Lausanne · 19h–21h · max 18h', who:'both',
+    detail:{ scenario:'David choisit Lausanne centre, 19h–21h. Mel fait pareil.', status:'warn', label:'⚠️ À vérifier en conditions réelles',
+      checks:['Carte Leaflet → tap → zone choisie','Molette heure → créneau max 18h','UPDATE profiles is_available=true','Cron expiration 18h actif (déployé ce soir)'],
+      verify:['UPDATE → 0 rows silencieux ? Upsert fallback actif ?','David apparaît IMMÉDIATEMENT dans liste Mel ?','Polling 20s ou refresh manuel ?','Zones géo se recoupent bien ?'],
+      ethique:['Offset position 50m actif (pas GPS exact)','Seule la zone de dispo stockée, jamais GPS exact ✅'],
+    }},
+  { id:4, emoji:'✦', title:'Mel voit David — Présences', sub:'Liste profils dispo · CD · fiabilité', who:'mel',
+    detail:{ scenario:'Mel ouvre Présences. David apparaît avec son score CD et sa fiabilité.', status:'warn', label:'⚠️ Design récent — à valider',
+      checks:['Liste profils depuis Supabase','Score CD ●●●●○ visible','Fiabilité ★★★★☆ visible','Filtre genre actif','Photo ronde + nom + âge + job'],
+      verify:['David s\'affiche bien ?','Sa vraie photo s\'affiche ?','Bouton + visible et compris ?','Score CD cohérent (pas toujours max) ?'],
+      design:['Nouveau design (ce soir) — 1ère validation Mel','Cards assez grandes sur iPhone ?'],
+    }},
+  { id:5, emoji:'👁', title:'Mel consulte le profil de David', sub:'Sheet → photo + bio + score + intentions', who:'mel',
+    detail:{ scenario:'Mel tape + sur David → sheet profil slide-up avec tous ses détails.', status:'ok', label:'✅ Implémenté',
+      checks:['Sheet slide-up depuis le bas','Photo + nom + âge + bio + job + langues','Score fiabilité affiché','Bouton Envoyer un Clutch','Bouton Bloquer (2 taps max)'],
+      verify:['Intentions de David visibles ?','Sheet ferme bien au swipe-down ?','Photo haute qualité ?'],
+      ethique:['Mel peut bloquer David AVANT d\'accepter ✅','Aucune localisation exacte visible ✅'],
+    }},
+  { id:6, emoji:'✉️', title:'David envoie un Clutch à Mel', sub:'Café du Grütli · 19h30 · "Un café ?"', who:'david',
+    detail:{ scenario:'David clutche Mel : lieu = Café du Grütli, 19h30, message court.', status:'ok', label:'✅ Implémenté',
+      checks:['Modal lieu (recherche OSM)','Molette heure','Message 300 chars max','INSERT clutches + expires_at now()+2h','Notif push OneSignal à Mel'],
+      verify:['Recherche OSM marche ("Grütli Lausanne") ?','Confirmation "Clutch envoyé !" visible ?','Expiration 2h calculée correctement ?'],
+      missing:['Anti-doublon : David ne peut pas renvoyer si pending','Wow moment "Clutch envoyé" inexploité'],
+    }},
+  { id:7, emoji:'🔔', title:'Mel reçoit la notification', sub:'Push iOS → son + badge app icon', who:'mel',
+    detail:{ scenario:'Mel reçoit la push sur iPhone : "David t\'a envoyé un Clutch 📍 Café du Grütli · 19h30"', status:'warn', label:'⚠️ Non testé iPhone réel',
+      checks:['OneSignal configuré + plugin Capacitor','Notif envoyée côté Supabase (logs OK)'],
+      verify:['🔴 TEST CRITIQUE : Mel reçoit-elle la notif ?','Son de notification actif ?','Badge sur l\'icône app ?','Tap notif → ouvre onglet Clutchs ?','Contenu lisible (lieu + heure) ?'],
+      missing:['Deep link notif → onglet Clutchs (à implémenter)'],
+    }},
+  { id:8, emoji:'📋', title:'Mel voit le Clutch dans l\'app', sub:'Onglet Clutchs → card + lieu + heure', who:'mel',
+    detail:{ scenario:'Mel ouvre Clutchs → voit la card de David avec détails et countdown 2h.', status:'ok', label:'✅ Implémenté',
+      checks:['Card : photo + nom + lieu + heure + message','Countdown 2h visible','Boutons Accepter ✓ / Refuser ✗','Lien profil David depuis card','Badge bleu sur onglet Clutchs'],
+      verify:['Card lisible iPhone 14/15 ?','Message "Un café ?" visible ?','Countdown temps réel ?'],
+      ethique:['Mel consulte profil avant d\'accepter ✅','Refus sans explication requise ✅'],
+    }},
+  { id:9, emoji:'✅', title:'Mel accepte', sub:'Tap Accepter → status = confirmed', who:'mel',
+    detail:{ scenario:'Mel tape Accepter. Status → confirmed. David notifié en temps réel.', status:'ok', label:'✅ Implémenté',
+      checks:['UPDATE clutches SET status="confirmed"','Notif push à David : "Mel a accepté !"','Realtime channel séparé detecte UPDATE','Animation célébration déclenchée'],
+      verify:['David reçoit la notif en temps réel ?','Animation célébration visible et mémorable ?','Les deux voient le Verrou simultanément ?'],
+    }},
+  { id:10, emoji:'🔒', title:'VERROU — RDV Confirmé', sub:'Chat ouvert · SOS · Countdown · Lieu', who:'both',
+    detail:{ scenario:'🔒 Verrou ! David et Mel voient l\'écran de Verrou : Café du Grütli · 19h30 · Chat · SOS.', status:'warn', label:'⚠️ Partiellement testé',
+      checks:['Écran Verrou : lieu + heure','Chat 5 messages max / personne','Bouton SOS → partage position','Proximity meter 30min avant','Lien Maps vers le lieu'],
+      verify:['Écran Verrou mémorable ? Envie d\'y aller ?','Chat temps réel entre les 2 ?','Countdown exact ?','Proximity meter se lance à J-30min ?'],
+      design:['Wow moment — animation sablier ?','Couleur or/bordeaux = urgence positive ?'],
+      ethique:['SOS accessible en 1 tap ✅','Lieu public uniquement ✅'],
+    }},
+  { id:11, emoji:'☕', title:'Le vrai RDV', sub:'Café du Grütli · 19h30 · En vrai', who:'both',
+    detail:{ scenario:'David et Mel se rencontrent. Proximity meter pulse. Chat se ferme 1h après.', status:'warn', label:'⚠️ Feature partielle',
+      checks:['Proximity meter actif','Chat fermé 1h après heure RDV','SOS disponible pendant le RDV'],
+      verify:['Proximity meter fonctionne à ~50m ?','Notif "Tu y es ?" à l\'heure H ?'],
+      missing:['GPS auto-confirmation présence (v2)','Feedback screen post-RDV (UI manquante)','Notif rappel feedback J+1'],
+      ethique:['Clutch n\'est pas responsable du RDV','Signalement possible 24h post-RDV','Données RDV = données sensibles LPD'],
+    }},
+];
+
+// ── EDGE CASES ──────────────────────────────────────────────────
+const EDGE = [
+  { id:'E1', emoji:'⏱', title:'Clutch expire — 2h sans réponse', sub:'Mel n\'a pas répondu dans les 2h', who:'david',
+    detail:{ scenario:'David envoie un Clutch à 17h. Mel ne répond pas. À 19h → expiration auto.', status:'warn', label:'⚠️ Partiel',
+      checks:['expires_at = now()+2h calculé à l\'insertion','Cron expire clutches statut pending'],
+      verify:['David reçoit-il une notif "expiré" ?','La card disparaît du onglet Clutchs de Mel ?','David peut-il renvoyer après expiration ?'],
+      missing:['Notif à David "Ton Clutch a expiré"','Cooldown avant de pouvoir renvoyer à même personne ?'],
+    }},
+  { id:'E2', emoji:'❌', title:'Mel refuse le Clutch', sub:'Tap Refuser → David notifié discrètement', who:'mel',
+    detail:{ scenario:'Mel ne se sent pas à l\'aise. Elle refuse sans donner d\'explication.', status:'ok', label:'✅ Implémenté',
+      checks:['UPDATE status="declined"','David notifié discrètement du refus'],
+      verify:['Message de refus pas trop brutal ?','David peut-il renvoyer à Mel après ?'],
+      ethique:['Mel NE DOIT PAS expliquer son refus ✅','Pas de "Pourquoi tu refuses ?" dark pattern ✅','Cooldown si 3 refus consécutifs d\'un même homme ?'],
+    }},
+  { id:'E3', emoji:'👻', title:'David ghost — ne vient pas', sub:'Score -15 à -25pts selon l\'heure d\'annulation', who:'david',
+    detail:{ scenario:'David confirme, puis ne vient pas au RDV. Mel attend seule.', status:'warn', label:'⚠️ Partiel',
+      checks:['Pénalité score calculée selon heure annulation','Suspension auto si score < 60'],
+      verify:['Mel peut-elle signaler le no-show ?','Score de David visible sur son profil après ?','Pénalité appliquée automatiquement ?'],
+      missing:['GPS auto-détection no-show','Notification à Mel "Il semblerait que David n\'est pas là"','Signalement UI post-RDV'],
+      ethique:['Ghost systématique = comportement prédateur à surveiller','Pénalité proportionnelle + récidive ×2 déjà prévu ✅'],
+    }},
+  { id:'E4', emoji:'🚫', title:'Double clutch — David essaie d\'en envoyer 2', sub:'Anti-doublon manquant', who:'david',
+    detail:{ scenario:'David est impatient. Il essaie d\'envoyer un 2ème Clutch à Mel alors que le 1er est pending.', status:'warn', label:'🔴 Non implémenté',
+      checks:[],
+      verify:['Le bouton est-il désactivé si pending ?','Erreur claire affichée ?'],
+      missing:['Gate côté front : cacher bouton si Clutch pending vers cette personne','Vérification côté Supabase (RLS ou trigger)'],
+      ethique:['Doublon = harcèlement potentiel — bloquer impérativement'],
+    }},
+  { id:'E5', emoji:'📴', title:'App en background — notif tardive', sub:'iPhone a tué l\'app en background', who:'mel',
+    detail:{ scenario:'Mel a fermé l\'app. Elle reçoit la notif 5min après l\'envoi du Clutch (background fetch iOS).', status:'warn', label:'⚠️ Non testé',
+      checks:['OneSignal gère le background push iOS'],
+      verify:['Délai entre envoi et réception push ?','Push reçue si app complètement fermée ?','Push reçue si Do Not Disturb actif ?'],
+      missing:['Background app refresh configuré dans Capacitor ?'],
+    }},
+];
+
+// ── SECURITY ──────────────────────────────────────────────────────
+const SECURITY = [
+  { id:'S1', emoji:'📍', title:'Localisation des femmes', sub:'Position jamais exacte — offset 50m + zone seulement', who:'mel',
+    detail:{ scenario:'Un homme mal intentionné veut localiser Mel via l\'app.', status:'ok', label:'✅ Implémenté',
+      checks:['fuzzPosition() : offset aléatoire stable par userId','Supabase stocke available_city (texte), jamais lat/lng','Étoiles carte non cliquables → impossible d\'identifier qui est où','GPS exact jamais transmis à d\'autres utilisateurs'],
+      verify:['Offset 50m confirmé sur un vrai device ?','Un homme ne peut-il vraiment pas calculer la position exacte avec plusieurs mesures ?'],
+      missing:['Rotation de l\'offset dans le temps (pas seulement par userId)'],
+    }},
+  { id:'S2', emoji:'🛡️', title:'Saturation — protection femmes', sub:'Max N clutchs/jour reçus par une femme', who:'mel',
+    detail:{ scenario:'Mel est populaire. 20 hommes veulent lui envoyer un Clutch en même temps.', status:'ok', label:'✅ Implémenté',
+      checks:['MAX_CLUTCHS_PER_DAY_WOMEN configurable','Banner info si saturation atteinte','Hommes voient "non disponible" après N envois'],
+      verify:['Valeur MAX_CLUTCHS_PER_DAY_WOMEN = combien ? (à afficher à David)','Reset à minuit ou à 18h après ouverture fenêtre ?'],
+    }},
+  { id:'S3', emoji:'🚨', title:'Bouton SOS', sub:'Partage position contact de confiance en 1 tap', who:'mel',
+    detail:{ scenario:'Mel se sent mal à l\'aise pendant ou avant le RDV.', status:'ok', label:'✅ Implémenté',
+      checks:['SOS accessible depuis écran Verrou','Partage GPS réel vers contact de confiance','1 tap suffit'],
+      verify:['SOS fonctionne si GPS désactivé ?','Le contact reçoit bien le SMS/message ?','SOS visible même si chat est fermé ?'],
+      missing:['SOS depuis le chat (pas seulement depuis Verrou)','Alerte si Mel ne répond pas X minutes après l\'heure RDV'],
+      ethique:['SOS ne doit jamais requérir d\'explication → 1 tap direct ✅'],
+    }},
+  { id:'S4', emoji:'🚫', title:'Blocage utilisateur', sub:'Mel bloque David — il disparaît définitivement', who:'mel',
+    detail:{ scenario:'David se comporte mal. Mel veut le bloquer.', status:'ok', label:'✅ Implémenté',
+      checks:['Blocage depuis profil (2 taps max)','Blocage depuis card Présences','David ne voit plus Mel','Mel ne voit plus David','Table blocks Supabase'],
+      verify:['Blocage persiste après déconnexion/reconnexion ?','David ne peut pas contourner en créant un nouveau compte ?'],
+      missing:['Signalement (report) avec catégories : photo inappropriée, harcèlement, fake profil','Modération manuelle si signalement'],
+      ethique:['Blocage silencieux → David ne sait pas qu\'il est bloqué ✅','Pas de notification à David du blocage ✅'],
+    }},
+  { id:'S5', emoji:'🕵️', title:'Faux comptes en masse', sub:'Quelqu\'un crée 50 profils fake', who:'both',
+    detail:{ scenario:'Un utilisateur malveillant crée des dizaines de comptes pour spammer ou tester.', status:'warn', label:'🔴 Non protégé actuellement',
+      checks:['Supabase Auth bloque les emails dupliqués'],
+      missing:['Rate limiting inscription (max X comptes / IP / heure)','Vérification email obligatoire avant accès','Détection comportement anormal (N clutchs/min)','Phone number verification (optionnel v2)'],
+      ethique:['Faux compte homme = risque harcèlement systématique vers femmes — priorité haute'],
+    }},
+];
+
+// ── LEGAL ──────────────────────────────────────────────────────────
+const LEGAL = [
+  { id:'L1', emoji:'📋', title:'Consentement & CGU', sub:'Obligatoire au signup — LPD suisse', who:'both',
+    detail:{ scenario:'Tout utilisateur doit avoir explicitement accepté les CGU avant d\'accéder à l\'app.', status:'ok', label:'✅ Pages en ligne',
+      checks:['/terms disponible ✅','/privacy disponible ✅','Liens dans footer landing page'],
+      verify:['Case à cocher CGU explicite au signup ?','Date de consentement stockée en base ?','CGU version datée (si modification future) ?'],
+      legal:['LPD art. 6 : consentement éclairé obligatoire','Mineur : consentement parental — vérification âge ?','RGPD applicable si utilisateur EU (Genève-France ?)'],
+    }},
+  { id:'L2', emoji:'🗑️', title:'Suppression de compte', sub:'Anonymisation LPD + delete auth', who:'both',
+    detail:{ scenario:'L\'utilisateur veut supprimer son compte. RGPD/LPD = droit à l\'effacement.', status:'ok', label:'✅ Déployé ce soir',
+      checks:['Suppression compte UI : Profil → Supprimer','Edge Function delete-account déployée Supabase','Anonymisation profil (name="Compte supprimé")','Suppression clutchs + messages + favoris','Suppression auth.users (irréversible)'],
+      verify:['Test complet de la suppression demain ?','Profil anonymisé correctement ?','Auth user supprimé → plus possible de se connecter ?'],
+      legal:['Délai légal réponse demande suppression : 30j max (LPD)','Historique anonymisé gardé combien de temps ?'],
+    }},
+  { id:'L3', emoji:'📍', title:'Données de localisation', sub:'Donnée sensible LPD — consentement explicite', who:'both',
+    detail:{ scenario:'La localisation est une donnée sensible selon la LPD suisse.', status:'warn', label:'⚠️ Consentement à renforcer',
+      checks:['GPS jamais stocké exact ✅','Zone de dispo = texte quartier seulement ✅','Offset position 50m ✅'],
+      verify:['Demande de permission localisation iOS bien formulée ?','Consentement localisation distinct des CGU ?','Texte dans Info.plist explique pourquoi (fait ce soir ✅)'],
+      legal:['LPD art. 5 : localisation = donnée sensible','Consentement explicite séparé requis','Droit de retrait consentement à tout moment'],
+    }},
+  { id:'L4', emoji:'🔞', title:'Âge minimum 18+', sub:'Vérification absente — risque légal', who:'both',
+    detail:{ scenario:'Un mineur de 16 ans s\'inscrit avec un faux âge.', status:'warn', label:'🔴 Non vérifié actuellement',
+      checks:['Mention 18+ dans les CGU'],
+      missing:['Case à cocher "J\'ai 18 ans" au signup','Vérification pièce d\'identité (impossible sans prestataire externe)','Suspicion de profil mineur → signalement modération'],
+      legal:['LPD : données de mineurs soumises à protection renforcée','Responsabilité civile si mineur utilise l\'app','Mentions App Store : 17+ configuré ✅'],
+    }},
+  { id:'L5', emoji:'🏛️', title:'Responsabilité civile RDV', sub:'Que se passe-t-il si quelque chose va mal au RDV ?', who:'both',
+    detail:{ scenario:'Un RDV tourne mal. L\'utilisateur tente d\'engager la responsabilité de Clutch.', status:'warn', label:'⚠️ CGU à renforcer',
+      checks:['Clause de non-responsabilité dans CGU (/terms)','App = intermédiaire technique seulement'],
+      verify:['CGU signifiées avant chaque RDV (pas seulement au signup) ?','Clause "lieu public uniquement" dans les CGU ?'],
+      missing:['Conseil juridique professionnel recommandé avant lancement public','Assurance RC startup (coût ~200 CHF/an)'],
+      legal:['CC suisse art. 41 : responsabilité pour dommage causé à autrui','Si Clutch facilite une rencontre qui tourne mal : exposition potentielle','SOS button = preuve de bonne foi ✅'],
+    }},
+];
+
+// ── FIABILITÉ & ANTI-GHOSTING ──────────────────────────────────────────
+const FIABILITE = [
+  { id:'R0', emoji:'🔒', title:'Philosophie anti-ghosting', sub:'Le problème de fond', who:'both', status:'ok',
+    detail:{ scenario:'La promesse de Clutch : un match = un vrai RDV. Mais comment vérifier sans surveillance invasive ?',
+      status:'ok', label:'✅ Décision prise',
+      checks:[
+        'Un Clutch accepté = engagement moral. Partir = pénalité.',
+        'GPS check-in silencieux (bouton "J\'y suis") — pas de QR code, pas de police',
+        'Score fiabilité visible sur le profil → auto-régulation communautaire',
+        'On ne peut PAS prouver à 100% qu\'on était là. C\'est la limite acceptée.',
+      ],
+      verify:['Le système décourage-t-il les cancellations de dernière minute ?','Le score est-il visible AVANT d\'envoyer un Clutch ?'],
+      missing:['Pas de surveillance continue — décision éthique délibérée'],
+      legal:['LPD : GPS = donnée sensible. Consentement explicite requis avant check-in','On stocke uniquement le résultat (vérifié/non-vérifié), pas la position GPS brute'],
+    }},
+  { id:'R1', emoji:'📍', title:'GPS check-in au RDV', sub:'Vérification silencieuse présence', who:'both', status:'ok',
+    detail:{ scenario:'Quand l\'utilisateur clique "J\'y suis", l\'app capture sa position GPS et vérifie s\'il est à moins de 300m du lieu de RDV.',
+      status:'ok', label:'✅ Implémenté',
+      checks:[
+        'Bouton "J\'y suis" apparaît quand RDV est passé (ProximityRadar)',
+        'GPS demandé au moment du clic — pas de tracking en continu',
+        'Si GPS à <300m du lieu → badge "Présence vérifiée GPS 📍"',
+        'Si GPS refusé ou hors zone → check-in enregistré sans badge (neutre)',
+        'venue_lat/venue_lng sauvés lors de la création du Clutch (Nominatim)',
+        'checkin_verified = true/false sauvé en DB',
+      ],
+      verify:['Test : cliquer "J\'y suis" depuis chez soi vs depuis le lieu → résultats différents ?','Le badge GPS apparaît-il dans le feedback post-RDV ?'],
+      missing:['Afficher le badge GPS dans l\'historique des Clutchs'],
+      legal:['GPS capturé une seule fois, au moment du clic — pas de tracking en arrière-plan','Position brute jamais stockée — uniquement le bool vérifié/non-vérifié'],
+    }},
+  { id:'R2', emoji:'🎭', title:'Les 5 scénarios post-RDV', sub:'Qui peut prouver quoi ?', who:'both', status:'warn',
+    detail:{ scenario:'Les différents cas possibles après l\'heure de RDV, et ce que l\'app peut (ou ne peut pas) détecter.',
+      status:'warn', label:'⚠️ Cas gris existants',
+      checks:[
+        '✅ A là + B là, les deux cliquent → RDV réussi, scores OK',
+        '✅ A là (GPS ✓) + B absent → A prouvé, B prend pénalité lapin (-20pts)',
+        '⚠️ A là + B vient, voit A, repart SANS cliquer → B pénalisé (a accepté = responsabilité)',
+        '⚠️ A là + B vient, CLIQUE puis repart → techniquement vu comme présent. Non résolvable sans surveillance.',
+        '❓ Ni A ni B ne cliquent → expire silencieusement, scores neutres',
+        '❓ A ment "B n\'était pas là" mais B a GPS ✓ → B a la preuve, A tort',
+      ],
+      verify:['Cas gris accepté : B clique et repart. Impossible à distinguer sans tracking continu.'],
+      missing:[
+        'Option "Parti·e après 2 min" dans le feedback → signal accumulable au fil du temps',
+        'Si un user reçoit 3x ce feedback → score baisse automatiquement (à implémenter)',
+      ],
+      legal:['On ne peut pas condamner quelqu\'un sur la base d\'une accusation non prouvée','Feedback = signal de réputation, pas une sanction automatique'],
+    }},
+  { id:'R3', emoji:'📊', title:'Feedback post-RDV', sub:'5 options + GPS badge', who:'both', status:'ok',
+    detail:{ scenario:'Après chaque RDV (check-in ou expiration), un écran de feedback s\'affiche.',
+      status:'ok', label:'✅ Implémenté',
+      checks:[
+        '🌟 Super RDV (+5 pts fiabilité)',
+        '👍 Bien, sympa (+3 pts)',
+        '🚶 Parti·e après 2 min (-15 pts pour l\'autre)',
+        '🐰 Lapin — personne pas venue (-20 pts pour l\'autre)',
+        '👻 Je n\'y suis pas allé·e (-15 pts sur moi-même)',
+        'Si GPS vérifié : badge "Présence vérifiée GPS 📍" visible dans le feedback',
+        'Sauvegardé en DB table feedback (clutch_id, given_by, to_user_id, rating, gps_verified)',
+      ],
+      verify:['Le feedback est-il déclenché automatiquement après l\'heure de RDV (sans check-in) ?','Un utilisateur peut-il donner le même feedback deux fois sur le même Clutch ?'],
+      missing:['Score fiabilité recalculé automatiquement depuis table feedback (trigger Supabase)','Notification à l\'autre personne quand il reçoit un feedback négatif'],
+      legal:['Feedback visible uniquement par les deux parties — pas public','Option "Contester un feedback" à envisager en V2'],
+    }},
+  { id:'R4', emoji:'🔢', title:'Score fiabilité', sub:'Comment il évolue', who:'both', status:'warn',
+    detail:{ scenario:'Le score fiabilité (étoiles salmon sur le profil) est la clé de l\'auto-régulation.',
+      status:'warn', label:'⚠️ Calcul à fiabiliser',
+      checks:[
+        'Score initial : 80/100',
+        'Super RDV : +5 pts | Bien : +3 pts',
+        'Lapin : -20 pts | Parti tôt : -15 pts | J\'ai ghosté : -15 pts sur moi',
+        'Score visible sur le profil AVANT d\'envoyer un Clutch',
+        'Score < 50 → pas de Clutch possible (à implémenter)',
+      ],
+      verify:['Un serial-ghoster finit-il vraiment avec un mauvais score ?','Le score est-il recalculé depuis la table feedback ou seulement mis à jour manuellement ?'],
+      missing:[
+        'Trigger Supabase : recalcul automatique score depuis table feedback',
+        'Score < 50 → compte suspendu temporairement (anti-abus)',
+        'Score < 30 → ban permanent',
+      ],
+      legal:['LPD : score = profil de personnalité = donnée sensible. Droit de consultation et rectification.','Si contestation : procédure de révision manuelle par équipe Clutch'],
+    }},
+  { id:'R5', emoji:'🚫', title:'Anti-doublon Clutch', sub:'Un seul Clutch actif à la fois', who:'both', status:'ok',
+    detail:{ scenario:'Un utilisateur ne peut pas envoyer ou recevoir un nouveau Clutch s\'il a déjà un Verrou actif.',
+      status:'ok', label:'✅ Implémenté',
+      checks:[
+        'Envoi bloqué si sender a un Clutch confirmed/accepted',
+        'Envoi bloqué si receiver a un Clutch confirmed/accepted',
+        'Auto-décliné si nouveau Clutch reçu pendant qu\'un Verrou est actif',
+        'Envoi bloqué si Clutch pending/confirmed avec cette même personne',
+      ],
+      verify:['Test : avoir un Verrou actif + tenter d\'envoyer un Clutch → bloqué ?','Test : quelqu\'un t\'envoie un Clutch pendant ton Verrou → auto-décliné ?'],
+      missing:['Notification à l\'envoyeur : "Cette personne a un RDV actif — réessaie plus tard"'],
+      legal:['Protège les deux parties d\'un engagement simultané impossible'],
+    }},
+];
+
+// ── FULL TREE (simplified) ──────────────────────────────────────────
+const FULL_NODES = [
+  { id:'F0', emoji:'📱', title:'Ouverture app', sub:'Point d\'entrée', who:'both', status:'ok',
+    branch: true, branchLabel: 'A-t-il un compte ?',
+    left: { label:'✅ Oui', color: '#2DBD7E' },
+    right: { label:'❌ Non', color: '#ef4444' },
+    detail:{ scenario:'Point d\'entrée de l\'application.', status:'ok', label:'✅ OK', checks:['Splash animé','Détection session','Redirect auto'] }
+  },
+  { id:'F1a', emoji:'🔓', title:'Connexion', sub:'Session restaurée', who:'both', status:'ok',
+    detail:{ scenario:'Utilisateur existant.', status:'ok', label:'✅ OK', checks:['Login Supabase','Session persistée','Redirect app'] }
+  },
+  { id:'F1b', emoji:'📝', title:'Inscription', sub:'Nouveau compte', who:'both', status:'ok',
+    detail:{ scenario:'Nouvel utilisateur.', status:'ok', label:'✅ OK', checks:['Form email+password','Création profil','Email vérification'], missing:['CGU case à cocher explicite','Vérif 18+'] }
+  },
+  { id:'F2', emoji:'👤', title:'Profil complété ?', sub:'Photo + bio + intentions', who:'both', status:'warn',
+    branch:true, branchLabel:'Profil complet ?',
+    left:{ label:'✅ Oui', color:'#2DBD7E' },
+    right:{ label:'⚠️ Non', color:'#C8860A' },
+    detail:{ scenario:'Le profil est-il assez complet pour aller dans Discover ?', status:'warn', label:'⚠️ Pas de gate', missing:['Photo obligatoire avant Discover','Bio minimum requis'] }
+  },
+  { id:'F3', emoji:'⧗', title:'Ouvrir fenêtre', sub:'Zone + créneau 18h max', who:'both', status:'ok',
+    branch:true, branchLabel:'Type de compte ?',
+    left:{ label:'Free', color:'#FFBF9E99' },
+    right:{ label:'Premium', color:'#C8860A' },
+    detail:{ scenario:'L\'utilisateur choisit zone et créneau.', status:'ok', label:'✅ OK', checks:['Carte Leaflet','Molette heure','UPDATE profiles'] }
+  },
+  { id:'F4a', emoji:'✦', title:'Présences (doit être dispo)', sub:'Gate free : dispo requis', who:'both', status:'ok',
+    detail:{ scenario:'Free : doit être disponible pour voir Présences.', status:'ok', label:'✅ Gate actif', checks:['isReallyAvail vérifié','Banner si invisible'] }
+  },
+  { id:'F4b', emoji:'👁', title:'Présences (stealth)', sub:'Premium : browse sans être visible', who:'both', status:'ok',
+    detail:{ scenario:'Premium peut browsser sans se mettre dispo.', status:'ok', label:'✅ Implémenté', checks:['isPremium flag','Banner "mode discret"'] }
+  },
+  { id:'F5', emoji:'✉️', title:'Envoi Clutch', sub:'Lieu + heure + message → expires 2h', who:'both', status:'ok',
+    branch:true, branchLabel:'Réponse de la cible ?',
+    left:{ label:'✅ Accepte', color:'#2DBD7E' },
+    right:{ label:'❌ Refuse', color:'#ef4444' },
+    detail:{ scenario:'Envoi d\'un Clutch.', status:'ok', label:'✅ OK', checks:['Modal OSM','INSERT clutches','Notif push'], missing:['Anti-doublon'] }
+  },
+  { id:'F6a', emoji:'🔒', title:'VERROU', sub:'Chat + SOS + Countdown', who:'both', status:'ok',
+    detail:{ scenario:'Happy path : Verrou confirmé.', status:'ok', label:'✅ Implémenté', checks:['Chat 5 msgs','SOS','Proximity meter','Countdown'] }
+  },
+  { id:'F6b', emoji:'💨', title:'Clutch refusé', sub:'David notifié discrètement', who:'both', status:'ok',
+    detail:{ scenario:'Refus normal — pas de pénalité.', status:'ok', label:'✅ OK', checks:['Status declined','Notif à l\'expéditeur'], ethique:['Pas d\'explication requise ✅','Pas de dark pattern ✅'] }
+  },
+  { id:'F7', emoji:'⏱', title:'Timeout 2h — pas de réponse', sub:'Clutch expire automatiquement', who:'both', status:'warn',
+    detail:{ scenario:'Personne n\'a répondu dans les 2h.', status:'warn', label:'⚠️ Partiel', checks:['expires_at calculé'], missing:['Notif à l\'expéditeur','UI de l\'expiration'] }
+  },
+];
+
+let mode = 'happy';
+let currentData = HAPPY;
+let visible = 1;
+let selectedId = null;
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (m === 'happy') { currentData = HAPPY; document.getElementById('mode-badge').textContent = '✓ HAPPY PATH'; document.getElementById('mode-badge').style.background = '#2DBD7E22'; document.getElementById('mode-badge').style.color = '#2DBD7E'; document.getElementById('mode-badge').style.borderColor = '#2DBD7E66'; }
+  else if (m === 'full') { currentData = FULL_NODES; document.getElementById('mode-badge').textContent = '🌳 ARBRE COMPLET'; document.getElementById('mode-badge').style.background = '#C8860A22'; document.getElementById('mode-badge').style.color = '#C8860A'; document.getElementById('mode-badge').style.borderColor = '#C8860A66'; }
+  else if (m === 'edge') { currentData = EDGE; document.getElementById('mode-badge').textContent = '⚠️ CAS LIMITES'; document.getElementById('mode-badge').style.background = '#ef444422'; document.getElementById('mode-badge').style.color = '#ef4444'; document.getElementById('mode-badge').style.borderColor = '#ef444466'; }
+  else if (m === 'security') { currentData = SECURITY; document.getElementById('mode-badge').textContent = '🛡️ SÉCURITÉ'; document.getElementById('mode-badge').style.background = '#8b5cf622'; document.getElementById('mode-badge').style.color = '#8b5cf6'; document.getElementById('mode-badge').style.borderColor = '#8b5cf666'; }
+  else if (m === 'legal') { currentData = LEGAL; document.getElementById('mode-badge').textContent = '⚖️ LÉGAL LPD'; document.getElementById('mode-badge').style.background = '#38bdf822'; document.getElementById('mode-badge').style.color = '#38bdf8'; document.getElementById('mode-badge').style.borderColor = '#38bdf866'; }
+  else if (m === 'fiabilite') { currentData = FIABILITE; document.getElementById('mode-badge').textContent = '⭐ FIABILITÉ'; document.getElementById('mode-badge').style.background = '#C8860A22'; document.getElementById('mode-badge').style.color = '#C8860A'; document.getElementById('mode-badge').style.borderColor = '#C8860A66'; }
+
+  visible = 1; selectedId = null;
+  document.getElementById('detail').innerHTML = '<div class="detail-empty">← Clique sur une étape</div>';
+  render();
+}
+
+function statusColors(s) {
+  return s==='ok' ? {bg:GRN,border:'#2DBD7E'} : s==='warn' ? {bg:ORG,border:'#C8860A'} : s==='missing' ? {bg:RED,border:'#ef4444'} : {bg:PUR,border:'#8b5cf6'};
+}
+
+function whoColor(w) { return w==='david'?D:w==='mel'?'#FFBF9E88':B; }
+function whoLabel(w) { return w==='david'?'David ♂':w==='mel'?'Mel ♀':'David + Mel'; }
+
+function render() {
+  const tl = document.getElementById('timeline');
+  let html = '';
+
+  for (let i = 0; i < visible && i < currentData.length; i++) {
+    const s = currentData[i];
+    const wc = whoColor(s.who);
+    const wl = whoLabel(s.who);
+    const sc = statusColors(s.detail?.status || 'ok');
+    const si = s.detail?.status==='ok'?'✅':s.detail?.status==='warn'?'⚠️':'❓';
+    const isActive = selectedId === s.id;
+
+    if (i > 0) {
+      html += `<div style="display:flex;justify-content:center;width:100%;max-width:500px"><div class="connector"><div class="conn-line" style="background:${sc.border}44"></div></div></div>`;
+    }
+
+    if (s.branch && mode==='full') {
+      html += `<div style="width:100%;max-width:500px;padding:0 16px">`;
+      html += `<div class="step-node${isActive?' active':''}" onclick="select(${i})" style="border-radius:10px">
+        <div class="step-num" style="border-color:${wc};background:${wc}11;color:${wc}">${s.id||i+1}</div>
+        <div style="flex:1"><div class="step-title">${s.emoji} ${s.title}</div><div class="step-sub">${s.sub}</div></div>
+        <span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:20px;background:${wc}11;color:${wc};border:1px solid ${wc}33">${wl}</span>
+        <span>${si}</span>
+      </div>`;
+      html += `<div style="text-align:center;font-size:9px;color:#FFBF9E33;margin:4px 0;letter-spacing:.5px;text-transform:uppercase">${s.branchLabel}</div>`;
+      html += `<div class="branch-wrap"><div class="branch-col">
+        <div style="width:2px;height:14px;background:${s.left.color}66"></div>
+        <div class="branch-node" style="background:${s.left.color}11;border-color:${s.left.color}55;color:${s.left.color};font-size:10px;font-weight:800">${s.left.label}</div>
+      </div><div class="branch-col">
+        <div style="width:2px;height:14px;background:${s.right.color}66"></div>
+        <div class="branch-node" style="background:${s.right.color}11;border-color:${s.right.color}55;color:${s.right.color};font-size:10px;font-weight:800">${s.right.label}</div>
+      </div></div></div>`;
+    } else {
+      html += `<div class="step-node${isActive?' active':''}" style="max-width:500px" onclick="select(${i})">
+        <div class="step-num" style="border-color:${wc};background:${wc}11;color:${wc}">${s.id||i+1}</div>
+        <div style="flex:1"><div class="step-title">${s.emoji} ${s.title}</div><div class="step-sub">${s.sub}</div></div>
+        <span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:20px;background:${wc}11;color:${wc};border:1px solid ${wc}33;white-space:nowrap">${wl}</span>
+        <span>${si}</span>
+      </div>`;
+    }
+  }
+
+  if (visible < currentData.length) html += `<div style="font-size:10px;color:#FFBF9E22;text-align:center;padding:8px;max-width:500px">↓ ${currentData.length - visible} étape(s) à venir…</div>`;
+
+  tl.innerHTML = html;
+  const pct = (visible / currentData.length * 100).toFixed(0);
+  document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('prog-label').textContent = `${visible}/${currentData.length}`;
+  document.getElementById('btn-prev').disabled = visible <= 1;
+  document.getElementById('btn-next').disabled = visible >= currentData.length;
+}
+
+function select(i) {
+  const s = currentData[i];
+  selectedId = s.id;
+  const d = s.detail;
+  if (!d) return;
+
+  const sc = d.status==='ok'?'s-ok':d.status==='warn'?'s-warn':'s-err';
+  let html = `<div class="d-title">${s.emoji} ${s.title}</div><div class="d-body">`;
+  html += `<div class="d-status ${sc}">${d.label}</div>`;
+  if (d.scenario) html += `<div class="d-scenario">🎯 ${d.scenario}</div>`;
+
+  const sec = (label, items, icon, cls) => {
+    if (!items?.length) return '';
+    let h = `<div class="d-section"><div class="d-sec-label">${label}</div>`;
+    items.forEach(t => { h += `<div class="d-item"><span class="${cls}">${icon}</span><span>${t}</span></div>`; });
+    return h + '</div>';
+  };
+
+  html += sec('✅ Implémenté', d.checks, '✓', 'icon-ok');
+  html += sec('⚠️ À vérifier demain', d.verify, '▸', 'icon-warn');
+  html += sec('🔴 Manque', d.missing, '✗', 'icon-err');
+  html += sec('◈ Éthique', d.ethique, '◈', 'icon-eth');
+  html += sec('⚖️ Légal LPD', d.legal, '⚖', 'icon-law');
+  html += sec('🎨 Design', d.design, '◉', 'icon-des');
+  html += '</div>';
+
+  document.getElementById('detail').innerHTML = html;
+  render();
+}
+
+function next() { if (visible < currentData.length) { visible++; render(); document.getElementById('timeline').scrollTo({top:9999,behavior:'smooth'}); } }
+function prev() { if (visible > 1) { visible--; render(); } }
+
+render();
+</script>
+</body>
+</html>

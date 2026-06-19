@@ -257,11 +257,11 @@ export default function Landing() {
           justifyContent: 'center', marginBottom: 20,
         }}>
           <a href="/app2" className="btn-red" style={{ fontSize: 17, padding: '17px 32px' }}>
-            Tester la démo →
+            Tester l'app →
           </a>
-          <button className="btn-outline" onClick={scrollToWaitlist} style={{ fontSize: 17, padding: '17px 32px' }}>
-            Rejoindre la beta
-          </button>
+          <a href="/app2?preview=onboarding" className="btn-outline" style={{ fontSize: 17, padding: '17px 32px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+            Voir le flow d'inscription
+          </a>
         </div>
 
         <div className="anim d5" style={{ fontSize: 12, color: 'rgba(245,232,222,0.3)', letterSpacing: '.03em' }}>

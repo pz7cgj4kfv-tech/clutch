@@ -12,21 +12,139 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'v14.06-P'
+const V = 'v18.06-Z35'
+
+// ─── ID Mel (seuil GPS élargi pour les tests) ────────────────────
+const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'
+
+// ─── Sound Engine — Web Audio API (zéro fichier) ─────────────────
+let _audioCtx: AudioContext | null = null
+const getCtx = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+  if (_audioCtx.state === 'suspended') _audioCtx.resume()
+  return _audioCtx
+}
+
+const Sounds = {
+  // 🔒 Verrou confirmé — clic métallique + résonance grave
+  verrou: () => {
+    const ctx = getCtx(); if (!ctx) return
+    // Click bruit blanc filtré
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.06), ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(ctx.sampleRate*0.004))
+    const src = ctx.createBufferSource(); src.buffer = buf
+    const flt = ctx.createBiquadFilter(); flt.type='bandpass'; flt.frequency.value=600; flt.Q.value=2
+    const gn = ctx.createGain(); gn.gain.setValueAtTime(0.7, ctx.currentTime)
+    src.connect(flt); flt.connect(gn); gn.connect(ctx.destination); src.start()
+    // Résonance basse
+    const osc = ctx.createOscillator(); const og = ctx.createGain()
+    osc.type='sine'; osc.frequency.setValueAtTime(180, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime+0.4)
+    og.gain.setValueAtTime(0.4, ctx.currentTime+0.03)
+    og.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+1.0)
+    osc.connect(og); og.connect(ctx.destination)
+    osc.start(ctx.currentTime+0.03); osc.stop(ctx.currentTime+1.0)
+  },
+  // ⚡ Clutch reçu — double ping tendu
+  clutch: () => {
+    const ctx = getCtx(); if (!ctx) return
+    ;[0, 0.12].forEach((delay, i) => {
+      const osc = ctx.createOscillator(); const g = ctx.createGain()
+      osc.type='sine'; osc.frequency.value = i===0 ? 880 : 1100
+      g.gain.setValueAtTime(0.35, ctx.currentTime+delay)
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+delay+0.25)
+      osc.connect(g); g.connect(ctx.destination)
+      osc.start(ctx.currentTime+delay); osc.stop(ctx.currentTime+delay+0.25)
+    })
+  },
+  // 📍 J'y suis — bip GPS net
+  checkin: () => {
+    const ctx = getCtx(); if (!ctx) return
+    const osc = ctx.createOscillator(); const g = ctx.createGain()
+    osc.type='sine'; osc.frequency.value=1047
+    g.gain.setValueAtTime(0.4, ctx.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.18)
+    osc.connect(g); g.connect(ctx.destination)
+    osc.start(); osc.stop(ctx.currentTime+0.18)
+  },
+  // 💬 Message reçu — pop discret
+  message: () => {
+    const ctx = getCtx(); if (!ctx) return
+    const osc = ctx.createOscillator(); const g = ctx.createGain()
+    osc.type='sine'; osc.frequency.setValueAtTime(520, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(380, ctx.currentTime+0.08)
+    g.gain.setValueAtTime(0.25, ctx.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.12)
+    osc.connect(g); g.connect(ctx.destination)
+    osc.start(); osc.stop(ctx.currentTime+0.12)
+  },
+  // ✓ Feedback envoyé — ding satisfaisant
+  done: () => {
+    const ctx = getCtx(); if (!ctx) return
+    ;[660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const g = ctx.createGain()
+      osc.type='sine'; osc.frequency.value=freq
+      g.gain.setValueAtTime(0.3, ctx.currentTime+i*0.1)
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+i*0.1+0.4)
+      osc.connect(g); g.connect(ctx.destination)
+      osc.start(ctx.currentTime+i*0.1); osc.stop(ctx.currentTime+i*0.1+0.4)
+    })
+  },
+}
 
 // ─── Palette — fond = splash (#542A44), cohérence totale ────────
 const C = {
   bg:'#542A44',          // fond principal = même que splash/page-zéro
-  bgCard:'#6B3558',      // cartes (plus clair que bg)
-  bgSheet:'#5E2E4A',     // bottom sheets
+  bgCard:'#7A3D65',      // cartes — boosté pour contraste outdoor
+  bgSheet:'#6A3358',     // bottom sheets
   bordeaux:'#3D1A33',    // accent sombre (boutons, ombres)
   bordeauxLight:'#7A3D65', // accent moyen
   salmon:'#FFBF9E', salmonFaint:'rgba(255,191,158,0.15)', salmonMid:'rgba(255,191,158,0.5)',
   orange:'#E27C00', orangeFaint:'rgba(226,124,0,0.15)',
-  white:'#FAFAFA', whiteMid:'rgba(250,250,250,0.65)', whiteFaint:'rgba(255,191,158,0.1)',
-  border:'rgba(255,191,158,0.22)', borderStrong:'rgba(255,191,158,0.45)',
+  white:'#FFFFFF', whiteMid:'rgba(255,255,255,0.82)', whiteFaint:'rgba(255,191,158,0.12)',
+  border:'rgba(255,191,158,0.30)', borderStrong:'rgba(255,191,158,0.55)',
   green:'#2DBD7E', red:'#ef4444',
+  gold:'C.gold',
 }
+
+// ─── Config fiabilité — TOUTES les pondérations ici, jamais inline ─
+const TRUST_CONFIG = {
+  // Points positifs
+  GPS_CHECKIN:           3,
+  DOUBLE_POSITIVE:       2,  // les deux feedbacks positifs
+  SINGLE_POSITIVE:       1,  // un seul côté a confirmé
+  // Points négatifs
+  NOSHOW_REPORTED:      -5,  // l'autre dit "absent"
+  SELF_GHOST:           -3,  // s'autodéclare fantôme (honnêteté récompensée)
+  LEFT_EARLY:           -4,  // venu·e puis reparti·e
+  LATE_REPORTED:        -1,  // retard signalé >20min
+  CANCEL_LATE:          -2,  // annulation <30min avant
+  SILENCE_AUTO:         -1,  // aucun feedback après 24h (auto-close)
+  // Soft gate — paliers
+  GATE_WARN:             1,  // bannière douce
+  GATE_ORANGE:           2,  // bannière orange + notif
+  GATE_BLOCK:            3,  // bloque l'envoi de nouveau Clutch
+  // GPS
+  GPS_RADIUS_KM:       0.3,  // 300m
+  // Feedback révélation
+  REVEAL_DELAY_HOURS:    3,  // feedbacks cachés N heures
+  AUTO_CLOSE_HOURS:     24,  // auto-close si silence total
+  // Bayésien
+  BAYES_FULL_AT:        10,  // poids = 1 quand rdv_count >= 10
+  // Seuils de niveau
+  LEVEL_FIABLE_MIN_RDV:   3,
+  LEVEL_FIABLE_MIN_SCORE: 10,
+  LEVEL_TRESFIABLE_MIN_RDV: 15,
+  LEVEL_TRESFIABLE_MIN_SCORE: 30,
+  LEVEL_EXEMPLAIRE_MIN_RDV: 25,
+  LEVEL_EXEMPLAIRE_MIN_SCORE: 60,
+  LEVEL_EXEMPLAIRE_MIN_GPS:   5,
+  // Fenêtre bloquée autour d'un RDV (minutes avant + heures après)
+  RDV_LOCK_BEFORE_MIN:       60,  // 60min avant = fenêtre RDV bloquée
+  RDV_LOCK_AFTER_H:           2,  // 2h après = café/verre
+} as const
 
 // ─── Couleurs genre — cohérentes carte + liste ─────────────────
 const GC = { F:'#FF6B9D', M:'#4FC3F7', X:'#B39DDB' } as const
@@ -36,7 +154,7 @@ type GenderKey = keyof typeof GC
 function getAccountBadge(profile: any): {label:string; color:string; emoji:string}|null {
   if (profile?.account_type === 'bot' || (profile?.id && ['38dda77a','6cf880cf','c504c886','074e38bb','b1e2cc39','df99921f'].some((p:string) => profile.id.startsWith(p))))
     return {label:'Bot', color:'#6B7280', emoji:'🤖'}
-  if (['David','Mélanie','Mel','David Saugy'].includes(profile?.name||''))
+  if (['David','David Saugy'].includes(profile?.name||''))
     return {label:'Admin', color:'#F59E0B', emoji:'👑'}
   if (profile?.account_type === 'friend')
     return {label:'Friend', color:'#3B82F6', emoji:'💙'}
@@ -60,6 +178,7 @@ const TAB_ICONS:Record<string,string> = {
   presences:'/icons/presence_couleur.svg',
   evenements:'/icons/events_couleur.svg',
   clutchs:'/icons/clutch_couleur.svg',
+  contacts: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFBF9E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E`,
   profil:'/icons/profil_couleur.svg',
 }
 function TabSvg({id, size=22, active}:{id:string; size?:number; active:boolean}) {
@@ -72,7 +191,8 @@ function TabSvg({id, size=22, active}:{id:string; size?:number; active:boolean})
 type Lang = 'fr' | 'en'
 const TR: Record<Lang, Record<string,string>> = {
   fr: {
-    'tab.presences':'Présences','tab.events':'Événements','tab.clutchs':'Clutchs','tab.profil':'Profil',
+    'tab.presences':'Présences','tab.events':'Événements','tab.clutchs':'Clutchs','tab.contacts':'Contacts','tab.profil':'Profil',
+    'contacts.title':'Mes contacts','contacts.empty':'Aucun contact pour l\'instant','contacts.empty.sub':'Tes contacts apparaissent ici après un RDV réussi',
     'page1.title':'Choisis ton moment','page1.cta':'Voir les présences →',
     'page1.step':'Étape 1/2 — Quand ?',
     'page2.title':'Tes envies','page2.cta':'Ouvrir ma Fenêtre ✦',
@@ -98,7 +218,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'events.myevents':'Mes inscriptions','events.spots':'places restantes',
     'events.unregister':'Se désinscrire','events.free':'Gratuit',
     'clutchs.title':'Mes Clutchs','clutchs.active':'actif','clutchs.history':'Historique',
-    'clutchs.clear':'🗑 Effacer historique','clutchs.empty':'Aucun clutch actif',
+    'clutchs.clear':'🗑 Effacer historique','clutchs.empty':'Aucun clutch actif','clutchs.empty.sub':'Envoie un Clutch depuis l\'onglet Présences','clutchs.empty.events':'Aucun clutch actif pour l\'instant',
     'clutchs.sent':'↗ Envoyé à','clutchs.received':'↙ Reçu de',
     'clutchs.chat':'💬 Chat avec {name}','clutchs.accept.btn':'✓ Accepter',
     'profile.title':'Mon profil','profile.edit':'Modifier','profile.save':'Enregistrer',
@@ -127,6 +247,24 @@ const TR: Record<Lang, Record<string,string>> = {
     'presence.gate.cta': '✦ Me mettre disponible',
     'presence.gate.premium': 'Ou passe au premium pour voir sans être visible',
     'presence.stealth': '👁 Mode furtif · Tu vois les présences sans être visible',
+    'settings.account': 'Mon compte',
+    'settings.avail': 'Disponibilité',
+    'settings.avail.until': 'Jusqu\'à {time}',
+    'settings.avail.off': 'Hors ligne',
+    'settings.lang': 'Langue',
+    'settings.lang.fr': 'Français',
+    'settings.lang.en': 'English',
+    'settings.notif': 'Notifications',
+    'settings.notif.sub': 'Activer les alertes Clutch',
+    'settings.notif.ok': 'Notifications activées 🔔',
+    'settings.notif.later': 'Notifications disponibles sur iOS (bientôt)',
+    'settings.hq': 'Clutch HQ',
+    'settings.hq.sub': 'Tableau de bord interne',
+    'settings.score': 'Mon score Clutch',
+    'settings.reliability': 'Score fiabilité',
+    'settings.cancels': 'Annulations',
+    'settings.remove': 'Retirer ×',
+    'settings.enable': 'Activer →',
     'feedback.title': '💬 Feedback Clutch',
     'feedback.sub': 'Ton avis compte énormément. Écris, ou enregistre un audio — tout est lu.',
     'feedback.placeholder': 'Ce qui marche, ce qui ne marche pas, tes idées folles...',
@@ -151,7 +289,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'ev.filter.all': 'Tout', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Bien-être', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Gastronomie', 'ev.filter.musique': 'Musique', 'ev.filter.parents': 'Parents',
-    'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte',
+    'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte', 'ev.filter.groupe': 'Groupe',
     'ev.by': 'par',
     'ev.notif.new': '◇ Nouveau·elle Clutcheur·se dans ton quartier',
     'lab.title': '🔬 Ce qu\'on construit',
@@ -175,7 +313,8 @@ const TR: Record<Lang, Record<string,string>> = {
     'profile.languages': 'Langues parlées',
   },
   en: {
-    'tab.presences':'Nearby','tab.events':'Events','tab.clutchs':'Clutches','tab.profil':'Profile',
+    'tab.presences':'Nearby','tab.events':'Events','tab.clutchs':'Clutches','tab.contacts':'Contacts','tab.profil':'Profile',
+    'contacts.title':'My contacts','contacts.empty':'No contacts yet','contacts.empty.sub':'Contacts appear here after a successful meetup',
     'page1.title':'Pick your window','page1.cta':'See who\'s around →',
     'page1.step':'Step 1/2 — When?',
     'page2.title':'Your vibe','page2.cta':'Open my Window ✦',
@@ -201,7 +340,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'events.myevents':'My events','events.spots':'spots left',
     'events.unregister':'Unregister','events.free':'Free',
     'clutchs.title':'My Clutches','clutchs.active':'active','clutchs.history':'History',
-    'clutchs.clear':'🗑 Clear history','clutchs.empty':'No active clutch',
+    'clutchs.clear':'🗑 Clear history','clutchs.empty':'No active clutch','clutchs.empty.sub':'Send a clutch from the Nearby tab','clutchs.empty.events':'No active clutch right now',
     'clutchs.sent':'↗ Sent to','clutchs.received':'↙ Received from',
     'clutchs.chat':'💬 Chat with {name}','clutchs.accept.btn':'✓ Accept',
     'profile.title':'My profile','profile.edit':'Edit','profile.save':'Save',
@@ -254,9 +393,27 @@ const TR: Record<Lang, Record<string,string>> = {
     'ev.filter.all': 'All', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Wellness', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Food & Drink', 'ev.filter.musique': 'Music', 'ev.filter.parents': 'Parents',
-    'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed',
+    'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed', 'ev.filter.groupe': 'Group',
     'ev.by': 'by',
     'ev.notif.new': '◇ New Clutcher in your area',
+    'settings.account': 'My account',
+    'settings.avail': 'Availability',
+    'settings.avail.until': 'Until {time}',
+    'settings.avail.off': 'Offline',
+    'settings.lang': 'Language',
+    'settings.lang.fr': 'Français',
+    'settings.lang.en': 'English',
+    'settings.notif': 'Notifications',
+    'settings.notif.sub': 'Enable Clutch alerts',
+    'settings.notif.ok': 'Notifications enabled 🔔',
+    'settings.notif.later': 'Notifications available on native iOS (soon)',
+    'settings.hq': 'Clutch HQ',
+    'settings.hq.sub': 'Internal dashboard',
+    'settings.score': 'My Clutch score',
+    'settings.reliability': 'Reliability score',
+    'settings.cancels': 'Cancellations',
+    'settings.remove': 'Remove ×',
+    'settings.enable': 'Enable →',
     'lab.title': '🔬 What we\'re building',
     'lab.sub': 'Clutch is built with its users. Tap a feature to say you want it — we\'re listening.',
     'lab.r1.label': 'See who viewed my profile', 'lab.r1.note': 'Not "who clutched you" — that\'s for everyone',
@@ -291,20 +448,19 @@ function isNightNow(): boolean {
   return hour >= 20 || hour < 7
 }
 
-type Screen   = 'splash' | 'login' | 'register' | 'main'
+type Screen   = 'splash' | 'login' | 'register' | 'onboarding' | 'setup' | 'main'
 type AppFlow  = 'carte' | 'options' | 'app'  // flow une fois loggé
-type MainTab  = 'presences' | 'evenements' | 'clutchs' | 'profil'
+type MainTab  = 'presences' | 'evenements' | 'clutchs' | 'contacts' | 'profil'
 
-// ─── Slots de temps — toutes les 15 minutes ───────────────────
+// ─── Slots de temps — toutes les 5 minutes ───────────────────
 function makeSlots(fromDate?: Date): string[] {
   const base = fromDate || new Date()
   const slots: string[] = []
-  const rem = 15 - (base.getMinutes() % 15)
-  // Toujours au moins 15min dans le futur (rem=15 quand pile sur :00/:15/:30/:45)
+  const rem = 5 - (base.getMinutes() % 5)
   const start = new Date(base.getTime() + rem * 60_000)
   start.setSeconds(0, 0)
-  for (let i = 0; i <= 72; i++) {  // 18h à 15min = 72 slots
-    const t  = new Date(start.getTime() + i * 15 * 60_000)
+  for (let i = 0; i <= 216; i++) {  // 18h à 5min = 216 slots
+    const t  = new Date(start.getTime() + i * 5 * 60_000)
     const hh = String(t.getHours()).padStart(2, '0')
     const mm = String(t.getMinutes()).padStart(2, '0')
     slots.push(`${hh}:${mm}`)
@@ -476,6 +632,13 @@ function fmtKm(r: number): string { return r < 10 ? r.toFixed(1)+' km' : Math.ro
 function isInLake(lat: number, lng: number): boolean {
   return lat < 46.513 && lat > 46.35 && lng > 6.05 && lng < 7.0
 }
+// Distance entre deux points GPS en km (formule de Haversine)
+function haversineKm(lat1:number,lng1:number,lat2:number,lng2:number):number {
+  const R=6371,d2r=Math.PI/180
+  const dLat=(lat2-lat1)*d2r, dLng=(lng2-lng1)*d2r
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLng/2)**2
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+}
 
 // Génère des positions aléatoires STABLES à l'intérieur du cercle rayon
 // anti-triangulation : positions aléatoires, pas les vraies positions membres (LPD)
@@ -635,11 +798,17 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
           const prof = profiles[si]
           let starLat = s.lat, starLng = s.lng
           if (prof) {
-            const profIdShort = (prof.id||'').slice(0,8)
-            const cfg = botCfg[profIdShort] || botCfg[prof.id]
-            if (cfg) {
-              const [fLat, fLng] = fuzzPosition(cfg.lat, cfg.lng, prof.id)
+            // Bot GPS hardcodé avec position fixe (_fixedLat/_fixedLng)
+            if ((prof as any)._fixedLat && (prof as any)._fixedLng) {
+              const [fLat, fLng] = fuzzPosition((prof as any)._fixedLat, (prof as any)._fixedLng, prof.id)
               starLat = fLat; starLng = fLng
+            } else {
+              const profIdShort = (prof.id||'').slice(0,8)
+              const cfg = botCfg[profIdShort] || botCfg[prof.id]
+              if (cfg) {
+                const [fLat, fLng] = fuzzPosition(cfg.lat, cfg.lng, prof.id)
+                starLat = fLat; starLng = fLng
+              }
             }
           }
           const color = GC[s.gender]
@@ -686,7 +855,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
               onGpsUpdate?.(loc)
             },
             () => {},
-            { timeout:8000, maximumAge:60000 }
+            { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
           )
         }
 
@@ -1076,24 +1245,53 @@ function RegisterScreen({onSuccess,onLogin,showToast}:{onSuccess:(p:Profile)=>vo
 // COMPOSANTS UI
 // ═════════════════════════════════════════════════════════════
 function Toast({msg,color,onDone}:{msg:string;color:string;onDone:()=>void}) {
-  useEffect(()=>{const t=setTimeout(onDone,3200);return()=>clearTimeout(t)},[onDone])
+  const [translateY,setTranslateY]=useState(0)
+  const [dismissed,setDismissed]=useState(false)
+  const [dragging,setDragging]=useState(false)
+  const startYRef=useRef(0)
+  useEffect(()=>{const t=setTimeout(onDone,2000);return()=>clearTimeout(t)},[onDone])
   const isSuccess = color===C.green
   const isError = color===C.red
+  const handleTouchStart=(e:React.TouchEvent)=>{
+    startYRef.current=e.touches[0].clientY
+    setDragging(true)
+  }
+  const handleTouchMove=(e:React.TouchEvent)=>{
+    const dy=startYRef.current-e.touches[0].clientY
+    if(dy>0) setTranslateY(Math.max(-120,Math.min(0,-dy)))
+  }
+  const handleTouchEnd=()=>{
+    setDragging(false)
+    if(translateY<-40){
+      setDismissed(true)
+      setTimeout(onDone,150)
+    } else {
+      setTranslateY(0)
+    }
+  }
   return (
     <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,padding:'env(safe-area-inset-top,0px) 12px 0',pointerEvents:'none'}}>
-      <div style={{
-        background: isSuccess ? `linear-gradient(135deg,rgba(20,60,30,.97),rgba(10,40,20,.97))`
-          : isError ? `linear-gradient(135deg,rgba(60,10,10,.97),rgba(40,5,5,.97))`
-          : `linear-gradient(135deg,rgba(61,26,51,.97),rgba(42,15,32,.97))`,
-        backdropFilter:'blur(20px)',
-        border:`1.5px solid ${color}55`,
-        borderRadius:16,
-        padding:'11px 16px',
-        display:'flex', alignItems:'center', gap:10,
-        boxShadow:`0 4px 24px ${color}33, 0 1px 0 ${color}22 inset`,
-        animation:'toastIn .4s cubic-bezier(.22,1,.36,1)',
-        marginTop:6,
-      }}>
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          background: isSuccess ? `linear-gradient(135deg,rgba(20,60,30,.97),rgba(10,40,20,.97))`
+            : isError ? `linear-gradient(135deg,rgba(60,10,10,.97),rgba(40,5,5,.97))`
+            : `linear-gradient(135deg,rgba(61,26,51,.97),rgba(42,15,32,.97))`,
+          backdropFilter:'blur(20px)',
+          border:`1.5px solid ${color}55`,
+          borderRadius:16,
+          padding:'11px 16px',
+          display:'flex', alignItems:'center', gap:10,
+          boxShadow:`0 4px 24px ${color}33, 0 1px 0 ${color}22 inset`,
+          animation:'toastIn .4s cubic-bezier(.22,1,.36,1)',
+          marginTop:6,
+          pointerEvents:'auto',
+          transform:`translateY(${dismissed?-120:translateY}px)`,
+          opacity: dismissed ? 0 : 1,
+          transition: dismissed ? 'all .2s ease' : dragging ? 'none' : 'transform .15s ease',
+        }}>
         <div style={{width:6,height:6,borderRadius:'50%',background:color,flexShrink:0,boxShadow:`0 0 8px ${color}`}}/>
         <span style={{fontSize:13,fontWeight:800,color:C.white,letterSpacing:'-.01em',lineHeight:1.3}}>{msg}</span>
       </div>
@@ -1124,57 +1322,117 @@ function RabbitBadge() {
   return <span title="Has ghosted before" style={{fontSize:12}}>🐰</span>
 }
 
+// ─── Système de confiance — niveaux calculés ──────────────────
+type TrustLevel = 'new' | 'reliable' | 'very_reliable' | 'exemplary'
+function getTrustLevel(p: {trust_score?:number|null; rdv_count?:number|null; gps_checkin_count?:number|null; recent_noshows?:number|null}): TrustLevel {
+  const score = p.trust_score ?? 0
+  const rdv   = p.rdv_count ?? 0
+  const gps   = p.gps_checkin_count ?? 0
+  const noshow= p.recent_noshows ?? 0
+  const bayesWeight = Math.min(1, rdv / TRUST_CONFIG.BAYES_FULL_AT)
+  const effective = Math.round(score * bayesWeight)
+  if (rdv >= TRUST_CONFIG.LEVEL_EXEMPLAIRE_MIN_RDV && effective >= TRUST_CONFIG.LEVEL_EXEMPLAIRE_MIN_SCORE && gps >= TRUST_CONFIG.LEVEL_EXEMPLAIRE_MIN_GPS && noshow === 0)
+    return 'exemplary'
+  if (rdv >= TRUST_CONFIG.LEVEL_TRESFIABLE_MIN_RDV && effective >= TRUST_CONFIG.LEVEL_TRESFIABLE_MIN_SCORE && noshow <= 1)
+    return 'very_reliable'
+  if (rdv >= TRUST_CONFIG.LEVEL_FIABLE_MIN_RDV && effective >= TRUST_CONFIG.LEVEL_FIABLE_MIN_SCORE)
+    return 'reliable'
+  return 'new'
+}
+function TrustBadge({profile, lang='fr', showCount=true}:{profile:any; lang?:Lang; showCount?:boolean}) {
+  const level = getTrustLevel(profile)
+  const rdv = profile.rdv_count ?? 0
+  const map: Record<TrustLevel,{stars:string; label:string; color:string; bg:string}> = {
+    new:          {stars:'◦',   label:lang==='en'?'New':'Nouveau',        color:'rgba(255,191,158,0.55)',  bg:'rgba(255,191,158,0.08)'},
+    reliable:     {stars:'✦',   label:lang==='en'?'Reliable':'Fiable',    color:'#4FC3F7',                 bg:'rgba(79,195,247,0.10)'},
+    very_reliable:{stars:'✦✦',  label:lang==='en'?'Very reliable':'Très fiable', color:'#2DBD7E',          bg:'rgba(45,189,126,0.10)'},
+    exemplary:    {stars:'✦✦✦', label:lang==='en'?'Exemplary':'Exemplaire',color:'#E27C00',                bg:'rgba(226,124,0,0.12)'},
+  }
+  const m = map[level]
+  const countStr = rdv >= TRUST_CONFIG.LEVEL_FIABLE_MIN_RDV ? ` · ${rdv} RDV` : ''
+  return (
+    <span style={{display:'inline-flex',alignItems:'center',gap:4,background:m.bg,border:`1px solid ${m.color}55`,borderRadius:20,padding:'2px 9px',fontSize:10,fontWeight:700,color:m.color}}>
+      {m.stars} {m.label}{showCount ? countStr : ''}
+    </span>
+  )
+}
+
 // Tab bar — uniquement en mode 'app'
 type TabBadge =
   | {type:'clutch-new'; count:number}   // nouveau clutch reçu → rouge urgent
+  | {type:'retard'}                     // retard 30min en attente de validation → rouge
   | {type:'message'; count:number}      // message non lu → bleu
   | {type:'verrou'}                     // verrou confirmé → vert pulse
   | {type:'urgent'; count:number}       // générique urgent → rose
   | {type:'activity'}                   // activité → orange dot
   | {type:'info'}                       // info → blanc dot
+  | {type:'contact-msg'; count:number}  // message contact → orange dot
+  | {type:'contact-new'}               // nouveau contact mutuel → vert pulse
   | null
-function TabBar({tab,set,lang,badges}:{tab:MainTab;set:(t:MainTab)=>void;lang:Lang;badges?:Partial<Record<MainTab,TabBadge>>}) {
+function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t:MainTab)=>void;lang:Lang;badges?:Partial<Record<MainTab,TabBadge>>;availInfo?:{isAvail:boolean;until?:string;city?:string;rayon?:number};onAvailClick?:()=>void}) {
   const t = useT(lang)
-  const tabs:[MainTab,string][]=[['presences',t('tab.presences')],['evenements',t('tab.events')],['clutchs',t('tab.clutchs')],['profil',t('tab.profil')]]
+  const tabs:[MainTab,string][]=[['presences',t('tab.presences')],['evenements',t('tab.events')],['clutchs',t('tab.clutchs')],['contacts',t('tab.contacts')],['profil',t('tab.profil')]]
+  const [showAvailTooltip,setShowAvailTooltip]=useState(false)
+  const isFr = lang!=='en'
   return (
     <>
       <style>{`
         @keyframes badgePulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}
         @keyframes badgeUrgent{0%,100%{transform:scale(1)}20%{transform:scale(1.2)}40%{transform:scale(.95)}60%{transform:scale(1.1)}80%{transform:scale(.98)}}
       `}</style>
+      {/* Tooltip disponibilité */}
+      {showAvailTooltip&&availInfo&&(
+        <div style={{position:'fixed',bottom:80,right:12,zIndex:2000,background:C.bgCard,border:`1px solid ${availInfo.isAvail?'rgba(34,197,94,.4)':C.border}`,borderRadius:16,padding:'14px 16px',minWidth:200,boxShadow:'0 8px 32px rgba(0,0,0,.5)'}}>
+          <div style={{fontSize:11,fontWeight:800,color:availInfo.isAvail?'#22C55E':C.whiteMid,marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+            <span style={{width:7,height:7,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(255,255,255,.3)',display:'inline-block',flexShrink:0}}/>
+            {availInfo.isAvail?(isFr?'Tu es visible':'You\'re visible'):(isFr?'Tu es hors ligne':'You\'re offline')}
+          </div>
+          {availInfo.isAvail&&availInfo.until&&(
+            <div style={{fontSize:12,color:C.white,marginBottom:4}}>🕐 {isFr?'Jusqu\'à':'Until'} {availInfo.until}</div>
+          )}
+          {availInfo.isAvail&&availInfo.city&&(
+            <div style={{fontSize:12,color:C.white,marginBottom:10}}>📍 {availInfo.city}</div>
+          )}
+          {!availInfo.isAvail&&<div style={{fontSize:11,color:C.whiteMid,marginBottom:10}}>{isFr?'Ouvre un créneau pour apparaître':'Open a slot to appear'}</div>}
+          <button onClick={()=>{setShowAvailTooltip(false);onAvailClick?.()}} style={{width:'100%',padding:'8px 0',borderRadius:10,background:`rgba(200,134,10,0.15)`,border:`1px solid rgba(200,134,10,0.3)`,color:C.orange,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            {isFr?'Modifier →':'Change →'}
+          </button>
+          <div onClick={()=>setShowAvailTooltip(false)} style={{position:'fixed',inset:0,zIndex:-1}}/>
+        </div>
+      )}
       <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:`${C.bg}f0`,borderTop:`1px solid ${C.border}`,backdropFilter:'blur(16px)',display:'flex',zIndex:1000}}>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
+          const isProfil = id==='profil'
           return (
-            <button key={id} onClick={()=>set(id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
+            <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
+              {/* Pastille dispo sur Profil — bouton séparé */}
+              {isProfil&&availInfo&&(
+                <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:4,right:'calc(50% - 20px)',width:12,height:12,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(255,255,255,.25)',border:`2px solid ${C.bg}`,zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
+              )}
               {/* Badge — différencié par type */}
               {badge && (()=>{
-                const base: React.CSSProperties = {position:'absolute',top:3,right:'calc(50% - 18px)',minWidth:16,height:16,borderRadius:8,border:`1.5px solid ${C.bg}`,display:'flex',alignItems:'center',justifyContent:'center',zIndex:2,padding:'0 3px'}
-                const dot: React.CSSProperties = {position:'absolute',top:5,right:'calc(50% - 16px)',width:8,height:8,borderRadius:'50%',border:`1.5px solid ${C.bg}`,zIndex:2}
-                const num = (n:number) => <span style={{fontSize:9,fontWeight:900,color:'#fff',lineHeight:1}}>{n>9?'9+':n}</span>
-                if(badge.type==='clutch-new') return (
-                  <div style={{...base,background:'#E8317A',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 10px rgba(232,49,122,.7)'}}>
-                    {num(badge.count)}
-                  </div>
+                const dot: React.CSSProperties = {position:'absolute',top:5,right:'calc(50% - 16px)',width:9,height:9,borderRadius:'50%',border:`2px solid ${C.bg}`,zIndex:2}
+                if(badge.type==='retard') return (
+                  <div style={{...dot,background:'#EF4444',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(239,68,68,.9)'}}/>
+                )
+                if(badge.type==='clutch-new'||badge.type==='urgent') return (
+                  <div style={{...dot,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
                 )
                 if(badge.type==='message') return (
-                  <div style={{...base,background:'#4A90D9',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 2px 8px rgba(74,144,217,.5)'}}>
-                    {num(badge.count)}
-                  </div>
+                  <div style={{...dot,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
                 )
                 if(badge.type==='verrou') return (
-                  <div style={{...dot,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 2px 6px rgba(34,197,94,.5)'}}/>
+                  <div style={{...dot,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 6px rgba(34,197,94,.6)'}}/>
                 )
-                if(badge.type==='urgent') return (
-                  <div style={{...base,background:'#E8317A',animation:'badgeUrgent 1.5s ease-in-out infinite',boxShadow:'0 2px 8px rgba(232,49,122,.5)'}}>
-                    {num(badge.count)}
-                  </div>
+                if(badge.type==='contact-msg') return (
+                  <div style={{...dot,background:'#FF8C00',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(255,140,0,.85)'}}/>
                 )
-                if(badge.type==='activity') return (
-                  <div style={{...dot,background:C.orange,animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 2px 6px rgba(200,134,10,.4)'}}/>
+                if(badge.type==='contact-new') return (
+                  <div style={{...dot,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 8px rgba(34,197,94,.8)'}}/>
                 )
-                return <div style={{...dot,width:8,height:8,background:'rgba(255,255,255,.5)'}}/>
+                return null
               })()}
               <TabSvg id={id} size={32} active={isActive}/>
               <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?C.salmon:'rgba(255,255,255,0.28)',letterSpacing:'.04em'}}>{label}</div>
@@ -1238,6 +1496,7 @@ const TEST_PROFILE_PREFIXES = [
   'df99921f', // Thomas TEST
   '04a65be7', // TestClutch
   '6180c714', // TestMeuf
+  'gpsbotma', // Max GPS Test (Morges)
 ]
 function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(p => id.startsWith(p)) }
 
@@ -1256,6 +1515,8 @@ const BOT_ENRICHMENT: Record<string,{
   '6180c714': { name:'Emma', photo_url:'https://randomuser.me/api/portraits/women/33.jpg', bio:'Photographe & amoureuse du Léman 📷', job:'Photographe', age:24, neighborhood:'Lausanne', interests:['Photo','Art','Randonnée','Café','Musique'], languages:['Français','Anglais'], extraPhotos:[], lastSeen:'il y a 2min', verified:true },
   'f3d1b492': { name:'Nora', photo_url:'https://randomuser.me/api/portraits/women/62.jpg', bio:'Danseuse & épicurienne 💃', job:'Chorégraphe', age:31, neighborhood:'Prilly', interests:['Danse','Gastronomie','Théâtre','Yoga','Musique'], languages:['Français','Arabe'], extraPhotos:[], lastSeen:'il y a 15min', verified:false },
   '1ceb0c71': { name:'Hugo', photo_url:'https://randomuser.me/api/portraits/men/55.jpg', bio:'Médecin & coureur du dimanche 🏃', job:'Médecin interne', age:29, neighborhood:'CHUV', interests:['Running','Médecine','Lecture','Vélo','Cuisine'], languages:['Français','Anglais'], extraPhotos:[], lastSeen:'il y a 7min', verified:false },
+  // ─── BOT GPS DE TEST — position fixe Morges Gare ─────────────
+  'gpsbotma': { name:'Max 🛰️', photo_url:'https://randomuser.me/api/portraits/men/77.jpg', bio:'Bot de test GPS — positionné à Morges Gare 📍', job:'Test Bot', age:30, neighborhood:'Morges', interests:['Test','GPS','Clutch'], languages:['Français'], extraPhotos:[], lastSeen:'à l\'instant', verified:true },
 }
 
 // ─── Réponses bots contextuelles par prénom ────────────────────
@@ -1358,95 +1619,277 @@ function enrichProfile(p: any): any {
   }
 }
 
-function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime}:{
+function SlotGoneOverlay({name, avatar, lang, onDone}:{name:string;avatar?:string;lang?:Lang;onDone:()=>void}) {
+  const isFr = lang !== 'en'
+  const msgs = isFr
+    ? ['Dommage… son créneau vient d\'expirer.','Ça arrive ! Retente quand tu la vois disponible.','Parfois l\'occasion passe vite. La prochaine sera la bonne !']
+    : ['Too bad… their slot just expired.','It happens! Try again when they\'re available.','Sometimes timing is everything. Next one\'s yours!']
+  const msg = msgs[Math.floor(Date.now()/1000)%msgs.length]
+  const firstName = name?.split(' ')[0] || (isFr?'Cette personne':'This person')
+  useEffect(()=>{ const t=setTimeout(onDone,3800); return ()=>clearTimeout(t) },[onDone])
+  return (
+    <div onClick={onDone} style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24,background:'rgba(20,5,15,0.88)',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',animation:'fadeIn .25s ease'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:360,background:'linear-gradient(160deg,#3a1828 0%,#251018 100%)',borderRadius:28,padding:'36px 28px 32px',border:`1px solid rgba(200,134,10,0.18)`,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',display:'flex',flexDirection:'column',alignItems:'center',gap:20,textAlign:'center'}}>
+        {/* Avatar avec croix */}
+        <div style={{position:'relative',width:80,height:80}}>
+          {avatar
+            ? <img src={avatar} style={{width:80,height:80,borderRadius:'50%',objectFit:'cover',opacity:0.55,filter:'grayscale(40%)'}}/>
+            : <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(255,191,158,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>👤</div>
+          }
+          <div style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid rgba(200,134,10,0.35)'}}/>
+          <div style={{position:'absolute',bottom:-4,right:-4,width:28,height:28,borderRadius:'50%',background:'#3a1828',border:`2px solid rgba(200,134,10,0.3)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>⏱</div>
+        </div>
+        {/* Message principal */}
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:'#f5e8de',marginBottom:6,lineHeight:1.3}}>
+            {isFr?`${firstName} n'est plus disponible`:`${firstName} is no longer available`}
+          </div>
+          <div style={{fontSize:13,color:'rgba(255,191,158,0.65)',lineHeight:1.5}}>{msg}</div>
+        </div>
+        {/* Barre de progression auto-close */}
+        <div style={{width:'100%',height:3,borderRadius:2,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
+          <div style={{height:'100%',borderRadius:2,background:'rgba(200,134,10,0.5)',animation:'shrink 3.8s linear forwards'}}/>
+        </div>
+        <button onClick={onDone} style={{width:'100%',padding:'13px 0',borderRadius:14,background:'rgba(200,134,10,0.12)',border:`1px solid rgba(200,134,10,0.25)`,color:'C.gold',fontSize:14,fontWeight:700,cursor:'pointer',letterSpacing:'.04em'}}>
+          {isFr?'Voir les présences →':'See who\'s available →'}
+        </button>
+      </div>
+      <style>{`@keyframes shrink{from{width:100%}to{width:0%}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}</style>
+    </div>
+  )
+}
+
+function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onTargetUnavailable,excludeWindow}:{
   from:Profile;to:Profile;onClose:()=>void;onSent:(clutchId?:string)=>void;showToast:(m:string,c?:string)=>void;
-  fromTime?:string;untilTime?:string;
+  fromTime?:string;untilTime?:string;lang?:Lang;onTargetUnavailable?:()=>void;
+  excludeWindow?:{fromHH:string;untilHH:string}; // créneaux à exclure (RDV en cours de l'envoyeur)
 }) {
+  const t = useT(lang||'fr')
   const [msg,setMsg]=useState(''); const [loading,setLoading]=useState(false)
-  // Heures : intersection fenêtre user avec plage 06h-23h30
+  const [isQuickDate,setIsQuickDate]=useState(false)
+
+  // ── Slots horaires : intersection fenêtre sender ∩ receiver, moins le RDV en cours ──
   const allSlots = useMemo(() => makeSlots(), [])
   const slots = useMemo(() => {
-    const from18 = fromTime||'18:00', until18 = untilTime||'22:00'
-    return allSlots.filter(s => s >= from18 && s <= until18).slice(0,12)
-  }, [allSlots, fromTime, untilTime])
-  const H = slots.length ? slots : allSlots.slice(0,9)
+    const sFrom  = fromTime||'00:00', sUntil = untilTime||'23:30'
+    const toFrom = (to as any).available_from ? new Date((to as any).available_from).toTimeString().slice(0,5) : '00:00'
+    const intFrom = sFrom > toFrom ? sFrom : toFrom
+    // Gestion minuit : si sUntil < sFrom, la fenêtre passe minuit (ex: 23:00–01:30)
+    const crossMidnight = sUntil < sFrom
+    const filtered = allSlots.filter(s => crossMidnight ? (s >= intFrom || s <= sUntil) : (s >= intFrom && s <= sUntil))
+    const base = filtered.length >= 2 ? filtered : allSlots.filter(s => s >= intFrom).slice(0,8)
+    // Exclure les créneaux qui tombent dans la fenêtre RDV active de l'envoyeur
+    if (!excludeWindow) return base
+    return base.filter(s => s < excludeWindow.fromHH || s > excludeWindow.untilHH)
+  }, [allSlots, fromTime, untilTime, to, excludeWindow])
+  const H = slots.length ? slots : allSlots.slice(2,10)
   const [hi,setHi]=useState(Math.min(2, H.length-1))
 
-  // Lieu : suggestions Lausanne + champ libre
-  const SUGGESTIONS=['Café Romand','Bar du Flon','Café du Grütli','Blackbird Coffee','Brasserie Lipp','Café de la Paix','Rooftop du MAD','Terrasse Ouchy']
-  const [venueInput,setVenueInput]=useState(SUGGESTIONS[0])
+  // ── Nominatim OpenStreetMap — recherche de lieux ──
+  const SUGGESTIONS=['Café Romand','Terrasse Ouchy','Pont Bessières','Parc de Milan','Place de la Riponne','Bar du Flon','Escaliers du Marché','Tour de Sauvabelin']
+  const [venueInput,setVenueInput]=useState('')
+  const [venueAddress,setVenueAddress]=useState<string|null>(null) // adresse complète sélectionnée
+  const [venueLat,setVenueLat]=useState<number|null>(null)
+  const [venueLng,setVenueLng]=useState<number|null>(null)
+  const [nominatimResults,setNominatimResults]=useState<any[]>([])
   const [showSugg,setShowSugg]=useState(false)
+  const [searchLoading,setSearchLoading]=useState(false)
+  const [venueError,setVenueError]=useState(false)
+  const nominatimTimer=useRef<ReturnType<typeof setTimeout>|null>(null)
+
+  const searchNominatim=async(q:string)=>{
+    if (q.length < 3) { setNominatimResults([]); return }
+    setSearchLoading(true)
+    try {
+      // viewbox centré Suisse romande — priorité locale, mais pas limitée (bounded=0)
+      const resp=await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1&viewbox=6.0,47.0,7.2,46.0&bounded=0`,
+        { headers:{'Accept-Language':lang==='fr'?'fr':'en','User-Agent':'Clutch/1.0 (clutch.lausanne)'} }
+      )
+      const data=await resp.json()
+      setNominatimResults(data||[])
+    } catch { setNominatimResults([]) }
+    setSearchLoading(false)
+  }
+
+  const handleVenueChange=(v:string)=>{
+    setVenueInput(v); setVenueAddress(null)
+    if (nominatimTimer.current) clearTimeout(nominatimTimer.current)
+    nominatimTimer.current=setTimeout(()=>searchNominatim(v), 600)
+    setShowSugg(true)
+  }
+
+  const selectVenue=(name:string, address?:string, lat?:number, lng?:number)=>{
+    setVenueInput(name)
+    setVenueAddress(address||null)
+    setVenueLat(lat||null)
+    setVenueLng(lng||null)
+    setNominatimResults([]); setShowSugg(false)
+  }
+
+  const formatAddress=(r:any):string=>{
+    const a=r.address||{}
+    const parts=[a.road||'', a.city||a.town||a.village||a.municipality||'', a.postcode||''].filter(Boolean)
+    return parts.join(', ')
+  }
 
   const send=async()=>{
-    if (!venueInput.trim()){showToast('Pick a venue first',C.orange);return}
+    if (!venueInput.trim()){setVenueError(true);return}
     setLoading(true)
-    // Block si verrou actif avec n'importe qui (une seule rencontre à la fois)
-    const {data:activeLock} = await supabase.from('clutches')
-      .select('id,status,receiver:profiles!clutches_receiver_id_fkey(name),sender:profiles!clutches_sender_id_fkey(name)')
+    // Bots GPS de test hardcodés — toujours disponibles, bypass Supabase
+    const isGpsBot = (to as any)._isGpsTestBot === true
+    if (!isGpsBot) {
+      // Vérifier que la cible est toujours disponible au moment d'envoyer
+      const {data:freshTarget} = await supabase.from('profiles').select('is_available,available_until').eq('id',to.id).single()
+      if (!freshTarget?.is_available || !freshTarget?.available_until || new Date(freshTarget.available_until) <= new Date()) {
+        setLoading(false)
+        onTargetUnavailable?.()
+        return
+      }
+    }
+    // Seuil temporel : un verrou est "actif" seulement si le RDV est dans les 3h à venir ou passé depuis moins de 3h
+    const activeThreshold = new Date(Date.now() - 3*3600*1000).toISOString()
+    // Block verrou actif sur MOI
+    const {data:activeLock}=await supabase.from('clutches')
+      .select('id,status,proposed_time,receiver:profiles!clutches_receiver_id_fkey(name),sender:profiles!clutches_sender_id_fkey(name)')
       .or(`sender_id.eq.${from.id},receiver_id.eq.${from.id}`)
       .in('status',['confirmed','accepted'])
+      .gt('proposed_time', activeThreshold)
       .limit(1)
-    if (activeLock && activeLock.length > 0) {
+    if (activeLock&&activeLock.length>0){
       setLoading(false)
-      const other = (activeLock[0] as any).sender?.id === from.id ? (activeLock[0] as any).receiver?.name : (activeLock[0] as any).sender?.name
-      showToast(`🔒 You already have a locked meetup${other ? ` with ${other}` : ''}`,C.orange)
+      const other=(activeLock[0]as any).sender?.name&&(activeLock[0]as any).sender_id!==from.id?(activeLock[0]as any).sender?.name:(activeLock[0]as any).receiver?.name
+      showToast(lang==='fr'?`🔒 Tu as déjà un verrou actif${other?` avec ${other}`:''}`:`🔒 You already have a locked meetup${other?` with ${other}`:''}`,C.orange)
       return
     }
-    // Block double clutch — vérifie si un clutch actif existe déjà entre ces deux personnes
-    const {data:existing} = await supabase.from('clutches')
+    // Bots GPS : skip les checks RPC (pas dans Supabase)
+    if (isGpsBot) {
+      setLoading(false)
+      const pt2=new Date(); const [h2,m2]=H[hi].split(':').map(Number); pt2.setHours(h2,m2,0,0)
+      const fakeId = `bot-${Date.now()}`
+      onSent(fakeId)
+      return
+    }
+    // Block if receiver already has a confirmed Clutch with anyone — RPC SECURITY DEFINER pour contourner RLS
+    const {data:recLocked}=await supabase.rpc('has_active_lock',{p_user_id:to.id})
+    if (recLocked){
+      setLoading(false)
+      const first=to.name?.split(' ')[0]||'Cette personne'
+      showToast(lang==='fr'?`🔒 ${first} a déjà un RDV actif`:`🔒 ${first} already has an active meetup`,C.orange)
+      return
+    }
+    // Block double clutch with same person
+    const {data:existing}=await supabase.from('clutches')
       .select('id,status')
       .or(`and(sender_id.eq.${from.id},receiver_id.eq.${to.id}),and(sender_id.eq.${to.id},receiver_id.eq.${from.id})`)
-      .in('status',['pending','confirmed','accepted'])
-      .limit(1)
-    if (existing && existing.length > 0) {
+      .in('status',['pending','confirmed','accepted']).limit(1)
+    if (existing&&existing.length>0){
       setLoading(false)
-      showToast(`Already a Clutch with ${to.name?.split(' ')[0]||'them'}`,C.orange)
+      showToast(lang==='fr'?`Un Clutch existe déjà avec ${to.name?.split(' ')[0]||'cette personne'}`:`Already a Clutch with ${to.name?.split(' ')[0]||'them'}`,C.orange)
+      return
+    }
+    // Limite simultanéité : femmes = 20, hommes free = 3, premium = 5
+    const senderGender = (from as any).gender
+    const senderPlan   = (from as any).account_type || 'free'
+    const maxSimult    = senderGender === 'F' ? 20 : senderPlan === 'premium' ? 5 : 3
+    const {data:activeSent}=await supabase.from('clutches')
+      .select('id')
+      .eq('sender_id', from.id)
+      .in('status',['pending','confirmed','accepted'])
+    const activeCount = activeSent?.length ?? 0
+    if (activeCount >= maxSimult) {
+      setLoading(false)
+      const msg = lang==='fr'
+        ? `Tu as déjà ${maxSimult} Clutch${maxSimult>1?'s':''} actifs simultanés${senderGender!=='F'&&senderPlan==='free'?' (passe Premium pour en avoir 5)':''}`
+        : `You already have ${maxSimult} active Clutch${maxSimult>1?'es':''}${senderGender!=='F'&&senderPlan==='free'?' (upgrade to Premium for 5)':''}`
+      showToast(msg, C.orange)
       return
     }
     const pt=new Date(); const [h,m]=H[hi].split(':').map(Number); pt.setHours(h,m,0,0)
-    const{data:inserted,error}=await supabase.from('clutches').insert({
+    const venueLabel=venueAddress?`${venueInput.trim()} · ${venueAddress}`:venueInput.trim()
+    const {data:inserted,error}=await supabase.from('clutches').insert({
       sender_id:from.id, receiver_id:to.id,
-      venue:venueInput.trim(),
+      venue:venueLabel,
+      venue_lat:venueLat||null,
+      venue_lng:venueLng||null,
       venue_safety:'neutral',
-      message:msg||`Dispo pour ${venueInput.trim()} à ${H[hi]} ?`,
+      message:msg||(lang==='fr'?`Dispo pour ${venueInput.trim()} à ${H[hi]} ?`:`Free for ${venueInput.trim()} at ${H[hi]}?`),
       proposed_time:pt.toISOString(),
       expires_at:new Date(Date.now()+2*3600*1000).toISOString(),
-      status:'pending'
+      status:'pending',
+      is_quick_date:isQuickDate,
+      duration_minutes:isQuickDate?60:null
     }).select('id').single()
     setLoading(false)
-    if(error){showToast("Erreur: "+error.message,C.red);return}
+    if(error){showToast('Erreur: '+error.message,C.red);return}
     onSent(inserted?.id)
   }
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:2000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}} onClick={onClose}/>
-      <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 36px',animation:'modalIn .4s cubic-bezier(.22,1,.36,1)',maxHeight:'82vh',overflowY:'auto'}}>
+      <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 36px',animation:'modalIn .4s cubic-bezier(.22,1,.36,1)',maxHeight:'88vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-          <div style={{fontSize:16,fontWeight:900}}>✦ Send a Clutch</div>
+          <div style={{fontSize:16,fontWeight:900}}>{t('modal.send')}</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer'}}>✕</button>
         </div>
 
         {/* Profil cible */}
         <div style={{display:'flex',gap:10,alignItems:'center',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:14}}>
           <Av src={to.photo_url} name={to.name||'?'} size={38}/>
-          <div><div style={{fontSize:14,fontWeight:800}}>{to.name}</div>{to.bio&&<div style={{fontSize:11,color:C.whiteMid}}>{to.bio.slice(0,55)}</div>}</div>
+          <div>
+            <div style={{fontSize:14,fontWeight:800}}>{to.name}</div>
+            {(to as any).available_from&&(to as any).available_until&&(
+              <div style={{fontSize:10,color:C.salmon}}>
+                ⏱ {new Date((to as any).available_from).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}–{new Date((to as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Lieu — champ libre + suggestions */}
+        {/* ── LIEU avec Nominatim ── */}
         <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Venue</div>
+          <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>
+            {t('modal.venue')} {searchLoading&&<span style={{opacity:.5}}>🔍</span>}
+          </div>
           <input
             value={venueInput}
-            onChange={e=>{setVenueInput(e.target.value);setShowSugg(true)}}
+            onChange={e=>{handleVenueChange(e.target.value);setVenueError(false)}}
             onFocus={()=>setShowSugg(true)}
-            placeholder="Café Romand, Bar du Flon…"
-            style={{width:'100%',background:C.whiteFaint,border:`1.5px solid ${C.borderStrong}`,borderRadius:12,padding:'10px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}
+            placeholder={lang==='fr'?'Tape un lieu (adresse, café, parc…)':'Type a venue (address, café, park…)'}
+            style={{width:'100%',background:C.whiteFaint,border:`1.5px solid ${venueError?C.orange:venueAddress?C.orange:C.borderStrong}`,borderRadius:12,padding:'10px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}
           />
-          {showSugg && (
+          {venueError&&(
+            <div style={{fontSize:11,color:C.orange,marginTop:5,paddingLeft:4,fontWeight:700,display:'flex',alignItems:'center',gap:4}}>
+              ⚠ {lang==='en'?'Please enter a venue before sending':'Indique un lieu avant d\'envoyer'}
+            </div>
+          )}
+          {venueAddress&&(
+            <div style={{fontSize:10,color:C.orange,marginTop:4,paddingLeft:4}}>
+              📍 {venueAddress}
+            </div>
+          )}
+          {/* Résultats Nominatim */}
+          {showSugg&&nominatimResults.length>0&&(
+            <div style={{marginTop:6,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+              {nominatimResults.map((r:any,i:number)=>{
+                const name=r.name||r.display_name.split(',')[0]
+                const addr=formatAddress(r)
+                return (
+                  <div key={i} onClick={()=>selectVenue(name,addr,parseFloat(r.lat),parseFloat(r.lon))}
+                    style={{padding:'10px 14px',borderBottom:i<nominatimResults.length-1?`1px solid ${C.border}`:'none',cursor:'pointer',display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.white}}>{name}</div>
+                    {addr&&<div style={{fontSize:10,color:C.whiteMid}}>📍 {addr}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {/* Suggestions rapides si pas de résultat Nominatim */}
+          {showSugg&&nominatimResults.length===0&&(
             <div style={{marginTop:6,display:'flex',gap:5,flexWrap:'wrap'}}>
-              {SUGGESTIONS.filter(s=>!venueInput||s.toLowerCase().includes(venueInput.toLowerCase())).map(s=>(
-                <button key={s} onClick={()=>{setVenueInput(s);setShowSugg(false)}} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:venueInput===s?C.salmonFaint:C.whiteFaint,color:venueInput===s?C.salmon:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
+              {SUGGESTIONS.filter(s=>!venueInput||s.toLowerCase().includes(venueInput.toLowerCase())).slice(0,5).map(s=>(
+                <button key={s} onClick={()=>selectVenue(s)} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:venueInput===s?C.salmonFaint:C.whiteFaint,color:venueInput===s?C.salmon:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
                   {s}
                 </button>
               ))}
@@ -1454,15 +1897,39 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime}:{
           )}
         </div>
 
-        {/* Heure — intersection des deux fenêtres */}
+        {/* ── HEURE — intersection des deux fenêtres ── */}
         <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Time</div>
+          <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>
+            {lang==='fr'?'Heure du RDV':'Meeting time'}
+          </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {H.map((h,i)=><button key={h} onClick={()=>setHi(i)} style={{padding:'6px 11px',borderRadius:10,border:`1.5px solid ${hi===i?C.salmon:C.border}`,background:hi===i?C.salmonFaint:C.whiteFaint,color:hi===i?C.salmon:C.whiteMid,fontSize:12,fontWeight:hi===i?800:500,cursor:'pointer',fontFamily:'inherit'}}>{h}</button>)}
+            {H.map((h,i)=>(
+              <button key={h} onClick={()=>setHi(i)}
+                style={{padding:'8px 13px',borderRadius:10,border:`1.5px solid ${hi===i?C.orange:C.border}`,background:hi===i?`${C.orange}22`:C.whiteFaint,color:hi===i?C.orange:C.whiteMid,fontSize:13,fontWeight:hi===i?800:500,cursor:'pointer',fontFamily:'inherit'}}>
+                {h}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Message */}
+        {/* ── QUICK DATE ── */}
+        <div style={{marginBottom:14}}>
+          <button onClick={()=>setIsQuickDate(q=>!q)}
+            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',borderRadius:12,border:`1.5px solid ${isQuickDate?C.orange:C.border}`,background:isQuickDate?`${C.orange}18`:C.whiteFaint,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:18}}>⚡</span>
+              <div style={{textAlign:'left'}}>
+                <div style={{fontSize:13,fontWeight:800,color:isQuickDate?C.orange:C.white}}>Quick Date · 1h</div>
+                <div style={{fontSize:11,color:C.whiteMid}}>On se retrouve, on voit si ça clique — libre après 1h</div>
+              </div>
+            </div>
+            <div style={{width:22,height:22,borderRadius:11,border:`2px solid ${isQuickDate?C.orange:C.border}`,background:isQuickDate?C.orange:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+              {isQuickDate&&<span style={{color:'#000',fontSize:13,fontWeight:900}}>✓</span>}
+            </div>
+          </button>
+        </div>
+
+        {/* ── MESSAGE ── */}
         <div style={{marginBottom:18}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase'}}>Message</div>
@@ -1471,14 +1938,25 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime}:{
           <textarea
             value={msg}
             onChange={e=>setMsg(e.target.value.slice(0,300))}
-            placeholder={`Free for ${venueInput||'…'} at ${H[hi]}?`}
-            style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',height:68,caretColor:C.salmon}}
+            placeholder={lang==='fr'?`Dispo pour ${venueInput||'…'} à ${H[hi]} ?`:`Free for ${venueInput||'…'} at ${H[hi]}?`}
+            style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',height:72,caretColor:C.salmon,boxSizing:'border-box'}}
           />
         </div>
 
-        <Btn loading={loading} onClick={send}>✦ Send Clutch → {H[hi]}</Btn>
+        {/* Alerte lieu manquant — visible juste au-dessus du bouton Envoyer */}
+        {venueError && (
+          <div style={{background:'rgba(226,124,0,.12)',border:'1.5px solid rgba(226,124,0,.5)',borderRadius:12,padding:'10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:18}}>📍</span>
+            <span style={{fontSize:13,fontWeight:700,color:C.orange}}>
+              {lang==='en' ? 'Add a venue before sending' : 'Ajoute un lieu de rendez-vous avant d\'envoyer'}
+            </span>
+          </div>
+        )}
+        <Btn loading={loading} onClick={send}>{t('modal.sendBtn')} → {H[hi]}</Btn>
         <div style={{textAlign:'center',marginTop:10,fontSize:11,color:C.whiteMid}}>
-          {to.name} has <strong style={{color:C.salmon}}>2h to reply</strong> · Meetup within <strong style={{color:C.salmon}}>18h max</strong>
+          {lang==='fr'
+            ?<>{to.name} a <strong style={{color:C.salmon}}>2h pour répondre</strong> · RDV dans <strong style={{color:C.salmon}}>18h max</strong></>
+            :<>{to.name} has <strong style={{color:C.salmon}}>2h to reply</strong> · Meetup within <strong style={{color:C.salmon}}>18h max</strong></>}
         </div>
       </div>
     </div>
@@ -1603,10 +2081,18 @@ function VerrouExplosion({ onDone, verrou }:{ onDone:()=>void; verrou?:{venue?:s
 // "CLU" vient de la gauche, "TCH" de la droite → SLAM au centre
 // L'app s'estompe derrière. Boutons Accepter / Décliner.
 // ═════════════════════════════════════════════════════════════
-function ClutchIncoming({ clutch, onAccept, onDecline, onLater }:{
-  clutch:any; onAccept:()=>void; onDecline:()=>void; onLater?:()=>void
+function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:inLang }:{
+  clutch:any; onAccept:()=>void; onDecline:()=>void; onLater?:()=>void; onCounter?:(venue:string,time:string)=>void; lang?:Lang
 }) {
+  const isFr = inLang !== 'en'
   const [ph, setPh] = useState(0)
+  const [showCounter, setShowCounter] = useState(false)
+  const [counterVenue, setCounterVenue] = useState('')
+  const [counterTime, setCounterTime] = useState('')
+  const counterSlots = Array.from({length:12},(_,i)=>{
+    const d = new Date(Date.now()+(i+1)*30*60*1000)
+    return { label:d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}), iso:d.toISOString() }
+  })
   useEffect(()=>{
     if ('vibrate' in navigator) navigator.vibrate([150,80,150,80,300])
     const t1 = setTimeout(()=>setPh(1), 80)
@@ -1653,7 +2139,7 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater }:{
 
       {/* Sous-titre */}
       {ph>=1&&<div style={{fontSize:13,color:C.whiteMid,fontWeight:600,marginBottom:24,animation:'ciSub .5s ease .7s both'}}>
-        Someone wants to meet you
+        {isFr ? 'Quelqu\'un veut te rencontrer' : 'Someone wants to meet you'}
       </div>}
 
       {/* Profil sender */}
@@ -1663,10 +2149,15 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater }:{
             {sender.photo_url ? <img src={sender.photo_url} style={{width:'100%',height:'100%',borderRadius:12,objectFit:'cover'}}/> : <GenderSvg gk={gk} size={24}/>}
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:900,color:C.white,display:'flex',alignItems:'center',gap:6}}>{sender.name||'Someone'} <GenderSvg gk={gk} size={14}/></div>
+            <div style={{fontSize:15,fontWeight:900,color:C.white,display:'flex',alignItems:'center',gap:6}}>
+              {sender.name||'Someone'}
+              {sender.age&&<span style={{fontSize:12,fontWeight:500,color:C.whiteMid}}>{sender.age} {isFr?'ans':'yo'}</span>}
+              <GenderSvg gk={gk} size={14}/>
+            </div>
+            {sender.bio&&<div style={{fontSize:11,color:C.whiteMid,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sender.bio}</div>}
             {clutch.venue&&<div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>📍 {clutch.venue}</div>}
             {clutch.proposed_time&&<div style={{fontSize:11,color:C.orange,marginTop:1}}>🕐 {new Date(clutch.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</div>}
-            {clutch.message&&<div style={{fontSize:11,color:C.whiteMid,marginTop:3,fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>"{clutch.message}"</div>}
+            {clutch.message&&<div style={{fontSize:11,color:C.salmon,marginTop:3,fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>"{clutch.message}"</div>}
           </div>
         </div>
       )}
@@ -1674,22 +2165,56 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater }:{
       {/* Boutons */}
       {ph>=2 && (
         <div style={{display:'flex',flexDirection:'column',gap:8,width:'min(320px,90vw)',animation:'ciBtns .5s cubic-bezier(.22,1,.36,1) .1s both'}}>
-          <div style={{display:'flex',gap:12}}>
-            <button onClick={onDecline} style={{flex:1,padding:'14px',background:'rgba(239,68,68,.12)',border:'1.5px solid rgba(239,68,68,.35)',borderRadius:16,color:C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-              ✕ Decline
-            </button>
-            <button onClick={onAccept} style={{flex:2,padding:'14px',background:`linear-gradient(135deg,${C.green},#1a9660)`,border:'none',borderRadius:16,color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 4px 20px ${C.green}44`,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-              <img src="/icons/LOCK.svg" width={18} height={18} alt="" style={{filter:'brightness(0) invert(1)',flexShrink:0}}/> Lock in
-            </button>
-          </div>
-          <button onClick={()=>{ if(onLater) onLater() }} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:16,color:C.whiteMid,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            ⏸ Set aside · I'll reply later
-          </button>
+          {!showCounter ? (<>
+            <div style={{display:'flex',gap:12}}>
+              <button onClick={onDecline} style={{flex:1,padding:'14px',background:'rgba(239,68,68,.12)',border:'1.5px solid rgba(239,68,68,.35)',borderRadius:16,color:C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                ✕ {isFr?'Refuser':'Decline'}
+              </button>
+              <button onClick={onAccept} style={{flex:2,padding:'14px',background:`linear-gradient(135deg,${C.green},#1a9660)`,border:'none',borderRadius:16,color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 4px 20px ${C.green}44`,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <img src="/icons/LOCK.svg" width={18} height={18} alt="" style={{filter:'brightness(0) invert(1)',flexShrink:0}}/> {isFr?'Verrouiller 🔒':'Lock in 🔒'}
+              </button>
+            </div>
+            {onCounter && (
+              <button onClick={()=>setShowCounter(true)} style={{width:'100%',padding:'11px',background:'rgba(200,134,10,.1)',border:'1.5px solid rgba(200,134,10,.33)',borderRadius:14,color:"C.gold",fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                ↩ {isFr?'Contre-clutch…':'Counter-clutch…'}
+              </button>
+            )}
+          </>) : (
+            <div style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(200,134,10,.27)',borderRadius:16,padding:16,display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{fontSize:13,fontWeight:800,color:"C.gold",marginBottom:2}}>{isFr?'Ton contre-Clutch':'Your counter-Clutch'}</div>
+              <input
+                value={counterVenue}
+                onChange={e=>setCounterVenue(e.target.value)}
+                placeholder={isFr?'Lieu (ex: Café du Grütli)':'Venue (e.g. Café du Grütli)'}
+                style={{padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.07)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',width:'100%',boxSizing:'border-box'}}
+              />
+              <select
+                value={counterTime}
+                onChange={e=>setCounterTime(e.target.value)}
+                style={{padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'#2a1020',color:counterTime?C.white:C.whiteMid,fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'}}
+              >
+                <option value="">{isFr?'Choisir une heure…':'Pick a time…'}</option>
+                {counterSlots.map(s=><option key={s.iso} value={s.iso}>{s.label}</option>)}
+              </select>
+              <div style={{display:'flex',gap:8,marginTop:2}}>
+                <button onClick={()=>setShowCounter(false)} style={{flex:1,padding:'10px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>
+                  ← {isFr?'Retour':'Back'}
+                </button>
+                <button
+                  onClick={()=>{ if(counterVenue.trim()&&counterTime) onCounter?.(counterVenue.trim(),counterTime) }}
+                  disabled={!counterVenue.trim()||!counterTime}
+                  style={{flex:2,padding:'10px',background:counterVenue.trim()&&counterTime?`linear-gradient(135deg,C.gold,#a06800)`:'rgba(255,255,255,.1)',border:'none',borderRadius:10,color:counterVenue.trim()&&counterTime?'#fff':C.whiteMid,fontSize:13,fontWeight:800,cursor:counterVenue.trim()&&counterTime?'pointer':'default',fontFamily:'inherit'}}
+                >
+                  ⚡ {isFr?'Envoyer':'Send'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <div style={{position:'absolute',bottom:40,fontSize:10,color:'rgba(255,255,255,.2)'}}>
-        You have 2h to reply
+        {isFr?'Tu as 2h pour répondre':'You have 2h to reply'}
       </div>
     </div>
   )
@@ -2050,6 +2575,7 @@ const MOCK_EVENTS = [
 // mais à documenter dans CGU. Pas de filtrage automatique = utilisateur choisit.
 const EV_FILTERS = [
   {id:'all',      trKey:'ev.filter.all',      icon:'✦'},
+  {id:'groupe',   trKey:'ev.filter.groupe',   icon:'👥'},
   {id:'soir',     trKey:'ev.filter.soir',     icon:'🌙'},
   {id:'demain',   trKey:'ev.filter.demain',   icon:'☀️'},
   {id:'sport',    trKey:'ev.filter.sport',    icon:'🏃'},
@@ -2061,6 +2587,61 @@ const EV_FILTERS = [
   {id:'evF',      trKey:'ev.filter.evF',      icon:'♀'},
   {id:'evX',      trKey:'ev.filter.evX',      icon:'◇'},
 ]
+
+// Events de groupe créés par des utilisateurs (bots de démo + futurs events réels)
+const GROUP_EVENTS_DEMO = [
+  {
+    id:'g1', emoji:'🍷', title:'Apéro découverte — inconnus bienvenus',
+    creator:'Sophie M.', creatorBio:'Organisatrice d\'apéros depuis 3 ans. Je crois aux rencontres improbables.', creatorPhoto:null,
+    date:'Ce soir', time:'19h00', lieu:'Bar du Marché, Place de la Palud, Lausanne',
+    spots:8, taken:3, price:'Chacun paye sa conso', description:'Un apéro entre gens qui ne se connaissent pas. Pas de pression, juste un verre et des conversations. Venez comme vous êtes.',
+    tags:['groupe','gastro'], isGroupe:true, evGender:'X', certified:false,
+    eventPhotos:['linear-gradient(135deg,#7B2D5E,#3D1A33)'], eventPhotoEmojis:['🍷'],
+  },
+  {
+    id:'g2', emoji:'♟️', title:'Partie d\'échecs — tous niveaux',
+    creator:'Marcus T.', creatorBio:'Joueur d\'échecs amateur. Batteur de jazz à mes heures.', creatorPhoto:null,
+    date:'Ce soir', time:'20h30', lieu:'Café Romand, Place Saint-François, Lausanne',
+    spots:6, taken:1, price:'Gratuit', description:'Une partie d\'échecs sympa au café. Débutants acceptés, je vous explique si besoin. On est là pour s\'amuser, pas pour gagner.',
+    tags:['groupe','culture'], isGroupe:true, evGender:'X', certified:false,
+    eventPhotos:['linear-gradient(135deg,#1a3a5c,#0d1f33)'], eventPhotoEmojis:['♟️'],
+  },
+  {
+    id:'g3', emoji:'🏃', title:'Run matinal — 5km bord du lac',
+    creator:'Léa K.', creatorBio:'Coach running, végane. Aucun coureur laissé derrière.', creatorPhoto:null,
+    date:'Demain', time:'07h00', lieu:'Quai d\'Ouchy, Lausanne (fontaine)',
+    spots:10, taken:4, price:'Gratuit', description:'Petit run tranquille de 5km le long du lac. Rythme conversationnel — on parle autant qu\'on court. Café offert après si on est courageux.',
+    tags:['groupe','sport'], isGroupe:true, evGender:'X', certified:false,
+    eventPhotos:['linear-gradient(135deg,#1a4d2e,#0d2618)'], eventPhotoEmojis:['🏃'],
+  },
+  {
+    id:'g4', emoji:'💻', title:'Coworking spontané — 2h focus',
+    creator:'Adrien B.', creatorBio:'Freelance UX. Je travaille mieux entouré de gens qui bossent.', creatorPhoto:null,
+    date:'Demain', time:'14h00', lieu:'BCV Innovation Hub, Lausanne',
+    spots:5, taken:2, price:'Gratuit', description:'2h de travail en silence companionnable. Chacun bosse sur son truc. Pas de présentation, pas de networking forcé. Juste de la bonne énergie collective.',
+    tags:['groupe','culture'], isGroupe:true, evGender:'X', certified:false,
+    eventPhotos:['linear-gradient(135deg,#2d1a4d,#180d33)'], eventPhotoEmojis:['💻'],
+  },
+  {
+    id:'g5', emoji:'🎬', title:'Ciné en plein air — film surprise',
+    creator:'Emma R.', creatorBio:'Cinéphile et organisatrice d\'événements culturels à Lausanne.', creatorPhoto:null,
+    date:'Ce soir', time:'21h00', lieu:'Parc de Milan, Lausanne',
+    spots:20, taken:7, price:'3 CHF (chaise incluse)', description:'Un film projeté en plein air, film annoncé sur place. Apportez un plaid. L\'ambiance compte plus que le film.',
+    tags:['groupe','culture','musique'], isGroupe:true, evGender:'X', certified:false,
+    eventPhotos:['linear-gradient(135deg,#1a1a3d,#0d0d26)'], eventPhotoEmojis:['🎬'],
+  },
+  // ─── Event de test : Max GPS Bot — Casino de Morges ───────────
+  {
+    id:'gGPS', emoji:'🎰', title:'Apéro test — Casino de Morges (BOT)',
+    creator:'Max 🛰️', creatorBio:'Bot GPS de test. Envoyez-moi un Clutch pour tester le flow RDV à Morges !', creatorPhoto:'https://randomuser.me/api/portraits/men/77.jpg',
+    date:'Ce soir', time:'19h30', lieu:'Casino de Morges — Grande salle',
+    spots:10, taken:1, price:'Gratuit (test)', description:'Event créé par le bot GPS de test. Lieu : Casino de Morges. Pour tester le flow Clutch → RDV → J\'y suis depuis Lausanne ou Morges.',
+    tags:['groupe','test','gps'], isGroupe:true, evGender:'X', certified:false, _isBotEvent:true,
+    eventPhotos:['linear-gradient(135deg,#C8860A,#7A4500)'], eventPhotoEmojis:['🎰'],
+  },
+]
+
+const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','🎬','🎨','🌿','🎲','🚴','🍺','💻','🌙','🎵','🧆','🏊','⛰️']
 
 function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile }:{
   onClutch:(p:Profile)=>void;
@@ -2084,7 +2665,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       })
   }, [])
 
-  const events = dbEvents.length > 0 ? dbEvents.map(e => ({
+  const partnerEvents = dbEvents.length > 0 ? dbEvents.map(e => ({
     id: e.id,
     emoji: e.emoji || '🎉',
     title: e.title,
@@ -2105,7 +2686,59 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     eventPhotos: e.event_photos || [],
     eventPhotoEmojis: e.event_photo_emojis || [],
     reviews: [],
-  })) : MOCK_EVENTS  // fallback sur les mocks si DB vide
+  })) : MOCK_EVENTS
+
+  // Events de groupe : démo bots + events créés par l'user dans cette session
+  const [userGroupEvents, setUserGroupEvents] = useState<any[]>(GROUP_EVENTS_DEMO)
+  const [groupJoined, setGroupJoined] = useState<Set<string>>(new Set())
+
+  // Fusion : partenaires + groupe
+  const events = [...partnerEvents, ...userGroupEvents]
+
+  // Création event groupe
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [newEvEmoji, setNewEvEmoji] = useState('🍷')
+  const [newEvTitle, setNewEvTitle] = useState('')
+  const [newEvLieu, setNewEvLieu] = useState('')
+  const [newEvTime, setNewEvTime] = useState('')
+  const [newEvMax, setNewEvMax] = useState(8)
+  const [newEvDesc, setNewEvDesc] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+
+  const createGroupEvent = async () => {
+    if (!newEvTitle.trim() || !newEvLieu.trim() || !newEvTime.trim()) return
+    setCreating(true)
+    await new Promise(r => setTimeout(r, 700))
+    const newEv = {
+      id: `g-user-${Date.now()}`,
+      emoji: newEvEmoji,
+      title: newEvTitle.trim(),
+      creator: 'Toi',
+      creatorBio: 'Organisateur·ice de cet événement',
+      creatorPhoto: null,
+      certified: false,
+      date: 'Ce soir',
+      time: newEvTime.trim(),
+      lieu: newEvLieu.trim(),
+      spots: newEvMax,
+      taken: 1,
+      price: 'Gratuit',
+      bring: null,
+      description: newEvDesc.trim() || 'Événement créé sur Clutch.',
+      tags: ['groupe'],
+      evGender: 'X',
+      isGroupe: true,
+      eventPhotos: [`linear-gradient(135deg,#542A44,#2a1020)`],
+      eventPhotoEmojis: [newEvEmoji],
+      reviews: [],
+    }
+    setUserGroupEvents(prev => [newEv, ...prev])
+    setGroupJoined(prev => new Set([...prev, newEv.id]))
+    setCreating(false)
+    setShowCreateGroup(false)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(8)
+  }
 
   const [selEv, setSelEv] = useState<any|null>(()=>
     initialEventId ? MOCK_EVENTS.find(e=>e.id===initialEventId)||null : null
@@ -2126,6 +2759,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   const filteredEvs = events.filter(ev => {
     if (evFilter==='all') return true
+    if (evFilter==='groupe') return !!(ev as any).isGroupe
     if (evFilter==='soir') return ev.date === 'Ce soir'
     if (evFilter==='demain') return ev.date.toLowerCase().includes('demain')
     if (evFilter==='sport') return ev.tags.includes('sport') || ev.tags.includes('running') || ev.tags.includes('escalade') || ev.tags.includes('vélo')
@@ -2151,16 +2785,41 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   return (
     <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'52px 16px 10px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-        <div style={{fontSize:19,fontWeight:900,marginBottom:8}}>Events</div>
-        {/* Filtres */}
+      <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:6}}>{t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
+          <button onClick={()=>setShowCreateGroup(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',borderRadius:20,background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+            <span style={{fontSize:14,lineHeight:1}}>+</span> Créer un groupe
+          </button>
+        </div>
+        {/* Filtres avec compteurs dynamiques */}
         <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',paddingBottom:8,padding:'0 0 8px'}}>
-          {EV_FILTERS.map(f=>(
-            <button key={f.id} onClick={()=>setEvFilter(f.id)}
-              style={{padding:'5px 12px',borderRadius:20,border:`1px solid ${evFilter===f.id?C.orange:C.border}`,background:evFilter===f.id?C.orangeFaint:'transparent',color:evFilter===f.id?C.orange:C.whiteMid,fontSize:11,fontWeight:evFilter===f.id?800:500,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',flexShrink:0}}>
-              {f.icon} {t(f.trKey)}
-            </button>
-          ))}
+          {EV_FILTERS.map(f=>{
+            const countForFilter = (fid:string) => {
+              if (fid==='all') return events.length
+              if (fid==='groupe') return events.filter(ev=>(ev as any).isGroupe).length
+              if (fid==='soir') return events.filter(ev=>ev.date==='Ce soir').length
+              if (fid==='demain') return events.filter(ev=>ev.date.toLowerCase().includes('demain')).length
+              if (fid==='sport') return events.filter(ev=>ev.tags.includes('sport')||ev.tags.includes('running')||ev.tags.includes('escalade')||ev.tags.includes('vélo')).length
+              if (fid==='bienetre') return events.filter(ev=>ev.tags.includes('bien-être')||ev.tags.includes('yoga')||ev.tags.includes('méditation')).length
+              if (fid==='culture') return events.filter(ev=>ev.tags.includes('culture')||ev.tags.includes('art')||ev.tags.includes('théâtre')||ev.tags.includes('lecture')).length
+              if (fid==='gastro') return events.filter(ev=>ev.tags.includes('gastronomie')||ev.tags.includes('cuisine')||ev.tags.includes('brunch')).length
+              if (fid==='musique') return events.filter(ev=>ev.tags.includes('musique')||ev.tags.includes('jazz')||ev.tags.includes('indie')).length
+              if (fid==='parents') return events.filter(ev=>(ev as any).isParents===true).length
+              if (fid==='evF') return events.filter(ev=>(ev as any).evGender==='F').length
+              if (fid==='evX') return events.filter(ev=>(ev as any).evGender==='X').length
+              return 0
+            }
+            const cnt = countForFilter(f.id)
+            const inactive = f.id !== 'all' && cnt === 0
+            return (
+              <button key={f.id} onClick={()=>!inactive&&setEvFilter(f.id)}
+                style={{padding:'5px 10px',borderRadius:20,border:`1px solid ${evFilter===f.id?C.orange:inactive?`${C.border}44`:C.border}`,background:evFilter===f.id?C.orangeFaint:'transparent',color:evFilter===f.id?C.orange:inactive?`${C.whiteMid}44`:C.whiteMid,fontSize:11,fontWeight:evFilter===f.id?800:500,cursor:inactive?'default':'pointer',fontFamily:'inherit',whiteSpace:'nowrap',flexShrink:0,display:'flex',alignItems:'center',gap:4}}>
+                <span>{f.icon} {t(f.trKey)}</span>
+                {cnt > 0 && <span style={{background:evFilter===f.id?C.orange:`${C.whiteMid}30`,color:evFilter===f.id?'#fff':C.whiteMid,borderRadius:10,padding:'0 5px',fontSize:9,fontWeight:900,minWidth:14,textAlign:'center'}}>{cnt}</span>}
+              </button>
+            )
+          })}
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
@@ -2178,13 +2837,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
                   <span style={{fontSize:13,fontWeight:800}}>{ev.title}</span>
                   {ev.certified&&<span style={{fontSize:9,background:C.orangeFaint,color:C.orange,border:`1px solid ${C.orange}44`,borderRadius:6,padding:'1px 5px',fontWeight:800,flexShrink:0}}>✓ CERTIFIED</span>}
+                  {(ev as any).isGroupe&&<span style={{fontSize:9,background:'rgba(96,165,250,0.15)',color:'#60a5fa',border:'1px solid rgba(96,165,250,0.3)',borderRadius:6,padding:'1px 5px',fontWeight:800,flexShrink:0}}>👥 GROUPE</span>}
                 </div>
                 <div style={{fontSize:11,color:C.whiteMid,display:'flex',alignItems:'center',gap:3,flexWrap:'wrap'}}>
                   {(ev as any).creatorPhoto && <img src={(ev as any).creatorPhoto} alt="" style={{width:16,height:16,borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>}
                   <span>{t('ev.by')} <strong style={{color:C.salmon}}>{ev.creator}</strong> · {ev.time} · {(ev.lieu||'').split(',')[0]}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                  <div style={{fontSize:11,color:ev.taken/ev.spots>.8?C.orange:C.whiteMid}}>{ev.taken}/{ev.spots} registered</div>
+                  <div style={{fontSize:11,color:ev.taken/ev.spots>.8?C.orange:C.whiteMid}}>{ev.taken}/{ev.spots} {lang==='en'?'registered':'inscrit·es'}</div>
                   <div style={{flex:1,height:3,borderRadius:2,background:`${C.whiteFaint}`,overflow:'hidden'}}>
                     <div style={{height:'100%',width:`${ev.taken/ev.spots*100}%`,background:ev.taken/ev.spots>.8?C.orange:C.green,borderRadius:2}}/>
                   </div>
@@ -2382,16 +3042,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                         const labels=['None','Minor','Significant','Severe']
                         return (
                           <>
-                            <div style={{fontSize:13,color:C.white,fontWeight:800,marginBottom:6}}>Unregister from "{selEv.title}"?</div>
+                            <div style={{fontSize:13,color:C.white,fontWeight:800,marginBottom:6}}>{lang==='en'?`Unregister from "${selEv.title}"?`:`Se désinscrire de "${selEv.title}" ?`}</div>
                             {/* Thermomètre */}
                             <div style={{marginBottom:10}}>
-                              <div style={{fontSize:10,color:C.whiteMid,marginBottom:4}}>Penalty level</div>
+                              <div style={{fontSize:10,color:C.whiteMid,marginBottom:4}}>{lang==='en'?'Penalty level':'Niveau de pénalité'}</div>
                               <div style={{display:'flex',gap:3,marginBottom:3}}>
                                 {[0,1,2,3].map(i=>(
                                   <div key={i} style={{flex:1,height:8,borderRadius:4,background:i<=level?colors[level]:`${C.whiteMid}33`,transition:'background .2s'}}/>
                                 ))}
                               </div>
-                              <div style={{fontSize:11,fontWeight:700,color:colors[level]}}>{p.emoji} Penalty: {labels[level]}</div>
+                              <div style={{fontSize:11,fontWeight:700,color:colors[level]}}>{p.emoji} {lang==='en'?'Penalty':'Pénalité'}: {lang==='en'?labels[level]:['Aucune','Mineure','Significative','Sévère'][level]}</div>
                             </div>
                             <div style={{display:'flex',gap:8}}>
                               <button onClick={()=>{
@@ -2400,11 +3060,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                                 setUnregConfirmId(null)
                                 setSelEv(null)
                               }} style={{flex:1,padding:'9px',background:C.red,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
-                                Yes, unregister
+                                {lang==='en'?'Yes, unregister':'Oui, se désinscrire'}
                               </button>
                               <button onClick={()=>setUnregConfirmId(null)}
                                 style={{flex:1,padding:'9px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,color:C.whiteMid,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
-                                Stay registered
+                                {lang==='en'?'Stay registered':'Rester inscrit·e'}
                               </button>
                             </div>
                           </>
@@ -2416,7 +3076,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                       <div style={{flex:1,textAlign:'center',padding:'14px',color:C.green,fontWeight:700,fontSize:13}}>✓ {t('events.registered')}</div>
                       <button onClick={()=>setUnregConfirmId(selEv.id)}
                         style={{padding:'10px 14px',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',borderRadius:12,color:C.red,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-                        ↩ Unregister
+                        ↩ {lang==='en'?'Unregister':'Se désinscrire'}
                       </button>
                     </div>
                   ))
@@ -2436,12 +3096,84 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 ) : (
                   <button onClick={()=>doRegister(selEv)} disabled={registering}
                     style={{width:'100%',padding:'15px',background:`linear-gradient(135deg,${C.salmon},${C.orange})`,border:'none',borderRadius:16,color:C.bordeaux,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:registering?.7:1}}>
-                    {registering?'…':t('events.register')}
+                    {registering?'…':(selEv as any).isGroupe?'👥 Rejoindre le groupe':t('events.register')}
                   </button>
                 )
               }
               {selEv.price!=='Entrée libre'&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 Pay on-site · {selEv.price}</div>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom sheet création event de groupe ── */}
+      {showCreateGroup&&(
+        <div style={{position:'fixed',inset:0,zIndex:9100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={()=>setShowCreateGroup(false)}/>
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 40px',animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'90vh',overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+            {/* Handle */}
+            <div style={{width:36,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 18px'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <div style={{fontSize:16,fontWeight:900}}>👥 Créer un événement groupe</div>
+              <button onClick={()=>setShowCreateGroup(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
+            </div>
+
+            {/* Champ 1 : Emoji + Titre */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>TON ÉVÉNEMENT</div>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setShowEmojiPicker(p=>!p)} style={{fontSize:24,width:52,height:52,borderRadius:12,background:C.whiteFaint,border:`1px solid ${C.border}`,cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {newEvEmoji}
+                </button>
+                <input value={newEvTitle} onChange={e=>setNewEvTitle(e.target.value)} placeholder="Ex : Apéro découverte, Partie d'échecs..."
+                  style={{flex:1,background:C.whiteFaint,border:`1px solid ${newEvTitle?C.salmon:C.border}`,borderRadius:12,padding:'0 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
+              </div>
+              {showEmojiPicker&&(
+                <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:6,background:C.bgCard,borderRadius:12,padding:'10px',border:`1px solid ${C.border}`}}>
+                  {GROUP_EMOJIS.map(em=>(
+                    <button key={em} onClick={()=>{setNewEvEmoji(em);setShowEmojiPicker(false)}}
+                      style={{fontSize:22,width:38,height:38,borderRadius:8,background:newEvEmoji===em?C.salmonFaint:'transparent',border:newEvEmoji===em?`1px solid ${C.salmon}`:'1px solid transparent',cursor:'pointer'}}>
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Champ 2 : Lieu */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>📍 OÙ</div>
+              <input value={newEvLieu} onChange={e=>setNewEvLieu(e.target.value)} placeholder='Bar du Marché, Parc de Milan, Café Romand...'
+                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvLieu?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
+            </div>
+
+            {/* Champ 3 : Heure + Max participants */}
+            <div style={{marginBottom:14,display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div>
+                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>🕐 QUAND</div>
+                <input value={newEvTime} onChange={e=>setNewEvTime(e.target.value)} placeholder='19h30, Ce soir 20h...'
+                  style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvTime?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
+              </div>
+              <div>
+                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 MAX PARTICIPANTS : <span style={{color:C.salmon}}>{newEvMax}</span></div>
+                <input type='range' min={3} max={20} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
+                  style={{width:'100%',marginTop:14,accentColor:C.salmon}}/>
+              </div>
+            </div>
+
+            {/* Champ 4 : Description (optionnel) */}
+            <div style={{marginBottom:22}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💬 DESCRIPTION (optionnel)</div>
+              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={2}
+                placeholder='Quelques mots pour donner envie...'
+                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box'}}/>
+            </div>
+
+            <button onClick={createGroupEvent} disabled={!newEvTitle.trim()||!newEvLieu.trim()||!newEvTime.trim()||creating}
+              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvTitle&&newEvLieu&&newEvTime?C.salmon:'rgba(255,191,158,0.2)',border:'none',color:newEvTitle&&newEvLieu&&newEvTime?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:newEvTitle&&newEvLieu&&newEvTime?'pointer':'default',fontFamily:'inherit',transition:'all .2s'}}>
+              {creating?'Création...':`✦ Publier l\'événement`}
+            </button>
+            <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Visible dans Événements · Expire automatiquement après 18h</div>
           </div>
         </div>
       )}
@@ -2457,10 +3189,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 // S'ouvre depuis l'onglet Clutchs sur un Verrou confirmé
 // Supabase realtime si vrai profil, mock si bot
 // ═════════════════════════════════════════════════════════════
-type ChatMsg = { id:string; sender:string; text:string; t:string; mine:boolean }
+type ChatMsg = { id:string; sender:string; text:string; t:string; mine:boolean; is_system?:boolean }
 
-function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
-  clutch:any; userId:string; onClose:()=>void; showToast:(m:string,c?:string)=>void; onMarkRead?:(id:string)=>void
+function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead, maxMessages=5 }:{
+  clutch:any; userId:string; onClose:()=>void; showToast:(m:string,c?:string)=>void; onMarkRead?:(id:string)=>void; maxMessages?:number
 }) {
   const other = clutch.sender_id === userId ? clutch.receiver : clutch.sender
   const otherId = clutch.sender_id === userId ? clutch.receiver_id : clutch.sender_id
@@ -2477,6 +3209,7 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
   const [msgs, setMsgs] = useState<ChatMsg[]>(isBotChat ? botInitMsgs : [])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [clutchStatus, setClutchStatus] = useState<string>(clutch.status||'confirmed')
   const [likedMsgs, setLikedMsgs] = useState<Set<string>>(new Set())
   const [dbMode, setDbMode] = useState<'loading'|'ok'|'fallback'>(isBotChat ? 'ok' : 'loading')
   const [botTyping, setBotTyping] = useState(false)
@@ -2519,6 +3252,7 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
         text: m.content,
         t: new Date(m.created_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}),
         mine: m.sender_id === userId,
+        is_system: !!m.is_system,
       }))
       setMsgs(loaded)
       setDbMode('ok')
@@ -2541,13 +3275,15 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
           filter: `clutch_id=eq.${clutch.id}`,
         }, (payload: any) => {
           const m = payload.new
-          if (m.sender_id === userId) return // déjà ajouté optimistement
+          if (m.sender_id === userId && !m.is_system) return // déjà ajouté optimistement
+          if (m.is_system) setClutchStatus('cancelled') // bloquer l'input dès réception
           setMsgs(prev => [...prev, {
             id: m.id,
             sender: other?.name || '?',
             text: m.content,
             t: new Date(m.created_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}),
             mine: false,
+            is_system: !!m.is_system,
           }])
           // Marquer comme lu immédiatement
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', m.id)
@@ -2589,13 +3325,15 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
       tapTimers.current[id] = setTimeout(()=>{ delete tapTimers.current[id] }, 350)
     }
   }
-  const myCount = msgs.filter(m=>m.mine).length
-  const MAX = 5
+  const myCount = msgs.filter(m=>m.mine && !m.is_system).length
+  const MAX = maxMessages
 
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[msgs])
 
+  const isClosed = ['cancelled','declined','expired'].includes(clutchStatus)
+
   const send = async () => {
-    if (!input.trim() || myCount >= MAX) return
+    if (!input.trim() || myCount >= MAX || isClosed) return
     setSending(true)
     const t0 = new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
     const text = input.trim()
@@ -2671,23 +3409,25 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
             {dbMode === 'fallback' ? '💬 Chat DB not configured — demo mode' : '🤖 Bot mode — simulated messages'}
           </div>
         )}
-        {/* Bannière lieu de RDV */}
-        <div style={{flexShrink:0,background:`${C.green}12`,borderBottom:`1px solid ${C.green}33`,padding:'7px 16px',display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontSize:16}}>📍</span>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,fontWeight:800,color:C.green}}>{clutch.venue||'Venue TBD'}</div>
-            <div style={{fontSize:9,color:C.whiteMid}}>{new Date(clutch.proposed_time).toLocaleString('fr-CH',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</div>
+        {/* Bannière lieu de RDV + lien Maps */}
+        <div style={{flexShrink:0,background:`${C.green}12`,borderBottom:`1px solid ${C.green}33`,padding:'8px 16px',display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:18}}>📍</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.green,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{clutch.venue||'Lieu à confirmer'}</div>
+            <div style={{fontSize:10,color:C.whiteMid}}>
+              {new Date(clutch.proposed_time).toLocaleString('fr-CH',{weekday:'short',hour:'2-digit',minute:'2-digit'})}
+              {' · '}
+              <a href={`https://maps.google.com/?q=${encodeURIComponent(clutch.venue||'')}`} target="_blank" rel="noreferrer"
+                style={{color:C.salmon,textDecoration:'none',fontWeight:700}}>
+                Voir sur Maps →
+              </a>
+            </div>
           </div>
-          <button onClick={()=>{
-            const txt = `📍 See you at ${clutch.venue||'our spot'} at ${new Date(clutch.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`
-            setInput(txt)
-          }} style={{background:`${C.green}20`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'4px 10px',color:C.green,fontSize:10,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-            Confirm venue
-          </button>
         </div>
+        {/* Retard géré depuis la carte Verrou — supprimé ici */}
         <div style={{flexShrink:0,background:C.orangeFaint,borderBottom:`1px solid ${C.orange}33`,padding:'5px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <span style={{fontSize:10,color:C.orange,fontWeight:700}}>⚡ Max {MAX} messages · To coordinate your meetup</span>
-          <span style={{fontSize:10,color:C.orange}}>{myCount}/{MAX}</span>
+          {MAX < 9999 && <span style={{fontSize:10,color:C.orange,fontWeight:700}}>⚡ Max {MAX} messages · Pour coordonner le RDV</span>}
+          {MAX < 9999 && <span style={{fontSize:10,color:C.orange}}>{myCount}/{MAX}</span>}
         </div>
         {/* Messages — loader initial */}
         {dbMode === 'loading' && (
@@ -2696,6 +3436,7 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
         <div style={{flex:'1 1 0',overflowY:'scroll',WebkitOverflowScrolling:'touch',padding:'12px 16px'}}>
           {msgs.map(m=>{
             const liked = likedMsgs.has(m.id)
+            if ((m as any).is_system) return null // messages système cachés du chat
             return (
               <div key={m.id} style={{display:'flex',justifyContent:m.mine?'flex-end':'flex-start',marginBottom:10,position:'relative'}}>
                 <div onClick={()=>handleMsgTap(m.id)}
@@ -2728,14 +3469,18 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead }:{
         </div>
         {/* Input */}
         <div style={{flexShrink:0,padding:'8px 12px calc(env(safe-area-inset-bottom,0px) + 12px)',borderTop:`1px solid ${C.border}`,display:'flex',gap:8,alignItems:'flex-end'}}>
-          {myCount >= MAX
+          {isClosed
+            ? <div style={{flex:1,padding:'12px',textAlign:'center',fontSize:12,color:C.whiteMid,fontStyle:'italic'}}>
+                {clutch.status==='cancelled'?'↩ Ce Clutch a été annulé — le chat est fermé':clutch.status==='declined'?'✕ Clutch refusé — le chat est fermé':'⏱ Clutch expiré — le chat est fermé'}
+              </div>
+            : myCount >= MAX
             ? <div style={{flex:1,padding:'12px',textAlign:'center',fontSize:12,color:C.whiteMid}}>
-                Limit reached — see you at {clutch.venue}!
+                Limite atteinte — à tout à l'heure à {clutch.venue?.split('·')[0]?.trim()||'votre lieu'} !
               </div>
             : <>
                 <div style={{flex:1,position:'relative'}}>
                   <textarea value={input} onChange={e=>setInput(e.target.value.slice(0,300))} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}}
-                    placeholder="Short message…" rows={1}
+                    placeholder="Message court…" rows={1}
                     style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:16,padding:'10px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon,lineHeight:1.4}}/>
                   {input.length>0&&<div style={{position:'absolute',bottom:4,right:8,fontSize:9,color:input.length>250?C.orange:C.whiteMid}}>{input.length}/300</div>}
                 </div>
@@ -2814,7 +3559,7 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
   if (sent) return (
     <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.75)',backdropFilter:'blur(8px)'}}>
       <div style={{textAlign:'center',animation:'verrouPop .5s cubic-bezier(.22,1,.36,1)'}}>
-        <div style={{fontSize:72,marginBottom:16,filter:'drop-shadow(0 0 30px #C8860A)'}}>💬</div>
+        <div style={{fontSize:72,marginBottom:16,filter:'drop-shadow(0 0 30px C.gold)'}}>💬</div>
         <div style={{fontSize:22,fontWeight:900,color:C.white,letterSpacing:'-.02em',marginBottom:8}}>Thank you!</div>
         <div style={{fontSize:14,color:C.salmon,opacity:.8}}>Your feedback is received · Mel &amp; David will read it ❤️</div>
         <div style={{marginTop:20,display:'flex',gap:6,justifyContent:'center'}}>
@@ -2862,8 +3607,8 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
         </div>
         <button onClick={send} disabled={sending||(!text.trim()&&!audioBlob)} style={{
           width:'100%',padding:'14px',
-          background:(!text.trim()&&!audioBlob)?'rgba(255,255,255,.08)':`linear-gradient(135deg,#C8860A,${C.orange})`,
-          border:`1px solid ${(!text.trim()&&!audioBlob)?C.border:'#C8860A'}`,
+          background:(!text.trim()&&!audioBlob)?'rgba(255,255,255,.08)':`linear-gradient(135deg,C.gold,${C.orange})`,
+          border:`1px solid ${(!text.trim()&&!audioBlob)?C.border:'C.gold'}`,
           borderRadius:16,
           color:(!text.trim()&&!audioBlob)?C.whiteMid:'#000',
           fontSize:15,fontWeight:900,cursor:(!text.trim()&&!audioBlob)?'default':'pointer',
@@ -2878,64 +3623,115 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
   )
 }
 
-function FeedbackSheet({ clutch, userId, onClose, onScore }:{
-  clutch:any; userId:string; onClose:(rating:'super'|'ok'|'rabbit'|'ghost'|null)=>void; onScore:(delta:number)=>void
+function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingCount=0 }:{
+  clutch:any; userId:string; lang?:Lang; onClose:(rating:string|null)=>void; onScore:(delta:number)=>void; pendingCount?:number
 }) {
+  const lang = fbLang||'fr'
   const other = clutch.sender_id===userId ? clutch.receiver : clutch.sender
-  const [selected,setSelected] = useState<'super'|'ok'|'rabbit'|'ghost'|null>(null)
+  const [selected,setSelected] = useState<string|null>(null)
   const [done,setDone] = useState(false)
+  const gpsVerified = !!(clutch as any).checkin_verified
 
-  const RATINGS:{key:'super'|'ok'|'rabbit'|'ghost';emoji:string;label:string;sub:string;pts:number}[] = [
-    {key:'super', emoji:'🌟', label:'Great meetup',  sub:'We really connected',          pts:5},
-    {key:'ok',    emoji:'👍', label:'OK',            sub:'Nice, nothing special',         pts:3},
-    {key:'rabbit',emoji:'🐰', label:'No-show',       sub:'The person didn\'t show up',   pts:-20},
-    {key:'ghost', emoji:'👻', label:'I didn\'t go',  sub:'I admit, I ghosted',            pts:-15},
+  // 3 outcomes — objectifs, décision Mel + David 15.06.2026
+  // Principe : présence = positif (même en retard), absence = négatif
+  const OUTCOMES = lang==='en' ? [
+    {key:'on_time', emoji:'⭐', label:'On time',   sub:'Showed up right on schedule',          pts: 2,  bad:false},
+    {key:'showed',  emoji:'📍', label:'Was there', sub:'Came — late or not, they made it',     pts: 1,  bad:false},
+    {key:'absent',  emoji:'🐰', label:'No-show',   sub:'Didn\'t come, didn\'t warn',           pts:-5,  bad:true },
+  ] : [
+    {key:'on_time', emoji:'⭐', label:'À l\'heure', sub:'Présent·e à l\'heure',                pts: 2,  bad:false},
+    {key:'showed',  emoji:'📍', label:'Est venu·e', sub:'Est venu·e — en retard ou non, il·elle était là', pts: 1, bad:false},
+    {key:'absent',  emoji:'🐰', label:'Lapin 👻',   sub:'N\'est pas venu·e, n\'a pas prévenu', pts:-5,  bad:true },
   ]
 
-  const submit = () => {
+  const submit = async () => {
     if (!selected) return
-    const r = RATINGS.find(r=>r.key===selected)!
-    localStorage.setItem(`feedback_done_${clutch.id}`, '1')
-    if (selected==='super'||selected==='ok') onScore(r.pts)
-    else onScore(r.pts)
+    const r = OUTCOMES.find(r=>r.key===selected)!
+    try { localStorage.setItem(`feedback_done_${clutch.id}`, String(Date.now())) } catch {}
+    const otherId = clutch.sender_id===userId ? clutch.receiver_id : clutch.sender_id
+    const revealAt = new Date(Date.now() + TRUST_CONFIG.REVEAL_DELAY_HOURS * 60 * 60 * 1000).toISOString()
+    // Nouveau système : rdv_feedbacks (double-révélation)
+    await supabase.from('rdv_feedbacks').upsert({
+      rdv_id: clutch.id,
+      from_id: userId,
+      to_id: otherId,
+      outcome: selected,
+      revealed_at: revealAt,
+      is_revealed: false,
+    }, { onConflict: 'rdv_id,from_id' })
+    await supabase.from('feedback').upsert({
+      clutch_id: clutch.id,
+      given_by: userId,
+      to_user_id: otherId,
+      rating: selected,
+      pts_delta: r.pts,
+      gps_verified_by_reporter: gpsVerified,
+    }, { onConflict: 'clutch_id,given_by' })
+    const ptsDelta = r.pts
+    onScore(ptsDelta)
     setDone(true)
-    setTimeout(()=>onClose(selected), 1800)
+    setTimeout(()=>onClose(selected), 2000)
   }
+
+  const sel = OUTCOMES.find(r=>r.key===selected)
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:4000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}}/>
-      <div style={{position:'relative',background:C.bgSheet,borderRadius:'22px 22px 0 0',padding:'20px 20px 40px',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={done?()=>onClose(selected):undefined}/>
+      <div style={{position:'relative',background:C.bgSheet,borderRadius:'22px 22px 0 0',padding:'20px 20px 40px',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)',maxHeight:'88vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'center',paddingBottom:8}}><div style={{width:36,height:4,borderRadius:2,background:C.border}}/></div>
         {done ? (
-          <div style={{textAlign:'center',padding:'20px 0'}}>
-            <div style={{fontSize:40,marginBottom:8}}>{RATINGS.find(r=>r.key===selected)?.emoji}</div>
-            <div style={{fontSize:15,fontWeight:900,color:C.white,marginBottom:4}}>Thank you!</div>
-            {(selected==='super'||selected==='ok') && <div style={{fontSize:13,color:C.green}}>+{RATINGS.find(r=>r.key===selected)?.pts} reliability pts</div>}
-            {(selected==='rabbit'||selected==='ghost') && <div style={{fontSize:13,color:C.red}}>{RATINGS.find(r=>r.key===selected)?.pts} reliability pts</div>}
+          <div style={{textAlign:'center',padding:'20px 0',cursor:'pointer'}} onClick={()=>onClose(selected)}>
+            <div style={{fontSize:40,marginBottom:8}}>{sel?.emoji}</div>
+            <div style={{fontSize:15,fontWeight:900,color:C.white,marginBottom:4}}>{lang==='en'?'Thank you!':'Merci !'}</div>
+            <div style={{fontSize:13,color:sel?.bad?C.red:C.green}}>
+              {lang==='en'?'Revealed in':'Révélé dans'} {TRUST_CONFIG.REVEAL_DELAY_HOURS}h
+            </div>
+            <div style={{fontSize:11,color:C.whiteMid,marginTop:12,opacity:.6}}>{lang==='en'?'Tap to close':'Appuie pour fermer'}</div>
           </div>
         ) : (
           <>
-            <div style={{textAlign:'center',marginBottom:16}}>
-              <div style={{fontSize:13,color:C.whiteMid,marginBottom:4}}>Meetup with <strong style={{color:C.white}}>{other?.name||'?'}</strong> · {clutch.venue}</div>
-              <div style={{fontSize:17,fontWeight:900}}>How did it go?</div>
+            <div style={{textAlign:'center',marginBottom:14}}>
+              <div style={{fontSize:13,color:C.whiteMid,marginBottom:2}}>
+                {lang==='en'?'Meetup with':'RDV avec'} <strong style={{color:C.white}}>{other?.name||'?'}</strong>
+              </div>
+              <div style={{fontSize:10,color:C.whiteMid,marginBottom:gpsVerified?6:0}}>{clutch.venue}</div>
+              {gpsVerified && (
+                <div style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(34,197,94,.15)',border:'1px solid rgba(34,197,94,.3)',borderRadius:20,padding:'3px 10px',fontSize:10,color:C.green}}>
+                  📍 {lang==='en'?'GPS-verified presence':'Présence vérifiée GPS'} +{TRUST_CONFIG.GPS_CHECKIN} pts
+                </div>
+              )}
+              {pendingCount > 1 && (
+                <div style={{fontSize:10,color:C.orange,marginTop:6}}>
+                  {pendingCount-1} {lang==='en'?'other meetup(s) awaiting feedback':'autre(s) RDV en attente de feedback'}
+                </div>
+              )}
+              <div style={{fontSize:17,fontWeight:900,marginTop:10}}>{lang==='en'?'Was the other person there?':'L\'autre personne était-elle là ?'}</div>
+              <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>{lang==='en'?`Revealed in ${TRUST_CONFIG.REVEAL_DELAY_HOURS}h — fair for both`:`Révélé dans ${TRUST_CONFIG.REVEAL_DELAY_HOURS}h — équitable pour les deux`}</div>
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
-              {RATINGS.map(r=>(
-                <button key={r.key} onClick={()=>setSelected(r.key)}
-                  style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:selected===r.key?`${r.key==='super'||r.key==='ok'?C.green:C.red}18`:'transparent',border:`1.5px solid ${selected===r.key?r.key==='super'||r.key==='ok'?C.green:C.red:C.border}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',WebkitTapHighlightColor:'transparent'}}>
-                  <span style={{fontSize:24,flexShrink:0}}>{r.emoji}</span>
-                  <div style={{flex:1,textAlign:'left'}}>
-                    <div style={{fontSize:13,fontWeight:800,color:C.white}}>{r.label}</div>
-                    <div style={{fontSize:11,color:C.whiteMid}}>{r.sub}</div>
-                  </div>
-                  <span style={{fontSize:11,fontWeight:700,color:r.pts>0?C.green:C.red}}>{r.pts>0?'+':''}{r.pts} pts</span>
-                </button>
-              ))}
+            <div style={{display:'flex',flexDirection:'column',gap:7,marginBottom:16}}>
+              {OUTCOMES.map(r=>{
+                const isSel = selected===r.key
+                const borderCol = isSel ? (r.bad?C.red:C.green) : C.border
+                const bgCol = isSel ? (r.bad?'rgba(239,68,68,.12)':'rgba(34,197,94,.12)') : 'transparent'
+                const ptsLabel = (r as any).pts>0?`+${(r as any).pts}pts`:`${(r as any).pts}pts`
+                const ptsColor = r.bad?C.red:C.green
+                return (
+                  <button key={r.key} onClick={()=>setSelected(r.key)}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',background:bgCol,border:`1.5px solid ${borderCol}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',WebkitTapHighlightColor:'transparent',transition:'all .15s'}}>
+                    <span style={{fontSize:22,flexShrink:0}}>{r.emoji}</span>
+                    <div style={{flex:1,textAlign:'left'}}>
+                      <div style={{fontSize:13,fontWeight:800,color:C.white}}>{r.label}</div>
+                      <div style={{fontSize:10,color:C.whiteMid}}>{r.sub}</div>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:700,color:ptsColor}}>{ptsLabel}</span>
+                  </button>
+                )
+              })}
             </div>
             <button onClick={submit} disabled={!selected}
               style={{width:'100%',padding:'14px',background:selected?`linear-gradient(135deg,${C.salmon},${C.orange})`:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
-              Submit feedback
+              {lang==='en'?'Send feedback':'Envoyer le feedback'}
             </button>
           </>
         )}
@@ -3067,7 +3863,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
               {(profile as any).age&&<span style={{fontSize:14,color:C.whiteMid,fontWeight:600}}>{(profile as any).age} ans</span>}
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              {profile.reliability_score!=null&&<Score v={profile.reliability_score}/>}
+              <TrustBadge profile={profile} lang={psLang} showCount={true}/>
               {compatScore!==null&&(
                 <span style={{fontSize:11,fontWeight:800,padding:'2px 8px',borderRadius:20,
                   background:compatScore>=80?`${C.green}22`:compatScore>=60?`${C.orange}22`:`${C.whiteMid}11`,
@@ -3177,7 +3973,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
                 <div style={{fontSize:11,color:C.whiteMid}}>Waiting for {firstName} to reply…</div>
               </div>
               <button onClick={async()=>{
-                await supabase.from('clutches').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('id',pendingClutch.id)
+                await supabase.from('clutches').update({status:'cancelled'}).eq('id',pendingClutch.id)
                 showToast('Clutch cancelled',C.whiteMid)
                 onClose()
               }} style={{width:'100%',padding:'10px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:12,color:C.red,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
@@ -3277,18 +4073,34 @@ function FieldRow({ icon, label, value, gk, placeholder, isEditing, onTap, locke
   )
 }
 
-function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable }:{
+function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable, rdvBlocked }:{
   user:Profile; flow:AppFlow; setFlow:(f:AppFlow)=>void;
   signOut:()=>void; setShowDelete:(v:boolean)=>void;
   showToast:(m:string,c?:string)=>void; onUserUpdate:(p:Profile)=>void;
   lang:Lang; setLang:(l:Lang)=>void;
-  onSetAvailable?:()=>void; isAvailable?:boolean;
+  onSetAvailable?:()=>void; isAvailable?:boolean; rdvBlocked?:boolean;
 }) {
   const [profileSubTab, setProfileSubTab] = useState<'profil'|'settings'>('profil')
+  const [profilePage, setProfilePage] = useState<string|null>(null)
   const [editField, setEditField] = useState<string|null>(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(user.name||'')
   const [editBio, setEditBio] = useState(user.bio||'')
+  // Activité du moment — visible sur le profil dans la carte
+  const actKey = `clutch_activity_${user.id}`
+  const [actText, setActText] = useState(()=>{ try{return JSON.parse(localStorage.getItem(actKey)||'{}').text||''}catch{return ''} })
+  const [actEmoji, setActEmoji] = useState(()=>{ try{return JSON.parse(localStorage.getItem(actKey)||'{}').emoji||''}catch{return ''} })
+  const [actSaving, setActSaving] = useState(false)
+  const ACTIVITY_EMOJIS = ['♟️','🎸','🍕','🏃','☕','🎬','📚','🏊','🎲','🎵','🍷','🌙','⛰️','🚴','🎨']
+  const saveActivity = async () => {
+    setActSaving(true)
+    const payload = { text: actText.trim(), emoji: actEmoji, expires: new Date(Date.now()+8*3600*1000).toISOString() }
+    try { localStorage.setItem(actKey, JSON.stringify(payload)) } catch {}
+    // Aussi en DB si champ dispo
+    await supabase.from('profiles').update({current_activity: actText.trim()?`${actEmoji} ${actText.trim()}`:null} as any).eq('id', user.id)
+    setActSaving(false)
+    showToast(actText.trim() ? '✦ Activité visible 8h' : '✓ Activité supprimée', C.green)
+  }
   const [editGender, setEditGender] = useState<GenderKey>(genderKey((user as any).gender))
   const [editJob, setEditJob] = useState<string>((user as any).job||'')
   const [editInterests, setEditInterests] = useState<string[]>((user as any).interests||[])
@@ -3298,6 +4110,14 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [editKids, setEditKids] = useState((user as any).has_kids||false)
   const [editKidsCount, setEditKidsCount] = useState((user as any).kids_ages||'')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [editHeight, setEditHeight] = useState<string>((user as any).height_cm?.toString()||'')
+  const [editZodiac, setEditZodiac] = useState<string>((user as any).zodiac||'')
+  const [editRelStatus, setEditRelStatus] = useState<string>((user as any).relationship_status||'')
+  const [editSmoking, setEditSmoking] = useState<string>((user as any).smoking||'')
+  const [editDrinking, setEditDrinking] = useState<string>((user as any).drinking||'')
+  const [editLookingFor, setEditLookingFor] = useState<string>((user as any).looking_for||'')
+  const [editEducation, setEditEducation] = useState<string>((user as any).education||'')
+  const [editKidsPref, setEditKidsPref] = useState<string>((user as any).kids_pref||'')
   const t = useT(lang)
   const [favorites, setFavorites] = useState<Profile[]>([])
   const [blocked, setBlocked] = useState<Profile[]>([])
@@ -3309,6 +4129,28 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     try { const s=localStorage.getItem(storageKey); return s?JSON.parse(s):[null,null,null,null] } catch { return [null,null,null,null] }
   })
   const [swapFromIdx, setSwapFromIdx] = useState<number|null>(null) // tap-to-swap photos
+
+  // SOS — contacts d'urgence (persistés en localStorage)
+  const sosKey = `clutch_sos_${user.id}`
+  const [sosName, setSosName] = useState(()=>{ try{return JSON.parse(localStorage.getItem(sosKey)||'{}').name||''}catch{return ''} })
+  const [sosPhone, setSosPhone] = useState(()=>{ try{return JSON.parse(localStorage.getItem(sosKey)||'{}').phone||''}catch{return ''} })
+  const [sosSaving, setSosSaving] = useState(false)
+  const saveSos = () => {
+    setSosSaving(true)
+    try { localStorage.setItem(sosKey, JSON.stringify({name:sosName.trim(), phone:sosPhone.trim()})) } catch {}
+    setTimeout(()=>{setSosSaving(false); showToast('✓ Contact SOS sauvegardé', C.green)}, 300)
+  }
+
+  // Mode réception (pour les femmes) — persisté localStorage
+  const recepKey = `clutch_recep_${user.id}`
+  const [recepMode, setRecepMode] = useState<'open'|'selective'|'pause'>(()=>{
+    try{return (localStorage.getItem(recepKey) as any)||'open'}catch{return 'open'}
+  })
+  const saveRecepMode = (m:'open'|'selective'|'pause') => {
+    setRecepMode(m)
+    try{localStorage.setItem(recepKey, m)}catch{}
+    showToast(m==='open'?'🟢 Mode Ouverte':m==='selective'?'🟡 Mode Sélective':'🔴 Mode Pause', C.whiteMid)
+  }
 
   const handleRetirerDispo = async () => {
     const { error } = await supabase.from('profiles').update({
@@ -3398,6 +4240,11 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     }
   }
 
+  const saveProfileField = async (field: string, value: any) => {
+    await supabase.from('profiles').update({[field]: value}).eq('id', user.id)
+    onUserUpdate({...user, [field]: value} as any)
+  }
+
   const uploadPhoto = async (file: File) => {
     const ext = file.name.split('.').pop()
     const path = `${user.id}/avatar.${ext}`
@@ -3420,679 +4267,657 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   const genderLocked = !!(user as any).gender && (user as any).gender !== 'undefined' && (user as any).gender !== null && (user as any).gender !== 'other'
 
+  // ── helpers locaux ──────────────────────────────────────────
+  const SH = (label: string) => (
+    <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase',padding:'16px 2px 6px'}}>{label}</div>
+  )
+  const MCard = ({children}:{children:React.ReactNode}) => (
+    <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:4}}>{children}</div>
+  )
+  const MRow = ({icon,label,sub,onTap,danger,noArrow}:{icon:string,label:string,sub?:string,onTap:()=>void,danger?:boolean,noArrow?:boolean}) => (
+    <div onClick={onTap} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 14px',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
+      <span style={{width:24,textAlign:'center',fontSize:18,flexShrink:0}}>{icon}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:600,color:danger?'#f87171':C.white,lineHeight:1.2}}>{label}</div>
+        {sub&&<div style={{fontSize:11,color:C.whiteMid,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sub}</div>}
+      </div>
+      {!noArrow&&<span style={{color:C.whiteMid,fontSize:18,flexShrink:0}}>›</span>}
+    </div>
+  )
+  // Chip picker inline
+  const Chips = ({opts,val,onPick}:{opts:{k:string,l:string}[],val:string,onPick:(k:string)=>void}) => (
+    <div style={{display:'flex',flexWrap:'wrap',gap:8,padding:'4px 12px 14px'}}>
+      {opts.map(({k,l})=>(
+        <button key={k} onClick={()=>onPick(k)}
+          style={{padding:'7px 16px',borderRadius:20,fontFamily:'inherit',fontSize:12,fontWeight:val===k?700:400,cursor:'pointer',
+            border:`1.5px solid ${val===k?C.orange:C.border}`,
+            background:val===k?`${C.orange}22`:C.bgCard,
+            color:val===k?C.orange:C.whiteMid}}>
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+  // Sauvegarde champ + ferme
+  const pickAndSave = async (field:string, k:string, setter:(v:string)=>void) => {
+    setter(k); setEditField(null)
+    await saveProfileField(field, k)
+    showToast('✓ Sauvegardé', C.green)
+  }
+
+  // ── Contenu des sous-pages ────────────────────────────────────
+  const PageEditProfil = () => {
+    const ALL_INTERESTS = ['☕ Café','🍷 Vins','🥾 Randonnée','🧘 Yoga','🎬 Cinéma','🍳 Cuisine','🎵 Musique','✈️ Voyage','🏃 Running','🎨 Art','💻 Tech','⛽ Sport','📚 Lecture','💃 Danse','🎉 Festivals','🍕 Restos','🎸 Concerts','🌿 Nature']
+    const ALL_LANGS = ['Français','English','Deutsch','Italiano','Español','Português','العربية','日本語','中文','Русский']
+    const ZODIACS = ['♈ Bélier','♉ Taureau','♊ Gémeaux','♋ Cancer','♌ Lion','♍ Vierge','♎ Balance','♏ Scorpion','♐ Sagittaire','♑ Capricorne','♒ Verseau','♓ Poissons']
+    const EDUC_OPTS = [{k:'lycee',l:'🎒 Lycée'},{k:'bachelor',l:'🎓 Bachelor'},{k:'master',l:'📜 Master'},{k:'doctorat',l:'🔬 Doctorat'},{k:'autre',l:'✦ Autre'}]
+    const REL_OPTS = [{k:'single',l:'💫 Célibataire'},{k:'open',l:'🔓 Couple ouvert'},{k:'divorced',l:'↩ Divorcé·e'},{k:'widowed',l:'🕊 Veuf·ve'}]
+    const KIDS_OPTS = [{k:'none',l:"👶 Pas d'enfants"},{k:'have',l:"👨‍👧 J'en ai"},{k:'want',l:'✨ J\'en veux'},{k:'no_want',l:'🚫 Non pour moi'}]
+    const SMOKE_OPTS = [{k:'never',l:'🚭 Non-fumeur'},{k:'sometimes',l:'💨 Parfois'},{k:'yes',l:'🚬 Fumeur'}]
+    const DRINK_OPTS = [{k:'never',l:'🧃 Jamais'},{k:'sometimes',l:'🍷 Parfois'},{k:'often',l:'🍺 Régulièrement'}]
+
+    return (
+      <div>
+        {/* Photos */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>📷 Photos (1+5)</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:5}}>
+            <div style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',border:`1.5px solid ${user.photo_url?C.orange+'66':C.border}`,cursor:'pointer',background:C.bgCard}}
+              onClick={()=>fileRef.current?.click()}>
+              {user.photo_url
+                ? <img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,color:C.whiteMid,opacity:.4}}>+</div>}
+              <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(0,0,0,.45)',borderRadius:5,padding:'2px 5px'}}>Principal</div>
+            </div>
+            {[0,1,2,3,4].map(i=>{
+              const photo = extraPhotos[Math.min(i,3)] ?? null
+              const isSelected = swapFromIdx === i
+              const isSwapping = swapFromIdx !== null
+              return (
+                <div key={i} style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',border:`1.5px solid ${isSelected?C.orange:photo?C.borderStrong:C.border}`,cursor:'pointer',background:C.bgCard,transform:isSelected?'scale(0.96)':'scale(1)',transition:'transform .15s'}}
+                  onClick={()=>{
+                    if (isSwapping && swapFromIdx !== null) {
+                      if (swapFromIdx === i) { setSwapFromIdx(null); return }
+                      const upd=[...extraPhotos]; const fi=Math.min(swapFromIdx,3); const ti=Math.min(i,3); const tmp=upd[fi]; upd[fi]=upd[ti]; upd[ti]=tmp
+                      setExtraPhotos(upd); try{localStorage.setItem(storageKey,JSON.stringify(upd))}catch{}; setSwapFromIdx(null)
+                    } else { photo ? setSwapFromIdx(i) : extraRefs[Math.min(i,3)]?.current?.click() }
+                  }}>
+                  {photo
+                    ? <><img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none'}}/>
+                        {!isSelected&&<button onClick={e=>{e.stopPropagation();removeExtra(Math.min(i,3))}} style={{position:'absolute',top:4,right:4,background:'rgba(0,0,0,.7)',border:'none',color:'#fff',width:18,height:18,borderRadius:'50%',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>}
+                      </>
+                    : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:C.whiteMid,opacity:.3}}>+</div>}
+                  <div style={{position:'absolute',bottom:4,left:5,fontSize:9,fontWeight:700,color:'rgba(255,255,255,.7)',background:'rgba(0,0,0,.4)',borderRadius:4,padding:'1px 5px'}}>{i+2}</div>
+                  <input ref={i<4?extraRefs[i]:undefined} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0])uploadExtra(e.target.files[0],Math.min(i,3))}}/>
+                </div>
+              )
+            })}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0])uploadPhoto(e.target.files[0])}}/>
+          {swapFromIdx!==null&&<button onClick={()=>setSwapFromIdx(null)} style={{width:'100%',marginTop:6,padding:'6px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕ Annuler</button>}
+        </div>
+
+        {/* À propos */}
+        {SH('À propos')}
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
+          {/* Bio */}
+          <FieldRow icon="📝" label="Bio" value={user.bio||''} placeholder="Ajoute une bio…"
+            isEditing={editField==='bio'} onTap={()=>setEditField(editField==='bio'?null:'bio')}>
+            <div style={{padding:'4px 12px 12px'}}>
+              <textarea value={editBio} onChange={e=>setEditBio(e.target.value.slice(0,160))} rows={3} autoFocus
+                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',boxSizing:'border-box'}}/>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
+                <span style={{fontSize:10,color:C.whiteMid}}>{editBio.length}/160</span>
+                <button onClick={async()=>{await saveProfileField('bio',editBio.trim()||null);setEditField(null);showToast('✓ Bio sauvegardée',C.green)}}
+                  style={{padding:'6px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Save</button>
+              </div>
+            </div>
+          </FieldRow>
+          {/* Prénom */}
+          <FieldRow icon="✏️" label="Prénom" value={user.name||''} placeholder="Ton prénom"
+            isEditing={editField==='name'} onTap={()=>setEditField(editField==='name'?null:'name')}>
+            <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
+              <input value={editName} onChange={e=>setEditName(e.target.value.slice(0,30))} autoFocus maxLength={30}
+                style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit'}}/>
+              <button onClick={async()=>{const n=editName.trim();if(!n)return;await saveProfileField('name',n);onUserUpdate({...user,name:n} as any);setEditField(null);showToast('✓ Prénom mis à jour',C.green)}}
+                style={{padding:'8px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            </div>
+          </FieldRow>
+          {/* Âge — verrouillé après saisie */}
+          <div style={{borderBottom:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,padding:'13px 14px',cursor:(user as any).age?'default':'pointer'}}
+              onClick={()=>{if(!(user as any).age)setEditField(editField==='age'?null:'age')}}>
+              <span style={{width:22,textAlign:'center',fontSize:16}}>🎂</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:C.whiteMid,fontWeight:600,marginBottom:1}}>Âge</div>
+                <div style={{fontSize:13,fontWeight:600,color:(user as any).age?C.white:C.orange}}>
+                  {(user as any).age?`${(user as any).age} ans`:'Entre ton âge →'}
+                </div>
+              </div>
+              <span style={{fontSize:10,color:C.whiteMid,background:C.whiteFaint,padding:'2px 8px',borderRadius:10}}>
+                {(user as any).age?'🔒 Verrouillé':'Requis'}
+              </span>
+            </div>
+            {editField==='age'&&!(user as any).age&&(
+              <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
+                <input type="number" min={18} max={99} placeholder="Ex: 28" autoFocus
+                  style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:16,color:C.white,outline:'none',fontFamily:'inherit'}}
+                  onChange={e=>setEditJob(e.target.value)}/>
+                <button onClick={async()=>{
+                  const age=parseInt(editJob);if(isNaN(age)||age<18||age>99){showToast('Âge invalide (18-99)',C.red);return}
+                  await supabase.from('profiles').update({age}).eq('id',user.id);onUserUpdate({...user,age} as any);setEditField(null);setEditJob('')
+                  showToast('✓ Âge enregistré — verrouillé',C.green)
+                }} style={{padding:'8px 14px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+              </div>
+            )}
+          </div>
+          {/* Métier */}
+          <FieldRow icon="💼" label="Métier" value={(user as any).job||''} placeholder="Ton métier ou tes études"
+            isEditing={editField==='job'} onTap={()=>setEditField(editField==='job'?null:'job')}>
+            <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
+              <input value={editJob} onChange={e=>setEditJob(e.target.value.slice(0,50))} maxLength={50} autoFocus placeholder="Designer, Étudiant…"
+                style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit'}}/>
+              <button onClick={async()=>{await saveProfileField('job',editJob.trim()||null);setEditField(null);showToast('✓ Métier mis à jour',C.green)}}
+                style={{padding:'8px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            </div>
+          </FieldRow>
+          {/* Niveau d'études */}
+          <FieldRow icon="🎓" label="Niveau d'études" value={EDUC_OPTS.find(o=>o.k===editEducation)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='education'} onTap={()=>setEditField(editField==='education'?null:'education')}>
+            <Chips opts={EDUC_OPTS} val={editEducation} onPick={k=>pickAndSave('education',k,setEditEducation)}/>
+          </FieldRow>
+        </div>
+
+        {/* Identité */}
+        {SH('Identité')}
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
+          {/* Genre */}
+          <FieldRow icon="" label="Genre" gk={editGender} locked={genderLocked}
+            value={editGender==='F'?'Femme':editGender==='M'?'Homme':'Non renseigné'}
+            isEditing={editField==='genre'&&!genderLocked} onTap={()=>!genderLocked&&setEditField(editField==='genre'?null:'genre')}>
+            <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
+              {(['F','M','X'] as GenderKey[]).map(g=>(
+                <button key={g} onClick={async()=>{setEditGender(g);await saveProfileField('gender',g==='F'?'woman':g==='M'?'man':'other');setEditField(null);showToast('✓ Genre sauvegardé',C.green)}}
+                  style={{flex:1,padding:'8px 4px',borderRadius:10,border:`1.5px solid ${editGender===g?GC[g]:C.border}`,background:editGender===g?`${GC[g]}22`:'transparent',color:editGender===g?GC[g]:C.whiteMid,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
+                  <GenderSvg gk={g} size={14}/>{g==='F'?'Femme':g==='M'?'Homme':'Autre'}
+                </button>
+              ))}
+            </div>
+          </FieldRow>
+          {/* Taille */}
+          <FieldRow icon="📏" label="Taille" value={editHeight?`${editHeight} cm`:''} placeholder="Ta taille en cm"
+            isEditing={editField==='height'} onTap={()=>setEditField(editField==='height'?null:'height')}>
+            <div style={{padding:'4px 12px 12px',display:'flex',gap:8,alignItems:'center'}}>
+              <input type="number" min={140} max={220} value={editHeight} onChange={e=>setEditHeight(e.target.value)} autoFocus placeholder="Ex: 175"
+                style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:16,color:C.white,outline:'none',fontFamily:'inherit'}}/>
+              <span style={{color:C.whiteMid,fontSize:13}}>cm</span>
+              <button onClick={async()=>{const h=parseInt(editHeight);if(isNaN(h)||h<140||h>220){showToast('Taille invalide (140-220)',C.red);return}await saveProfileField('height_cm',h);setEditField(null);showToast('✓ Taille enregistrée',C.green)}}
+                style={{padding:'8px 14px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            </div>
+          </FieldRow>
+          {/* Signe astrologique */}
+          <FieldRow icon="✨" label="Signe astro" value={editZodiac||''} placeholder="Ton signe"
+            isEditing={editField==='zodiac'} onTap={()=>setEditField(editField==='zodiac'?null:'zodiac')}>
+            <div style={{display:'flex',flexWrap:'wrap',gap:7,padding:'4px 12px 14px'}}>
+              {ZODIACS.map(z=>(
+                <button key={z} onClick={()=>pickAndSave('zodiac',z,setEditZodiac)}
+                  style={{padding:'6px 12px',borderRadius:20,fontFamily:'inherit',fontSize:12,fontWeight:editZodiac===z?700:400,cursor:'pointer',border:`1.5px solid ${editZodiac===z?C.orange:C.border}`,background:editZodiac===z?`${C.orange}22`:C.bgCard,color:editZodiac===z?C.orange:C.whiteMid}}>
+                  {z}
+                </button>
+              ))}
+            </div>
+          </FieldRow>
+        </div>
+
+        {/* Style de vie */}
+        {SH('Style de vie')}
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
+          <FieldRow icon="💫" label="Statut" value={REL_OPTS.find(o=>o.k===editRelStatus)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='relstatus'} onTap={()=>setEditField(editField==='relstatus'?null:'relstatus')}>
+            <Chips opts={REL_OPTS} val={editRelStatus} onPick={k=>pickAndSave('relationship_status',k,setEditRelStatus)}/>
+          </FieldRow>
+          <FieldRow icon="👶" label="Enfants" value={KIDS_OPTS.find(o=>o.k===editKidsPref)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='kids'} onTap={()=>setEditField(editField==='kids'?null:'kids')}>
+            <Chips opts={KIDS_OPTS} val={editKidsPref} onPick={k=>pickAndSave('kids_pref',k,setEditKidsPref)}/>
+          </FieldRow>
+          <FieldRow icon="🚬" label="Tabac" value={SMOKE_OPTS.find(o=>o.k===editSmoking)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='smoking'} onTap={()=>setEditField(editField==='smoking'?null:'smoking')}>
+            <Chips opts={SMOKE_OPTS} val={editSmoking} onPick={k=>pickAndSave('smoking',k,setEditSmoking)}/>
+          </FieldRow>
+          <FieldRow icon="🍷" label="Alcool" value={DRINK_OPTS.find(o=>o.k===editDrinking)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='drinking'} onTap={()=>setEditField(editField==='drinking'?null:'drinking')}>
+            <Chips opts={DRINK_OPTS} val={editDrinking} onPick={k=>pickAndSave('drinking',k,setEditDrinking)}/>
+          </FieldRow>
+        </div>
+
+        {/* Passions */}
+        {SH('Passions')}
+        {(()=>{
+          const saveInterests = async (list:string[]) => {
+            setSavingInterests(true)
+            await supabase.from('profiles').update({interests:list}).eq('id',user.id)
+            onUserUpdate({...user,interests:list} as any); setSavingInterests(false)
+          }
+          return (
+            <div style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+                {editInterests.length>0&&<button onClick={()=>saveInterests(editInterests)} disabled={savingInterests}
+                  style={{fontSize:11,fontWeight:800,color:C.green,background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'3px 12px',cursor:'pointer',fontFamily:'inherit'}}>
+                  {savingInterests?'…':'Save'}
+                </button>}
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+                {ALL_INTERESTS.map(interest=>{
+                  const sel=editInterests.includes(interest)
+                  return <button key={interest} onClick={()=>{
+                    const next=sel?editInterests.filter(i=>i!==interest):editInterests.length>=8?(showToast('Max 8',C.orange),editInterests):[...editInterests,interest]
+                    setEditInterests(next)
+                  }} style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${sel?C.salmon:C.border}`,background:sel?`${C.salmon}20`:'transparent',color:sel?C.salmon:C.whiteMid,fontSize:12,fontWeight:sel?700:400,cursor:'pointer',fontFamily:'inherit'}}>{interest}</button>
+                })}
+              </div>
+              <div style={{fontSize:9,color:C.whiteMid,opacity:.5,marginTop:6,textAlign:'center'}}>{editInterests.length}/8 sélectionnés</div>
+            </div>
+          )
+        })()}
+
+        {/* Langues */}
+        {SH('Langues')}
+        {(()=>{
+          const saveLangs = async (list:string[]) => {
+            setSavingLanguages(true)
+            await supabase.from('profiles').update({languages:list}).eq('id',user.id)
+            onUserUpdate({...user,languages:list} as any); setSavingLanguages(false)
+          }
+          return (
+            <div style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+                {editLanguages.length>0&&<button onClick={()=>saveLangs(editLanguages)} disabled={savingLanguages}
+                  style={{fontSize:11,fontWeight:800,color:C.green,background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'3px 12px',cursor:'pointer',fontFamily:'inherit'}}>
+                  {savingLanguages?'…':'Save'}
+                </button>}
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+                {ALL_LANGS.map(l=>{
+                  const sel=editLanguages.includes(l)
+                  return <button key={l} onClick={()=>{const next=sel?editLanguages.filter(x=>x!==l):[...editLanguages,l];setEditLanguages(next)}}
+                    style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${sel?C.salmon:C.border}`,background:sel?C.salmonFaint:'transparent',color:sel?C.salmon:C.whiteMid,fontSize:12,fontWeight:sel?700:400,cursor:'pointer',fontFamily:'inherit'}}>{l}</button>
+                })}
+              </div>
+            </div>
+          )
+        })()}
+      </div>
+    )
+  }
+
+  const PageSeeking = () => {
+    const SEEK_OPTS = [{k:'romance',l:'❤️ Romantique'},{k:'friendship',l:'🤝 Amical'},{k:'pro',l:'💼 Pro / Réseau'},{k:'all',l:'✨ Tout à la fois'}]
+    return (
+      <div>
+        {SH('Ce que je cherche')}
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
+          <FieldRow icon="🎯" label="Mode de rencontre" value={SEEK_OPTS.find(o=>o.k===editLookingFor)?.l||''} placeholder="Sélectionne…"
+            isEditing={editField==='seeking'} onTap={()=>setEditField(editField==='seeking'?null:'seeking')}>
+            <Chips opts={SEEK_OPTS} val={editLookingFor} onPick={k=>pickAndSave('looking_for',k,setEditLookingFor)}/>
+          </FieldRow>
+        </div>
+        <div style={{background:C.bgCard,borderRadius:12,padding:'14px',border:`1px solid ${C.border}`,marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.white,marginBottom:4}}>✦ Tip Clutch</div>
+          <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6}}>
+            Ton mode de rencontre est visible sur ton profil. Il aide les autres à comprendre tes intentions avant de t'envoyer un Clutch.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const PageFavorites = () => (
+    <div>
+      {favorites.length===0
+        ? <div style={{textAlign:'center',padding:'40px 0',color:C.whiteMid,fontSize:14}}>❤️<br/>Pas encore de favoris</div>
+        : <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+            {favorites.map((f,i)=>(
+              <div key={f.id} style={{display:'flex',gap:10,alignItems:'center',padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <Av src={f.photo_url} name={f.name||'?'} size={40}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{f.name}</div>
+                  {f.bio&&<div style={{fontSize:11,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.bio.slice(0,50)}</div>}
+                </div>
+                <button onClick={()=>unfav(f.id)} style={{background:'none',border:`1px solid ${C.border}`,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit',padding:'5px 10px',borderRadius:8,flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+      }
+    </div>
+  )
+
+  const PageGhosted = () => (
+    <div>
+      <div style={{background:C.bgCard,borderRadius:12,padding:'12px 14px',border:`1px solid ${C.border}`,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.white,marginBottom:4}}>👻 Personnes ghostées</div>
+        <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6}}>Ces personnes ne verront plus ton profil et ne pourront plus t'envoyer de Clutch.</div>
+      </div>
+      {blocked.length===0
+        ? <div style={{textAlign:'center',padding:'40px 0',color:C.whiteMid,fontSize:14}}>👻<br/>Personne de ghosté</div>
+        : <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+            {blocked.map((b,i)=>(
+              <div key={b.id} style={{display:'flex',gap:10,alignItems:'center',padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <Av src={b.photo_url} name={b.name||'?'} size={40}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{b.name}</div>
+                </div>
+                <button onClick={()=>unblock(b.id)} style={{background:`${C.green}18`,border:`1px solid ${C.green}44`,color:C.green,fontSize:11,cursor:'pointer',fontFamily:'inherit',padding:'5px 10px',borderRadius:8,fontWeight:700,flexShrink:0}}>Dé-ghoster</button>
+              </div>
+            ))}
+          </div>
+      }
+    </div>
+  )
+
+  const PageSubscription = () => {
+    const tiers = [
+      {id:'free',label:'Gratuit',price:'CHF 0',color:'#6b7280',features:['3 Clutchs / jour','Profil standard','Accès à tous les événements']},
+      {id:'premium',label:'Premium ✦',price:'CHF 19.90/mois',color:C.gold,features:['Clutchs illimités','Profil mis en avant','Voir qui t\'a mis en favoris','Badge ✦ visible','Accès anticipé events']},
+    ]
+    const current = 'free'
+    return (
+      <div>
+        {tiers.map(tier=>(
+          <div key={tier.id} style={{background:C.bgCard,borderRadius:16,padding:'16px',border:`2px solid ${tier.id===current?tier.color:C.border}`,marginBottom:12,position:'relative',overflow:'hidden'}}>
+            {tier.id===current&&<div style={{position:'absolute',top:0,right:0,background:tier.color,padding:'4px 12px',borderBottomLeftRadius:10,fontSize:10,fontWeight:800,color:'#000'}}>ACTUEL</div>}
+            <div style={{fontSize:16,fontWeight:900,color:tier.id===current?tier.color:C.white,marginBottom:2}}>{tier.label}</div>
+            <div style={{fontSize:14,fontWeight:700,color:tier.id===current?tier.color:C.whiteMid,marginBottom:12}}>{tier.price}</div>
+            {tier.features.map((f,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                <span style={{color:tier.id===current?tier.color:C.whiteMid,fontSize:14}}>✓</span>
+                <span style={{fontSize:12,color:tier.id===current?C.white:C.whiteMid}}>{f}</span>
+              </div>
+            ))}
+            {tier.id!==current&&<button style={{width:'100%',marginTop:12,padding:'12px',borderRadius:12,border:'none',background:tier.color,color:'#000',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+              Passer à {tier.label}
+            </button>}
+          </div>
+        ))}
+        <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',opacity:.5,lineHeight:1.6}}>
+          Abonnement mensuel · Résiliable à tout moment<br/>Prix en CHF · Suisse uniquement pour l'instant
+        </div>
+      </div>
+    )
+  }
+
+  const PagePreferences = () => (
+    <div>
+      {SH('Langue')}
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
+        <div style={{display:'flex',gap:8,padding:'12px 14px'}}>
+          {(['fr','en'] as Lang[]).map(l=>(
+            <button key={l} onClick={()=>setLang(l)}
+              style={{flex:1,padding:'9px',borderRadius:10,border:`1.5px solid ${lang===l?C.orange:C.border}`,background:lang===l?`${C.orange}22`:C.bgCard,color:lang===l?C.orange:C.whiteMid,fontSize:13,fontWeight:lang===l?800:400,cursor:'pointer',fontFamily:'inherit'}}>
+              {l==='fr'?'🇨🇭 Français':'🇬🇧 English'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {SH('Mode de réception')}
+      <div style={{background:C.bgCard,borderRadius:14,padding:'14px',border:`1px solid ${C.border}`,marginBottom:8}}>
+        <div style={{fontSize:11,color:C.whiteMid,marginBottom:10,lineHeight:1.5}}>Contrôle qui peut t'envoyer un Clutch quand tu es disponible.</div>
+        {([['open','🟢 Ouverte','Tout le monde peut t\'envoyer un Clutch'],['selective','🟡 Sélective','Seulement les profils compatibles'],['pause','🔴 Pause','Personne ne peut t\'envoyer de Clutch']] as [typeof recepMode,string,string][]).map(([m,label,desc])=>(
+          <div key={m} onClick={()=>saveRecepMode(m)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px',borderRadius:12,border:`1.5px solid ${recepMode===m?C.orange:C.border}`,background:recepMode===m?`${C.orange}11`:C.bgCard,marginBottom:6,cursor:'pointer'}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:recepMode===m?800:500,color:recepMode===m?C.orange:C.white}}>{label}</div>
+              <div style={{fontSize:11,color:C.whiteMid}}>{desc}</div>
+            </div>
+            {recepMode===m&&<div style={{width:18,height:18,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#000',fontWeight:900}}>✓</div>}
+          </div>
+        ))}
+      </div>
+
+      {SH('Activité du moment')}
+      <div style={{background:C.bgCard,border:`1px solid ${actText.trim()?C.gold:C.border}`,borderRadius:14,padding:'14px',marginBottom:8}}>
+        <div style={{fontSize:11,color:C.whiteMid,marginBottom:10,lineHeight:1.5}}>Visible sur ton profil pendant 8h. Les autres peuvent te rejoindre.</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+          {ACTIVITY_EMOJIS.map(e=>(
+            <button key={e} onClick={()=>setActEmoji(actEmoji===e?'':e)}
+              style={{width:34,height:34,borderRadius:10,border:`1.5px solid ${actEmoji===e?C.gold:C.border}`,background:actEmoji===e?`${C.gold}22`:C.bgCard,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {e}
+            </button>
+          ))}
+        </div>
+        <input value={actText} onChange={e=>setActText(e.target.value)} placeholder={`${actEmoji||'♟️'} Décris ton activité…`} maxLength={60}
+          style={{width:'100%',padding:'10px 14px',borderRadius:12,border:`1.5px solid ${C.border}`,background:'rgba(0,0,0,.2)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',marginBottom:8}}/>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={saveActivity} disabled={actSaving}
+            style={{flex:1,padding:'10px',borderRadius:12,border:'none',background:C.gold,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:actSaving?.6:1}}>
+            {actSaving?'…':actText.trim()?'✦ Partager':'Effacer'}
+          </button>
+          {actText.trim()&&<button onClick={()=>{setActText('');setActEmoji('');saveActivity()}} style={{padding:'10px 14px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕</button>}
+        </div>
+      </div>
+    </div>
+  )
+
+  const PageSecurity = () => (
+    <div>
+      <div style={{background:'rgba(248,113,113,0.06)',border:'1.5px solid rgba(248,113,113,0.25)',borderRadius:14,padding:'16px',marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:800,color:'#f87171',marginBottom:8}}>🆘 Contact d'urgence</div>
+        <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.6,marginBottom:14}}>
+          En cas de problème, appuie longuement sur le logo Clutch → SOS → ton contact est prévenu avec ta position.
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <input value={sosName} onChange={e=>setSosName(e.target.value)} placeholder="Nom du contact (ex: Maman)"
+            style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+          <input value={sosPhone} onChange={e=>setSosPhone(e.target.value)} placeholder="Numéro (+41…)" type="tel"
+            style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+          <button onClick={saveSos} disabled={sosSaving||!sosName.trim()||!sosPhone.trim()}
+            style={{width:'100%',padding:'12px',borderRadius:12,border:'none',background:'#f87171',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:sosSaving||!sosName.trim()||!sosPhone.trim()?.5:1}}>
+            {sosSaving?'Sauvegarde…':'💾 Sauvegarder'}
+          </button>
+        </div>
+      </div>
+      <div style={{background:C.bgCard,borderRadius:12,padding:'14px',border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.white,marginBottom:6}}>Score de fiabilité</div>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{fontSize:36,fontWeight:900,color:(user.reliability_score??100)>=80?C.green:C.orange}}>{user.reliability_score??100}</div>
+          <div>
+            <div style={{height:6,width:120,background:C.border,borderRadius:3,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${user.reliability_score??100}%`,background:(user.reliability_score??100)>=80?C.green:C.orange,borderRadius:3,transition:'width .4s'}}/>
+            </div>
+            <div style={{fontSize:10,color:C.whiteMid,marginTop:4}}>{(user.reliability_score??100)>=90?'Excellent — Les gens te font confiance':((user.reliability_score??100)>=70?'Bon — Continue comme ça':'À améliorer — Honore tes RDV')}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const PageLegal = () => (
+    <div>
+      {[
+        {icon:'📋',label:'Conditions d\'utilisation',href:'/terms'},
+        {icon:'🔒',label:'Politique de confidentialité',href:'/privacy'},
+        {icon:'⚖️',label:'Mentions légales',href:'/legal'},
+      ].map(({icon,label,href})=>(
+        <div key={href} onClick={()=>window.open(href,'_blank')} style={{display:'flex',alignItems:'center',gap:12,padding:'14px',background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,cursor:'pointer'}}>
+          <span style={{fontSize:20}}>{icon}</span>
+          <span style={{flex:1,fontSize:13,fontWeight:600,color:C.white}}>{label}</span>
+          <span style={{color:C.whiteMid,fontSize:16}}>↗</span>
+        </div>
+      ))}
+      <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',opacity:.5,marginTop:16,lineHeight:1.6}}>
+        Clutch — Lausanne 🇨🇭<br/>
+        Données hébergées en Suisse · Conformité LPD<br/>
+        Version beta · david.saugy@gmail.com
+      </div>
+    </div>
+  )
+
+  const PageContact = () => (
+    <div>
+      <div style={{background:C.bgCard,borderRadius:14,padding:'20px',border:`1px solid ${C.border}`,marginBottom:12,textAlign:'center'}}>
+        <div style={{fontSize:32,marginBottom:8}}>📩</div>
+        <div style={{fontSize:15,fontWeight:800,color:C.white,marginBottom:4}}>Nous contacter</div>
+        <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.6,marginBottom:16}}>
+          Un bug ? Une idée ? Une question ?<br/>On répond dans les 24h.
+        </div>
+        <button onClick={()=>window.open('mailto:david.saugy@gmail.com?subject=Clutch feedback','_blank')}
+          style={{width:'100%',padding:'13px',borderRadius:12,border:'none',background:C.orange,color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+          ✉️ Envoyer un email
+        </button>
+      </div>
+      <div style={{background:C.bgCard,borderRadius:12,padding:'14px',border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.white,marginBottom:4}}>Beta tester</div>
+        <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6}}>Tu fais partie des premiers à tester Clutch. Ton feedback est précieux — n'hésite pas à tout nous dire.</div>
+      </div>
+    </div>
+  )
+
+  // ── Sous-page container ─────────────────────────────────────
+  const subPageTitles: Record<string,string> = {
+    edit_profil:'Mon profil', seeking:'Ce que je cherche',
+    favorites:'Favoris', ghosted:'Ghostés',
+    subscription:'Mon abonnement', preferences:'Préférences',
+    security:'Sécurité & SOS', legal:'Légal', contact:'Nous contacter',
+  }
+  const subPageContent: Record<string,React.ReactNode> = {
+    edit_profil: <PageEditProfil/>,
+    seeking: <PageSeeking/>,
+    favorites: <PageFavorites/>,
+    ghosted: <PageGhosted/>,
+    subscription: <PageSubscription/>,
+    preferences: <PagePreferences/>,
+    security: <PageSecurity/>,
+    legal: <PageLegal/>,
+    contact: <PageContact/>,
+  }
+
   return (
     <>
     <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'0 0 32px'}}>
 
-      {/* ─── HERO PHOTO (style Bumble) ─── */}
-      <div style={{position:'relative',height:320,background:user.photo_url?'transparent':`linear-gradient(160deg,${C.bordeauxLight},${C.bordeaux})`,overflow:'hidden',flexShrink:0}}>
+      {/* ─── HERO ─── */}
+      <div style={{position:'relative',height:260,background:user.photo_url?'transparent':`linear-gradient(160deg,${C.bordeauxLight},${C.bordeaux})`,overflow:'hidden',flexShrink:0}}>
         {user.photo_url&&<img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% 30%'}}/>}
-        {/* Gradient bas */}
-        <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(42,16,32,.98) 0%,rgba(42,16,32,.3) 50%,transparent 100%)'}}/>
-        {/* Settings btn */}
-        <button onClick={()=>{setProfileSubTab('settings');setEditField(null)}}
-          style={{position:'absolute',top:52,right:14,background:'rgba(42,16,32,.65)',border:`1px solid ${C.border}`,backdropFilter:'blur(6px)',borderRadius:'50%',width:38,height:38,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:C.whiteMid,fontSize:18,zIndex:2}}>⚙</button>
-        {/* Edit photo btn */}
-        <button onClick={()=>fileRef.current?.click()}
-          style={{position:'absolute',top:52,left:14,background:'rgba(42,16,32,.65)',border:`1px solid ${C.border}`,backdropFilter:'blur(6px)',borderRadius:20,padding:'7px 12px',display:'flex',alignItems:'center',gap:6,cursor:'pointer',color:C.salmon,fontSize:12,fontWeight:700,zIndex:2}}>
-          📷 Photo
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}}
-          onChange={e=>{if(e.target.files?.[0])uploadPhoto(e.target.files[0])}}/>
-        {/* Nom + infos en bas de la photo */}
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(42,16,32,1) 0%,rgba(42,16,32,.2) 55%,transparent 100%)'}}/>
         <div style={{position:'absolute',bottom:14,left:16,right:16}}>
-          <div style={{display:'flex',alignItems:'flex-end',gap:10,marginBottom:6}}>
-            <span style={{fontSize:26,fontWeight:900,color:C.white,lineHeight:1}}>{user.name}</span>
-            {(user as any).age&&<span style={{fontSize:18,fontWeight:600,color:`${C.white}bb`,lineHeight:1,paddingBottom:1}}>{(user as any).age}</span>}
-            <GenderSvg gk={genderKey((user as any).gender)} size={20}/>
+          <div style={{display:'flex',alignItems:'flex-end',gap:10,marginBottom:4}}>
+            <span style={{fontSize:24,fontWeight:900,color:C.white,lineHeight:1}}>{user.name}</span>
+            {(user as any).age&&<span style={{fontSize:17,fontWeight:600,color:`${C.white}aa`,lineHeight:1,paddingBottom:1}}>{(user as any).age}</span>}
+            <GenderSvg gk={genderKey((user as any).gender)} size={18}/>
           </div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-            {user.reliability_score!=null&&<Score v={user.reliability_score}/>}
-            {user.available_city&&CITIES_NAMES.has(user.available_city)&&(
-              <span style={{fontSize:11,color:`${C.white}99`,display:'flex',alignItems:'center',gap:3}}>📍 {user.available_city}</span>
-            )}
-            {(user as any).job&&<span style={{fontSize:11,color:`${C.white}88`}}>· {(user as any).job}</span>}
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+            <TrustBadge profile={user} lang={lang} showCount={true}/>
+            {(user as any).job&&<span style={{fontSize:11,color:`${C.white}88`}}>{(user as any).job}</span>}
           </div>
         </div>
       </div>
 
-      {/* ─── BARRE COMPLÉTION PROFIL ─── */}
+      {/* ─── SCORE FIABILITÉ ─── */}
+      <div style={{padding:'10px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
+        <div style={{flex:1,height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${user.reliability_score??100}%`,background:(user.reliability_score??100)>=80?C.green:C.orange,borderRadius:2,transition:'width .4s'}}/>
+        </div>
+        <span style={{fontSize:11,fontWeight:800,color:(user.reliability_score??100)>=80?C.green:C.orange,flexShrink:0}}>
+          Fiabilité {user.reliability_score??100}/100
+        </span>
+      </div>
+
+      {/* ─── BARRE COMPLÉTION ─── */}
       {(()=>{
-        const fields = [user.photo_url, user.bio, (user as any).gender, user.available_city, (user as any).age, (user as any).job]
-        const filled = fields.filter(Boolean).length
-        const pct = Math.round((filled/fields.length)*100)
-        if (pct >= 100) return null
+        const fields=[user.photo_url,user.bio,(user as any).gender,(user as any).age,(user as any).job]
+        const pct=Math.round((fields.filter(Boolean).length/fields.length)*100)
+        if(pct>=100) return null
         return (
-          <div style={{padding:'12px 16px 0',flexShrink:0}}>
-            <div style={{background:C.bgCard,borderRadius:12,padding:'10px 14px',border:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                <span style={{fontSize:11,fontWeight:700,color:C.salmon}}>Complete your profile</span>
-                <span style={{fontSize:11,fontWeight:900,color:C.orange}}>{pct}%</span>
+          <div style={{padding:'4px 16px 0'}}>
+            <div onClick={()=>setProfilePage('edit_profil')} style={{background:C.bgCard,borderRadius:10,padding:'8px 12px',border:`1px solid ${C.border}`,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.salmon}}>Complète ton profil · {pct}%</div>
+                <div style={{height:3,background:C.border,borderRadius:2,overflow:'hidden',marginTop:4}}>
+                  <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C.bordeauxLight},${C.orange})`,borderRadius:2}}/>
+                </div>
               </div>
-              <div style={{height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C.bordeauxLight},${C.orange})`,borderRadius:2,transition:'width .4s'}}/>
-              </div>
-              <div style={{fontSize:10,color:C.whiteMid,marginTop:5}}>
-                {!user.photo_url&&'📷 Add a photo · '}
-                {!(user as any).age&&'🎂 Your age · '}
-                {!user.bio&&'📝 A bio'}
-              </div>
+              <span style={{color:C.whiteMid,fontSize:16}}>›</span>
             </div>
           </div>
         )
       })()}
 
-      {/* ─── BOUTON DISPONIBILITÉ — CTA principal ─── */}
-      <div style={{padding:'10px 16px 4px',flexShrink:0}}>
-        <button onClick={isAvailable ? handleRetirerDispo : onSetAvailable}
+      {/* ─── CTA DISPONIBILITÉ ─── */}
+      <div style={{padding:'10px 16px 4px'}}>
+        <button onClick={rdvBlocked&&!isAvailable?()=>showToast('RDV en cours — tu redeviendras visible 2h après ton RDV',C.orange):isAvailable?handleRetirerDispo:()=>setFlow('carte')}
           style={{width:'100%',padding:'13px 20px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
-            background:isAvailable
-              ?`linear-gradient(135deg,#0a4a1a,#166534)`
-              :`linear-gradient(135deg,${C.bordeauxLight},${C.bordeaux})`,
+            background:isAvailable?`linear-gradient(135deg,#0a4a1a,#166534)`:`linear-gradient(135deg,${C.bordeauxLight},${C.bordeaux})`,
             border:`1.5px solid ${isAvailable?'#22c55e66':C.border}`,
             display:'flex',alignItems:'center',justifyContent:'space-between',
-            boxShadow:isAvailable?'0 0 20px rgba(34,197,94,.25)':'none',
-            transition:'all .3s',
-          }}>
+            boxShadow:isAvailable?'0 0 20px rgba(34,197,94,.25)':'none',transition:'all .3s'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:20,display:'inline-block',animation:isAvailable?'none':'none'}}>
-              {isAvailable?'🟢':'⚪'}
-            </span>
+            <span style={{fontSize:20}}>{isAvailable?'🟢':'⚪'}</span>
             <div style={{textAlign:'left'}}>
               <div style={{fontSize:13,fontWeight:900,color:isAvailable?'#4ade80':C.white}}>
-                {isAvailable?'Available now':'Set myself available'}
+                {isAvailable?t('profile.avail.on'):t('profile.avail.off')}
               </div>
               <div style={{fontSize:10,color:isAvailable?'#86efac':C.whiteMid}}>
-                {isAvailable?`Visible until ${(user as any).available_until?new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'...'} · Tap to remove` :'Appear on the Clutch map'}
+                {isAvailable?(t('profile.avail.sub.on').replace('{time}',(user as any).available_until?new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'...')):t('profile.avail.sub.off')}
               </div>
             </div>
           </div>
-          <span style={{fontSize:13,fontWeight:700,color:isAvailable?'#4ade80':C.salmon,
-            background:isAvailable?'rgba(34,197,94,.15)':'rgba(255,191,158,.1)',
-            borderRadius:10,padding:'5px 10px',border:`1px solid ${isAvailable?'rgba(34,197,94,.3)':'rgba(255,191,158,.2)'}`}}>
-            {isAvailable?'Remove ×':'Enable →'}
+          <span style={{fontSize:13,fontWeight:700,color:isAvailable?'#4ade80':C.salmon,background:isAvailable?'rgba(34,197,94,.15)':'rgba(255,191,158,.1)',borderRadius:10,padding:'5px 10px',border:`1px solid ${isAvailable?'rgba(34,197,94,.3)':'rgba(255,191,158,.2)'}`}}>
+            {isAvailable?t('settings.remove'):t('settings.enable')}
           </span>
         </button>
       </div>
 
-      {/* ─── TABS ─── */}
-      <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,margin:'8px 16px 0'}}>
-        {(['profil','settings'] as const).map(st=>(
-          <button key={st} onClick={()=>{setProfileSubTab(st);setEditField(null)}}
-            style={{flex:1,padding:'10px',background:'transparent',border:'none',
-              borderBottom:`2.5px solid ${profileSubTab===st?C.orange:'transparent'}`,
-              color:profileSubTab===st?C.orange:C.whiteMid,fontSize:13,
-              fontWeight:profileSubTab===st?800:500,cursor:'pointer',fontFamily:'inherit',
-              transition:'all .15s'}}>
-            {st==='profil'?'My Profile':'Settings'}
-          </button>
-        ))}
+      {/* ─── MENU PRINCIPAL ─── */}
+      <div style={{padding:'0 16px'}}>
+
+        {SH('Mon compte')}
+        <MCard>
+          <MRow icon="👤" label="Mon profil" sub="Photos, bio, passions, style de vie…" onTap={()=>setProfilePage('edit_profil')}/>
+          <MRow icon="🎯" label="Ce que je cherche" sub={editLookingFor?({romance:'❤️ Romantique',friendship:'🤝 Amical',pro:'💼 Pro',all:'✨ Tout'}[editLookingFor]||''):'Mode de rencontre…'} onTap={()=>setProfilePage('seeking')}/>
+          <MRow icon="💎" label="Mon abonnement" sub="Gratuit · Passer Premium CHF 19.90/mois" onTap={()=>setProfilePage('subscription')}/>
+        </MCard>
+
+        {SH('Social')}
+        <MCard>
+          <MRow icon="❤️" label="Favoris" sub={favorites.length>0?`${favorites.length} personne${favorites.length>1?'s':''}`:'Aucun favori'} onTap={()=>setProfilePage('favorites')}/>
+          <MRow icon="👻" label="Ghostés" sub={blocked.length>0?`${blocked.length} personne${blocked.length>1?'s':''}`:'Personne de ghosté'} onTap={()=>setProfilePage('ghosted')}/>
+        </MCard>
+
+        {SH('Application')}
+        <MCard>
+          <MRow icon="🔔" label="Préférences" sub="Langue, réception, activité…" onTap={()=>setProfilePage('preferences')}/>
+          <MRow icon="🆘" label="Sécurité & SOS" sub={sosName?`Contact : ${sosName}`:'Configurer un contact d\'urgence'} onTap={()=>setProfilePage('security')}/>
+        </MCard>
+
+        {SH('Informations')}
+        <MCard>
+          <MRow icon="⚖️" label="Légal & Confidentialité" sub="CGU, données, LPD suisse" onTap={()=>setProfilePage('legal')}/>
+          <MRow icon="📩" label="Nous contacter" sub="Bug, idée, feedback" onTap={()=>setProfilePage('contact')}/>
+        </MCard>
+
+        {SH('Danger')}
+        <MCard>
+          <MRow icon="🚪" label="Se déconnecter" danger onTap={()=>{ if(confirm('Se déconnecter ?')) signOut() }}/>
+          <MRow icon="🗑" label="Supprimer mon compte" danger onTap={()=>setShowDelete(true)}/>
+        </MCard>
+
+        <div style={{height:16}}/>
       </div>
 
-      {/* ════════════ TAB MON PROFIL ════════════ */}
-      {profileSubTab==='profil' && (
-        <div style={{padding:'0 16px'}}>
-
-          {/* Photos — grille Bumble-style (3 colonnes, petites, numérotées) */}
-          <div style={{marginBottom:20}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase'}}>Photos & videos</div>
-              <div style={{fontSize:9,color:C.whiteMid,opacity:.6}}>Tap to select · tap again to swap</div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:5}}>
-              {/* Slot 0 = principale */}
-              <div style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',
-                border:`1.5px solid ${user.photo_url?C.orange+`66`:C.border}`,cursor:'pointer',background:C.bgCard}}
-                onClick={()=>fileRef.current?.click()}>
-                {user.photo_url
-                  ? <img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  : <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}}>
-                      <span style={{fontSize:22,color:C.whiteMid,opacity:.4}}>+</span>
-                      <span style={{fontSize:8,color:C.whiteMid,opacity:.4}}>Photo</span>
-                    </div>
-                }
-                <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(0,0,0,.45)',borderRadius:5,padding:'2px 5px'}}>Main photo</div>
-              </div>
-              {/* Slots 1-5 = extra — tap-to-swap */}
-              {[0,1,2,3,4].map(i=>{
-                const refIdx = Math.min(i,3)
-                const photo = extraPhotos[refIdx] ?? null
-                const isSelected = swapFromIdx === i
-                const isSwapping = swapFromIdx !== null
-                return (
-                  <div key={i} style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',
-                    border:`1.5px solid ${isSelected?C.orange:photo?C.borderStrong:C.border}`,
-                    cursor:'pointer',background:C.bgCard,
-                    boxShadow:isSelected?`0 0 0 2px ${C.orange}`:undefined,
-                    transform:isSelected?'scale(0.96)':'scale(1)',
-                    transition:'transform .15s,box-shadow .15s',
-                  }}
-                  onClick={()=>{
-                    if (isSwapping && swapFromIdx !== null) {
-                      if (swapFromIdx === i) { setSwapFromIdx(null); return }
-                      const updated = [...extraPhotos]
-                      const fi = Math.min(swapFromIdx, 3)
-                      const ti = Math.min(i, 3)
-                      const tmp = updated[fi]; updated[fi] = updated[ti]; updated[ti] = tmp
-                      setExtraPhotos(updated)
-                      try { localStorage.setItem(storageKey, JSON.stringify(updated)) } catch {}
-                      setSwapFromIdx(null)
-                      showToast('✓ Photos swapped', C.green)
-                    } else {
-                      if (photo) {
-                        setSwapFromIdx(i)
-                      } else {
-                        extraRefs[refIdx]?.current?.click()
-                      }
-                    }
-                  }}>
-                  {photo
-                    ? <>
-                        <img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none'}}/>
-                        {isSelected && <div style={{position:'absolute',inset:0,background:'rgba(226,124,0,.25)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          <div style={{background:C.orange,borderRadius:20,padding:'4px 10px',fontSize:10,fontWeight:800,color:'#000'}}>Move here →</div>
-                        </div>}
-                        {!isSelected && <button onClick={e=>{e.stopPropagation();removeExtra(refIdx)}}
-                          style={{position:'absolute',top:4,right:4,background:'rgba(0,0,0,.7)',border:'none',color:'#fff',width:18,height:18,borderRadius:'50%',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>×</button>}
-                      </>
-                    : <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,fontSize:20,color:C.whiteMid,opacity:isSwapping?.7:.3}}>
-                        {isSwapping ? <span style={{fontSize:14,opacity:.9}}>Place here</span> : <span>+</span>}
-                      </div>
-                  }
-                  <div style={{position:'absolute',bottom:4,left:5,fontSize:9,fontWeight:700,color:'rgba(255,255,255,.7)',background:'rgba(0,0,0,.4)',borderRadius:4,padding:'1px 5px'}}>{i+2}</div>
-                  <input ref={i<4?extraRefs[i]:undefined} type="file" accept="image/*" style={{display:'none'}}
-                    onChange={e=>{if(e.target.files?.[0])uploadExtra(e.target.files[0],refIdx)}}/>
-                  </div>
-                )
-              })}
-            </div>
-            {swapFromIdx !== null && (
-              <button onClick={()=>setSwapFromIdx(null)} style={{width:'100%',marginTop:6,padding:'6px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
-                ✕ Cancel selection
-              </button>
-            )}
-            <div style={{fontSize:9,color:C.whiteMid,opacity:.5,marginTop:6,textAlign:'center'}}>
-              More photos = more Clutches ✦
-            </div>
+      {/* ─── SOUS-PAGE (slide depuis la droite) ─── */}
+      {profilePage && (
+        <div style={{position:'fixed',inset:0,bottom:72,background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+          {/* Header */}
+          <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'48px 16px 12px',display:'flex',alignItems:'center',gap:12,zIndex:2}}>
+            <button onClick={()=>{setProfilePage(null);setEditField(null)}}
+              style={{background:'none',border:'none',color:C.salmon,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4,padding:'4px 0',flexShrink:0}}>
+              ‹ Retour
+            </button>
+            <span style={{fontSize:16,fontWeight:800,color:C.white,flex:1,textAlign:'center'}}>{subPageTitles[profilePage]||''}</span>
+            <div style={{width:60}}/>
           </div>
-
-          {/* À propos — champs éditables */}
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:10,letterSpacing:'.08em',textTransform:'uppercase'}}>About me</div>
-            <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
-
-              {/* Bio */}
-              <FieldRow icon="📝" label="Bio" value={user.bio||''} placeholder="Add a bio..."
-                isEditing={editField==='bio'} onTap={()=>setEditField(editField==='bio'?null:'bio')}>
-                <div style={{padding:'4px 12px 12px'}}>
-                  <textarea value={editBio} onChange={e=>setEditBio(e.target.value.slice(0,160))} rows={3}
-                    autoFocus
-                    style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',boxSizing:'border-box'}}/>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
-                    <span style={{fontSize:10,color:C.whiteMid}}>{editBio.length}/160</span>
-                    <button onClick={saveEdit} disabled={savingEdit}
-                      style={{padding:'6px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:savingEdit?.7:1}}>
-                      {savingEdit?'…':'Save'}
-                    </button>
-                  </div>
-                </div>
-              </FieldRow>
-
-              {/* Âge — éditable une seule fois si vide, sinon immuable */}
-              <div style={{borderBottom:`1px solid ${C.border}`}}>
-                <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',cursor:(user as any).age?'default':'pointer'}}
-                  onClick={()=>{if(!(user as any).age)setEditField(editField==='age'?null:'age')}}>
-                  <span style={{width:22,textAlign:'center',fontSize:16}}>🎂</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:11,color:C.whiteMid,fontWeight:600,marginBottom:1}}>Age</div>
-                    <div style={{fontSize:13,fontWeight:600,color:(user as any).age?C.white:C.orange}}>
-                      {(user as any).age ? `${(user as any).age}` : 'Enter my age →'}
-                    </div>
-                  </div>
-                  <span style={{fontSize:10,color:C.whiteMid,background:C.whiteFaint,padding:'2px 8px',borderRadius:10}}>
-                    {(user as any).age ? 'Locked' : 'Required'}
-                  </span>
-                </div>
-                {editField==='age'&&!(user as any).age&&(
-                  <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
-                    <input type="number" min={18} max={99} value={editJob} onChange={e=>setEditJob(e.target.value)} placeholder="Ex: 28"
-                      autoFocus
-                      style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:16,color:C.white,outline:'none',fontFamily:'inherit'}}/>
-                    <button onClick={async()=>{
-                      const age=parseInt(editJob)
-                      if(isNaN(age)||age<18||age>99){showToast('Invalid age (18-99)',C.red);return}
-                      setSavingEdit(true)
-                      await supabase.from('profiles').update({age}).eq('id',user.id)
-                      onUserUpdate({...user, age} as any)
-                      setEditField(null);setEditJob('');setSavingEdit(false)
-                      showToast('✓ Age saved — locked forever',C.green)
-                    }} disabled={savingEdit} style={{padding:'8px 14px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Métier */}
-              <FieldRow icon="💼" label="Job" value={(user as any).job||''} placeholder="Your job or studies"
-                isEditing={editField==='job'} onTap={()=>setEditField(editField==='job'?null:'job')}>
-                <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
-                  <input type="text" value={editJob} onChange={e=>setEditJob(e.target.value.slice(0,50))} maxLength={50}
-                    autoFocus placeholder="e.g. Designer, Student..."
-                    style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit'}}/>
-                  <button onClick={saveEdit} disabled={savingEdit}
-                    style={{padding:'8px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-                    {savingEdit?'…':'OK'}
-                  </button>
-                </div>
-              </FieldRow>
-
-              {/* Genre */}
-              <div style={{borderBottom:`1px solid ${C.border}`}}>
-                <FieldRow icon="" label="Gender"
-                  value={editGender==='F'?'Woman':editGender==='M'?'Man':'Not set'}
-                  gk={editGender} locked={genderLocked}
-                  isEditing={editField==='genre'&&!genderLocked}
-                  onTap={()=>!genderLocked&&setEditField(editField==='genre'?null:'genre')}>
-                  <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
-                    {(['F','M','X'] as GenderKey[]).map(g=>(
-                      <button key={g} onClick={()=>{setEditGender(g);saveEdit()}}
-                        style={{flex:1,padding:'8px 4px',borderRadius:10,border:`1.5px solid ${editGender===g?GC[g]:C.border}`,background:editGender===g?`${GC[g]}22`:'transparent',color:editGender===g?GC[g]:C.whiteMid,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
-                        <GenderSvg gk={g} size={14}/>{g==='F'?'Woman':g==='M'?'Man':'Other'}
-                      </button>
-                    ))}
-                  </div>
-                </FieldRow>
-              </div>
-
-              {/* Disponibilité inline */}
-              <div onClick={()=>setFlow('carte')} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 14px',cursor:'pointer'}}>
-                <span style={{width:22,textAlign:'center',fontSize:16}}>⏱</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:11,color:C.whiteMid,fontWeight:600,marginBottom:1}}>Availability</div>
-                  <div style={{fontSize:13,fontWeight:600,color:user.is_available?C.green:C.whiteMid}}>
-                    {user.is_available&&user.available_until&&new Date(user.available_until)>new Date()
-                      ?`Until ${new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`
-                      :'Offline'}
-                  </div>
-                </div>
-                <span style={{color:C.whiteMid,fontSize:16}}>›</span>
-              </div>
-
-            </div>
+          <div style={{padding:'12px 16px 32px'}}>
+            {subPageContent[profilePage]}
           </div>
-
-          {/* ─── INTÉRÊTS ─── */}
-          {(()=>{
-            const ALL_INTERESTS = ['☕ Café','🍷 Vins','🥾 Randonnée','🧘 Yoga','🎬 Cinéma','🍳 Cuisine','🎵 Musique','✈️ Voyage','🏃 Running','🎨 Art','💻 Tech','⚽ Sport','📚 Lecture','💃 Danse','🎉 Festivals','🍕 Restos','🎸 Concerts','🌿 Nature']
-            const saveInterests = async (list: string[]) => {
-              setSavingInterests(true)
-              await supabase.from('profiles').update({interests: list}).eq('id', user.id)
-              onUserUpdate({...user, interests: list} as any)
-              setSavingInterests(false)
-              showToast('✓ Interests updated', C.green)
-            }
-            const toggle = (interest: string) => {
-              const next = editInterests.includes(interest)
-                ? editInterests.filter(i=>i!==interest)
-                : editInterests.length >= 8 ? (showToast('Max 8 interests', C.orange), editInterests) : [...editInterests, interest]
-              setEditInterests(next)
-            }
-            return (
-              <div style={{marginBottom:20}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                  <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase'}}>Interests ({editInterests.length}/8)</div>
-                  {editInterests.length > 0 && (
-                    <button onClick={()=>saveInterests(editInterests)} disabled={savingInterests}
-                      style={{fontSize:11,fontWeight:800,color:C.green,background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'3px 12px',cursor:'pointer',fontFamily:'inherit'}}>
-                      {savingInterests?'…':'Save'}
-                    </button>
-                  )}
-                </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
-                  {ALL_INTERESTS.map(interest=>{
-                    const sel = editInterests.includes(interest)
-                    return (
-                      <button key={interest} onClick={()=>toggle(interest)}
-                        style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${sel?C.salmon:C.border}`,background:sel?`${C.salmon}20`:'transparent',color:sel?C.salmon:C.whiteMid,fontSize:12,fontWeight:sel?700:400,cursor:'pointer',fontFamily:'inherit',transition:'all .15s'}}>
-                        {interest}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* ─── LANGUES ─── */}
-          {(()=>{
-            const ALL_LANGS = ['Français','English','Deutsch','Italiano','Español','Português','العربية','日本語','中文','Русский']
-            const saveLangs = async (list: string[]) => {
-              setSavingLanguages(true)
-              await supabase.from('profiles').update({languages: list}).eq('id', user.id)
-              onUserUpdate({...user, languages: list} as any)
-              setSavingLanguages(false)
-              showToast('✓ Languages updated', C.green)
-            }
-            const toggleLang = (l: string) => {
-              const next = editLanguages.includes(l)
-                ? editLanguages.filter(x=>x!==l)
-                : [...editLanguages, l]
-              setEditLanguages(next)
-            }
-            return (
-              <div style={{marginBottom:20}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                  <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase'}}>🗣 {t('profile.languages')}</div>
-                  {editLanguages.length > 0 && (
-                    <button onClick={()=>saveLangs(editLanguages)} disabled={savingLanguages}
-                      style={{fontSize:11,fontWeight:800,color:C.green,background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'3px 12px',cursor:'pointer',fontFamily:'inherit'}}>
-                      {savingLanguages?'…':'Save'}
-                    </button>
-                  )}
-                </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
-                  {ALL_LANGS.map(l=>{
-                    const sel = editLanguages.includes(l)
-                    return (
-                      <button key={l} onClick={()=>toggleLang(l)}
-                        style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${sel?C.salmon:C.border}`,background:sel?C.salmonFaint:'transparent',color:sel?C.salmon:C.whiteMid,fontSize:12,fontWeight:sel?700:400,cursor:'pointer',fontFamily:'inherit',transition:'all .15s'}}>
-                        {l}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Favoris */}
-          {favorites.length>0&&(
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:10,letterSpacing:'.08em',textTransform:'uppercase'}}>Favorites ({favorites.length})</div>
-              <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
-                {favorites.map((f,i)=>(
-                  <div key={f.id} style={{display:'flex',gap:10,alignItems:'center',padding:'10px 14px',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
-                    <Av src={f.photo_url} name={f.name||'?'} size={36}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:700}}>{f.name}</div>
-                      {f.bio&&<div style={{fontSize:11,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.bio.slice(0,50)}</div>}
-                    </div>
-                    <button onClick={()=>unfav(f.id)} style={{background:'none',border:`1px solid ${C.border}`,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit',padding:'4px 8px',borderRadius:8}}>✕</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* ════════════ TAB PARAMÈTRES ════════════ */}
-      {profileSubTab==='settings' && (
-        <div style={{padding:'0 16px'}}>
-
-          {/* ── Abonnements — Éléments chimiques ── */}
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:10,letterSpacing:'.08em',textTransform:'uppercase',padding:'0 2px'}}>{t('sub.section')}</div>
-            <div style={{fontSize:9,color:C.whiteMid,opacity:.6,marginBottom:10,fontStyle:'italic',paddingLeft:2}}>
-              {t('sub.tagline')}
-            </div>
-            {([
-              {
-                sym:'H', name:t('sub.h.name'), sub:t('sub.h.sub'), price:'CHF 0',
-                color:'#9ca3af', active: true,
-                features:[t('sub.h.f1'),t('sub.h.f2'),t('sub.h.f3')],
-                note:t('sub.h.note')
-              },
-              {
-                sym:'Au', name:t('sub.au.name'), sub:t('sub.au.sub'), price:'CHF 9.90/mois',
-                color:'#f59e0b', active: false,
-                features:[t('sub.au.f1'),t('sub.au.f2'),t('sub.au.f3')],
-                note:t('sub.au.note')
-              },
-              {
-                sym:'Rh', name:t('sub.rh.name'), sub:t('sub.rh.sub'), price:'CHF 19.90/mois',
-                color:'#C8860A', active: false,
-                features:[t('sub.rh.f1'),t('sub.rh.f2'),t('sub.rh.f3'),t('sub.rh.f4'),t('sub.rh.f5')],
-                note:t('sub.rh.note')
-              },
-              {
-                sym:'At', name:t('sub.at.name'), sub:t('sub.at.sub'), price:'CHF 39.90/mois',
-                color:'#FFBF9E', active: false,
-                features:[t('sub.at.f1'),t('sub.at.f2'),t('sub.at.f3'),t('sub.at.f4'),t('sub.at.f5'),t('sub.at.f6')],
-                note:t('sub.at.note')
-              },
-            ] as {sym:string;name:string;sub:string;price:string;color:string;active:boolean;features:string[];note:string}[]).map((tier,i)=>(
-              <div key={i} onClick={()=>!tier.active&&showToast(`${tier.name} (${tier.sub}) — coming soon ✦`, tier.color)}
-                style={{
-                  background:tier.active?`${tier.color}15`:`${C.bgCard}`,
-                  border:`1.5px solid ${tier.active?tier.color:tier.color+'33'}`,
-                  borderRadius:14, padding:'12px 14px', marginBottom:8,
-                  cursor:tier.active?'default':'pointer',
-                  position:'relative', overflow:'hidden',
-                }}>
-                {tier.active&&<div style={{position:'absolute',top:8,right:8,fontSize:8,fontWeight:900,background:tier.color,color:'#000',borderRadius:20,padding:'2px 7px',letterSpacing:'.05em'}}>ACTIVE</div>}
-                {!tier.active&&<div style={{position:'absolute',top:8,right:8,fontSize:8,fontWeight:800,color:tier.color,background:`${tier.color}22`,border:`1px solid ${tier.color}44`,borderRadius:20,padding:'2px 7px'}}>Soon</div>}
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                  <div style={{
-                    width:36,height:36,borderRadius:10,
-                    background:`${tier.color}22`,border:`1.5px solid ${tier.color}55`,
-                    display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
-                  }}>
-                    <span style={{fontSize:14,fontWeight:900,color:tier.color,fontFamily:'monospace'}}>{tier.sym}</span>
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:900,color:tier.active?tier.color:C.white}}>{tier.name} <span style={{fontSize:10,fontWeight:600,color:C.whiteMid}}>· {tier.sub}</span></div>
-                    <div style={{fontSize:11,color:tier.active?tier.color:C.orange,fontWeight:700}}>{tier.price}</div>
-                  </div>
-                </div>
-                <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:6}}>
-                  {tier.features.map(f=>(
-                    <span key={f} style={{fontSize:9,color:tier.active?tier.color:C.whiteMid,background:`${tier.color}18`,border:`1px solid ${tier.color}30`,borderRadius:20,padding:'2px 8px'}}>{f}</span>
-                  ))}
-                </div>
-                <div style={{fontSize:9,color:C.whiteMid,opacity:.5,fontStyle:'italic'}}>{tier.note}</div>
-              </div>
-            ))}
-            <div style={{fontSize:9,color:C.whiteMid,opacity:.4,textAlign:'center',marginTop:4}}>
-              {t('sub.women')}
-            </div>
-          </div>
-
-          {/* ── Compte ── */}
-          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:8,letterSpacing:'.08em',textTransform:'uppercase',padding:'0 2px'}}>My account</div>
-          <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:16}}>
-            {([
-              {icon:'⏱', l:'Availability', s:user.is_available?`Until ${new Date(user.available_until||'').toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`:'Offline', onClick:()=>setFlow('carte')},
-              {icon:'🌐', l:'Language', s:lang==='fr'?'Français':'English', onClick:()=>{ const next=lang==='fr'?'en':'fr'; setLang(next); try{localStorage.setItem('clutch_lang',next)}catch{} }},
-              {icon:'🔔', l:'Notifications', s:'Enable Clutch alerts', onClick:()=>{
-                if ((window as any).OneSignal) {
-                  (window as any).OneSignal.showNativePrompt?.()
-                  showToast('Notifications enabled 🔔', C.green)
-                } else { showToast('Notifications available on native iOS (soon)', C.whiteMid) }
-              }},
-              {icon:'🏠', l:'Clutch HQ', s:'Internal dashboard', onClick:()=>{ if(typeof window!=='undefined') window.open('/hq','_blank') }},
-            ] as {icon:string;l:string;s:string;onClick:()=>void}[]).map((item,i,arr)=>(
-              <div key={i} onClick={item.onClick}
-                style={{display:'flex',gap:12,alignItems:'center',padding:'13px 14px',borderBottom:i<arr.length-1?`1px solid ${C.border}`:'none',cursor:'pointer'}}>
-                <span style={{fontSize:18,width:24,textAlign:'center'}}>{item.icon}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.white}}>{item.l}</div>
-                  {item.s&&<div style={{fontSize:11,color:C.whiteMid}}>{item.s}</div>}
-                </div>
-                <span style={{color:C.whiteMid,fontSize:16}}>›</span>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Score & Stats ── */}
-          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:8,letterSpacing:'.08em',textTransform:'uppercase',padding:'0 2px'}}>My Clutch score</div>
-          <div style={{background:C.bgCard,borderRadius:14,padding:'14px 16px',border:`1px solid ${C.border}`,marginBottom:16}}>
-            <div style={{display:'flex',gap:16,marginBottom:12}}>
-              <div style={{flex:1,textAlign:'center'}}>
-                <div style={{fontSize:28,fontWeight:900,color:user.reliability_score!=null&&user.reliability_score>=80?C.green:C.orange}}>{user.reliability_score??'—'}</div>
-                <div style={{fontSize:10,color:C.whiteMid}}>Reliability score</div>
-              </div>
-              <div style={{width:1,background:C.border}}/>
-              <div style={{flex:1,textAlign:'center'}}>
-                <div style={{fontSize:28,fontWeight:900,color:C.salmon}}>{(()=>{try{return JSON.parse(localStorage.getItem(`clutch_cancel_count_${user.id}`)||'0')}catch{return 0}})()}</div>
-                <div style={{fontSize:10,color:C.whiteMid}}>Cancellations</div>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,background:C.whiteFaint,borderRadius:10,padding:'8px 12px'}}>
-              ★ +5 pts per meetup kept · −20 pts if ghost · −10 if late cancel
-            </div>
-          </div>
-
-          {/* ══ MINI QG — ADN + LAB ══ */}
-          <div style={{marginBottom:20}}>
-
-            {/* Header QG */}
-            <div style={{
-              background:`linear-gradient(160deg,#1a0a16,#2a0f22)`,
-              border:`1px solid ${C.orange}33`,
-              borderRadius:16, padding:'18px 16px', marginBottom:12,
-              position:'relative', overflow:'hidden',
-            }}>
-              {/* Fond étoile décorative */}
-              <div style={{position:'absolute',top:-20,right:-20,fontSize:80,opacity:.04,pointerEvents:'none',userSelect:'none'}}>✦</div>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-                <div style={{
-                  width:36,height:36,borderRadius:10,flexShrink:0,
-                  background:`${C.orange}18`,border:`1.5px solid ${C.orange}44`,
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,
-                }}>🧪</div>
-                <div>
-                  <div style={{fontSize:14,fontWeight:900,color:C.orange,letterSpacing:'.02em'}}>Headquarters</div>
-                  <div style={{fontSize:9,color:C.whiteMid,opacity:.7}}>What's being built. What's being dreamed. What becomes.</div>
-                </div>
-              </div>
-
-              {/* ADN Clutch */}
-              <div style={{fontSize:11,fontWeight:900,color:C.salmon,marginBottom:8,letterSpacing:'.06em',textTransform:'uppercase'}}>Clutch DNA</div>
-              {([
-                { icon:'⚡', titre:'Spontaneity first', texte:'A Clutch = a meetup within 18h. No endless chatting. Action, now.' },
-                { icon:'🔒', titre:'The Lock as a promise', texte:'When both say yes, it\'s a commitment. Not a "maybe".' },
-                { icon:'♀', titre:'Women at the center', texte:'Free, protected, prioritized. Without them, Clutch doesn\'t exist.' },
-                { icon:'✦', titre:'Friction is a feature', texte:'If it works from the couch without moving, that\'s Tinder. Clutch is about going out.' },
-                { icon:'🇨🇭', titre:'Lausanne first', texte:'We build here, we test here. Then we grow. Small, precise, real.' },
-              ] as {icon:string;titre:string;texte:string}[]).map((p,i)=>(
-                <div key={i} style={{
-                  display:'flex',gap:10,padding:'8px 0',
-                  borderTop:i>0?`1px solid ${C.border}`:undefined,
-                }}>
-                  <span style={{fontSize:14,flexShrink:0,width:20,textAlign:'center',marginTop:1}}>{p.icon}</span>
-                  <div>
-                    <div style={{fontSize:11,fontWeight:800,color:C.white,marginBottom:2}}>{p.titre}</div>
-                    <div style={{fontSize:10,color:C.whiteMid,lineHeight:1.5,opacity:.8}}>{p.texte}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Lab — ce qu'on construit */}
-            <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:'14px 14px',marginBottom:8}}>
-              <div style={{fontSize:11,fontWeight:900,color:C.salmon,marginBottom:4,letterSpacing:'.04em'}}>{t('lab.title')}</div>
-              <div style={{fontSize:9,color:C.whiteMid,opacity:.6,marginBottom:10,lineHeight:1.5}}>
-                {t('lab.sub')}
-              </div>
-
-            {([
-              { icon:'👁',  label:t('lab.r1.label'),  tier:'Rh', status:'design', note:t('lab.r1.note') },
-              { icon:'✓✓', label:t('lab.r2.label'),   tier:'Rh', status:'design', note:t('lab.r2.note') },
-              { icon:'🚀', label:t('lab.r3.label'),   tier:'Rh', status:'design', note:t('lab.r3.note') },
-              { icon:'⭐', label:t('lab.r4.label'),   tier:'Rh', status:'design', note:t('lab.r4.note') },
-              { icon:'🎭', label:t('lab.r5.label'),   tier:'At', status:'design', note:t('lab.r5.note') },
-              { icon:'📍', label:t('lab.r6.label'),   tier:'H',  status:'dev',    note:t('lab.r6.note') },
-              { icon:'📸', label:t('lab.r7.label'),   tier:'H',  status:'dev',    note:t('lab.r7.note') },
-              { icon:'🎛', label:t('lab.r8.label'),   tier:'H',  status:'dev',    note:t('lab.r8.note') },
-              { icon:'🎉', label:t('lab.r9.label'),   tier:'H',  status:'dev',    note:t('lab.r9.note') },
-              { icon:'👋', label:t('lab.r10.label'),  tier:'H',  status:'dev',    note:t('lab.r10.note') },
-              { icon:'🔗', label:t('lab.r11.label'),  tier:'H',  status:'idea',   note:t('lab.r11.note') },
-              { icon:'📊', label:t('lab.r12.label'),  tier:'Au', status:'idea',   note:t('lab.r12.note') },
-              { icon:'🌍', label:t('lab.r13.label'),  tier:'H',  status:'idea',   note:t('lab.r13.note') },
-              { icon:'🔒', label:t('lab.r14.label'),  tier:'H',  status:'idea',   note:t('lab.r14.note') },
-              { icon:'✅', label:t('lab.r15.label'),  tier:'H',  status:'idea',   note:t('lab.r15.note') },
-              { icon:'💬', label:t('lab.r16.label'),  tier:'H',  status:'idea',   note:t('lab.r16.note') },
-            ] as {icon:string;label:string;tier:string;status:'dev'|'design'|'idea';note:string}[]).map((item,i)=>{
-              const statusC = item.status==='dev'?'#4ade80':item.status==='design'?C.orange:'#818cf8'
-              const tierC   = item.tier==='Rh'?'#C8860A':item.tier==='At'?'#FFBF9E':item.tier==='Au'?'#f59e0b':'#9ca3af'
-              return (
-                <div key={i} onClick={()=>showToast(`✦ Noted — "${item.label}"`, statusC)}
-                  style={{display:'flex',alignItems:'center',gap:9,padding:'8px 0',
-                    borderTop:i>0?`1px solid ${C.border}`:undefined,cursor:'pointer'}}>
-                  <span style={{fontSize:14,width:20,textAlign:'center',flexShrink:0}}>{item.icon}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:11,fontWeight:700,color:C.white}}>{item.label}</div>
-                    <div style={{fontSize:9,color:C.whiteMid,opacity:.6}}>{item.note}</div>
-                  </div>
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,flexShrink:0}}>
-                    <span style={{fontSize:8,fontWeight:800,color:statusC,background:`${statusC}18`,borderRadius:20,padding:'1px 6px'}}>
-                      {item.status==='dev'?'In dev':item.status==='design'?'Design':'Idea'}
-                    </span>
-                    <span style={{fontSize:8,color:tierC,fontFamily:'monospace',fontWeight:700,opacity:.8}}>{item.tier}</span>
-                  </div>
-                </div>
-              )
-            })}
-            </div>
-
-            <div style={{fontSize:9,color:C.whiteMid,opacity:.35,textAlign:'center',lineHeight:1.6}}>
-              Clutch {V} · Built in Lausanne, one meetup at a time 🇨🇭
-            </div>
-          </div>
-
-          {/* ── Légal & Aide ── */}
-          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:8,letterSpacing:'.08em',textTransform:'uppercase',padding:'0 2px'}}>Information</div>
-          <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:16}}>
-            {([
-              {icon:'⚖️', l:'Terms & Privacy', s:'Swiss LPD', onClick:()=>window.location.href='/legal'},
-              {icon:'🔒', l:'Security & Data', s:'Fuzzy GPS · Anonymized data', onClick:()=>window.location.href='/privacy'},
-              {icon:'🏠', l:'Main page', s:'clutch.lausanne', onClick:()=>window.location.href='/'},
-              {icon:'💌', l:'Contact the team', s:'david.saugy@gmail.com', onClick:()=>window.location.href='mailto:david.saugy@gmail.com'},
-            ] as {icon:string;l:string;s:string;onClick:()=>void}[]).map((item,i,arr)=>(
-              <div key={i} onClick={item.onClick}
-                style={{display:'flex',gap:12,alignItems:'center',padding:'13px 14px',borderBottom:i<arr.length-1?`1px solid ${C.border}`:'none',cursor:'pointer'}}>
-                <span style={{fontSize:18,width:24,textAlign:'center'}}>{item.icon}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.white}}>{item.l}</div>
-                  {item.s&&<div style={{fontSize:11,color:C.whiteMid}}>{item.s}</div>}
-                </div>
-                <span style={{color:C.whiteMid,fontSize:16}}>›</span>
-              </div>
-            ))}
-          </div>
-
-
-          {/* Bloqués */}
-          {blocked.length>0&&(
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,marginBottom:10,letterSpacing:'.08em',textTransform:'uppercase'}}>Blocked ({blocked.length})</div>
-              <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:'1px solid rgba(239,68,68,.2)'}}>
-                {blocked.map((b,i)=>(
-                  <div key={b.id} style={{display:'flex',gap:10,alignItems:'center',padding:'10px 14px',borderTop:i>0?'1px solid rgba(239,68,68,.12)':'none'}}>
-                    <Av src={b.photo_url} name={b.name||'?'} size={34}/>
-                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.whiteMid}}>{b.name}</div></div>
-                    <button onClick={()=>unblock(b.id)} style={{background:'none',border:`1px solid ${C.green}55`,borderRadius:8,color:C.green,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'4px 10px'}}>Unblock</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button onClick={()=>setFlow('carte')}
-            style={{width:'100%',padding:'12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit',marginBottom:8}}>
-            🔁 Replay intro
-          </button>
-          <button onClick={signOut}
-            style={{width:'100%',padding:'13px',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,color:C.white,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:8}}>
-            Sign out
-          </button>
-          <button onClick={()=>setShowDelete(true)}
-            style={{width:'100%',padding:'12px',background:'transparent',border:'1px solid rgba(239,68,68,.2)',borderRadius:12,color:'rgba(239,68,68,.6)',fontSize:12,cursor:'pointer',fontFamily:'inherit',marginBottom:20}}>
-            Delete my account
-          </button>
-
-          <div style={{textAlign:'center',fontSize:10,color:C.whiteMid,marginTop:4}}>Clutch {V} · Lausanne 🇨🇭</div>
         </div>
       )}
 
@@ -4151,76 +4976,709 @@ function penaltyReasonFromTime(proposedTime: string|null, isGhost=false): Penalt
 // ═════════════════════════════════════════════════════════════
 // RADAR DE PROXIMITÉ — Overlay persistant sur TOUTES les pages
 // S'active automatiquement quand RDV dans < 30min
+// RÈGLE SÉCURITÉ PERMANENTE : ce radar montre le temps restant avant le RDV,
+// JAMAIS la distance GPS à l'autre personne. Si on ajoute un vrai GPS proximity
+// en v2, il doit montrer la distance au LIEU DU RDV (le café), pas à la personne.
+// Raison : un homme malveillant pourrait se déplacer dans la ville pour triangulariser
+// où habite la femme en observant les variations de distance. → INTERDIT.
 // ═════════════════════════════════════════════════════════════
-function ProximityRadar({ verrou, userId, lang, onClick }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void }) {
+function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, onRetardAck, supabase: sb }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void; onCheckin?:()=>void; onTerminer?:()=>void; onRetardAck?:()=>void; supabase?:any }) {
   const [now,setNow] = useState(new Date())
+  const [myPos,setMyPos] = useState<{lat:number,lng:number,ts:number}|null>(null)
+  const [otherPos,setOtherPos] = useState<{lat:number,lng:number}|null>(null)
+  // Doppler : direction de déplacement (-1=recul, 0=arrêt, 1=approche) + vitesse relative
+  const [dopplerDir, setDopplerDir] = useState<-1|0|1>(0)
+  const [dopplerSpeed, setDopplerSpeed] = useState(0) // 0-1
+  const prevDistRef = useRef<{km:number,ts:number}|null>(null)
+  const dopplerTimerRef = useRef<ReturnType<typeof setTimeout>|null>(null)
+  // Refus retard — Mel peut ajouter un message, David doit acquitter
+  const [showRefuseInput, setShowRefuseInput] = useState(false)
+  const [refuseMsg, setRefuseMsg] = useState('')
   useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(t) },[])
+
+  const isSenderRef = useRef(verrou.sender_id === userId)
+
+  // GPS watch + push toutes les 5s dans clutches
+  useEffect(()=>{
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    const isSnd = isSenderRef.current
+    const latField = isSnd ? 'sender_cur_lat' : 'receiver_cur_lat'
+    const lngField = isSnd ? 'sender_cur_lng' : 'receiver_cur_lng'
+    let lastPush = 0
+    const id = navigator.geolocation.watchPosition(
+      pos => {
+        setMyPos({lat:pos.coords.latitude, lng:pos.coords.longitude, ts:Date.now()})
+        const now = Date.now()
+        if (sb && now - lastPush > 5000) {
+          lastPush = now
+          sb.from('clutches').update({[latField]:pos.coords.latitude,[lngField]:pos.coords.longitude})
+            .eq('id', verrou.id).then(()=>{})
+        }
+      },
+      ()=>{}, { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
+    )
+    return () => navigator.geolocation.clearWatch(id)
+  },[sb, verrou.id])
+
+  // Realtime — écoute la position de l'autre
+  useEffect(()=>{
+    if (!sb || !verrou.id) return
+    const isSnd = isSenderRef.current
+    const otherLatField = isSnd ? 'receiver_cur_lat' : 'sender_cur_lat'
+    const otherLngField = isSnd ? 'receiver_cur_lng' : 'sender_cur_lng'
+    // Init depuis les données existantes
+    const initLat = verrou[otherLatField], initLng = verrou[otherLngField]
+    if (initLat && initLng) setOtherPos({lat:initLat, lng:initLng})
+    const ch = sb.channel(`radar-other-${verrou.id}`)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'clutches',filter:`id=eq.${verrou.id}`},
+        (payload:any)=>{
+          const lat = payload.new[otherLatField], lng = payload.new[otherLngField]
+          if (lat && lng) setOtherPos({lat, lng})
+        })
+      .subscribe()
+    return () => { sb.removeChannel(ch) }
+  },[sb, verrou.id])
+
   const rdv = new Date(verrou.proposed_time)
   const diffMs = rdv.getTime()-now.getTime()
-  if (diffMs > 30*60*1000 || diffMs < -60*60*1000) return null
+  if (diffMs > 30*60*1000 || diffMs < -3*60*60*1000) return null
   const past = diffMs < 0
   const mins = Math.floor(Math.abs(diffMs)/60000)
   const secs = Math.floor((Math.abs(diffMs)%60000)/1000)
-  const urgency = !past && diffMs < 10*60*1000
-  const other = verrou.sender_id === userId ? verrou.receiver : verrou.sender
-  const pct = past ? 100 : Math.max(0, 100 - (diffMs/(30*60*1000))*100)
+
+  const isSender = verrou.sender_id === userId
+  // Profils : essayer sender/receiver joints, sinon chercher dans l'objet directement
+  const other = isSender ? (verrou.receiver || verrou._receiver) : (verrou.sender || verrou._sender)
+  const myPhoto = isSender ? (verrou.sender?.photo_url || verrou._sender?.photo_url) : (verrou.receiver?.photo_url || verrou._receiver?.photo_url)
+
+  // J'y suis indépendant par personne (nouveaux champs sender_arrived / receiver_arrived)
+  const myArrived   = isSender ? !!verrou.sender_arrived   : !!verrou.receiver_arrived
+  const otherArrived = isSender ? !!verrou.receiver_arrived : !!verrou.sender_arrived
+  const bothArrived  = !!verrou.sender_arrived && !!verrou.receiver_arrived
+
+  // GPS distances
+  const vLat = verrou.venue_lat, vLng = verrou.venue_lng
+  const myDistKm   = (vLat && vLng && myPos)    ? haversineKm(myPos.lat,    myPos.lng,    vLat, vLng) : null
+  const otherDistKm = (vLat && vLng && otherPos) ? haversineKm(otherPos.lat, otherPos.lng, vLat, vLng) : null
+  const timePct = past ? 100 : Math.max(0, 100-(diffMs/(10*60*1000))*100)
+
+  // Adresse : prendre la partie après "·" si elle existe (évite d'afficher juste "18")
+  const venueParts = (verrou.venue||'').split('·')
+  const venueStreet = venueParts.length>1 ? venueParts.slice(1).join('·').trim() : venueParts[0].trim()
+  const venueName = venueStreet || (lang==='en'?'Meeting point':'Lieu RDV')
+
+  // Animation GPS : 200m = bord, 15m = centre
+  const GPS_ANIM_FAR = 0.2, GPS_ANIM_NEAR = 0.015
+  const calcOffset = (distKm: number | null, fallbackPct: number) => {
+    const pct = distKm !== null
+      ? Math.max(0, Math.min(100, ((GPS_ANIM_FAR - distKm) / (GPS_ANIM_FAR - GPS_ANIM_NEAR)) * 100))
+      : fallbackPct
+    return (pct / 100) * 90
+  }
+  const MAX_OFFSET = 90
+  const myOffsetPx    = calcOffset(myDistKm,    past ? 90 : timePct * 0.7)
+  const otherOffsetPx = otherArrived ? MAX_OFFSET : calcOffset(otherDistKm, 0)
+
+  // Doppler : détecte direction + vitesse à chaque update GPS
+  useEffect(()=>{
+    if (myDistKm === null || myArrived) return
+    const now = Date.now()
+    const prev = prevDistRef.current
+    if (prev && now - prev.ts > 500 && now - prev.ts < 15000) {
+      const deltaDist = myDistKm - prev.km   // négatif = approche, positif = recul
+      const deltaT = (now - prev.ts) / 1000  // secondes
+      const speed = Math.min(1, Math.abs(deltaDist) / deltaT / 0.05) // normalisé 0-1
+      if (Math.abs(deltaDist) > 0.001) { // seuil 1m
+        setDopplerDir(deltaDist < 0 ? 1 : -1)
+        setDopplerSpeed(speed)
+        if (dopplerTimerRef.current) clearTimeout(dopplerTimerRef.current)
+        dopplerTimerRef.current = setTimeout(()=>{ setDopplerDir(0); setDopplerSpeed(0) }, 3000)
+      }
+    }
+    prevDistRef.current = { km: myDistKm, ts: now }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myDistKm])
+
+  // J'y suis : 25m David (test précis), 100m autres
+  const DAVID_ID = 'bad38f3e-87df-40e0-a2d2-75c03b58d72b'
+  const gpsThreshold = userId === DAVID_ID ? 0.025 : 0.100
+  const canCheckin = !myArrived && (
+    (myDistKm !== null && myDistKm < gpsThreshold) ||
+    (myDistKm === null && past)
+  )
+  const col = bothArrived ? C.green : otherArrived ? C.orange : past ? C.orange : C.salmon
+
+  const distLabel = (km: number | null) => {
+    if (bothArrived) return null
+    if (km === null) return <span style={{color:'#9ca3af',fontSize:11}}>GPS…</span>
+    if (km < 0.015) return <span style={{color:'#16a34a',fontWeight:800,fontSize:12}}>Sur place ✓</span>
+    if (km < 1) return <span style={{color:'#1a0810',fontWeight:700,fontSize:12}}>{Math.round(km*1000)}m du lieu</span>
+    return <span style={{color:'#6b2d4a',fontWeight:700,fontSize:12}}>{km.toFixed(2)}km du lieu</span>
+  }
 
   return (
     <>
       <style>{`
-        @keyframes radarExpand{0%{transform:scale(.6);opacity:.7}100%{transform:scale(2.4);opacity:0}}
-        @keyframes radarCore{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
-        @keyframes progressGlow{0%,100%{box-shadow:0 0 8px ${urgency?'rgba(239,68,68,.6)':'rgba(226,124,0,.4)'}}50%{box-shadow:0 0 16px ${urgency?'rgba(239,68,68,.9)':'rgba(226,124,0,.7)'}}}
+        @keyframes jySuisPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{transform:scale(1.03);box-shadow:0 0 0 8px rgba(74,222,128,0)}}
+        @keyframes rdvBlink{0%,100%{opacity:1}50%{opacity:.5}}
+        @keyframes sonarOut{0%{opacity:.7;transform:scale(0)}60%{opacity:.25}100%{opacity:0;transform:scale(1)}}
       `}</style>
       <div onClick={onClick} style={{
-        position:'fixed',bottom:84,left:12,right:12,zIndex:1400,
-        background:urgency?`linear-gradient(135deg,#3D0000,#7A0000)`:`linear-gradient(135deg,${C.bordeaux},#5A2E00)`,
-        border:`1.5px solid ${urgency?C.red+'88':C.orange+'66'}`,
-        borderRadius:18,padding:'12px 16px',cursor:'pointer',
-        boxShadow:urgency?`0 8px 32px rgba(239,68,68,.35)`:`0 8px 32px rgba(226,124,0,.25)`,
-        animation:'progressGlow 2s ease-in-out infinite',
+        position:'fixed',bottom:84,left:10,right:10,zIndex:1400,
+        background:'#ffffff',
+        border:`2px solid ${col}`,borderRadius:20,padding:'10px 12px 10px',cursor:'pointer',
+        boxShadow:`0 8px 28px rgba(0,0,0,.35)`,
       }}>
-        <div style={{display:'flex',gap:14,alignItems:'center'}}>
-          {/* Radar animé */}
-          <div style={{position:'relative',width:44,height:44,flexShrink:0}}>
-            {[0,.5,1].map(d=>(
-              <div key={d} style={{position:'absolute',inset:0,borderRadius:'50%',
-                border:`2px solid ${urgency?C.red:C.orange}`,
-                animation:`radarExpand 2s ease-out ${d}s infinite`,opacity:.6}}/>
-            ))}
-            <div style={{position:'absolute',inset:'8px',borderRadius:'50%',
-              background:urgency?C.red:C.orange,
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:15,animation:'radarCore 1.5s ease-in-out infinite',
-              boxShadow:`0 0 12px ${urgency?C.red:C.orange}`}}>
-              🔒
-            </div>
+
+        {/* Ligne 1 : timer + retard + adresse + heure RDV */}
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+          <div style={{flexShrink:0,minWidth:52}}>
+            {bothArrived
+              ? <div style={{fontSize:13,color:'#16a34a',fontWeight:900}}>🎉 Top !</div>
+              : <div style={{fontSize:20,fontWeight:900,color:past?'#d97706':'#1a0810',fontVariantNumeric:'tabular-nums',fontFamily:'monospace',lineHeight:1}}>
+                  {past ? '0:00' : `${mins}:${String(secs).padStart(2,'0')}`}
+                </div>}
           </div>
-          {/* Info */}
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:900,color:urgency?C.red:C.orange,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:2}}>
-              {past?(lang==='en'?'🔥 Meetup now!':'🔥 RDV en cours !'):urgency?(lang==='en'?'⚡ Almost time':'⚡ C\'est bientôt !'):(lang==='en'?'📍 Upcoming meetup':'📍 Rendez-vous approche')}
+          {Number(verrou.retard_min) > 0 && (
+            <div style={{flexShrink:0,padding:'2px 7px',borderRadius:8,background:'rgba(226,124,0,.12)',border:'1px solid rgba(226,124,0,.4)',color:'#d97706',fontSize:11,fontWeight:900}}>
+              +{verrou.retard_min}min
             </div>
-            <div style={{fontSize:13,fontWeight:800,color:C.white,marginBottom:3}}>
-              {other?.name} · {verrou.venue||'Café Romand'}
+          )}
+          <div style={{flex:1,overflow:'hidden'}}>
+            <div style={{fontSize:11,color:'#6b2d4a',fontWeight:800,letterSpacing:'.03em',textTransform:'uppercase',
+              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              📍 {venueName}
             </div>
-            {!past&&(
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                {/* Barre de progression */}
-                <div style={{flex:1,height:4,background:'rgba(255,255,255,.12)',borderRadius:2,overflow:'hidden'}}>
-                  <div style={{height:'100%',borderRadius:2,width:`${pct}%`,
-                    background:urgency?C.red:C.orange,
-                    transition:'width .5s ease'}}/>
-                </div>
-                <div style={{fontSize:15,fontWeight:900,color:urgency?C.red:C.orange,fontVariantNumeric:'tabular-nums',minWidth:52,textAlign:'right'}}>
-                  {mins}:{String(secs).padStart(2,'0')}
-                </div>
-              </div>
-            )}
+            <div style={{fontSize:11,color:'#9b5367',fontWeight:700}}>
+              RDV {new Date(verrou.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+              {Number(verrou.retard_min) > 0 && <span style={{color:'#d97706'}}> → {new Date(new Date(verrou.proposed_time).getTime()+Number(verrou.retard_min)*60000).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</span>}
+              {(verrou as any).is_quick_date && <span style={{color:C.orange,marginLeft:4}}>⚡ Quick Date</span>}
+            </div>
+            {(verrou as any).is_quick_date && (() => {
+              const endTime = new Date(verrou.proposed_time).getTime() + 60*60*1000
+              const over = Date.now() > endTime
+              if (!over) return null
+              return <div style={{fontSize:10,color:C.orange,fontWeight:800,marginTop:2}}>⏱ Ton heure est écoulée — libre de partir 👋</div>
+            })()}
           </div>
         </div>
+
+        {/* Ligne 2 : track avec photos animées */}
+        <div style={{position:'relative',height:70,marginBottom:4}}>
+          <div style={{position:'absolute',left:28,right:28,top:28,height:2,
+            background:`linear-gradient(90deg,transparent,${col} 20%,${col} 80%,transparent)`,opacity:.4}}/>
+          <div style={{position:'absolute',left:'50%',top:20,transform:'translateX(-50%)',fontSize:14,lineHeight:1,zIndex:2}}>📍</div>
+
+          {/* Doppler rendu inline — voir avatars ci-dessous */}
+
+          {/* Ma photo + ondes Doppler */}
+          {(()=>{
+            const comp = dopplerDir===0 ? 1 : Math.max(0.35, Math.min(0.95, 1-dopplerSpeed*0.65))
+            const xOff = dopplerDir * Math.min(14, dopplerSpeed*18) // décalage vers direction
+            const wc = dopplerDir===1?'#16a34a':dopplerDir===-1?'#d97706':'#94a3b8'
+            const dur = dopplerDir===0 ? 2.4 : Math.max(0.8, 2.4-dopplerSpeed*1.2)
+            return (
+              <div style={{position:'absolute',left:0,top:4,transform:`translateX(${myOffsetPx}px)`,transition:'transform 1.2s ease'}}>
+                <div style={{position:'relative',width:48,height:48}}>
+                  {/* Ondes sonar centrées sur l'avatar */}
+                  {!myArrived && (
+                    <svg style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',overflow:'visible',pointerEvents:'none',width:0,height:0}}>
+                      {[0,1,2].map(i=>(
+                        <ellipse key={i} cx={xOff} cy={0} rx={28*comp} ry={28}
+                          fill="none" stroke={wc} strokeWidth={1.6-i*0.4}
+                          style={{animation:`sonarOut ${dur}s ease-out ${i*(dur/3)}s infinite`}}/>
+                      ))}
+                    </svg>
+                  )}
+                  <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',position:'relative',zIndex:1,
+                    backgroundImage:myPhoto?`url(${myPhoto})`:'none',backgroundSize:'cover',backgroundPosition:'center',
+                    backgroundColor:'#e8d0c8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,
+                    border:`3px solid ${myArrived?'#16a34a':col}`,
+                    boxShadow:myArrived?`0 0 0 3px #16a34a33`:`0 2px 8px rgba(0,0,0,.2)`}}>
+                    {!myPhoto&&'👤'}
+                  </div>
+                  {myArrived&&<div style={{position:'absolute',bottom:-2,right:-2,width:17,height:17,borderRadius:'50%',zIndex:2,
+                    background:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
+                    border:'2px solid #fff',fontWeight:900,color:'#fff'}}>✓</div>}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Photo autre + ondes (cercles simples — on n'a pas sa direction) */}
+          <div style={{position:'absolute',right:0,top:4,transform:`translateX(${-otherOffsetPx}px)`,transition:'transform 1.2s ease'}}>
+            <div style={{position:'relative',width:48,height:48}}>
+              {!otherArrived && (
+                <svg style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',overflow:'visible',pointerEvents:'none',width:0,height:0}}>
+                  {[0,1,2].map(i=>(
+                    <ellipse key={i} cx={0} cy={0} rx={28} ry={28}
+                      fill="none" stroke="#94a3b8" strokeWidth={1.4-i*0.3}
+                      style={{animation:`sonarOut 2.4s ease-out ${i*0.8}s infinite`}}/>
+                  ))}
+                </svg>
+              )}
+              <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',position:'relative',zIndex:1,
+                backgroundImage:other?.photo_url?`url(${other.photo_url})`:'none',backgroundSize:'cover',backgroundPosition:'center',
+                backgroundColor:'#e8d0c8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,
+                border:`3px solid ${otherArrived?'#16a34a':col}`,
+                boxShadow:otherArrived?`0 0 0 3px #16a34a33`:`0 2px 8px rgba(0,0,0,.2)`}}>
+                {!other?.photo_url&&'👤'}
+              </div>
+              {otherArrived&&<div style={{position:'absolute',bottom:-2,left:-2,width:17,height:17,borderRadius:'50%',zIndex:2,
+                background:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
+                border:'2px solid #fff',fontWeight:900,color:'#fff'}}>✓</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Retard 30min — états pour les deux personnes */}
+        {Number(verrou.retard_min) === 30 && (()=>{
+          const iAmLate = verrou.retard_by === userId
+          const iNeedToDecide = !iAmLate && verrou.retard_by && verrou.retard_accepted == null
+
+          // Je suis en retard — je vois le statut de ma demande
+          if (iAmLate) {
+            if (verrou.retard_accepted === true) return (
+              <div style={{background:'rgba(22,163,74,.08)',border:'1px solid rgba(22,163,74,.3)',borderRadius:12,padding:'10px 12px',marginBottom:8,textAlign:'center'}}>
+                <div style={{fontSize:13,fontWeight:900,color:'#16a34a',marginBottom:2}}>✓ Retard accepté</div>
+                <div style={{fontSize:11,color:'#5a8a6a',lineHeight:1.5}}>Ton partenaire t'attend — prends ton temps 🙏</div>
+              </div>
+            )
+            if (verrou.retard_accepted === false) {
+              // Blocking gate — David doit acquitter avant de continuer
+              const ackKey = `retard_ack_${verrou.id}`
+              const alreadyAcked = typeof localStorage !== 'undefined' && localStorage.getItem(ackKey)
+              if (alreadyAcked) return null
+              const refuserMsg = verrou.cancel_message || null
+              return (
+                <div style={{position:'absolute',inset:0,background:'rgba(42,16,32,.97)',borderRadius:16,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 20px',gap:14,zIndex:99}}>
+                  <div style={{fontSize:28}}>😔</div>
+                  <div style={{fontSize:15,fontWeight:900,color:'#ef4444',textAlign:'center'}}>Retard refusé</div>
+                  <div style={{fontSize:12,color:'#FFBF9E',lineHeight:1.6,textAlign:'center'}}>
+                    {other?.name||'Ton partenaire'} n'a pas pu t'attendre.
+                    {refuserMsg && <><br/><span style={{fontStyle:'italic',color:'#f5e8de',marginTop:6,display:'block'}}>«&nbsp;{refuserMsg}&nbsp;»</span></>}
+                  </div>
+                  <div style={{fontSize:11,color:'rgba(255,191,158,.6)',textAlign:'center',lineHeight:1.5}}>
+                    Ce Clutch est annulé.<br/>Ton score de fiabilité est légèrement impacté.
+                  </div>
+                  <button onClick={async e=>{
+                    e.stopPropagation()
+                    try { localStorage.setItem(ackKey,'1') } catch {}
+                    // Malus fiabilité léger (-3 pts)
+                    try {
+                      const {data:prof} = await sb?.from('profiles').select('reliability_score').eq('id',userId).single()
+                      const cur = prof?.reliability_score ?? 100
+                      await sb?.from('profiles').update({reliability_score:Math.max(0,cur-3)}).eq('id',userId)
+                    } catch {}
+                    onRetardAck ? onRetardAck() : onClick()
+                  }} style={{width:'100%',padding:'13px',borderRadius:12,border:'none',background:'#C8860A',color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:.3}}>
+                    J'ai compris
+                  </button>
+                </div>
+              )
+            }
+            // En attente de réponse
+            return (
+              <div style={{background:'rgba(226,124,0,.06)',border:'1px solid rgba(226,124,0,.2)',borderRadius:12,padding:'8px 12px',marginBottom:8,textAlign:'center'}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#d97706'}}>⏳ En attente de réponse de {other?.name||'ton partenaire'}…</div>
+              </div>
+            )
+          }
+
+          // C'est l'autre qui est en retard — je dois décider
+          if (iNeedToDecide) return (
+            <div style={{background:'rgba(226,124,0,.08)',border:'1px solid rgba(226,124,0,.35)',borderRadius:12,padding:'10px 12px',marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:800,color:'#d97706',marginBottom:8,textAlign:'center'}}>
+                ⏰ {other?.name||'Partenaire'} sera 30 min en retard
+              </div>
+              {showRefuseInput ? (
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <input
+                    value={refuseMsg}
+                    onChange={e=>setRefuseMsg(e.target.value.slice(0,60))}
+                    placeholder="Un mot pour expliquer… (optionnel)"
+                    maxLength={60}
+                    autoFocus
+                    onClick={e=>e.stopPropagation()}
+                    style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid rgba(239,68,68,.4)',background:'rgba(239,68,68,.06)',color:'#f5e8de',fontSize:12,fontFamily:'inherit',boxSizing:'border-box',outline:'none'}}
+                  />
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={e=>{e.stopPropagation();setShowRefuseInput(false);setRefuseMsg('')}}
+                      style={{flex:1,padding:'8px',borderRadius:10,border:'1px solid rgba(255,191,158,.3)',background:'transparent',color:'#FFBF9E',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                      ← Retour
+                    </button>
+                    <button onClick={async e=>{
+                      e.stopPropagation()
+                      await sb?.from('clutches').update({retard_accepted:false,status:'cancelled',cancel_message:refuseMsg||null,cancel_by:userId}).eq('id',verrou.id)
+                    }} style={{flex:2,padding:'8px',borderRadius:10,border:'none',background:'#ef4444',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                      Confirmer le refus
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={async e=>{
+                    e.stopPropagation()
+                    await sb?.from('clutches').update({retard_accepted:true}).eq('id',verrou.id)
+                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                    ✓ OK, j'attends
+                  </button>
+                  <button onClick={e=>{
+                    e.stopPropagation()
+                    setShowRefuseInput(true)
+                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#ef4444',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                    ✗ Refuser
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+
+          return null
+        })()}
+
+        {bothArrived ? (
+          <div style={{textAlign:'center',padding:'4px 0 2px'}}>
+            <div style={{fontSize:14,fontWeight:900,color:'#16a34a',marginBottom:6}}>🎉 Les deux sur place !</div>
+            <button onClick={e=>{e.stopPropagation();onTerminer?.()}}
+              style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#16a34a',
+                color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
+                boxShadow:'0 3px 12px rgba(22,163,74,.4)',letterSpacing:.3}}>
+              ✓ Terminer le RDV
+            </button>
+          </div>
+        ) : (
+          <div style={{display:'flex',gap:6,marginTop:2}}>
+            {/* Moi — gauche */}
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4}}>
+              <div>{distLabel(myDistKm)}</div>
+              {!myArrived ? (
+                <button onClick={e=>{e.stopPropagation();if(canCheckin)onCheckin?.()}}
+                  style={{padding:'7px 12px',borderRadius:10,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:900,
+                    cursor:canCheckin?'pointer':'default',
+                    background:canCheckin?'#16a34a':'#e5e7eb',
+                    color:canCheckin?'#fff':'#9ca3af',
+                    animation:canCheckin?'jySuisPulse 1.5s ease-in-out infinite':undefined}}>
+                  ✓ {"J'y suis !"}
+                </button>
+              ) : (
+                <div style={{fontSize:13,color:'#16a34a',fontWeight:900}}>✓ Arrivé·e</div>
+              )}
+            </div>
+            {/* L'autre — droite */}
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+              {otherDistKm !== null
+                ? <div style={{color:'#1a0810',fontWeight:700,fontSize:12}}>{Math.round(otherDistKm*1000)}m du lieu</div>
+                : <div style={{fontSize:12,color:'#6b2d4a',fontWeight:700}}>{other?.name||''}</div>}
+              <div style={{fontSize:13,color:otherArrived?'#16a34a':'#9ca3af',fontWeight:otherArrived?900:500}}>
+                {otherArrived?'✓ Arrivé·e':'En route…'}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// ONBOARDING — 4 slides skippables (affiché 1 seule fois)
+// ═════════════════════════════════════════════════════════════
+function OnboardingScreen({onDone, isPreview}:{onDone:()=>void; isPreview?:boolean}) {
+  const [slide, setSlide] = useState(0)
+  const slides = [
+    {
+      icon:'🔒',
+      title:'Bienvenue sur Clutch',
+      body:'L\'app qui transforme une envie de sortir en vrai rendez-vous — en 18h max.',
+    },
+    {
+      icon:'⚡',
+      title:'Comment ça marche ?',
+      body:'Tu te rends disponible avec un créneau et un lieu. Tu envoies un Clutch. L\'autre accepte. Vous y allez.',
+      steps:['👁 Tu es disponible','⚡ Tu envoies un Clutch','🔒 Le Verrou se ferme'],
+    },
+    {
+      icon:'⭐',
+      title:'La réputation compte',
+      body:'À l\'heure = +2pts · Venu·e = +1pt · Lapin = −5pts. Un bon score donne plus de visibilité.',
+      scores:[{l:'À l\'heure',c:'#4ade80',v:'+2'},{l:'Venu·e',c:'#fb923c',v:'+1'},{l:'Lapin 🐰',c:'#f87171',v:'−5'}],
+    },
+    {
+      icon:'🆘',
+      title:'Ta sécurité d\'abord',
+      body:'Bouton SOS configurable, profils vérifiés, signalement en 2 taps. Tu restes toujours en contrôle.',
+      pills:['🔍 Profils vérifiés','🚫 Signalement facile','📍 Partage de position'],
+    },
+  ]
+  const s = slides[slide]
+  const isLast = slide === slides.length - 1
+  return (
+    <div style={{position:'fixed',inset:0,background:C.bg,display:'flex',flexDirection:'column',padding:'32px 24px 40px',zIndex:3000}}>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:16}}>
+        <button onClick={onDone} style={{background:'none',border:'none',color:`${C.whiteMid}`,fontSize:13,cursor:'pointer',fontFamily:'inherit',padding:'4px 8px'}}>
+          Passer →
+        </button>
+      </div>
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',gap:20}}>
+        <div style={{textAlign:'center',fontSize:56,lineHeight:1,marginBottom:4}}>{s.icon}</div>
+        <div style={{textAlign:'center',color:C.white,fontSize:22,fontWeight:900,letterSpacing:'-.4px',lineHeight:1.2}}>{s.title}</div>
+        <div style={{textAlign:'center',color:C.whiteMid,fontSize:14,lineHeight:1.7}}>{s.body}</div>
+        {s.steps && (
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:4}}>
+            {s.steps.map((st,i)=>(
+              <div key={i} style={{background:C.bgCard,borderRadius:12,padding:'12px 16px',color:C.white,fontSize:13,fontWeight:600,border:`1px solid ${C.border}`}}>{st}</div>
+            ))}
+          </div>
+        )}
+        {s.scores && (
+          <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap',marginTop:4}}>
+            {s.scores.map((sc,i)=>(
+              <div key={i} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',textAlign:'center'}}>
+                <div style={{color:sc.c,fontSize:20,fontWeight:900}}>{sc.v}</div>
+                <div style={{color:C.whiteMid,fontSize:10,marginTop:2}}>{sc.l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {s.pills && (
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:4}}>
+            {s.pills.map((p,i)=>(
+              <div key={i} style={{background:'rgba(74,222,128,.08)',border:'1px solid rgba(74,222,128,.2)',borderRadius:12,padding:'10px 16px',color:C.white,fontSize:13}}>{p}</div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Dots */}
+      <div style={{display:'flex',justifyContent:'center',gap:6,marginBottom:20}}>
+        {slides.map((_,i)=>(
+          <div key={i} onClick={()=>setSlide(i)} style={{width:i===slide?20:8,height:8,borderRadius:4,background:i===slide?C.gold:`${C.border}`,transition:'all .3s',cursor:'pointer'}}/>
+        ))}
+      </div>
+      <button onClick={()=>isLast?onDone():setSlide(slide+1)}
+        style={{width:'100%',padding:'14px',background:C.gold,border:'none',borderRadius:20,color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+        {isLast ? 'C\'est parti !' : 'Suivant'}
+      </button>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// SETUP WIZARD — Compléter son profil (après 1ère inscription)
+// ═════════════════════════════════════════════════════════════
+function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:(p:Profile)=>void; showToast:(m:string,c?:string)=>void; isPreview?:boolean}) {
+  const [step, setStep] = useState(0)
+  const [saving, setSaving] = useState(false)
+  // Champs
+  const [photoUrl, setPhotoUrl] = useState(user.photo_url||'')
+  const [name, setName] = useState(user.name||'')
+  const [age, setAge] = useState<string>(user.age?(user.age+''):'')
+  const [gender, setGender] = useState<'M'|'F'|'NB'>((user as any).gender||'')
+  const [lookingFor, setLookingFor] = useState<'M'|'F'|'ALL'>((user as any).looking_for||'ALL')
+  const [bio, setBio] = useState(user.bio||'')
+  const [job, setJob] = useState(user.job||'')
+  const [jobCategory, setJobCategory] = useState((user as any).job_category||'')
+  const [city, setCity] = useState((user as any).available_city||'Lausanne')
+  const JOB_CATS = [
+    '💻 Tech','🎨 Créatif','📸 Photo/Vidéo','📣 Marketing','💰 Finance',
+    '⚕️ Santé','⚖️ Droit','📚 Éducation','🍕 Cuisine/Chef','🎵 Musique',
+    '🏗 Architecture','🛍 Commerce','🏃 Sport/Coach','✈️ Tourisme','🔬 Sciences',
+    '🔧 Artisan/Bricolage','⚡ Électricité','🪵 Menuiserie','🔩 Mécanique','✂️ Coiffure/Beauté',
+    '🌱 Agriculture/Nature','🎭 Théâtre/Scène','🎬 Cinéma/Télé','📊 Consulting','🏠 Immobilier',
+    '👗 Mode/Textile','🌍 ONG/Social','🍷 Sommellerie/Cave','🐾 Animaux/Véto','Autre'
+  ]
+  const TOTAL = 5
+
+  const uploadPhoto = async (file:File) => {
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+    const {error} = await supabase.storage.from('avatars').upload(path, file, {upsert:true})
+    if (error) { showToast('Erreur upload photo',C.red); return }
+    const {data:{publicUrl}} = supabase.storage.from('avatars').getPublicUrl(path)
+    setPhotoUrl(publicUrl)
+  }
+
+  const saveAndContinue = async () => {
+    if (step === 0 && !photoUrl) { showToast('Ajoute une photo pour continuer',C.orange); return }
+    if (step === 1 && (!name.trim() || !age || !gender)) { showToast('Tous les champs sont requis',C.orange); return }
+    if (step < TOTAL - 1) { setStep(step+1); return }
+    // Dernière étape → sauvegarder tout
+    if (isPreview) {
+      showToast('🎉 Fin de la démo ! Crée un compte pour continuer.', C.green)
+      setTimeout(() => onDone(user), 1500)
+      return
+    }
+    setSaving(true)
+    const payload:any = {
+      name: name.trim(),
+      age: parseInt(age)||null,
+      gender,
+      looking_for: lookingFor,
+      bio: bio.trim()||null,
+      job: job.trim()||null,
+      job_category: jobCategory||null,
+      photo_url: photoUrl||null,
+      available_city: city||'Lausanne',
+      setup_complete: true,
+    }
+    const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().single()
+    setSaving(false)
+    if (error) { showToast('Erreur sauvegarde: '+error.message, C.red); return }
+    showToast('✓ Profil créé !', C.green)
+    onDone(data as Profile)
+  }
+
+  const GenderBtn = ({v,label}:{v:'M'|'F'|'NB',label:string}) => (
+    <button onClick={()=>setGender(v)} style={{flex:1,padding:'12px 8px',borderRadius:14,border:`2px solid ${gender===v?C.gold:C.border}`,background:gender===v?`${C.gold}22`:C.bgCard,color:gender===v?C.gold:C.white,fontSize:13,fontWeight:gender===v?700:400,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>{label}</button>
+  )
+  const LookBtn = ({v,label,icon}:{v:'M'|'F'|'ALL',label:string,icon:string}) => (
+    <button onClick={()=>setLookingFor(v)} style={{flex:1,padding:'14px 8px',borderRadius:14,border:`2px solid ${lookingFor===v?C.gold:C.border}`,background:lookingFor===v?`${C.gold}22`:C.bgCard,color:lookingFor===v?C.gold:C.white,fontSize:12,fontWeight:lookingFor===v?700:400,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:4,transition:'all .2s'}}>
+      <span style={{fontSize:22}}>{icon}</span>{label}
+    </button>
+  )
+
+  const steps = [
+    // Step 0 : Photo
+    <div key={0} style={{display:'flex',flexDirection:'column',gap:20,alignItems:'center'}}>
+      <div style={{color:C.white,fontSize:20,fontWeight:800,textAlign:'center'}}>Ajoute ta photo</div>
+      <div style={{color:C.whiteMid,fontSize:13,textAlign:'center'}}>Ta photo est obligatoire. Elle rassure les autres utilisateurs.</div>
+      <label style={{cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
+        <div style={{width:110,height:110,borderRadius:'50%',border:`3px dashed ${photoUrl?C.gold:C.border}`,overflow:'hidden',background:C.bgCard,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+          {photoUrl
+            ? <img src={photoUrl} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
+            : <div style={{textAlign:'center',color:C.whiteMid,fontSize:12,padding:12}}>📷<br/>Ajouter</div>
+          }
+        </div>
+        <div style={{color:C.gold,fontSize:13,fontWeight:600}}>{photoUrl?'Changer la photo':'Choisir une photo'}</div>
+        <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files?.[0]&&uploadPhoto(e.target.files[0])}/>
+      </label>
+      {photoUrl && <div style={{color:'#4ade80',fontSize:12,textAlign:'center'}}>✓ Photo ajoutée</div>}
+    </div>,
+
+    // Step 1 : Identité
+    <div key={1} style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div style={{color:C.white,fontSize:20,fontWeight:800,textAlign:'center'}}>Parle-nous de toi</div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:6,letterSpacing:'.08em',textTransform:'uppercase'}}>Prénom</div>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ton prénom" maxLength={30}
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+      </div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:6,letterSpacing:'.08em',textTransform:'uppercase'}}>Âge</div>
+        <input value={age} onChange={e=>setAge(e.target.value.replace(/\D/g,''))} placeholder="Ton âge" maxLength={2} inputMode="numeric"
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+      </div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:8,letterSpacing:'.08em',textTransform:'uppercase'}}>Je suis</div>
+        <div style={{display:'flex',gap:8}}>
+          <GenderBtn v="F" label="Femme"/>
+          <GenderBtn v="M" label="Homme"/>
+          <GenderBtn v="NB" label="Autre"/>
+        </div>
+      </div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:6,letterSpacing:'.08em',textTransform:'uppercase'}}>Ville</div>
+        <input value={city} onChange={e=>setCity(e.target.value)} placeholder="Lausanne"
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+      </div>
+    </div>,
+
+    // Step 2 : Je cherche
+    <div key={2} style={{display:'flex',flexDirection:'column',gap:20}}>
+      <div style={{color:C.white,fontSize:20,fontWeight:800,textAlign:'center'}}>Je cherche à rencontrer</div>
+      <div style={{color:C.whiteMid,fontSize:13,textAlign:'center'}}>Ça n'affecte que les profils qui te sont présentés.</div>
+      <div style={{display:'flex',gap:10}}>
+        <LookBtn v="F" label="Des femmes" icon="👩"/>
+        <LookBtn v="M" label="Des hommes" icon="👨"/>
+        <LookBtn v="ALL" label="Tout le monde" icon="🤝"/>
+      </div>
+      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
+        <div style={{color:C.whiteMid,fontSize:12,lineHeight:1.6}}>
+          💡 Pour les femmes : Clutch est <strong style={{color:C.gold}}>toujours gratuit</strong>, quel que soit le plan choisi.
+        </div>
+      </div>
+    </div>,
+
+    // Step 3 : Bio + Métier (skippable)
+    <div key={3} style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div style={{color:C.white,fontSize:20,fontWeight:800,textAlign:'center'}}>Ton profil</div>
+      <div style={{color:C.whiteMid,fontSize:13,textAlign:'center'}}>Optionnel — tu peux compléter plus tard depuis le profil.</div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:6,letterSpacing:'.08em',textTransform:'uppercase'}}>Bio courte</div>
+        <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Quelques mots sur toi..." maxLength={120} rows={3}
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:14,fontFamily:'inherit',outline:'none',resize:'none'}}/>
+        <div style={{color:C.whiteMid,fontSize:10,textAlign:'right',marginTop:3}}>{bio.length}/120</div>
+      </div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:6,letterSpacing:'.08em',textTransform:'uppercase'}}>Métier / Études</div>
+        <input value={job} onChange={e=>setJob(e.target.value)} placeholder="Photographe, étudiant·e, ..." maxLength={50}
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+      </div>
+      <div>
+        <div style={{color:C.whiteMid,fontSize:11,marginBottom:8,letterSpacing:'.08em',textTransform:'uppercase'}}>Domaine professionnel <span style={{opacity:.5}}>(pour le mode Pro)</span></div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {JOB_CATS.map(cat=>(
+            <button key={cat} onClick={()=>setJobCategory(jobCategory===cat?'':cat)}
+              style={{padding:'6px 12px',borderRadius:20,border:`1.5px solid ${jobCategory===cat?C.gold:C.border}`,background:jobCategory===cat?`${C.gold}22`:C.bgCard,color:jobCategory===cat?C.gold:C.whiteMid,fontSize:11,fontWeight:jobCategory===cat?700:400,cursor:'pointer',fontFamily:'inherit'}}>
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+
+    // Step 4 : Prêt !
+    <div key={4} style={{display:'flex',flexDirection:'column',gap:16,alignItems:'center',textAlign:'center'}}>
+      <div style={{fontSize:56,lineHeight:1}}>🎉</div>
+      <div style={{color:C.white,fontSize:22,fontWeight:900}}>Prêt·e à Clutcher !</div>
+      <div style={{color:C.whiteMid,fontSize:14,lineHeight:1.7}}>Ton profil est créé. Mets-toi disponible et envoie ton premier Clutch.</div>
+      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,padding:16,width:'100%',textAlign:'left'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+          {photoUrl
+            ? <img src={photoUrl} style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',border:`2px solid ${C.gold}`}} alt=""/>
+            : <div style={{width:48,height:48,borderRadius:'50%',background:C.bgCard,border:`2px solid ${C.gold}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>👤</div>
+          }
+          <div>
+            <div style={{color:C.white,fontSize:15,fontWeight:700}}>{name||'Toi'}{age?`, ${age} ans`:''}</div>
+            <div style={{color:C.whiteMid,fontSize:12}}>{city||'Lausanne'} · {job||'...'}</div>
+          </div>
+        </div>
+        {bio && <div style={{color:C.whiteMid,fontSize:12,fontStyle:'italic',borderTop:`1px solid ${C.border}`,paddingTop:8}}>"{bio}"</div>}
+      </div>
+    </div>,
+  ]
+
+  return (
+    <div style={{position:'fixed',inset:0,background:C.bg,display:'flex',flexDirection:'column',padding:'24px 24px 36px',zIndex:3000,overflowY:'auto'}}>
+      {/* Progress bar */}
+      <div style={{marginBottom:24}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{color:C.whiteMid,fontSize:12}}>Étape {step+1} sur {TOTAL}</div>
+          {step >= 3 && <button onClick={saveAndContinue} style={{background:'none',border:'none',color:C.whiteMid,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Passer →</button>}
+        </div>
+        <div style={{height:3,background:C.border,borderRadius:2}}>
+          <div style={{height:'100%',background:C.gold,borderRadius:2,width:`${((step+1)/TOTAL)*100}%`,transition:'width .4s ease'}}/>
+        </div>
+      </div>
+
+      {/* Contenu de l'étape */}
+      <div style={{flex:1}}>
+        {steps[step]}
+      </div>
+
+      {/* Boutons nav */}
+      <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:24}}>
+        <button onClick={saveAndContinue} disabled={saving}
+          style={{width:'100%',padding:'14px',background:C.gold,border:'none',borderRadius:20,color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:saving?.7:1}}>
+          {saving ? 'Sauvegarde...' : step === TOTAL-1 ? '🔒 Lancer Clutch !' : 'Continuer →'}
+        </button>
+        {step > 0 && (
+          <button onClick={()=>setStep(step-1)} style={{width:'100%',padding:'10px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:20,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>
+            ← Retour
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -4234,14 +5692,18 @@ export default function App2() {
   // Timestamps "vu" par onglet — stockés en localStorage pour persister entre sessions
   const [seenClutchsAt, setSeenClutchsAt] = useState<number>(()=>{try{return parseInt(localStorage.getItem('c_seen_clutchs')||'0')}catch{return 0}})
   const [seenEventsAt,  setSeenEventsAt]  = useState<number>(()=>{try{return parseInt(localStorage.getItem('c_seen_events')||'0')}catch{return 0}})
-  // setTab avec marquage "vu" automatique
+  // setTab avec marquage "vu" automatique — bloque si feedback en cours
   const setTab = (t: MainTab) => {
+    if (showFeedback) { showToast(lang==='en'?'Submit your feedback first':'Donne ton feedback d\'abord', C.orange); return }
     _setTab(t)
     const now = Date.now()
     if(t==='clutchs'){setSeenClutchsAt(now);try{localStorage.setItem('c_seen_clutchs',String(now))}catch{}}
     if(t==='evenements'){setSeenEventsAt(now);try{localStorage.setItem('c_seen_events',String(now))}catch{}}
   }
-  const [unreadChats, setUnreadChats] = useState<Record<string,number>>({}) // clutchId → nb msgs non lus
+  const [unreadChats, setUnreadChats] = useState<Record<string,number>>({})
+  const [contactsUnread, setContactsUnread] = useState(0)
+  const [contactClutchTarget, setContactClutchTarget] = useState<any|null>(null)
+  const [unreadRetards, setUnreadRetards] = useState<Set<string>>(new Set()) // clutchId → nb msgs non lus
   const [user,setUser]       = useState<Profile|null>(null)
   const [profiles,setProfiles] = useState<Profile[]>([])
   const [clutches,setClutches] = useState<any[]>([])
@@ -4250,6 +5712,7 @@ export default function App2() {
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)
   const [selProfile,setSelProfile] = useState<Profile|null>(null)
   const [showSend,setShowSend] = useState(false)
+  const [slotGoneProfile,setSlotGoneProfile] = useState<Profile|null>(null)
   const [showProfileSheet,setShowProfileSheet] = useState(false)
   const [showDelete,setShowDelete] = useState(false)
   const [showCelebration,setShowCelebration] = useState(false)
@@ -4264,9 +5727,39 @@ export default function App2() {
   const [incomingClutch,setIncomingClutch] = useState<any>(null)
   const [showChat,setShowChat] = useState(false)
   const [cancelConfirmId,setCancelConfirmId] = useState<string|null>(null) // ID du verrou en cours d'annulation
+  const [cancelMsg,setCancelMsg] = useState('') // Message optionnel lors d'une annulation
+  const [delayPickerOpen,setDelayPickerOpen] = useState<string|null>(null) // ID du clutch dont le picker retard est ouvert
   const [localConfirmed,setLocalConfirmed] = useState<Set<string>>(new Set()) // IDs verrouillés localement (contourne RLS)
   const [feedbackClutch,setFeedbackClutch] = useState<any>(null) // Clutch en attente de feedback post-RDV
   const [showFeedback,setShowFeedback] = useState(false)
+  const [terminerClutchId,setTerminerClutchId] = useState<string|null>(null)
+  const [inlineFeedbackId,setInlineFeedbackId] = useState<string|null>(null) // ID clutch en feedback inline (bypass modal)
+  const [inlineFbSel,setInlineFbSel] = useState<string|null>(null) // sélection inline feedback
+  const [pendingFeedbacks,setPendingFeedbacks] = useState(0) // Soft gate counter
+  const [announcedDelays,setAnnouncedDelays] = useState<Record<string,number>>({}) // clutchId → minutes annoncées
+  const [checkinDone,setCheckinDone] = useState<Set<string>>(new Set()) // IDs où J'y suis déjà tapé
+  // completedIds persisté dans localStorage — survit aux rechargements
+  const completedIds = useRef<Set<string>>((() => {
+    try { const s = localStorage.getItem('clutch_completedIds'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
+  })())
+  const addCompleted = (id: string) => {
+    completedIds.current.add(id)
+    try { localStorage.setItem('clutch_completedIds', JSON.stringify([...completedIds.current])) } catch {}
+  }
+  const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
+  const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
+  const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
+  const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
+  const [counterVenue,setCounterVenue] = useState('')
+  const [counterTime,setCounterTime] = useState('')
+  const [counterMsg,setCounterMsg] = useState('')
+  const autoFeedbackTimers = useRef<Record<string,ReturnType<typeof setTimeout>>>({}) // clutchId → timer auto-feedback 3h
+  const [liveMode,setLiveMode] = useState(false)
+  const [proMode,setProMode] = useState(false) // 💼 Manoski — mode pro
+  const [proJobFilter,setProJobFilter] = useState<string|null>(null) // catégorie sélectionnée en mode pro
+  const [livePos,setLivePos] = useState<[number,number]|null>(null)
+  const [liveLoading,setLiveLoading] = useState(false)
+  const [liveActivating,setLiveActivating] = useState(false) // animation d'entrée
   const [showAppFeedback,setShowAppFeedback] = useState(false)
   const [waitlistEvIds,setWaitlistEvIds] = useState<Set<string>>(()=>{
     if(typeof window==='undefined') return new Set()
@@ -4297,15 +5790,23 @@ export default function App2() {
     if (typeof window === 'undefined') return new Set<string>()
     try { const s = localStorage.getItem('clutch_hidden_hist'); return s ? new Set(JSON.parse(s)) : new Set<string>() } catch { return new Set<string>() }
   })
-  const [showHistory,setShowHistory] = useState(true)    // Section historique collapsible (ouvert par défaut)
+  const [showHistory,setShowHistory] = useState(false)   // Section historique collapsible (fermé par défaut)
   // Position RDV voulue — initialisée depuis GPS si disponible
   const [meetupPos,setMeetupPos] = useState<[number,number]>(ME)
   useEffect(()=>{
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    // maximumAge:0 = toujours une position fraîche (évite le cache iPhone)
     navigator.geolocation.getCurrentPosition(
       pos => { setMeetupPos([pos.coords.latitude, pos.coords.longitude]) },
-      () => {},
-      { timeout:8000, maximumAge:60000 }
+      () => {
+        // Fallback : retry sans enableHighAccuracy si timeout
+        navigator.geolocation.getCurrentPosition(
+          pos2 => { setMeetupPos([pos2.coords.latitude, pos2.coords.longitude]) },
+          () => {}, // reste sur Lausanne par défaut
+          { timeout:10000, maximumAge:0 }
+        )
+      },
+      { enableHighAccuracy:true, timeout:6000, maximumAge:0 }
     )
   },[])
   const mapGetCenterRef = useRef<(()=>[number,number])|null>(null)
@@ -4313,7 +5814,8 @@ export default function App2() {
   // Page 2 — Quel type de rencontre (multi-select)
   const [seekModes,setSeekModes]   = useState<string[]>(['romantic','friend'])  // multi
   const [seekGender,setSeekGender] = useState<'F'|'M'|'X'|'all'>('all')
-  const [seekAges,setSeekAges]     = useState<string[]>(['tous'])   // multi
+  const [ageMin,setAgeMin] = useState('18')
+  const [ageMax,setAgeMax] = useState('45')
   const [intentMsg,setIntentMsg]   = useState('')
 
   // Anti-saturation femmes
@@ -4337,7 +5839,7 @@ export default function App2() {
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)
     const b = new Date(); b.setHours(h,m,0,0)
-    return makeSlots(new Date(b.getTime() + 15*60_000)).slice(0,72)
+    return makeSlots(new Date(b.getTime() + 5*60_000)).slice(0,216)
   }, [fromTime])
 
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
@@ -4358,26 +5860,22 @@ export default function App2() {
     try { localStorage.setItem('clutch_waitlist', JSON.stringify([...waitlistEvIds])) } catch {}
   }, [waitlistEvIds])
 
-  // ── Feedback post-RDV : déclenche après l'heure du RDV passé ──
+  // ── Feedback post-RDV : déclenche 30min après le RDV + calcule pendingFeedbacks ──
   useEffect(() => {
-    if (!user?.id || showFeedback || feedbackClutch) return
-    const past = (clutches as any[]).find(c =>
-      (c.status==='confirmed'||c.status==='accepted') &&
+    if (!user?.id) return
+    const pastRdvs = (clutches as any[]).filter(c =>
+      (c.status==='confirmed'||c.status==='accepted'||c.status==='checked_in') &&
       c.proposed_time &&
-      // RDV doit être passé depuis au moins 30min
       new Date(c.proposed_time).getTime() + 30*60*1000 < Date.now() &&
-      !localStorage.getItem(`feedback_done_${c.id}`) &&
-      // Ne pas demander le feedback si le verrou vient d'être posé (< 2h)
-      Date.now() - parseInt(localStorage.getItem(`clutch_locked_at_${c.id}`)||'0') > 2*60*60*1000
+      !localStorage.getItem(`feedback_done_${c.id}`)
     )
-    if (past) {
-      // Délai 5min après l'heure du RDV pour laisser le temps d'arriver (si déjà passé, delay=0)
-      const rdvTime = new Date(past.proposed_time).getTime()
-      const delay = Math.max(0, rdvTime + 35*60000 - Date.now()) // 30min + 5min buffer
-      const t = setTimeout(() => { setFeedbackClutch(past); setShowFeedback(true) }, delay)
-      return () => clearTimeout(t)
+    setPendingFeedbacks(pastRdvs.length)
+    // Utilise toujours le feedback inline — ne jamais ouvrir l'ancien FeedbackSheet
+    if (!inlineFeedbackId && pastRdvs.length > 0) {
+      setInlineFeedbackId(pastRdvs[0].id)
+      _setTab('clutchs')
     }
-  }, [clutches, user?.id, showFeedback, feedbackClutch])
+  }, [clutches, user?.id, inlineFeedbackId])
 
   const isAvailableRef = useRef(false)
   const sliderRef = useRef<HTMLDivElement>(null) // slider rayon — doit être au top level (règle des hooks)
@@ -4388,6 +5886,20 @@ export default function App2() {
   const showToast = useCallback((msg:string,color=C.salmon) => setToast({msg,color}),[])
 
   // Applique une pénalité au score de l'utilisateur courant
+  const insertCancelMsg = async (clutchId: string, otherId: string) => {
+    const senderName = user?.name?.split(' ')[0] || (lang==='fr'?'L\'envoyeur':'The sender')
+    const text = lang==='fr'
+      ? `↩ ${senderName} a annulé ce Clutch.`
+      : `↩ ${senderName} cancelled this Clutch.`
+    await supabase.from('messages').insert({
+      clutch_id: clutchId,
+      sender_id: user?.id,
+      receiver_id: otherId,
+      content: text,
+      is_system: true,
+    })
+  }
+
   const applyPenalty = useCallback(async (reason: PenaltyReason) => {
     const p = getPenalty(reason)
     const isLate = reason==='cancel_late'||reason==='cancel_veryLate'||reason==='ghost'
@@ -4423,6 +5935,12 @@ export default function App2() {
   },[])
 
   const onSplashDone = useCallback(() => {
+    // Mode prévisualisation : ?preview=onboarding dans l'URL
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    if (params?.get('preview') === 'onboarding') {
+      setScreen('onboarding')
+      return
+    }
     if (authDone) setScreen(authTarget)
     else setTimeout(() => setScreen(authTarget), 300)
   },[authDone,authTarget])
@@ -4444,7 +5962,22 @@ export default function App2() {
     let q = supabase.from('profiles').select('*').neq('id',user.id).neq('is_banned',true).eq('is_available',true).or(`available_until.is.null,available_until.gt.${nowIso}`)
     bids.forEach((bid:string) => { q=q.neq('id',bid) })
     const {data, error} = await q
-    if (!error && data) setProfiles(data.map(enrichProfile))
+    if (!error && data) {
+      const real = data.map(enrichProfile)
+      // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible
+      const maxBot = {
+        id: 'gpsbotma-0000-0000-0000-000000000001',
+        name: 'Max 🛰️', gender: 'man', age: 30, neighborhood: 'Morges',
+        bio: 'Bot de test GPS — je suis à Morges Gare 📍 Envoyez-moi un Clutch !',
+        job: 'Test Bot GPS', photo_url: 'https://randomuser.me/api/portraits/men/77.jpg',
+        is_available: true, account_type: 'bot',
+        _fixedLat: 46.5099, _fixedLng: 6.4942, // Morges Gare
+        _isGpsTestBot: true,
+        _hasEvent: true, _eventId: 'gGPS', _eventEmoji: '🎰',
+        verified: true, interests: ['Test','GPS','Clutch'], languages: ['Français'],
+      }
+      setProfiles([...real, maxBot as any])
+    }
   },[user?.id])
 
   const loadClutches = useCallback(async () => {
@@ -4456,6 +5989,8 @@ export default function App2() {
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order('created_at',{ascending:false}).limit(30)
     if (data) {
+      // Respecter les terminaisons locales — résiste aux données stale de la DB
+      data.forEach((c:any) => { if (completedIds.current.has(c.id)) c.status = 'completed' })
       const now = new Date()
       // ── Auto-expiration côté client : pending dont expires_at < now → 'expired' ──
       const toExpire = data.filter((c:any) =>
@@ -4463,7 +5998,7 @@ export default function App2() {
       )
       for (const c of toExpire) {
         // guard .eq('status','pending') évite double update si l'autre user a déjà expiré
-        await supabase.from('clutches').update({status:'expired', updated_at: new Date().toISOString()})
+        await supabase.from('clutches').update({status:'expired'})
           .eq('id', c.id).eq('status', 'pending')
         c.status = 'expired'
       }
@@ -4500,12 +6035,43 @@ export default function App2() {
               localStorage.setItem(shownKey, String(Date.now()))
               localStorage.setItem(`clutch_locked_at_${newlyConfirmed.id}`, String(Date.now()))
               setVerrouData({ venue: newlyConfirmed.venue||'', name: newlyConfirmed.receiver?.name||'', photo: newlyConfirmed.receiver?.photo_url||null })
+              Sounds.verrou()
               setTimeout(() => setShowVerrou(true), 100)
+              if (newlyConfirmed.proposed_time) {
+                scheduleRdvNotifs(newlyConfirmed.id, newlyConfirmed.receiver?.name||'', newlyConfirmed.venue||'', newlyConfirmed.proposed_time)
+                scheduleAutoFeedback(newlyConfirmed.id, newlyConfirmed.proposed_time, ()=>(clutches as any[]).find((c:any)=>c.id===newlyConfirmed.id))
+                // Bloque la fenêtre RDV sur le profil (persiste même si Verrou annulé)
+                const rdvMs = new Date(newlyConfirmed.proposed_time).getTime()
+                const lockedFrom = new Date(rdvMs - TRUST_CONFIG.RDV_LOCK_BEFORE_MIN * 60*1000).toISOString()
+                const lockedUntil = new Date(rdvMs + TRUST_CONFIG.RDV_LOCK_AFTER_H * 3600*1000).toISOString()
+                supabase.from('profiles').update({ rdv_locked_from: lockedFrom, rdv_locked_until: lockedUntil }).eq('id', user.id).then(()=>{})
+              }
             }
           } catch {}
         }
         return data
       })
+      // Sync announcedDelays depuis la DB (pour que le receveur voie aussi le badge +Xmin)
+      const delaysFromDb: Record<string,number> = {}
+      data.forEach((c:any) => { if (c.announced_delay_min > 0) delaysFromDb[c.id] = c.announced_delay_min })
+      if (Object.keys(delaysFromDb).length > 0) {
+        setAnnouncedDelays(prev => ({...prev, ...delaysFromDb}))
+      }
+      // Charger les contacts mutuels parmi les clutchs terminés
+      const completedIds2 = data.filter((c:any)=>c.status==='completed').map((c:any)=>c.id)
+      if (completedIds2.length > 0 && user?.id) {
+        supabase.from('rdv_feedbacks')
+          .select('rdv_id,from_id,keep_contact')
+          .in('rdv_id', completedIds2)
+          .eq('keep_contact', true)
+          .then(({data: fbs}) => {
+            if (!fbs) return
+            const counts: Record<string,number> = {}
+            fbs.forEach((fb:any) => { counts[fb.rdv_id] = (counts[fb.rdv_id]||0) + 1 })
+            const mutual = new Set(Object.keys(counts).filter(id => counts[id] >= 2))
+            setMutualContactIds(mutual)
+          })
+      }
     }
   },[user?.id])
 
@@ -4555,81 +6121,91 @@ export default function App2() {
     }
   },[user?.id,loadProfiles,loadClutches])
 
-  // ── Bot incoming clutch — un profil test initie un clutch vers David ──
-  // Se déclenche 3-5min après ouverture de la fenêtre, puis toutes les 8-12min
-  useEffect(()=>{
-    if (screen !== 'main' || flow !== 'app') return
-    const BOT_PROFILES = [
-      {id:'38dda77a', name:'Camille', gender:'woman',
-       photo_url:'https://randomuser.me/api/portraits/women/44.jpg',
-       reliability_score:94, bio:'Café + vraies conversations ☕',
-       age:27, neighborhood:'Lausanne', job:'Designer UX',
-       interests:['Café','Design','Lectures','Randonnée','Musique'],
-       languages:['Français','Anglais','Allemand'],
-       extraPhotos:[],
-      },
-      {id:'6cf880cf', name:'Anaïs', gender:'woman',
-       photo_url:'https://randomuser.me/api/portraits/women/68.jpg',
-       reliability_score:99, bio:'Yoga & bonne humeur 🧘',
-       age:29, neighborhood:'Pully', job:'Prof de yoga RYT-500',
-       interests:['Yoga','Méditation','Randonnée','Cuisine végane'],
-       languages:['Français','Anglais'],
-       extraPhotos:[],
-      },
-      {id:'c504c886', name:'Sofia', gender:'woman',
-       photo_url:'https://randomuser.me/api/portraits/women/26.jpg',
-       reliability_score:97, bio:'Curieuse et spontanée ✨',
-       age:25, neighborhood:'Flon', job:'Marketing',
-       interests:['Art','Concerts','Gastronomie'],
-       languages:['Français','Espagnol'],
-       extraPhotos:[],
-      },
-      {id:'074e38bb', name:'Lucas', gender:'man',
-       photo_url:'https://randomuser.me/api/portraits/men/32.jpg',
-       reliability_score:88, bio:'Apéros & sorties culturelles 🎭',
-       age:30, neighborhood:'Paquis', job:'Architecte',
-       interests:['Architecture','Jazz','Escalade','Cinéma'],
-       languages:['Français','Anglais'],
-       extraPhotos:['https://randomuser.me/api/portraits/men/33.jpg'],
-      },
-    ]
-    const VENUES = ['Café Romand','Blackbird Coffee','Bar du Flon','Terrasse Ouchy','Café de la Paix']
-    const MSGS = ['Dispo pour un café ?','On se retrouve ?','Tu es dans le coin ?','Apéro ce soir ?','Envie de discuter ?']
-    const delay = 180000 + Math.floor(Math.random()*120000) // 3-5min
-    const t = setTimeout(()=>{
-      if (showIncoming || showVerrou) return
-      const bot = BOT_PROFILES[Math.floor(Math.random()*BOT_PROFILES.length)]
-      const venue = VENUES[Math.floor(Math.random()*VENUES.length)]
-      const msg = MSGS[Math.floor(Math.random()*MSGS.length)]
-      const pt = new Date(Date.now()+2*3600*1000).toISOString()
-      setIncomingClutch({id:'bot-'+Date.now(),sender:{...bot},venue,message:msg,proposed_time:pt,expires_at:pt})
-      // (popup supprimé — badge rouge sur onglet ⚡ suffit)
-      // Compteur anti-saturation femmes
-      if (user && (user as any).gender === 'woman') {
-        try {
-          const today = new Date().toDateString()
-          const todayKey = `clutch_daily_received_${user.id}_${today}`
-          const current = parseInt(localStorage.getItem(todayKey)||'0')
-          localStorage.setItem(todayKey, String(current+1))
-        } catch {}
-      }
-    }, delay)
-    return()=>clearTimeout(t)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[screen, flow, showIncoming, showVerrou])
+  // Bot auto-clutch supprimé — on n'utilise que les vrais clutchs Supabase
 
   // ── Verrou actif — clutch confirmed dans les 18h suivantes ──
   const activeVerrou = useMemo(() => {
     if (!user?.id) return null
     const now = new Date()
     const soon = new Date(now.getTime() + 18*3600*1000)
-    return (clutches as any[]).find(c =>
-      (c.status === 'confirmed' || c.status === 'accepted') &&
+    // Verrou actif normal
+    const normal = (clutches as any[]).find(c =>
+      (c.status === 'confirmed' || c.status === 'accepted' || c.status === 'checked_in') &&
+      !completedIds.current.has(c.id) &&
       c.proposed_time &&
-      new Date(c.proposed_time) > new Date(now.getTime() - 2*3600*1000) &&
+      new Date(c.proposed_time) > new Date(now.getTime() - 3*3600*1000) &&
       new Date(c.proposed_time) < soon
-    ) || null
+    )
+    if (normal) return normal
+    // Retard refusé non encore acquitté → garder le canvas visible
+    try {
+      return (clutches as any[]).find(c =>
+        c.status === 'cancelled' &&
+        c.retard_by === user.id &&
+        c.retard_accepted === false &&
+        !localStorage.getItem(`retard_ack_${c.id}`)
+      ) || null
+    } catch { return null }
   }, [clutches, user?.id])
+
+  // Blocage bouton Actif : 1h avant RDV jusqu'à 2h après
+  const rdvBlocked = useMemo(() => {
+    if (!activeVerrou?.proposed_time) return false
+    const rdvMs = new Date(activeVerrou.proposed_time).getTime()
+    const now = Date.now()
+    return now > rdvMs - 60*60*1000 && now < rdvMs + 2*60*60*1000
+  }, [activeVerrou])
+
+  // ── Notifications RDV — Option A : setTimeout + browser Notification API ─
+  // Option B (Supabase Edge Function + cron) à activer quand Supabase Pro
+  const rdvNotifsTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const scheduleRdvNotifs = useCallback((clutchId: string, partnerName: string, venue: string, proposedTime: string) => {
+    const rdvMs = new Date(proposedTime).getTime()
+    const now = Date.now()
+    // Annule les timers précédents pour ce clutch (anti-doublon)
+    rdvNotifsTimers.current.forEach(t => clearTimeout(t))
+    rdvNotifsTimers.current = []
+
+    const schedule = (delayMs: number, title: string, body: string) => {
+      const fireAt = rdvMs - delayMs
+      const wait = fireAt - now
+      if (wait <= 0) return // déjà passé
+      const t = setTimeout(() => {
+        // Browser Notification si permission accordée
+        if (typeof window !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+          new Notification(title, { body, icon: '/icon-192.png', tag: `rdv-${clutchId}-${delayMs}` })
+        }
+        // Toast in-app toujours (si app ouverte)
+        showToast(`${title} — ${body}`, C.orange)
+      }, wait)
+      rdvNotifsTimers.current.push(t)
+    }
+
+    schedule(30*60*1000, `RDV dans 30 min ⏰`,  `${partnerName} · ${venue} — prépare-toi !`)
+    schedule(10*60*1000, `🎯 Radar activé`,       `${partnerName} t'attend · ${venue}`)
+  }, [showToast])
+
+  // ── Auto-feedback 3h après RDV si personne n'a cliqué Terminer ─
+  const scheduleAutoFeedback = useCallback((clutchId: string, proposedTime: string, clutchRef: ()=>any|undefined) => {
+    if (autoFeedbackTimers.current[clutchId]) clearTimeout(autoFeedbackTimers.current[clutchId])
+    const fireAt = new Date(proposedTime).getTime() + 3*3600*1000
+    const wait = fireAt - Date.now()
+    if (wait <= 0) return
+    autoFeedbackTimers.current[clutchId] = setTimeout(() => {
+      const cl = clutchRef()
+      if (!cl) return
+      if (['completed','cancelled','declined','expired'].includes(cl.status)) return
+      // Auto-terminer + ouvrir feedback
+      const nowIso = new Date().toISOString()
+      supabase.from('clutches').update({status:'completed',expires_at:nowIso}).eq('id',clutchId).then(()=>{})
+      setClutches(prev=>(prev as any[]).map((c:any)=>c.id===clutchId?{...c,status:'completed',expires_at:nowIso}:c))
+      setFeedbackClutch(cl)
+      setShowFeedback(true)
+      if (typeof window !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('🎯 Comment s\'est passé le RDV ?', { body:'Donne ton feedback — 3 secondes', icon:'/icon-192.png', tag:`autofeedback-${clutchId}` })
+      }
+    }, wait)
+  }, [])
 
   // ── Notifications web push (préparation OneSignal) ─────────
   const requestNotificationPermission = useCallback(async () => {
@@ -4658,6 +6234,9 @@ export default function App2() {
   const clutchesRef = useRef<any[]>([])
   useEffect(() => { clutchesRef.current = clutches as any[] }, [clutches])
 
+  // ── Ref partagé entre Realtime + Polling pour déduplication Verrou ──
+  const shownVerrouIds = useRef<Set<string>>(new Set())
+
   // ── Realtime — 3 channels séparés (Supabase = 1 filtre par channel) ───
   useEffect(() => {
     if (!user?.id) return
@@ -4671,7 +6250,19 @@ export default function App2() {
         filter:`receiver_id=eq.${uid}`,
       }, async payload => {
         const {data:sender} = await supabase.from('profiles').select('*').eq('id',payload.new.sender_id).single()
+        // Auto-decline if receiver already has an active confirmed Clutch
+        const activeThresh = new Date(Date.now() - 3*3600*1000).toISOString()
+        const {data:alreadyLocked} = await supabase.from('clutches')
+          .select('id').or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+          .in('status',['confirmed','accepted']).neq('id', payload.new.id)
+          .gt('proposed_time', activeThresh).limit(1)
+        if (alreadyLocked && alreadyLocked.length > 0) {
+          await supabase.from('clutches').update({status:'declined'}).eq('id',payload.new.id)
+          loadClutches()
+          return
+        }
         setIncomingClutch({...payload.new, sender})
+        Sounds.clutch()
         loadClutches()
         try { notifyNewClutch(sender?.name || 'Quelqu\'un', payload.new.venue || 'un lieu') } catch {}
         if ((user as any).gender === 'woman') {
@@ -4694,16 +6285,55 @@ export default function App2() {
         filter:`receiver_id=eq.${uid}`,
       }, payload => {
         loadClutches()
-        if (payload.new?.status === 'confirmed' || payload.new?.status === 'accepted') {
-          const shownKey = `verrou_shown_${payload.new.id}`
-          try {
-            if (localStorage.getItem(shownKey)) { loadClutches(); return }
-            localStorage.setItem(shownKey, String(Date.now()))
-            localStorage.setItem(`clutch_locked_at_${payload.new.id}`, String(Date.now()))
-          } catch {}
-          const other = clutchesRef.current.find(c=>c.id===payload.new.id)
+        const status = payload.new?.status
+        const oldStatus = payload.old?.status
+        const id = payload.new?.id
+        // Toast retard 30min reçu
+        if (Number(payload.new?.retard_min) === 30 && payload.new?.retard_accepted == null && payload.new?.retard_by) {
+          showToast('⏰ Retard de 30 min — accepter ou refuser ?', C.orange)
+        }
+        // Verrou animation : guard via localStorage (payload.old non fiable sans REPLICA IDENTITY FULL)
+        if (status === 'confirmed' || status === 'accepted') {
+          try { if (localStorage.getItem(`verrou_shown_${id}`)) { shownVerrouIds.current.add(id); return } } catch {}
+          if (shownVerrouIds.current.has(id)) return
+          shownVerrouIds.current.add(id)
+          try { localStorage.setItem(`verrou_shown_${id}`, String(Date.now())); localStorage.setItem(`clutch_locked_at_${id}`, String(Date.now())) } catch {}
+          const other = clutchesRef.current.find(c=>c.id===id)
           setVerrouData({ venue:payload.new?.venue||'', name:other?.sender?.name||'', photo:other?.sender?.photo_url||null })
           setShowVerrou(true)
+          if (payload.new?.proposed_time) {
+            scheduleRdvNotifs(id, other?.sender?.name||'', payload.new.venue||'', payload.new.proposed_time)
+            scheduleAutoFeedback(id, payload.new.proposed_time, ()=>(clutches as any[]).find((c:any)=>c.id===id))
+            const _rdvMs = new Date(payload.new.proposed_time).getTime()
+            const _lockedFrom = new Date(_rdvMs - TRUST_CONFIG.RDV_LOCK_BEFORE_MIN * 60*1000).toISOString()
+            const lockedUntil = new Date(_rdvMs + TRUST_CONFIG.RDV_LOCK_AFTER_H * 3600*1000).toISOString()
+            supabase.from('profiles').update({ rdv_locked_from: _lockedFrom, rdv_locked_until: lockedUntil }).eq('id', uid).then(()=>{})
+          }
+        } else if (status === 'completed') {
+          addCompleted(id)
+          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===id?{...cl,status:'completed'}:cl))
+          try { if (localStorage.getItem(`feedback_done_${id}`)) return } catch {}
+          // Recharger pour avoir les données fraîches (sender/receiver joints), puis ouvrir feedback
+          supabase.from('clutches')
+            .select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
+            .eq('id', id).single()
+            .then(({data:fresh})=>{
+              if (fresh) { setInlineFeedbackId(fresh.id); _setTab('clutchs'); showToast('🎯 Comment s\'est passé le RDV ?',C.gold) }
+            })
+        } else if (status === 'cancelled') {
+          supabase.from('clutches')
+            .select('cancel_message,cancel_by,sender_id,sender:profiles!clutches_sender_id_fkey(name),receiver:profiles!clutches_receiver_id_fkey(name)')
+            .eq('id', id).single()
+            .then(({data:fresh})=>{
+              if (!fresh) return
+              const cancellerIsMe = fresh.cancel_by === uid
+              if (cancellerIsMe) return // je suis celui qui a annulé, pas de toast
+              const cancellerName = fresh.cancel_by === fresh.sender_id ? ((fresh as any).sender as any)?.name : ((fresh as any).receiver as any)?.name
+              const msg = fresh.cancel_message
+              showToast(`↩ ${cancellerName||'Partenaire'} a annulé${msg ? ` · "${msg}"` : ''}`, C.whiteMid)
+              setTimeout(()=>showToast('ℹ Son score de fiabilité sera impacté', C.orange), 1000)
+            })
+          loadClutches()
         }
       })
       .subscribe((status: string) => {
@@ -4719,16 +6349,54 @@ export default function App2() {
       }, payload => {
         console.log('[RT] chUpdateSend fired:', payload.new?.status)
         loadClutches()
-        if (payload.new?.status === 'confirmed' || payload.new?.status === 'accepted') {
-          const shownKey = `verrou_shown_${payload.new.id}`
-          try {
-            if (localStorage.getItem(shownKey)) { loadClutches(); return }
-            localStorage.setItem(shownKey, String(Date.now()))
-            localStorage.setItem(`clutch_locked_at_${payload.new.id}`, String(Date.now()))
-          } catch {}
-          const other = clutchesRef.current.find(c=>c.id===payload.new.id)
+        const status = payload.new?.status
+        const id = payload.new?.id
+        // Verrou animation : guard via localStorage
+        if (status === 'confirmed' || status === 'accepted') {
+          try { if (localStorage.getItem(`verrou_shown_${id}`)) { shownVerrouIds.current.add(id); return } } catch {}
+          if (shownVerrouIds.current.has(id)) return
+          shownVerrouIds.current.add(id)
+          try { localStorage.setItem(`verrou_shown_${id}`, String(Date.now())); localStorage.setItem(`clutch_locked_at_${id}`, String(Date.now())) } catch {}
+          const other = clutchesRef.current.find(c=>c.id===id)
           setVerrouData({ venue:payload.new?.venue||'', name:other?.receiver?.name||'', photo:other?.receiver?.photo_url||null })
           setShowVerrou(true)
+          if (payload.new?.proposed_time) {
+            scheduleRdvNotifs(id, other?.receiver?.name||'', payload.new.venue||'', payload.new.proposed_time)
+            scheduleAutoFeedback(id, payload.new.proposed_time, ()=>(clutches as any[]).find((c:any)=>c.id===id))
+            const _rdvMs = new Date(payload.new.proposed_time).getTime()
+            const _lockedFrom = new Date(_rdvMs - TRUST_CONFIG.RDV_LOCK_BEFORE_MIN * 60*1000).toISOString()
+            const lockedUntil = new Date(_rdvMs + TRUST_CONFIG.RDV_LOCK_AFTER_H * 3600*1000).toISOString()
+            supabase.from('profiles').update({ rdv_locked_from: _lockedFrom, rdv_locked_until: lockedUntil }).eq('id', uid).then(()=>{})
+          }
+        } else if (status === 'completed') {
+          addCompleted(id)
+          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===id?{...cl,status:'completed'}:cl))
+          try { if (localStorage.getItem(`feedback_done_${id}`)) return } catch {}
+          // Recharger pour avoir les données fraîches (sender/receiver joints), puis ouvrir feedback
+          supabase.from('clutches')
+            .select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
+            .eq('id', id).single()
+            .then(({data:fresh})=>{
+              if (fresh) { setInlineFeedbackId(fresh.id); _setTab('clutchs'); showToast('🎯 Comment s\'est passé le RDV ?',C.gold) }
+            })
+        } else if (status === 'declined') {
+          const other = clutchesRef.current.find((c:any)=>c.id===id)
+          const name = other?.receiver?.name || ''
+          showToast(`↩ ${name ? name+' a ' : ''}refusé le Clutch`, C.red)
+        } else if (status === 'cancelled') {
+          supabase.from('clutches')
+            .select('cancel_message,cancel_by,sender_id,sender:profiles!clutches_sender_id_fkey(name),receiver:profiles!clutches_receiver_id_fkey(name)')
+            .eq('id', id).single()
+            .then(({data:fresh})=>{
+              if (!fresh) return
+              const cancellerIsMe = fresh.cancel_by === uid
+              if (cancellerIsMe) return
+              const cancellerName = fresh.cancel_by === fresh.sender_id ? ((fresh as any).sender as any)?.name : ((fresh as any).receiver as any)?.name
+              const cmsg = fresh.cancel_message
+              showToast(`↩ ${cancellerName||'Partenaire'} a annulé${cmsg ? ` · "${cmsg}"` : ''}`, C.whiteMid)
+              setTimeout(()=>showToast('ℹ Son score de fiabilité sera impacté', C.orange), 1000)
+            })
+          loadClutches()
         }
       })
       .subscribe((status: string) => {
@@ -4743,8 +6411,62 @@ export default function App2() {
     }
   }, [user?.id, loadClutches, notifyNewClutch])
 
+  // ── Polling toutes les 5s : loadClutches (mise à jour générale) ──
+  useEffect(() => {
+    if (!user?.id) return
+    const t = setInterval(() => loadClutches(), 5000)
+    return () => clearInterval(t)
+  }, [user?.id, loadClutches])
+
+  // ── Polling feedback User 2 : standalone, sans closure stale ──
+  // Cherche clutchs completed pas encore traités → ouvre feedback
+  useEffect(() => {
+    if (!user?.id) return
+    const uid = user.id
+    const check = async () => {
+      const {data} = await supabase.from('clutches')
+        .select('*,sender:profiles!clutches_sender_id_fkey(id,name,photo_url),receiver:profiles!clutches_receiver_id_fkey(id,name,photo_url)')
+        .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+        .eq('status','completed')
+        .order('created_at',{ascending:false})
+        .limit(10)
+      if (!data?.length) return
+      for (const c of data) {
+        if (completedIds.current.has(c.id)) continue
+        try { if (localStorage.getItem(`feedback_done_${c.id}`)) { addCompleted(c.id); continue } } catch {}
+        addCompleted(c.id)
+        setInlineFeedbackId(c.id)
+        _setTab('clutchs')
+        showToast('🎯 Comment s\'est passé le RDV ?', C.gold)
+        break
+      }
+    }
+    const t = setInterval(check, 5000)
+    return () => clearInterval(t)
+  }, [user?.id])
+
+  // ── Polling contact mutuel : si l'autre dit Oui après nous ──
+  useEffect(() => {
+    if (!waitingMutualContact || !user?.id) return
+    const {clutchId, clutch} = waitingMutualContact
+    const isSnd = clutch.sender_id === user.id
+    const otherId = isSnd ? clutch.receiver_id : clutch.sender_id
+    const otherName = (isSnd ? (clutch.receiver||clutch._receiver) : (clutch.sender||clutch._sender))?.name || '...'
+    const t = setInterval(async () => {
+      const {data} = await supabase.from('rdv_feedbacks')
+        .select('keep_contact').eq('rdv_id',clutchId).eq('from_id',otherId).maybeSingle()
+      if (data?.keep_contact === true) {
+        setWaitingMutualContact(null)
+        setMutualContactIds(prev => new Set([...prev, clutchId]))
+        showToast(`✦ ${otherName} veut garder contact !`, C.gold)
+        _setTab('contacts')
+        loadClutches()
+      }
+    }, 5000)
+    return () => clearInterval(t)
+  }, [waitingMutualContact?.clutchId])
+
   // ── Polling ciblé : surveille mes clutchs pending toutes les 3s (stable via ref) ──
-  const shownVerrouIds = useRef<Set<string>>(new Set())
   const [debugLog] = useState<string>('')
   useEffect(() => {
     if (!user?.id) return
@@ -4797,6 +6519,11 @@ export default function App2() {
       for (const m of data) { if (m.clutch_id) counts[m.clutch_id] = (counts[m.clutch_id]||0)+1 }
       setUnreadChats(prev => {
         const same = JSON.stringify(prev) === JSON.stringify(counts)
+        if (!same) {
+          const prevTotal = Object.values(prev).reduce((a,b)=>a+b,0)
+          const newTotal = Object.values(counts).reduce((a,b)=>a+b,0)
+          if (newTotal > prevTotal) Sounds.message()
+        }
         return same ? prev : counts
       })
     }
@@ -4804,6 +6531,25 @@ export default function App2() {
     const t = setInterval(poll, 5000)
     return () => clearInterval(t)
   }, [user?.id, clutches])
+
+  // ── Polling messages non lus contacts (mutual keep_contact) ──
+  useEffect(() => {
+    if (!user?.id) return
+    const uid = user.id
+    const poll = async () => {
+      const contactIds = [...mutualContactIds]
+      if (contactIds.length === 0) { setContactsUnread(0); return }
+      const {data} = await supabase.from('messages')
+        .select('id')
+        .eq('receiver_id', uid)
+        .is('read_at', null)
+        .in('clutch_id', contactIds)
+      setContactsUnread(data?.length || 0)
+    }
+    poll()
+    const t = setInterval(poll, 8000)
+    return () => clearInterval(t)
+  }, [user?.id, mutualContactIds])
 
   const signOut = async () => { await supabase.auth.signOut(); setUser(null);setProfiles([]);setClutches([]);setScreen('login') }
 
@@ -4819,15 +6565,24 @@ export default function App2() {
     }
     const [h,m] = untilTime.split(':').map(Number)
     const until = new Date(); until.setHours(h,m,0,0)
-    // Si l'heure est déjà passée (ex: 22:00 alors qu'il est 23:30) → lendemain
     if (until <= new Date()) until.setDate(until.getDate() + 1)
+    // available_from : heure de début du créneau (pas de correction lendemain — la fenêtre peut déjà avoir commencé)
+    const [fh,fm] = fromTime.split(':').map(Number)
+    const from = new Date(); from.setHours(fh,fm,0,0)
+    // Si from > until (ex: from=02:30 mais on est à 03:00 donc until=04:00 aujourd'hui), on laisse from tel quel
     const city = nearestCity(meetupPos[0], meetupPos[1])
 
     // Update + .select() pour vérifier que des lignes ont été mises à jour
     const { data: updated, error } = await supabase.from('profiles').update({
       is_available:true,
+      available_from:from.toISOString(),
       available_until:until.toISOString(),
       available_city:city,
+      center_lat:meetupPos[0],
+      center_lng:meetupPos[1],
+      available_radius_km:Math.round(rayon),
+      pref_age_min: parseInt(ageMin) || 18,
+      pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
       ...(intentMsg ? {bio:intentMsg} : {}),
     } as any).eq('id',user.id).select()
 
@@ -4842,8 +6597,14 @@ export default function App2() {
       const { error: e2 } = await supabase.from('profiles').upsert({
         id: user.id,
         is_available:true,
+        available_from:from.toISOString(),
         available_until:until.toISOString(),
         available_city:city,
+        center_lat:meetupPos[0],
+        center_lng:meetupPos[1],
+        available_radius_km:Math.round(rayon),
+        pref_age_min: parseInt(ageMin) || 18,
+        pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
         name: (user as any).name || 'Utilisateur',
         gender: (user as any).gender || null,
         reliability_score: (user as any).reliability_score || 100,
@@ -4855,20 +6616,123 @@ export default function App2() {
       }
     }
 
-    setUser(prev=>prev?{...prev,is_available:true,available_until:until.toISOString(),available_city:city}:prev)
-    showToast(`✦ Window open · ${city} · ${rayon} km`,C.green)
+    setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon}:prev)
+    showToast(`✦ Fenêtre ouverte · ${city} · ${Math.round(rayon)} km`,C.green)
     requestNotificationPermission()
     setFlow('app')
     setTab('presences')
+    setTimeout(()=>loadProfiles(), 500) // Refresh la liste après mise à jour DB
   }
 
-  const filtered = profiles.filter(p => {
-    if (filterGender==='all') return true
-    const gk = genderKey((p as any).gender)
-    // Inclure aussi les profils sans genre défini (X) pour ne pas les rater
-    if (gk === 'X') return true
-    return gk === filterGender
+  const activateLive = () => {
+    if (liveMode) { setLiveMode(false); return }
+    // Animation d'activation
+    setLiveActivating(true)
+    setTimeout(() => {
+      setLiveActivating(false)
+      // Simulation : position Lausanne centre (Flon) — remplacé par GPS réel en prod
+      setLivePos([46.5197, 6.6323])
+      setLiveMode(true)
+    }, 900)
+  }
+
+  // En prod : filtre GPS réel. En simulation (pos = Lausanne Flon) : affiche les profils disponibles ou les mocks
+  const liveFiltered = liveMode && livePos ? (() => {
+    const real = profiles.filter(p => {
+      const now = Date.now()
+      const from = (p as any).available_from ? new Date((p as any).available_from).getTime() : null
+      const until = (p as any).available_until ? new Date((p as any).available_until).getTime() : null
+      if (!from || !until || now < from || now > until) return false
+      const lat = (p as any).center_lat, lng = (p as any).center_lng
+      if (lat == null || lng == null) return false
+      return haversineKm(livePos[0], livePos[1], lat, lng) <= 0.5
+    })
+    return real
+  })() : []
+
+  // ID du partenaire de Verrou actif — ces deux profils se cachent mutuellement
+  const activeVerrouPartnerId = useMemo(() => {
+    if (!activeVerrou || !user?.id) return null
+    return activeVerrou.sender_id === user.id ? activeVerrou.receiver_id : activeVerrou.sender_id
+  }, [activeVerrou, user?.id])
+
+  // 5 zones de distance depuis le centre de disponibilité choisi (meetupPos)
+  function getDistanceZone(theirLat: number|null, theirLng: number|null): string|null {
+    if (theirLat == null || theirLng == null) return null
+    const km = haversineKm(meetupPos[0], meetupPos[1], theirLat, theirLng)
+    if (km < 0.5)  return '📍 À deux pas'
+    if (km < 2)    return '📍 Dans le quartier'
+    if (km < 10)   return '📍 Dans la ville'
+    if (km < 50)   return '📍 Région proche'
+    return '📍 À distance'
+  }
+
+  const filtered = (!availableRef ? [] : profiles).filter(p => {
+    // Toujours inclure les bots GPS de test (ignorent tous les filtres)
+    if ((p as any)._isGpsTestBot) return true
+    // Masquer le partenaire de Verrou actif (on a déjà un RDV ensemble)
+    if (activeVerrouPartnerId && (p as any).id === activeVerrouPartnerId) return false
+    // Filtre genre
+    if (filterGender !== 'all') {
+      const gk = genderKey((p as any).gender)
+      if (gk !== 'X' && gk !== filterGender) return false
+    }
+    // Filtre âge — bidirectionnel
+    const theirAge = (p as any).age ? parseInt((p as any).age) : null
+    const myAge = (user as any)?.age ? parseInt((user as any).age) : null
+    if (theirAge !== null) {
+      const minA = parseInt(ageMin) || 18
+      const maxA = ageMax === '65+' ? 99 : (parseInt(ageMax) || 99)
+      if (theirAge < minA || theirAge > maxA) return false
+    }
+    // Symétrie : est-ce que mon âge entre dans LEUR préférence ? (seulement si la valeur est définie)
+    if (myAge !== null) {
+      const theirPrefMin = (p as any).pref_age_min
+      const theirPrefMax = (p as any).pref_age_max
+      if (theirPrefMin != null && theirPrefMax != null) {
+        if (myAge < theirPrefMin || myAge > theirPrefMax) return false
+      }
+    }
+    // Filtre horaire : les créneaux doivent se chevaucher
+    const myFrom = (user as any)?.available_from ? new Date((user as any).available_from).getTime() : null
+    const myUntil = user?.available_until ? new Date(user.available_until).getTime() : null
+    const theirFrom = (p as any).available_from ? new Date((p as any).available_from).getTime() : null
+    const theirUntil = (p as any).available_until ? new Date((p as any).available_until).getTime() : null
+    if (myFrom && myUntil && theirFrom && theirUntil) {
+      // Pas de chevauchement si mon from >= leur until OU leur from >= mon until
+      if (myFrom >= theirUntil || theirFrom >= myUntil) return false
+    }
+    // Exclure profils dans leur fenêtre RDV bloquée (1h avant → 2h après)
+    const rdvLockedFrom = (p as any).rdv_locked_from
+    const rdvLockedUntil = (p as any).rdv_locked_until
+    if (rdvLockedFrom && rdvLockedUntil) {
+      const now2 = Date.now()
+      if (now2 >= new Date(rdvLockedFrom).getTime() && now2 <= new Date(rdvLockedUntil).getTime()) return false
+    } else if (rdvLockedUntil && new Date(rdvLockedUntil) > new Date()) {
+      // fallback ancien format (pas encore migré)
+      return false
+    }
+    // Filtre géographique : les cercles de disponibilité doivent s'intersecter
+    const theirLat = (p as any).center_lat, theirLng = (p as any).center_lng
+    const theirRadius = (p as any).available_radius_km
+    if (theirLat != null && theirLng != null && theirRadius != null) {
+      const myRadius = (user as any)?.available_radius_km ?? rayon
+      const dist = haversineKm(meetupPos[0], meetupPos[1], theirLat, theirLng)
+      if (dist > myRadius + theirRadius) return false
+    }
+    return true
   })
+
+  // Fenêtre bloquée pour l'utilisateur courant (calculée depuis activeVerrou)
+  const myRdvWindow = useMemo(() => {
+    if (!activeVerrou?.proposed_time) return null
+    const rdvMs = new Date(activeVerrou.proposed_time).getTime()
+    const lockFrom = rdvMs - TRUST_CONFIG.RDV_LOCK_BEFORE_MIN * 60*1000
+    const lockUntil = rdvMs + TRUST_CONFIG.RDV_LOCK_AFTER_H * 3600*1000
+    const now = Date.now()
+    if (now < lockFrom || now > lockUntil) return null
+    return { lockFrom, lockUntil, rdvMs }
+  }, [activeVerrou])
 
   // Swipe supprimé — conflits avec zoom carte sur mobile
 
@@ -4894,15 +6758,30 @@ export default function App2() {
       `}</style>
 
       {screen==='splash'   && <Splash onDone={onSplashDone}/>}
-      {toast && <Toast msg={toast.msg} color={toast.color} onDone={()=>setToast(null)}/>}
+      {/* Toasts désactivés — remplacés par notifications dans les canvas */}
       {screen==='login'    && <LoginScreen onSuccess={p=>{
-        setUser(p); setScreen('main')
-        // Skip onboarding si déjà dispo — retour direct aux présences (feedback Mel)
-        if (p.is_available && p.available_until && new Date(p.available_until) > new Date()) setFlow('app')
-        // Lie le player OneSignal à notre user Supabase (natif uniquement)
+        setUser(p)
         import('@/lib/onesignal').then(({ setOneSignalExternalId }) => setOneSignalExternalId(p.id)).catch(() => {})
+        // Profil incomplet → wizard setup
+        const incomplete = !p.photo_url || !p.age || !(p as any).gender
+        if (incomplete) { setScreen('setup'); return }
+        setScreen('main')
+        if (p.is_available && p.available_until && new Date(p.available_until) > new Date()) setFlow('app')
       }} onRegister={()=>setScreen('register')} showToast={showToast}/>}
-      {screen==='register' && <RegisterScreen onSuccess={p=>{setUser(p);setScreen('main')}} onLogin={()=>setScreen('login')} showToast={showToast}/>}
+      {screen==='register' && <RegisterScreen onSuccess={p=>{
+        setUser(p)
+        // Nouveau user → onboarding si jamais fait
+        const done = typeof window !== 'undefined' && localStorage.getItem('clutch_onboarding_done')
+        setScreen(done ? 'setup' : 'onboarding')
+      }} onLogin={()=>setScreen('login')} showToast={showToast}/>}
+      {screen==='onboarding' && <OnboardingScreen onDone={()=>{
+        if (typeof window !== 'undefined') localStorage.setItem('clutch_onboarding_done','1')
+        setScreen('setup')
+      }} isPreview={!user}/>}
+      {screen==='setup' && (user
+        ? <SetupWizard user={user} showToast={showToast} onDone={p=>{ setUser(p); setScreen('main') }}/>
+        : <SetupWizard user={{id:'preview',name:'',bio:'',job:'',photo_url:null,age:null,is_available:false,available_until:null,available_city:null,score:0} as any} showToast={showToast} isPreview onDone={()=>setScreen('login')}/>
+      )}
 
       {screen==='main' && user && (
         <>
@@ -4917,41 +6796,10 @@ export default function App2() {
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
                   <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:900,letterSpacing:'.2em',textTransform:'uppercase',color:C.salmon,background:'rgba(61,26,51,.82)',backdropFilter:'blur(8px)',padding:'5px 12px',borderRadius:20,border:`1px solid ${C.border}`}}>
                     ✦ Clutch
-                    <span style={{fontSize:8,fontWeight:700,color:`${C.salmon}77`,letterSpacing:'.05em',textTransform:'none'}}>{V}</span>
                   </div>
-                  {/* Filtres genre avec label visible */}
-                  <div style={{display:'flex',gap:5,background:'rgba(61,26,51,.7)',backdropFilter:'blur(8px)',padding:'4px 8px',borderRadius:20,border:`1px solid ${C.border}`}}>
-                    {([
-                      {k:'all', icon:'◎', txt:'All'},
-                      {k:'F',   icon:GI.F, txt:'Women'},
-                      {k:'M',   icon:GI.M, txt:'Men'},
-                      {k:'X',   icon:GI.X, txt:'Non-binary'},
-                      {k:'kids',icon:'👶', txt:'Parents'},
-                    ] as const).map(g=>{
-                      // 👶 a sa propre couleur verte, indépendante des genres
-                      const color = g.k==='all' ? C.salmon : g.k==='kids' ? C.green : GC[g.k as GenderKey]
-                      const active = filterGender === (g.k as string)
-                      return (
-                        <button key={g.k} onClick={()=>{const v=g.k as any;setFilterGender(v);try{localStorage.setItem('clutch_filter_gender',v)}catch{}}} title={g.txt}
-                          style={{
-                            display:'flex',alignItems:'center',gap:active?4:0,
-                            padding:active?'3px 8px':'3px 6px',
-                            borderRadius:14,border:`1px solid ${active?color:'transparent'}`,
-                            background:active?`${color}22`:'transparent',
-                            color:active?color:C.whiteMid,
-                            fontSize:12,fontWeight:active?900:500,
-                            cursor:'pointer',fontFamily:'inherit',
-                            transition:'all .12s',overflow:'hidden',
-                            maxWidth:active?80:24,
-                            // 👶 emoji est naturellement jaune — on grise quand inactif
-                            filter:(!active&&g.k==='kids')?'grayscale(1) opacity(.45)':'none',
-                          }}>
-                          <span>{g.icon}</span>
-                          {active && <span style={{fontSize:9,fontWeight:800,whiteSpace:'nowrap'}}>{g.txt}</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{fontSize:12,fontWeight:700,color:C.whiteMid,background:'rgba(61,26,51,.82)',backdropFilter:'blur(8px)',padding:'5px 14px',borderRadius:20,border:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit'}}>
+                    {lang==='en'?'← Cancel':'← Annuler'}
+                  </button>
                 </div>
               </div>
 
@@ -4963,18 +6811,18 @@ export default function App2() {
                   onGpsUpdate={(loc)=>setMeetupPos(loc)}/>
                 {/* Bouton reset position — en haut à droite, compact */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
-                  title="Recenter on my position"
+                  title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}
                   style={{position:'absolute',top:8,right:8,zIndex:1200,
                     padding:'5px 10px',borderRadius:20,
                     background:'rgba(42,16,32,.8)',border:`1px solid ${C.border}`,
                     color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit',
                     backdropFilter:'blur(8px)',pointerEvents:'all'}}>
-                  ⊕ My position
+                  {lang==='en'?'⊕ My position':'⊕ Ma position'}
                 </button>
                 {/* Hint sobre — bas gauche */}
                 <div style={{position:'absolute',bottom:8,left:8,zIndex:1100,pointerEvents:'none'}}>
                   <div style={{background:'rgba(42,16,32,.75)',backdropFilter:'blur(4px)',borderRadius:8,padding:'4px 9px',fontSize:9,color:C.whiteMid,whiteSpace:'nowrap'}}>
-                    Move the map · long press to pin a location
+                    {lang==='en'?'Move the map · long press to pin':'Déplace la carte · appui long pour épingler'}
                   </div>
                 </div>
               </div>
@@ -4986,10 +6834,9 @@ export default function App2() {
                 onTouchStart={e=>e.stopPropagation()}
                 onTouchEnd={e=>e.stopPropagation()}
               >
-                {/* ── Slider rayon — style fader table de mixage ── */}
-                {/* ── Slider rayon custom — zone de clic 60px, fiable iOS/Android ── */}
+                {/* Slider rayon — sans légende km */}
                 {(()=>{
-                  const pct = rayonToSlider(rayon) // 0-100
+                  const pct = rayonToSlider(rayon)
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
@@ -4997,62 +6844,26 @@ export default function App2() {
                     setRayon(sliderToRayon(ratio * 100))
                   }
                   return (
-                    <div style={{padding:'10px 16px 6px'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10}}>
-                        <span style={{fontSize:12,fontWeight:700,color:C.whiteMid}}>📍 Radius</span>
-                        <span style={{fontSize:24,fontWeight:900,color:C.orange,letterSpacing:'-.03em',lineHeight:1}}>{fmtKm(rayon)}</span>
-                      </div>
-                      {/* Zone cliquable 60px de haut — toute la largeur */}
+                    <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:11,color:C.whiteMid,flexShrink:0}}>📍 {fmtKm(rayon)}</span>
                       <div ref={sliderRef}
-                        style={{position:'relative',height:60,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
-                        onPointerDown={e=>{
-                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                          updateFromEvent(e.clientX)
-                        }}
-                        onPointerMove={e=>{
-                          if(e.buttons===0) return
-                          updateFromEvent(e.clientX)
-                        }}>
-                        {/* Track fond */}
-                        <div style={{position:'absolute',left:0,right:0,height:8,borderRadius:4,background:'rgba(255,191,158,.18)',pointerEvents:'none'}}/>
-                        {/* Track rempli */}
-                        <div style={{position:'absolute',left:0,width:`${pct}%`,height:8,borderRadius:4,background:C.orange,pointerEvents:'none'}}/>
-                        {/* Thumb fader */}
-                        <div style={{position:'absolute',left:`calc(${pct}% - 7px)`,width:14,height:36,borderRadius:5,background:C.orange,border:`2px solid ${C.bg}`,pointerEvents:'none',transition:'left .05s'}}/>
-                      </div>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:`${C.whiteMid}66`,marginTop:2}}>
-                        <span>1 km</span><span>10 km</span><span>50 km</span><span>100 km</span>
+                        style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
+                        onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
+                        onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
+                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'rgba(255,191,158,.18)',pointerEvents:'none'}}/>
+                        <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:C.orange,pointerEvents:'none'}}/>
+                        <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:C.orange,border:`2px solid ${C.bg}`,pointerEvents:'none'}}/>
                       </div>
                     </div>
                   )
                 })()}
-
-                {/* Séparateur */}
-                <div style={{height:1,background:C.border,margin:'2px 0'}}/>
-
-                {/* Étiquettes temps */}
-                <div style={{display:'flex',padding:'6px 12px 0',gap:4,alignItems:'center'}}>
-                  <div style={{flex:1,textAlign:'center'}}>
-                    <div style={{display:'inline-flex',alignItems:'baseline',gap:5}}>
-                      <span style={{fontSize:16,fontWeight:900,color:C.salmon,letterSpacing:'-.02em'}}>From</span>
-                      <span style={{fontSize:20,fontWeight:900,color:C.white,letterSpacing:'-.03em',lineHeight:1}}>{fromTime}</span>
-                    </div>
-                  </div>
-                  <div style={{color:C.whiteMid,fontSize:14,flexShrink:0}}>→</div>
-                  <div style={{flex:1,textAlign:'center'}}>
-                    <div style={{display:'inline-flex',alignItems:'baseline',gap:5}}>
-                      <span style={{fontSize:16,fontWeight:900,color:C.salmon,letterSpacing:'-.02em'}}>To</span>
-                      <span style={{fontSize:20,fontWeight:900,color:C.white,letterSpacing:'-.03em',lineHeight:1}}>{untilTime}</span>
-                    </div>
-                  </div>
-                </div>
 
                 {/* 2 roues temps */}
                 <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}>
                   <JogWheel slots={initSlots} value={fromTime} onChange={v => {
                     setFromTime(v)
                     const [h,m]=v.split(':').map(Number); const b=new Date(); b.setHours(h,m,0,0)
-                    const ns=makeSlots(new Date(b.getTime()+30*60_000)).slice(0,36)
+                    const ns=makeSlots(new Date(b.getTime()+5*60_000)).slice(0,216)
                     if (!ns.includes(untilTime)) setUntilTime(ns[1]||ns[0])
                   }}/>
                   <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
@@ -5082,7 +6893,7 @@ export default function App2() {
                     cursor:'pointer',fontFamily:'inherit',
                     letterSpacing:'-.02em',
                   }}>
-                    Next →
+                    {lang==='en'?'Next →':'Suivant →'}
                   </button>
                 </div>
               </div>
@@ -5095,19 +6906,27 @@ export default function App2() {
           {flow==='options' && (
             <div className="fi" style={{position:'fixed',inset:0,background:C.bg,display:'flex',flexDirection:'column'}}>
               {/* Header */}
-              <div style={{padding:'52px 16px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+              <div style={{padding:'12px 16px 14px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
                   <button onClick={()=>setFlow('carte')} style={{background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:10,width:34,height:34,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:C.salmon,fontSize:16,flexShrink:0}}>←</button>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:17,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t('page2.type')}</div>
                     <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{t('page2.intention')}</div>
                   </div>
-                  {/* Étape 2/2 compact */}
+                  {/* Étape 2/2 */}
                   <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
                     <div style={{width:20,height:20,borderRadius:'50%',border:`2px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:C.whiteMid}}>1</div>
                     <div style={{width:12,height:2,borderRadius:1,background:C.orange}}/>
                     <div style={{width:20,height:20,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:C.bordeaux}}>2</div>
                   </div>
+                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,padding:'5px 10px',cursor:'pointer',color:C.whiteMid,fontSize:11,fontWeight:700,fontFamily:'inherit',flexShrink:0}}>
+                    ✕
+                  </button>
+                </div>
+                {/* Récap créneau — visible dès step 2 */}
+                <div style={{display:'flex',gap:10,fontSize:11,color:C.whiteMid,background:C.whiteFaint,borderRadius:10,padding:'7px 10px'}}>
+                  <span>🕐 <strong style={{color:C.white}}>{fromTime}–{untilTime}</strong></span>
+                  <span>📍 <strong style={{color:C.salmon}}>{nearestCity(meetupPos[0],meetupPos[1])}</strong> · <strong style={{color:C.orange}}>{fmtKm(rayon)}</strong></span>
                 </div>
               </div>
 
@@ -5116,14 +6935,14 @@ export default function App2() {
                 {/* 1. MODE — multi-select (pas exclusif : on peut chercher rencontre ET amitié) */}
                 <div style={{marginBottom:16}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>Mode <span style={{fontWeight:400,textTransform:'none'}}>— multiple choices allowed</span></div>
+                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>Mode <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'multiple choices allowed':'plusieurs choix possibles'}</span></div>
                   </div>
                   <div style={{display:'flex',gap:8}}>
                     {([
-                      {k:'romantic',icon:'💕',l:'Romance',   sub:'romantic meetup'},
-                      {k:'friend',  icon:'🤝',l:'Friendship',sub:'outing, activity'},
-                      {k:'pro',     icon:'💼',l:'Pro',       sub:'network, coworking'},
-                      {k:'parent',  icon:'👶',l:'Parents',   sub:'with kids'},
+                      {k:'romantic',icon:'💕',l:'Romance',   sub:lang==='en'?'romantic meetup':'rencontre romantique'},
+                      {k:'friend',  icon:'🤝',l:lang==='en'?'Friendship':'Amitié',sub:lang==='en'?'outing, activity':'sortie, activité'},
+                      {k:'pro',     icon:'💼',l:'Pro',       sub:lang==='en'?'network, coworking':'réseau, coworking'},
+                      {k:'parent',  icon:'👶',l:'Parents',   sub:lang==='en'?'with kids':'avec enfants'},
                     ] as const).map(m=>{
                       const on=seekModes.includes(m.k)
                       return <button key={m.k} onClick={()=>{
@@ -5148,18 +6967,18 @@ export default function App2() {
                       </button>
                     })}
                   </div>
-                  {seekModes.length===0&&<div style={{fontSize:9,color:C.orange,marginTop:4}}>⚠️ Select at least one mode to be visible</div>}
+                  {seekModes.length===0&&<div style={{fontSize:9,color:C.orange,marginTop:4}}>⚠️ {lang==='en'?'Select at least one mode to be visible':'Sélectionne au moins un mode pour être visible'}</div>}
                 </div>
 
                 {/* 2. GENRE RECHERCHÉ */}
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>I want to meet…</div>
+                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>{lang==='en'?'I want to meet…':'Je cherche…'}</div>
                   <div style={{display:'flex',gap:8}}>
                     {([
-                      {k:'F',   icon:GI.F, l:'Women',        c:GC.F},
-                      {k:'M',   icon:GI.M, l:'Men',          c:GC.M},
-                      {k:'X',   icon:GI.X, l:'Non-binary',   c:GC.X},
-                      {k:'all', icon:'◎',  l:'Doesn\'t matter', c:C.salmon},
+                      {k:'F',   icon:GI.F, l:lang==='en'?'Women':'Femmes',        c:GC.F},
+                      {k:'M',   icon:GI.M, l:lang==='en'?'Men':'Hommes',          c:GC.M},
+                      {k:'X',   icon:GI.X, l:lang==='en'?'Non-binary':'Non-binaire',   c:GC.X},
+                      {k:'all', icon:'◎',  l:lang==='en'?'Doesn\'t matter':'Peu importe', c:C.salmon},
                     ] as const).map(g=>{
                       const on=seekGender===g.k
                       return <button key={g.k} onClick={()=>setSeekGender(g.k as any)}
@@ -5171,33 +6990,45 @@ export default function App2() {
                   </div>
                 </div>
 
-                {/* 3. TRANCHE D'ÂGE — multi-select (ex: 18–25 ET 25–35) */}
+                {/* 3. TRANCHE D'ÂGE — double molette min/max */}
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>Age range <span style={{fontWeight:400,textTransform:'none'}}>— multiple ok</span></div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                    {['18–25','25–35','35–49','50–64','65+'].map(a=>{
-                      const on=seekAges.includes(a)&&!seekAges.includes('tous')
-                      return <button key={a} onClick={()=>{
-                        setSeekAges(prev=>{
-                          const without=prev.filter(x=>x!==a&&x!=='tous')
-                          return prev.includes(a)?without:(without.length===3?['tous']:without.concat(a))
-                        })
-                      }}
-                        style={{padding:'7px 14px',borderRadius:20,border:`1.5px solid ${on?C.orange:C.border}`,background:on?C.orangeFaint:'transparent',color:on?C.orange:C.whiteMid,fontSize:12,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit'}}>
-                        {a}
-                      </button>
-                    })}
-                    <button onClick={()=>setSeekAges(['tous'])}
-                      style={{padding:'7px 14px',borderRadius:20,border:`1.5px solid ${seekAges.includes('tous')?C.orange:C.border}`,background:seekAges.includes('tous')?C.orangeFaint:'transparent',color:seekAges.includes('tous')?C.orange:C.whiteMid,fontSize:12,fontWeight:seekAges.includes('tous')?800:500,cursor:'pointer',fontFamily:'inherit'}}>
-                      Doesn't matter
-                    </button>
+                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:4}}>
+                    {lang==='en'?'Age range':'Tranche d\'âge'}
+                    <span style={{fontWeight:400,textTransform:'none',marginLeft:6,color:C.orange}}>{ageMin} – {ageMax} ans</span>
                   </div>
-                  {seekAges.length>1&&!seekAges.includes('tous')&&<div style={{fontSize:9,color:C.orange,marginTop:3}}>✓ {seekAges.join(' + ')}</div>}
+                  {/* Étiquettes DE / À — même style que From/To des heures */}
+                  <div style={{display:'flex',padding:'4px 12px 0',gap:4,alignItems:'center'}}>
+                    <div style={{flex:1,textAlign:'center'}}>
+                      <span style={{fontSize:16,fontWeight:900,color:C.salmon,letterSpacing:'-.02em'}}>{lang==='en'?'From':'De'}</span>
+                    </div>
+                    <div style={{width:1,background:'transparent',margin:'0 4px'}}/>
+                    <div style={{flex:1,textAlign:'center'}}>
+                      <span style={{fontSize:16,fontWeight:900,color:C.salmon,letterSpacing:'-.02em'}}>{lang==='en'?'To':'À'}</span>
+                    </div>
+                  </div>
+                  {/* Molettes — même layout exact que les heures */}
+                  <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}
+                    onTouchStart={e=>e.stopPropagation()}
+                    onWheel={e=>e.stopPropagation()}>
+                    <JogWheel
+                      slots={Array.from({length:48},(_,i)=>String(i+18))}
+                      value={ageMin}
+                      onChange={v=>{setAgeMin(v);if(parseInt(v)>=parseInt(ageMax))setAgeMax(String(Math.min(65,parseInt(v)+1)))}}
+                      accent={true}
+                    />
+                    <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
+                    <JogWheel
+                      slots={[...Array.from({length:47},(_,i)=>String(i+19)),'65+']}
+                      value={ageMax}
+                      onChange={v=>{setAgeMax(v);if(v!=='65+'&&parseInt(v)<=parseInt(ageMin))setAgeMin(String(Math.max(18,parseInt(v)-1)))}}
+                      accent={false}
+                    />
+                  </div>
                 </div>
 
                 {/* 4. ACTIVITÉ */}
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>I feel like… <span style={{fontWeight:400,textTransform:'none',fontSize:9,color:C.whiteMid}}>(optional)</span></div>
+                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>{lang==='en'?'I feel like…':'J\'ai envie de…'} <span style={{fontWeight:400,textTransform:'none',fontSize:9,color:C.whiteMid}}>({lang==='en'?'optional':'optionnel'})</span></div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                     {[{e:'☕',l:'Café'},{e:'🍷',l:'Apéro'},{e:'🍕',l:'Dîner'},{e:'🚶',l:'Balade'},{e:'🎭',l:'Culture'},{e:'🏃',l:'Sport'},{e:'🎵',l:'Concert'},{e:'🎮',l:'Jeux'},{e:'📸',l:'Photo'},{e:'🧘',l:'Yoga'},{e:'🌿',l:'Bien-être'},{e:'🍜',l:'Resto'},{e:'✨',l:'Surprise moi'}].map(a=>{
                       const on=activites.includes(a.l)
@@ -5226,19 +7057,11 @@ export default function App2() {
                     <div style={{fontSize:9,color:intentMsg.length>120?C.orange:C.whiteMid}}>{intentMsg.length}/150</div>
                   </div>
                   <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,150))}
-                    placeholder={`e.g. I'd love a real conversation over coffee…`}
+                    placeholder={t('page2.intPlaceholder')}
                     rows={2} style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',fontSize:12,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon}}/>
                   <div style={{fontSize:9,color:C.whiteMid,marginTop:3}}>{t('page2.note')}</div>
                 </div>
 
-                {/* Récap fenêtre */}
-                <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:'11px 14px',marginBottom:20}}>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:10,fontSize:11,color:C.whiteMid}}>
-                    <span>🕐 <strong style={{color:C.white}}>{fromTime}–{untilTime}</strong></span>
-                    <span>📍 <strong style={{color:C.salmon}}>{nearestCity(meetupPos[0],meetupPos[1])}</strong> · <strong style={{color:C.orange}}>{fmtKm(rayon)}</strong></span>
-                    <span>⏱ <strong style={{color:C.white}}>18h max</strong></span>
-                  </div>
-                </div>
               </div>
 
               {/* Grand bouton CTA */}
@@ -5251,10 +7074,10 @@ export default function App2() {
                   letterSpacing:'-.03em',
                   boxShadow:`0 8px 32px rgba(226,124,0,.35)`,
                 }}>
-                  ✦ Open my Window
+                  {t('page2.cta')}
                 </button>
                 <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>
-                  Visible within {fmtKm(rayon)} of {nearestCity(meetupPos[0],meetupPos[1])}
+                  {lang==='fr'?`Visible dans un rayon de ${fmtKm(rayon)} autour de ${nearestCity(meetupPos[0],meetupPos[1])}`:`Visible within ${fmtKm(rayon)} of ${nearestCity(meetupPos[0],meetupPos[1])}`}
                 </div>
               </div>
             </div>
@@ -5265,103 +7088,420 @@ export default function App2() {
           ══════════════════════════════════════════════ */}
           {flow==='app' && (
             <>
-              {/* Version chip — visible sur toutes les pages */}
-              <div style={{position:'fixed',top:'env(safe-area-inset-top,6px)',left:8,zIndex:900,pointerEvents:'none'}}>
-                <span style={{fontSize:8,fontWeight:700,color:`${C.salmon}55`,letterSpacing:'.05em',fontFamily:'inherit'}}>{V}</span>
-              </div>
-
               {/* ── TAB : PRÉSENCES — cards compactes, tap = détail + Clutcher ── */}
-              {tab==='presences' && (
+              {tab==='presences' && (<>
                 <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
-                  {/* Bandeau créneau actif */}
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 16px',background:`${C.bg}ee`,borderBottom:`1px solid #C8860A44`,flexShrink:0,paddingTop:'env(safe-area-inset-top,8px)'}}>
-                    <div style={{fontSize:11,color:'#FFBF9E',opacity:0.8}}>
-                      {(user as any)?.is_available && (user as any)?.available_until
-                        ? `✦ Visible until ${new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`
-                        : '◌ Not visible'}
-                    </div>
-                    <button onClick={()=>setFlow('carte')} style={{padding:'4px 12px',borderRadius:20,border:`1px solid #C8860A`,background:'#C8860A22',color:'#C8860A',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',letterSpacing:0.3}}>
-                      + Window
-                    </button>
-                  </div>
-                  <div style={{padding:'8px 16px 10px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+
+                  {/* ── HEADER ── */}
+                  <div style={{padding:'12px 16px 0',paddingTop:'calc(env(safe-area-inset-top,8px) + 10px)',flexShrink:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:19,fontWeight:900}}>{t('tab.presences')}</div>
-                        <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{filtered.length} {lang==='en'?'available':'disponible'+(filtered.length!==1?'s':'')} · Lausanne</div>
+                        <div style={{fontSize:20,fontWeight:900,letterSpacing:-0.3,display:'flex',alignItems:'baseline',gap:6}}>{lang==='en'?'Nearby':'Présences'}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
+                        <div style={{fontSize:11,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span>{filtered.length} {lang==='en'?`available nearby`:`disponible${filtered.length!==1?'s':''} dans votre rayon`}</span>
+                          <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:14,height:14,borderRadius:'50%',border:`1px solid ${C.border}`,fontSize:8,color:C.whiteMid,cursor:'default'}} title="Seules les personnes qui ont ouvert une fenêtre de disponibilité apparaissent ici.">?</span>
+                          {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
+                              <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>
+                              {(user as any).available_from?new Date((user as any).available_from).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})+'–':''}
+                              {new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+                              {(user as any).available_radius_km?' · '+(user as any).available_radius_km+'km':''}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {(['all','F','M','X'] as const).map(g=>{
-                        const color = g==='all' ? C.salmon : GC[g as GenderKey]
-                        const isSelected = filterGender===g
-                        return (
-                          <button key={g} onClick={()=>{setFilterGender(g);try{localStorage.setItem('clutch_filter_gender',g)}catch{}}}
-                            style={{width:30,height:28,borderRadius:20,border:`1px solid ${isSelected?color:C.border}`,background:isSelected?`${color}22`:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {g==='all'
-                              ? <span style={{color:isSelected?color:C.whiteMid,fontSize:13,fontWeight:isSelected?900:500}}>◎</span>
-                              : <GenderSvg gk={g as GenderKey} size={14} style={{filter:isSelected?'none':'brightness(0) invert(1) opacity(0.4)'}}/>
-                            }
-                          </button>
-                        )
-                      })}
+                      {/* Boutons header Présences */}
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        {/* Bouton Live SVG */}
+                        <button onClick={activateLive} style={{position:'relative',width:40,height:40,borderRadius:'50%',border:`1.5px solid ${liveMode?'#E27D09':'rgba(226,125,9,.35)'}`,background:liveMode?'rgba(226,125,9,.15)':'rgba(226,125,9,.07)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,overflow:'visible',flexShrink:0}}>
+                          <style>{`
+                            @keyframes liveRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+                            @keyframes livePulseRing{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.25);opacity:0}}
+                            @keyframes liveBlast{0%{transform:scale(1);opacity:1}40%{transform:scale(2.5);opacity:.6}100%{transform:scale(4);opacity:0}}
+                          `}</style>
+                          {/* Anneau pulse autour */}
+                          {!liveMode && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'1.5px solid rgba(226,125,9,.5)',animation:'livePulseRing 2s ease-in-out infinite',pointerEvents:'none'}}/>}
+                          {liveActivating && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'2px solid #E27D09',animation:'liveBlast .9s ease-out forwards',pointerEvents:'none'}}/>}
+                          {/* SVG Clutch Live */}
+                          <svg width="22" height="21" viewBox="0 0 469.8 450" style={{animation:liveMode?'liveRotate 8s linear infinite':undefined,flexShrink:0}}>
+                            <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
+                            <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
+                            <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+                            <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+                            <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+                            <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+                          </svg>
+                          {/* Pastille LIVE quand actif */}
+                          {liveMode && <div style={{position:'absolute',top:-2,right:-2,width:9,height:9,borderRadius:'50%',background:'#FF1493',border:'1.5px solid #542A44',boxShadow:'0 0 6px rgba(255,20,147,.9)'}}/>}
+                        </button>
+                        {/* 💼 Manoski toggle */}
+                        <button onClick={()=>{setProMode(!proMode);setProJobFilter(null)}}
+                          style={{padding:'6px 10px',borderRadius:20,border:`1px solid ${proMode?C.gold:C.border}`,background:proMode?`${C.gold}22`:'transparent',color:proMode?C.gold:C.whiteMid,fontSize:11,fontWeight:proMode?800:500,cursor:'pointer',fontFamily:'inherit'}}>
+                          💼
+                        </button>
+                        <button onClick={rdvBlocked ? ()=>showToast('RDV en cours — reviens 2h après ton RDV',C.orange) : ()=>setFlow('carte')} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${rdvBlocked?C.border:C.orange}`,background:rdvBlocked?'rgba(255,191,158,.1)':C.orange,color:rdvBlocked?`${C.salmon}88`:'#fff',fontSize:11,fontWeight:800,cursor:rdvBlocked?'not-allowed':'pointer',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',opacity:rdvBlocked?.5:1}}>
+                          {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : (availableRef ? `✦ Actif` : '+ Créneau'))}
+                        </button>
+                      </div>
                     </div>
+
+                    <div style={{height:1,background:C.border,marginLeft:-16,marginRight:-16}}/>
                   </div>
-                  {/* Soft banner replaces blocking gate */}
-                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px'}}>
+
+                  {/* ── LISTE ── */}
+                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
+
+                    {/* ══ MODE PRO — MANOSKI ══ */}
+                    {proMode && !proJobFilter && (() => {
+                      // Comptage par catégorie parmi les profils dispo
+                      const PRO_CATS = [
+                        '💻 Tech','🎨 Créatif','📸 Photo/Vidéo','📣 Marketing','💰 Finance',
+                        '⚕️ Santé','⚖️ Droit','📚 Éducation','🍕 Cuisine/Chef','🎵 Musique',
+                        '🏗 Architecture','🛍 Commerce','🏃 Sport/Coach','✈️ Tourisme','🔬 Sciences',
+                        '🔧 Artisan/Bricolage','⚡ Électricité','🪵 Menuiserie','🔩 Mécanique','✂️ Coiffure/Beauté',
+                        '🌱 Agriculture/Nature','🎭 Théâtre/Scène','🎬 Cinéma/Télé','📊 Consulting','🏠 Immobilier',
+                        '👗 Mode/Textile','🌍 ONG/Social','🍷 Sommellerie/Cave','🐾 Animaux/Véto','Autre'
+                      ]
+                      const catCounts = PRO_CATS.map(cat => ({
+                        cat,
+                        count: filtered.filter(p => (p as any).job_category === cat).length
+                      })).filter(x => x.count > 0).sort((a,b) => b.count - a.count)
+                      const uncategorized = filtered.filter(p => !(p as any).job_category && (p as any).job).length
+                      return (
+                        <div>
+                          <div style={{marginBottom:16}}>
+                            <div style={{fontSize:16,fontWeight:900,color:C.gold,marginBottom:2}}>💼 Mode Pro</div>
+                            <div style={{fontSize:11,color:C.whiteMid}}>
+                              {filtered.length} personne{filtered.length!==1?'s':''} disponible{filtered.length!==1?'s':''} — filtre par domaine
+                            </div>
+                          </div>
+                          {catCounts.length === 0 && (
+                            <div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}>
+                              <div style={{fontSize:36,marginBottom:8}}>🔭</div>
+                              <div style={{fontSize:13,fontWeight:700,color:C.white}}>Aucun profil avec domaine pro</div>
+                              <div style={{fontSize:11,marginTop:4}}>Les gens configurent ça dans leur profil → Réglages</div>
+                            </div>
+                          )}
+                          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                            {catCounts.map(({cat,count}) => (
+                              <button key={cat} onClick={()=>setProJobFilter(cat)}
+                                style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                                <div style={{fontSize:24,width:36,textAlign:'center',flexShrink:0}}>{cat.split(' ')[0]}</div>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:14,fontWeight:700,color:C.white}}>{cat.substring(cat.indexOf(' ')+1)}</div>
+                                  <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{count} personne{count!==1?'s':''} disponible{count!==1?'s':''}</div>
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:20,padding:'3px 10px',color:C.gold,fontSize:12,fontWeight:900}}>{count}</div>
+                                  <span style={{color:C.whiteMid,fontSize:16}}>›</span>
+                                </div>
+                              </button>
+                            ))}
+                            {uncategorized > 0 && (
+                              <button onClick={()=>setProJobFilter('__job__')}
+                                style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',background:'transparent',border:`1px dashed ${C.border}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                                <div style={{fontSize:22,width:36,textAlign:'center'}}>💼</div>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:13,fontWeight:600,color:C.whiteMid}}>Autres profils avec métier</div>
+                                  <div style={{fontSize:11,color:C.whiteMid,opacity:.6}}>{uncategorized} profil{uncategorized!==1?'s':''}</div>
+                                </div>
+                                <span style={{color:C.whiteMid,fontSize:16}}>›</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Mode Pro — liste des profils d'une catégorie */}
+                    {proMode && proJobFilter && (() => {
+                      const proFiltered = proJobFilter === '__job__'
+                        ? filtered.filter(p => !(p as any).job_category && (p as any).job)
+                        : filtered.filter(p => (p as any).job_category === proJobFilter)
+                      return (
+                        <div>
+                          <button onClick={()=>setProJobFilter(null)} style={{display:'flex',alignItems:'center',gap:6,background:'none',border:'none',color:C.gold,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:14,padding:0}}>
+                            ← Retour aux domaines
+                          </button>
+                          <div style={{fontSize:14,fontWeight:900,color:C.white,marginBottom:4}}>
+                            {proJobFilter === '__job__' ? '💼 Autres profils' : proJobFilter}
+                          </div>
+                          <div style={{fontSize:11,color:C.whiteMid,marginBottom:14}}>{proFiltered.length} disponible{proFiltered.length!==1?'s':''}</div>
+                          {proFiltered.length === 0 && (
+                            <div style={{textAlign:'center',padding:'40px 0',color:C.whiteMid}}>
+                              <div style={{fontSize:32}}>🔭</div>
+                              <div style={{fontSize:13,marginTop:8}}>Aucun profil dans ce domaine pour l'instant</div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Liste normale (masquée en mode pro catégorie) */}
+                    {(!proMode || proJobFilter) && (() => {
+                      const displayProfiles = proMode && proJobFilter
+                        ? (proJobFilter === '__job__'
+                            ? filtered.filter(p => !(p as any).job_category && (p as any).job)
+                            : filtered.filter(p => (p as any).job_category === proJobFilter))
+                        : filtered
+                      return <>{/* profiles rendered below */}</>
+                    })()}
+
+                    {/* Banner invisible */}
                     {!availableRef && (
-                      <div style={{background:'rgba(200,134,10,.08)',border:`1px solid ${C.orange}33`,borderRadius:10,padding:'10px 12px',marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+                      <div style={{background:'rgba(200,134,10,.08)',border:`1px solid ${C.orange}33`,borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
                         <span style={{fontSize:14,flexShrink:0}}>{isPremium?'👁':'◌'}</span>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:11,fontWeight:700,color:C.orange}}>{isPremium?'Stealth mode — you are invisible':'You are not visible right now'}</div>
-                          <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{isPremium?'You can browse without being seen':'Open a window to appear on the map'}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:C.orange}}>{isPremium?'Mode discret — tu es invisible':'Tu n\'es pas visible pour l\'instant'}</div>
+                          <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{isPremium?'Tu peux explorer sans être vu·e':'Ouvre un créneau pour apparaître'}</div>
                         </div>
                         {!isPremium&&<button onClick={()=>setFlow('carte')} style={{padding:'5px 10px',borderRadius:8,background:`${C.orange}22`,border:`1px solid ${C.orange}44`,color:C.orange,fontSize:10,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>+ Créneau</button>}
                       </div>
                     )}
+
+                    {/* Bannière Mode Live supprimée — bouton dans header */}
+
+                    {/* Banner saturation femmes */}
                     {isWomanSaturated && (
-                      <div style={{background:`${C.orange}15`,border:`1px solid ${C.orange}33`,borderRadius:12,padding:'10px 14px',marginBottom:8,display:'flex',gap:8,alignItems:'center'}}>
+                      <div style={{background:`${C.orange}15`,border:`1px solid ${C.orange}33`,borderRadius:12,padding:'10px 14px',marginBottom:10,display:'flex',gap:8,alignItems:'center'}}>
                         <span style={{fontSize:16}}>🛡️</span>
                         <div>
-                          <div style={{fontSize:12,fontWeight:800,color:C.orange}}>Protection enabled</div>
-                          <div style={{fontSize:10,color:C.whiteMid}}>You've received {MAX_CLUTCHS_PER_DAY_WOMEN} clutches today. Come back tomorrow or raise your score to receive more.</div>
+                          <div style={{fontSize:12,fontWeight:800,color:C.orange}}>Protection activée</div>
+                          <div style={{fontSize:10,color:C.whiteMid}}>Tu as reçu {MAX_CLUTCHS_PER_DAY_WOMEN} clutchs aujourd'hui. Reviens demain ou améliore ton score.</div>
                         </div>
                       </div>
                     )}
-                    {filtered.length===0
-                      ?<div style={{textAlign:'center',padding:'60px 20px',color:C.whiteMid}}><div style={{fontSize:32,marginBottom:10}}>✦</div><div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:6}}>{t('discover.none')}</div><div style={{fontSize:12}}>{t('discover.nonenote')}</div></div>
-                      :filtered.map((p,i)=>(
-                        /* Card compact — genre coloré, tap ouvre send modal */
-                        <div key={p.id} className={`card-hover su${i<3?i:''}`}
-                          style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,marginBottom:8,cursor:'pointer',display:'flex',gap:10,alignItems:'center',padding:'11px 13px'}}
-                          onClick={()=>{setSelProfile(p);setShowProfileSheet(true)}}>
-                          <div style={{position:'relative',flexShrink:0}}>
-                            <Av src={p.photo_url} name={p.name||'?'} size={44}/>
-                            {/* Dot disponible */}
-                            <div style={{position:'absolute',bottom:-1,right:-1,width:11,height:11,borderRadius:'50%',background:C.green,border:`2px solid ${C.bgCard}`}}/>
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
-                              {/* Icône genre colorée */}
-                              <GenderSvg gk={genderKey((p as any).gender)} size={14}/>
-                              <span style={{fontSize:14,fontWeight:800}}>{p.name||'Anonyme'}</span>
-                              {isTestProfile(p.id)&&<span style={{fontSize:8,fontWeight:900,padding:'1px 4px',borderRadius:6,background:'rgba(107,114,128,.2)',color:'#9CA3AF',border:'1px solid rgba(107,114,128,.3)'}}>BOT</span>}
-                              {p.age&&<span style={{fontSize:11,color:C.whiteMid}}>{p.age}a</span>}
-                              {(p.reliability_score!=null&&p.reliability_score<60)&&<RabbitBadge/>}
-                              {p.reliability_score!=null&&<span style={{marginLeft:'auto'}}><Score v={p.reliability_score}/></span>}
-                            </div>
-                            {p.bio&&<div style={{fontSize:11,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.bio}</div>}
-                          </div>
-                          {/* Bouton Clutcher */}
-                          <div style={{flexShrink:0,width:34,height:34,borderRadius:10,background:C.salmonFaint,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>✦</div>
+
+                    {/* Section LIVE déplacée en overlay plein écran */}
+
+                    {/* Mode occupé — Verrou actif = profils masqués */}
+                    {activeVerrou ? (
+                      <div style={{textAlign:'center',padding:'50px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
+                        <div style={{fontSize:44}}>🔒</div>
+                        <div style={{fontSize:17,fontWeight:900,color:C.white}}>
+                          {myRdvWindow ? 'RDV en cours' : 'Tu as un Verrou'}
                         </div>
-                      ))
-                    }
+                        <div style={{fontSize:13,color:C.whiteMid,lineHeight:1.5}}>
+                          {activeVerrou.venue && <><strong style={{color:C.salmon}}>{activeVerrou.venue}</strong><br/></>}
+                          {myRdvWindow ? <>
+                            Profils masqués jusqu'à{' '}
+                            <strong style={{color:C.orange}}>
+                              {new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+                            </strong>
+                          </> : <>
+                            RDV prévu à{' '}
+                            <strong style={{color:C.orange}}>
+                              {new Date(activeVerrou.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+                            </strong>
+                            {' '}— profils masqués
+                          </>}
+                        </div>
+                        <div style={{fontSize:11,color:`${C.whiteMid}88`,marginTop:4}}>
+                          Tu réapparaîtras automatiquement après ton RDV
+                        </div>
+                      </div>
+                    ) : (
+                    /* Empty state */
+                    filtered.length===0
+                      ? <div style={{textAlign:'center',padding:'60px 20px',color:C.whiteMid}}>
+                          <div style={{fontSize:32,marginBottom:10}}>⧗</div>
+                          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:6}}>{t('discover.none')}</div>
+                          <div style={{fontSize:12}}>{t('discover.nonenote')}</div>
+                        </div>
+
+                      : (proMode && proJobFilter
+                          ? (proJobFilter === '__job__'
+                              ? filtered.filter(p => !(p as any).job_category && (p as any).job)
+                              : filtered.filter(p => (p as any).job_category === proJobFilter))
+                          : filtered
+                        ).map((p,i)=>{
+                          /* Score CD (Clutch Driver) = compatibilité fictive basée sur index + score fiabilité */
+                          const cdScore = Math.max(1, Math.min(5, 5 - i + (p.reliability_score!=null ? Math.floor(p.reliability_score/30) : 0)))
+                          const fiabStars = p.reliability_score!=null ? Math.round(p.reliability_score/20) : null
+                          const distZone = getDistanceZone((p as any).center_lat, (p as any).center_lng)
+
+                          return (
+                            <div key={p.id} className={`card-hover su${i<3?i:''}`}
+                              style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,marginBottom:8,cursor:'pointer',display:'flex',gap:12,alignItems:'center',padding:'12px 14px'}}
+                              onClick={()=>{setSelProfile(p);setShowProfileSheet(true)}}>
+
+                              {/* Photo carrée arrondie + badge CD étoile */}
+                              <div style={{position:'relative',flexShrink:0}}>
+                                <div style={{width:54,height:54,borderRadius:13,overflow:'hidden',border:`2px solid ${C.border}`}}>
+                                  <Av src={p.photo_url} name={p.name||'?'} size={54}/>
+                                </div>
+                                {/* Badge CD étoile — coin haut gauche */}
+                                <div style={{position:'absolute',top:-10,left:-10,width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',zIndex:2}}>
+                                  <svg width="36" height="36" viewBox="0 0 36 36" style={{position:'absolute',top:0,left:0}}>
+                                    <path d="M18 2l2.9 8.1L28 8.5l-5.8 5.5 2 8.7-6.2-3.7-6.2 3.7 2-8.7L8 8.5l7.1 1.6z" fill="#E8317A" stroke="rgba(255,255,255,0.35)" strokeWidth="0.6"/>
+                                  </svg>
+                                  <span style={{position:'relative',fontSize:9,fontWeight:900,color:'#fff',letterSpacing:0.5,zIndex:1,textShadow:'0 0 6px rgba(0,0,0,.5)',lineHeight:1}}>CD</span>
+                                </div>
+                                {/* Pastille dispo verte */}
+                                <div style={{position:'absolute',bottom:2,right:2,width:11,height:11,borderRadius:'50%',background:C.green,border:`2px solid ${C.bgCard}`}}/>
+                              </div>
+
+                              {/* Infos */}
+                              <div style={{flex:1,minWidth:0}}>
+                                {/* Ligne 1 : nom + âge + badges */}
+                                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:3}}>
+                                  <GenderSvg gk={genderKey((p as any).gender)} size={14}/>
+                                  <span style={{fontSize:16,fontWeight:800,letterSpacing:-0.3}}>{p.name||'Anonyme'}</span>
+                                  {p.age&&<span style={{fontSize:13,color:C.whiteMid,fontWeight:500}}>{p.age} ans</span>}
+                                  {(p as any).verified&&<span style={{fontSize:9,fontWeight:900,padding:'2px 5px',borderRadius:6,background:'rgba(255,20,147,.18)',color:'#FF1493',border:'1px solid rgba(255,20,147,.4)'}}>✓ Vérifié</span>}
+                                  {isTestProfile(p.id)&&<span style={{fontSize:8,fontWeight:900,padding:'1px 4px',borderRadius:6,background:'rgba(107,114,128,.2)',color:'#9CA3AF',border:'1px solid rgba(107,114,128,.3)'}}>BOT</span>}
+                                  {(p as any)._isGpsTestBot&&<span style={{fontSize:9,fontWeight:900,padding:'2px 7px',borderRadius:8,background:'rgba(34,197,94,.15)',color:'#22C55E',border:'1px solid rgba(34,197,94,.4)',letterSpacing:0.3}}>🛰️ GPS TEST · Morges Gare</span>}
+                                  {(p as any)._hasEvent&&(
+                                    <span onClick={e=>{e.stopPropagation();setTab('evenements');setOpenEventId((p as any)._eventId||null)}}
+                                      style={{fontSize:12,padding:'1px 5px',borderRadius:6,background:'rgba(200,134,10,.15)',border:'1px solid rgba(200,134,10,.35)',cursor:'pointer'}}
+                                      title="Voir l'événement">
+                                      {(p as any)._eventEmoji||'📅'}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Ligne 2 : activité du moment (si dispo) ou job/bio */}
+                                {(p as any).current_activity
+                                  ? <div style={{fontSize:12,color:C.gold,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:5,fontWeight:600}}>✦ {(p as any).current_activity}</div>
+                                  : (p.job||p.bio)&&<div style={{fontSize:12,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:5}}>{p.job||p.bio}</div>
+                                }
+                                {/* Ligne 3 : compatibilité + fiabilité */}
+                                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                  {/* Compatibilité — dots orange */}
+                                  <div style={{display:'flex',alignItems:'center',gap:3}}>
+                                    <span style={{fontSize:10,fontWeight:800,color:C.orange,letterSpacing:0.4}}>Compatibilité</span>
+                                    <div style={{display:'flex',gap:2}}>
+                                      {[1,2,3,4,5].map(s=>(
+                                        <div key={s} style={{width:7,height:7,borderRadius:'50%',background:s<=cdScore?C.orange:`${C.orange}33`}}/>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  {/* Fiabilité — turquoise pétant */}
+                                  {fiabStars!=null&&(
+                                    <div style={{display:'flex',alignItems:'center',gap:3}}>
+                                      <span style={{fontSize:10,fontWeight:800,color:'#06B6D4',letterSpacing:0.5}}>Fiabilité</span>
+                                      <div style={{display:'flex',gap:1}}>
+                                        {[1,2,3,4,5].map(s=>(
+                                          <span key={s} style={{fontSize:10,color:s<=fiabStars?'#06B6D4':'rgba(6,182,212,.3)'}}>★</span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(p.reliability_score!=null&&p.reliability_score<60)&&<RabbitBadge/>}
+                                  {distZone&&<span style={{fontSize:10,color:'rgba(255,191,158,.55)',fontWeight:600,marginLeft:'auto'}}>{distZone}</span>}
+                                </div>
+                              </div>
+
+                              {/* Bouton + = voir profil */}
+                              <div style={{flexShrink:0,width:36,height:36,borderRadius:10,background:`${C.orange}22`,border:`1.5px solid ${C.orange}66`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:C.orange,fontWeight:300}}>+</div>
+                            </div>
+                          )
+                        })
+                    )}
                   </div>
-                </div>
-              )}
+                </div>{/* fin presences container */}
+
+                {/* ── OVERLAY LIVE PLEIN ÉCRAN ── */}
+                {liveMode && (
+                  <div style={{position:'absolute',inset:0,background:'#0C0518',zIndex:50,display:'flex',flexDirection:'column',animation:'liveIn .35s cubic-bezier(.22,1,.36,1)'}}>
+                    <style>{`
+                      @keyframes liveIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+                      @keyframes radarPing1{0%{transform:scale(.3);opacity:.8}100%{transform:scale(2.8);opacity:0}}
+                      @keyframes radarPing2{0%{transform:scale(.3);opacity:.6}100%{transform:scale(2.8);opacity:0}}
+                      @keyframes radarPing3{0%{transform:scale(.3);opacity:.4}100%{transform:scale(2.8);opacity:0}}
+                      @keyframes liveDot{0%,100%{opacity:1}50%{opacity:.2}}
+                    `}</style>
+
+                    {/* Header */}
+                    <div style={{paddingTop:'calc(env(safe-area-inset-top,8px) + 14px)',padding:'calc(env(safe-area-inset-top,8px) + 14px) 20px 16px',flexShrink:0}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                          <div style={{position:'relative',width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            <div style={{position:'absolute',inset:0,borderRadius:'50%',background:'radial-gradient(circle,rgba(226,125,9,.3),transparent 70%)'}}/>
+                            <svg width="28" height="26" viewBox="0 0 469.8 450" style={{animation:'liveRotate 10s linear infinite'}}>
+                              <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
+                              <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
+                              <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+                              <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+                              <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+                              <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+                            </svg>
+                          </div>
+                          <span style={{fontSize:22,fontWeight:900,color:'#fff',letterSpacing:-.5}}>LIVE</span>
+                          <span style={{fontSize:13,color:'rgba(255,20,147,.7)',fontWeight:700}}>· 500m</span>
+                        </div>
+                        <button onClick={()=>setLiveMode(false)}
+                          style={{padding:'7px 14px',borderRadius:20,border:'1px solid rgba(255,255,255,.2)',background:'rgba(255,255,255,.07)',color:'rgba(255,255,255,.8)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                          ✕ Quitter
+                        </button>
+                      </div>
+                      <div style={{fontSize:12,color:'rgba(255,255,255,.45)',marginTop:5}}>
+                        {liveFiltered.length === 0
+                          ? (lang==='en'?'Scanning nearby...':'Scan en cours...')
+                          : `${liveFiltered.length} personne${liveFiltered.length>1?'s':''} disponible${liveFiltered.length>1?'s':''} maintenant`}
+                      </div>
+                    </div>
+
+                    {/* Zone radar + profils */}
+                    <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0}}>
+
+                      {liveFiltered.length === 0 ? (
+                        /* Radar animé quand personne */
+                        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',paddingBottom:60}}>
+                          <div style={{position:'relative',width:180,height:180,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:28}}>
+                            {/* Cercles radar */}
+                            <div style={{position:'absolute',width:180,height:180,borderRadius:'50%',border:'1.5px solid rgba(255,20,147,.5)',animation:'radarPing1 2.4s ease-out infinite'}}/>
+                            <div style={{position:'absolute',width:180,height:180,borderRadius:'50%',border:'1.5px solid rgba(255,20,147,.4)',animation:'radarPing2 2.4s ease-out infinite .8s'}}/>
+                            <div style={{position:'absolute',width:180,height:180,borderRadius:'50%',border:'1.5px solid rgba(255,20,147,.3)',animation:'radarPing3 2.4s ease-out infinite 1.6s'}}/>
+                            {/* Point central */}
+                            <div style={{width:14,height:14,borderRadius:'50%',background:'#FF1493',boxShadow:'0 0 20px rgba(255,20,147,.8)'}}/>
+                          </div>
+                          <div style={{fontSize:15,fontWeight:700,color:'rgba(255,255,255,.6)',textAlign:'center'}}>
+                            {lang==='en'?'Nobody within 500m right now':'Personne à 500m pour l\'instant'}
+                          </div>
+                          <div style={{fontSize:12,color:'rgba(255,255,255,.3)',marginTop:6,textAlign:'center'}}>
+                            {lang==='en'?'Check back in a few minutes':'Réessaie dans quelques minutes'}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Liste profils Live */
+                        <div style={{padding:'8px 16px 32px'}}>
+                          {/* Mini radar en haut même quand il y a des gens */}
+                          <div style={{display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20}}>
+                            <div style={{position:'relative',width:70,height:70,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <div style={{position:'absolute',width:70,height:70,borderRadius:'50%',border:'1px solid rgba(255,20,147,.4)',animation:'radarPing1 2s ease-out infinite'}}/>
+                              <div style={{position:'absolute',width:70,height:70,borderRadius:'50%',border:'1px solid rgba(255,20,147,.3)',animation:'radarPing2 2s ease-out infinite .7s'}}/>
+                              <div style={{width:8,height:8,borderRadius:'50%',background:'#FF1493',boxShadow:'0 0 12px rgba(255,20,147,.9)'}}/>
+                            </div>
+                          </div>
+                          {liveFiltered.map((p,i)=>(
+                            <div key={`live-${p.id}`}
+                              style={{background:'rgba(255,20,147,.07)',border:'1px solid rgba(255,20,147,.25)',borderRadius:16,marginBottom:10,display:'flex',alignItems:'center',gap:14,padding:'14px 14px',animation:`liveIn .3s ${i*.07}s both`}}>
+                              <div style={{position:'relative',flexShrink:0}}>
+                                <div style={{width:56,height:56,borderRadius:14,overflow:'hidden',border:'2px solid rgba(255,20,147,.5)'}}>
+                                  <Av src={p.photo_url} name={p.name||'?'} size={56}/>
+                                </div>
+                                <div style={{position:'absolute',bottom:2,right:2,width:12,height:12,borderRadius:'50%',background:'#FF1493',border:'2px solid #0C0518',boxShadow:'0 0 6px rgba(255,20,147,.8)',animation:'liveDot 1.5s ease-in-out infinite'}}/>
+                              </div>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:17,fontWeight:900,color:'#fff',letterSpacing:-.3}}>{p.name||'?'}</div>
+                                {p.age&&<div style={{fontSize:12,color:'rgba(255,255,255,.5)',marginTop:1}}>{p.age} ans</div>}
+                              </div>
+                              <button onClick={()=>{if(myRdvWindow){showToast(`🔒 RDV en cours — disponible après ${new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`,C.orange);return};setLiveMode(false);setSelProfile(p);setShowSend(true)}}
+                                style={{padding:'10px 16px',borderRadius:12,background:'#FF1493',border:'none',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit',flexShrink:0,boxShadow:'0 4px 16px rgba(255,20,147,.5)'}}>
+                                ⚡ Clutch
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>)}
 
               {/* ── TAB : ÉVÉNEMENTS — avec Anaïs + détail cliquable ── */}
               {tab==='evenements' && <EventsTab
-                onClutch={(p)=>{setSelProfile(p);setShowSend(true)}}
+                onClutch={(p)=>{if(myRdvWindow){showToast(`🔒 RDV en cours — disponible après ${new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`,C.orange);return};setSelProfile(p);setShowSend(true)}}
                 registered={registeredEvents}
                 setRegistered={setRegisteredEvents}
                 waitlist={waitlistEvIds}
@@ -5401,20 +7541,52 @@ export default function App2() {
               {tab==='clutchs' && (()=>{
                 const isMock = clutches.length === 0
                 const raw = isMock ? MOCK_CLUTCHES.map(c=>({...c,receiver_id:c.receiver_id==='me'?user.id:c.receiver_id,sender_id:c.sender_id==='me'?user.id:c.sender_id})) : clutches
-                // Actifs = pending + confirmed non expirés
-                const actifs = raw.filter((c:any)=>['pending','confirmed','accepted'].includes(c.status)&&new Date(c.expires_at||'9999')>new Date())
-                // Historique = expired / declined / cancelled
-                const hist = raw.filter((c:any)=>['declined','expired','cancelled'].includes(c.status)||new Date(c.expires_at||'0')<new Date())
+                // Actifs = pending + confirmed/accepted/checked_in non expirés + celui en feedback inline même si completed
+                const actifs = raw.filter((c:any)=>((['pending','confirmed','accepted','checked_in'].includes(c.status)&&new Date(c.expires_at||'9999')>new Date())||c.id===inlineFeedbackId))
+                // Historique = completed + expired / declined / cancelled
+                const hist = raw.filter((c:any)=>['completed','declined','expired','cancelled'].includes(c.status)||new Date(c.expires_at||'0')<new Date())
                 // Si effacé (mock ou réel), filtrer les IDs cachés localement
                 const displayHist = (isMock && mockCleared) ? [] : hist.filter((c:any)=>!hiddenHistIds.has(c.id))
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
-                  <div style={{padding:'52px 16px 10px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                  <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                    {/* ── Soft gate bannière feedback ── */}
+                    {pendingFeedbacks >= TRUST_CONFIG.GATE_WARN && (
+                      <div onClick={()=>{ const p=(clutches as any[]).find(c=>(c.status==='confirmed'||c.status==='accepted')&&c.proposed_time&&new Date(c.proposed_time).getTime()+30*60*1000<Date.now()&&!localStorage.getItem(`feedback_done_${c.id}`));if(p){setFeedbackClutch(p);setShowFeedback(true)}}}
+                        style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,marginBottom:10,cursor:'pointer',
+                          background: pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?'rgba(239,68,68,.12)':pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?'rgba(226,124,0,.12)':'rgba(255,191,158,.08)',
+                          border: `1px solid ${pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?C.red:pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?C.orange:C.border}`}}>
+                        <span style={{fontSize:20,flexShrink:0}}>{pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?'🔒':pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?'⚠️':'💬'}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:800,color:pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?C.red:pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?C.orange:C.salmon}}>
+                            {pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK
+                              ?(lang==='en'?'Feedback required to continue':'Feedback requis pour continuer')
+                              :(lang==='en'?`${pendingFeedbacks} meetup(s) awaiting your feedback`:`${pendingFeedbacks} RDV en attente de feedback`)}
+                          </div>
+                          <div style={{fontSize:10,color:C.whiteMid}}>
+                            {pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK
+                              ?(lang==='en'?'New clutches blocked until you respond':'Nouveaux Clutchs bloqués · Appuie ici')
+                              :(lang==='en'?'Tap to give your feedback':'Appuie ici — 2 taps suffisent')}
+                          </div>
+                        </div>
+                        <span style={{fontSize:12,color:C.whiteMid}}>→</span>
+                      </div>
+                    )}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                       <div>
-                        <div style={{fontSize:19,fontWeight:900}}>My Clutches</div>
-                        <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{pending} active · {actifs.length+displayHist.length} total</div>
+                        <div style={{fontSize:19,fontWeight:900,display:'flex',alignItems:'baseline',gap:6}}>{t('clutchs.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
+                        <div style={{fontSize:11,color:C.whiteMid,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span>{pending} {lang==='en'?'active':'actif'} · {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
+                          {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
+                              <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>
+                              {(user as any).available_from?new Date((user as any).available_from).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})+'–':''}
+                              {new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
+                              {(user as any).available_radius_km?' · '+(user as any).available_radius_km+'km':''}
+                            </span>
+                          )}
+                        </div>
                         {debugLog?<div style={{fontSize:9,color:'#ff0',fontFamily:'monospace',marginTop:4,wordBreak:'break-all'}}>{debugLog}</div>:null}
                       </div>
                       {displayHist.length>0&&<button onClick={()=>{
@@ -5424,17 +7596,17 @@ export default function App2() {
                         setMockCleared(true)
                         try { localStorage.setItem('clutch_mock_cleared','1') } catch {}
                         setShowHistory(false)
-                        showToast('History cleared',C.whiteMid)
-                      }} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>🗑 Clear history</button>}
+                        showToast(lang==='en'?'History cleared':'Historique effacé',C.whiteMid)
+                      }} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>{t('clutchs.clear')}</button>}
                     </div>
                   </div>
-                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px'}}>
+                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId ? 180 : 14}}>
                     {/* Mes inscriptions événements */}
                     {registeredEvents.size > 0 && (
                       <div style={{marginBottom:16,background:`${C.orange}0A`,border:`1px solid ${C.orange}33`,borderRadius:14,padding:'12px 14px'}}>
                         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
                           <span style={{fontSize:15}}>📅</span>
-                          <span style={{fontSize:11,fontWeight:900,color:C.orange,letterSpacing:'.08em',textTransform:'uppercase'}}>My Events</span>
+                          <span style={{fontSize:11,fontWeight:900,color:C.orange,letterSpacing:'.08em',textTransform:'uppercase'}}>{lang==='en'?'My Events':'Mes événements'}</span>
                           <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:`${C.orange}88`,background:`${C.orange}15`,padding:'2px 7px',borderRadius:20}}>{registeredEvents.size}</span>
                         </div>
                         {MOCK_EVENTS.filter(ev=>registeredEvents.has(ev.id)).map(ev=>(
@@ -5459,8 +7631,8 @@ export default function App2() {
                       </div>
                     )}
                     {/* Clutchs actifs */}
-                    {actifs.length===0&&registeredEvents.size===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>Send a clutch from the Nearby tab</div></div>}
-                    {actifs.length===0&&registeredEvents.size>0&&<div style={{textAlign:'center',padding:'16px',color:C.whiteMid,fontSize:11,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`}}>No active clutch right now</div>}
+                    {actifs.length===0&&registeredEvents.size===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
+                    {actifs.length===0&&registeredEvents.size>0&&<div style={{textAlign:'center',padding:'16px',color:C.whiteMid,fontSize:11,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`}}>{t('clutchs.empty.events')}</div>}
                     {actifs.map((c:any)=>{
                       const isRec=c.receiver_id===user.id
                       const other=isRec?c.sender:c.receiver
@@ -5470,7 +7642,7 @@ export default function App2() {
                       const countdown = msLeft>0 ? (hLeft>0?`${hLeft}h${mLeft>0?`${mLeft}m`:''}`:`${mLeft}min`) : null
                       // localConfirmed override — contourne les latences/RLS Supabase
                       const effectiveStatus = localConfirmed.has(c.id) ? 'confirmed' : c.status
-                      const isAccepted = effectiveStatus==='confirmed'||effectiveStatus==='accepted'
+                      const isAccepted = effectiveStatus==='confirmed'||effectiveStatus==='accepted'||effectiveStatus==='checked_in'
                       const isNewRec = !isAccepted && isRec && c.status==='pending'
                       const isSent = !isAccepted && !isRec && c.status==='pending'
                       const hasUnread = (unreadChats[c.id]||0) > 0
@@ -5484,6 +7656,66 @@ export default function App2() {
                         : C.bgCard
                       const sc = isAccepted ? C.green : isNewRec ? C.salmon : C.orange
                       const sl = isAccepted ? 'Verrou' : isNewRec ? (countdown?`← ${countdown}`:'← Received') : (countdown?`→ ${countdown}`:'→ Sent')
+                      // ── INLINE FEEDBACK : remplace toute la carte ──
+                      if (inlineFeedbackId === c.id) {
+                        const outcomes = [
+                          {key:'on_time',emoji:'⭐',label:lang==='en'?'On time':'À l\'heure',sub:lang==='en'?'Right on schedule':'Présent·e à l\'heure',pts:2,bad:false},
+                          {key:'showed', emoji:'📍',label:lang==='en'?'Was there':'Est venu·e',sub:lang==='en'?'Came — late or not':'Est venu·e (en retard ou non)',pts:1,bad:false},
+                          {key:'absent', emoji:'🐰',label:lang==='en'?'No-show':'Lapin 👻',sub:lang==='en'?'Didn\'t come':'N\'est pas venu·e',pts:-5,bad:true},
+                        ]
+                        const other2 = c.sender_id===user?.id?c.receiver:c.sender
+                        const [selFb,setSelFb] = [inlineFbSel,setInlineFbSel]
+                        return (
+                          <div key={c.id} style={{background:C.bgCard,border:`2px solid ${C.gold}`,borderRadius:14,marginBottom:8,padding:'16px'}}>
+                            <div style={{textAlign:'center',marginBottom:12}}>
+                              <div style={{fontSize:16,fontWeight:900,color:C.salmon}}>🎯 {lang==='en'?'Meetup with':'RDV avec'} <span style={{color:C.white}}>{other2?.name||'?'}</span></div>
+                              <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{lang==='en'?'Was the other person there?':'L\'autre personne était-elle là ?'}</div>
+                            </div>
+                            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>
+                              {outcomes.map(r=>(
+                                <button key={r.key} onClick={()=>setSelFb(r.key)}
+                                  style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:selFb===r.key?(r.bad?'rgba(239,68,68,.15)':'rgba(45,189,126,.15)'):'rgba(255,255,255,.04)',border:`1.5px solid ${selFb===r.key?(r.bad?C.red:C.green):C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent'}}>
+                                  <span style={{fontSize:22,flexShrink:0}}>{r.emoji}</span>
+                                  <div style={{flex:1,textAlign:'left'}}>
+                                    <div style={{fontSize:13,fontWeight:800,color:C.white}}>{r.label}</div>
+                                    <div style={{fontSize:10,color:C.whiteMid}}>{r.sub}</div>
+                                  </div>
+                                  <span style={{fontSize:11,fontWeight:900,color:r.bad?C.red:C.green}}>{r.pts>0?`+${r.pts}`:r.pts}pts</span>
+                                </button>
+                              ))}
+                            </div>
+                            <button onClick={()=>{
+                              if (!selFb) { showToast('⚠️ Sélectionne une option d\'abord', C.orange); return }
+                              if (!user?.id) return
+                              const r = outcomes.find(o=>o.key===selFb)!
+                              const clutchSnap = {...c}
+                              // 1. Marquer comme terminé LOCALEMENT (bloque polling)
+                              try { localStorage.setItem(`feedback_done_${c.id}`,String(Date.now())) } catch {}
+                              addCompleted(c.id)
+                              // 2. Reset état + navigation immédiate
+                              setInlineFeedbackId(null)
+                              setInlineFbSel(null)
+                              setShowFeedback(false)
+                              setFeedbackClutch(null)
+                              setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'completed'}:cl))
+                              _setTab('presences')
+                              if (!r.bad) Sounds.done()
+                              showToast(`✓ RDV terminé${r.pts>0?' · +'+r.pts+' pts':''}`, r.bad?C.orange:C.green)
+                              // 3. "Garder le contact" si RDV honoré
+                              if (!r.bad) setTimeout(()=>setKeepContactClutch(clutchSnap), 500)
+                              // 4. DB en arrière-plan (clutch déjà 'completed' depuis le clic Terminer)
+                              if (!isMock) {
+                                supabase.from('rdv_feedbacks').upsert({rdv_id:c.id,from_id:user.id,to_id:c.sender_id===user.id?c.receiver_id:c.sender_id,outcome:selFb,keep_contact:null},{onConflict:'rdv_id,from_id'}).then(()=>{})
+                                const newScore = Math.max(0,Math.min(100,(user?.reliability_score??80)+r.pts))
+                                setUser(prev=>prev?{...prev,reliability_score:newScore}:prev)
+                                supabase.from('profiles').update({reliability_score:newScore}).eq('id',user.id).then(()=>{})
+                              }
+                            }} style={{width:'100%',padding:'12px',background:selFb?C.gold:'rgba(255,255,255,.15)',border:`2px solid ${selFb?C.gold:C.border}`,borderRadius:10,color:selFb?'#1a0810':C.whiteMid,fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',transition:'all .2s'}}>
+                              {lang==='en'?'Send feedback ✓':'Envoyer le feedback ✓'}
+                            </button>
+                          </div>
+                        )
+                      }
                       return (
                         <div key={c.id} style={{background:cardBg,border:cardBorder,borderRadius:14,marginBottom:8,overflow:'hidden',position:'relative'}}>
                           {/* Barre colorée gauche selon type */}
@@ -5514,7 +7746,24 @@ export default function App2() {
                                   <span style={{fontSize:11,fontWeight:900,color:C.green,background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:10,padding:'1px 7px'}}>🔒 VERROU</span>
                                 </div>
                                 <div style={{fontSize:16,fontWeight:900,color:C.white}}>{other?.name||'?'}</div>
-                                <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{c.venue||'–'} · {c.proposed_time?new Date(c.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'–'}</div>
+                                <div style={{fontSize:11,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                                  {(()=>{
+                                    const venueShort = c.venue?.split('·')[0].trim()||'–'
+                                    const venueAddr = c.venue?.includes('·') ? c.venue.split('·').slice(1).join('·').trim() : null
+                                    const mapsUrl = venueAddr ? `https://maps.google.com/?q=${encodeURIComponent(venueAddr)}` : (c.venue_lat&&c.venue_lng?`https://maps.google.com/?q=${c.venue_lat},${c.venue_lng}`:null)
+                                    const delay = c.retard_min || announcedDelays[c.id] || 0
+                                    const baseTime = c.proposed_time ? new Date(c.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '–'
+                                    return (<>
+                                      {mapsUrl
+                                        ? <a href={mapsUrl} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:C.salmon,textDecoration:'none',fontWeight:700}}>📍 {venueShort}</a>
+                                        : <span>{venueShort}</span>
+                                      }
+                                      <span>·</span>
+                                      <span>{baseTime}</span>
+                                      {delay > 0 && <span style={{color:C.red,fontWeight:800}}>+{delay}min</span>}
+                                    </>)
+                                  })()}
+                                </div>
                               </div>
                               <span style={{fontSize:12,color:C.whiteMid,flexShrink:0}}>→ profile</span>
                             </div>
@@ -5539,8 +7788,7 @@ export default function App2() {
                               {/* Annuler clutch ENVOYÉ — compact, inline */}
                               {c.status==='pending'&&!isRec&&(
                                 <button onClick={async()=>{
-                                  if(!isMock) await supabase.from('clutches').update({status:'cancelled'}).eq('id',c.id)
-                                  // Pénalité minimale même pour annulation anticipée (cancel_early = -2 pts)
+                                  if(!isMock) { await supabase.from('clutches').update({status:'cancelled'}).eq('id',c.id); await insertCancelMsg(c.id, c.receiver_id) }
                                   await applyPenalty('cancel_early')
                                   loadClutches()
                                 }} title="Cancel (-2 pts)"
@@ -5573,46 +7821,182 @@ export default function App2() {
                                     </div>
                                     {getRecidiveMultiplier()>1&&(
                                       <div style={{fontSize:10,color:C.red,marginTop:4,textAlign:'center'}}>
-                                        ×{getRecidiveMultiplier()} — {getCancelCount()}th late cancellation
+                                        ×{getRecidiveMultiplier()} — {lang==='en'?`${getCancelCount()}th late cancel`:`${getCancelCount()}e annulation tardive`}
                                       </div>
                                     )}
+                                    {/* Message optionnel pour s'excuser */}
+                                    <div style={{marginBottom:8}}>
+                                      <input
+                                        value={cancelMsg}
+                                        onChange={e=>setCancelMsg(e.target.value.slice(0,60))}
+                                        placeholder="Un mot pour s'excuser… (optionnel)"
+                                        maxLength={60}
+                                        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.06)',color:C.white,fontSize:12,fontFamily:'inherit',boxSizing:'border-box',outline:'none'}}
+                                      />
+                                      <div style={{textAlign:'right',fontSize:10,color:C.whiteMid,marginTop:2}}>{cancelMsg.length}/60</div>
+                                    </div>
                                     <div style={{display:'flex',gap:8}}>
                                       <button onClick={async()=>{
-                                        if(!isMock) await supabase.from('clutches').update({status:'cancelled'}).eq('id',c.id)
+                                        if(!isMock) {
+                                          await supabase.from('clutches').update({status:'cancelled',cancel_message:cancelMsg||null,cancel_by:user?.id}).eq('id',c.id)
+                                          const otherId=c.sender_id===user?.id?c.receiver_id:c.sender_id
+                                          await insertCancelMsg(c.id,otherId)
+                                          if (user?.id) await supabase.from('profiles').update({rdv_locked_until:null}).eq('id',user.id)
+                                        }
                                         setCancelConfirmId(null)
+                                        setCancelMsg('')
                                         await applyPenalty(reason)
                                         loadClutches()
                                       }} style={{flex:1,padding:'8px',background:C.red,border:'none',borderRadius:9,color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
-                                        Yes, cancel
+                                        {lang==='en'?'Yes, cancel':'Oui, annuler'}
                                       </button>
-                                      <button onClick={()=>setCancelConfirmId(null)}
-                                        style={{flex:1,padding:'8px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:9,color:C.whiteMid,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
-                                        Keep the meetup
+                                      <button onClick={()=>{setCancelConfirmId(null);setCancelMsg('')}}
+                                        style={{flex:1,padding:'8px',background:`${C.green}14`,border:`1px solid ${C.green}44`,borderRadius:9,color:C.green,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                                        {lang==='en'?'Keep meetup ✓':'Garder le RDV ✓'}
                                       </button>
                                     </div>
                                   </>
                                 )})()}
                               </div>
                             ) : (
-                              <div style={{display:'flex',gap:8,marginTop:8}}>
-                                <button onClick={()=>{setChatClutch(c);setShowChat(true);setUnreadChats(prev=>{const n={...prev};delete n[c.id];return n})}}
-                                  style={{flex:2,padding:'8px',background:`${C.green}14`,border:`1px solid ${C.green}44`,borderRadius:10,color:C.green,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-                                  💬 Chat with {other?.name}
-                                  {unreadChats[c.id]>0 && (
-                                    <span style={{background:'#4A90D9',color:'#fff',fontSize:9,fontWeight:900,borderRadius:10,padding:'1px 5px',marginLeft:4}}>
-                                      {unreadChats[c.id]}
-                                    </span>
-                                  )}
-                                </button>
-                                <button onClick={()=>setCancelConfirmId(c.id)}
-                                  style={{flex:1,padding:'8px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:10,color:C.red,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-                                  ✕ Cancel
-                                </button>
+                              <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
+                                {/* Ligne 1 : Chat + Retard */}
+                                <div style={{display:'flex',gap:8}}>
+                                  <button onClick={()=>{setChatClutch(c);setShowChat(true);setUnreadChats(prev=>{const n={...prev};delete n[c.id];return n})}}
+                                    style={{flex:2,padding:'8px',background:`${C.green}14`,border:`1px solid ${C.green}44`,borderRadius:10,color:C.green,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                                    {lang==='en'?`💬 Chat with ${other?.name}`:`💬 Chat avec ${other?.name}`}
+                                    {unreadChats[c.id]>0 && (
+                                      <span style={{background:'#4A90D9',color:'#fff',fontSize:9,fontWeight:900,borderRadius:10,padding:'1px 5px',marginLeft:4}}>
+                                        {unreadChats[c.id]}
+                                      </span>
+                                    )}
+                                  </button>
+                                  {/* Retard — 15min auto / 30min avec accept/refuse */}
+                                  {c.proposed_time && new Date(c.proposed_time).getTime() + 5*60*1000 > Date.now() && (()=>{
+                                    const iDeclared = c.retard_by === user?.id
+                                    const otherDeclared = c.retard_min && c.retard_by && c.retard_by !== user?.id
+                                    const pending30 = otherDeclared && c.retard_min === 30 && c.retard_accepted == null
+
+                                    // Je suis le retardataire
+                                    if (iDeclared) return (
+                                      <div style={{padding:'6px 10px',borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}44`,color:C.orange,fontSize:11,fontWeight:900,flexShrink:0}}>
+                                        ⏰ +{c.retard_min}min
+                                      </div>
+                                    )
+
+                                    // L'autre a déclaré 30 min — je dois accepter ou refuser
+                                    if (pending30) return (
+                                      <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
+                                        <span style={{fontSize:10,color:C.orange,fontWeight:700}}>+30min ?</span>
+                                        <button onClick={async()=>{
+                                          if (!isMock) await supabase.from('clutches').update({retard_accepted:true}).eq('id',c.id)
+                                          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,retard_accepted:true}:cl))
+                                          showToast('✓ Retard accepté', C.green)
+                                        }} style={{padding:'5px 8px',borderRadius:8,background:`${C.green}20`,border:`1px solid ${C.green}55`,color:C.green,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                                          OK
+                                        </button>
+                                        <button onClick={async()=>{
+                                          if (!isMock) await supabase.from('clutches').update({retard_accepted:false,status:'cancelled'}).eq('id',c.id)
+                                          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,retard_accepted:false,status:'cancelled'}:cl))
+                                          showToast('RDV annulé — partenaire prévenu·e', C.red)
+                                        }} style={{padding:'5px 8px',borderRadius:8,background:`${C.red}15`,border:`1px solid ${C.red}40`,color:C.red,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                                          Non
+                                        </button>
+                                      </div>
+                                    )
+
+                                    // L'autre a déclaré et c'est accepté (15min auto ou 30min validé)
+                                    if (otherDeclared) return (
+                                      <div style={{padding:'6px 10px',borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}44`,color:C.orange,fontSize:11,fontWeight:900,flexShrink:0}}>
+                                        +{c.retard_min}min
+                                      </div>
+                                    )
+
+                                    // Aucun retard déclaré — bouton
+                                    if (c.retard_accepted === false) return null
+                                    const isOpen = delayPickerOpen === c.id
+                                    return (
+                                      <div style={{position:'relative',flexShrink:0}}>
+                                        <button onClick={()=>setDelayPickerOpen(isOpen?null:c.id)}
+                                          style={{padding:'8px 10px',background:'rgba(226,124,0,.1)',border:`1px solid ${C.orange}44`,borderRadius:10,color:C.orange,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                                          ⏰ Retard
+                                        </button>
+                                        {isOpen && (
+                                          <div style={{position:'absolute',bottom:'calc(100% + 6px)',right:0,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px',display:'flex',flexDirection:'column',gap:6,zIndex:10,boxShadow:'0 4px 20px rgba(0,0,0,.4)',minWidth:160}}>
+                                            <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginBottom:2}}>Depuis l'heure du RDV</div>
+                                            {[15,30].map(min=>(
+                                              <button key={min} onClick={async()=>{
+                                                setDelayPickerOpen(null)
+                                                const now = new Date().toISOString()
+                                                const updates = {retard_min:min,retard_by:user?.id,retard_declared_at:now,retard_accepted:min===15?true:null}
+                                                setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,...updates}:cl))
+                                                if (!isMock) {
+                                                  const {error:retErr} = await supabase.from('clutches').update(updates).eq('id',c.id)
+                                                  if (retErr) { showToast('⚠️ Erreur retard: '+retErr.message, C.red); return }
+                                                }
+                                                showToast(min===15?'⏰ +15 min — partenaire notifié·e (auto-accepté)':'⏰ +30 min — partenaire doit accepter', C.orange)
+                                              }} style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.orange}44`,background:`${C.orange}15`,color:C.orange,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                                                +{min} min {min===15?'(auto)':'(accord requis)'}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                                {/* Ligne 2 : Terminer + Annuler */}
+                                <div style={{display:'flex',gap:8}}>
+                                  {(()=>{
+                                    // Terminer : condition = J'y suis coché ET heure RDV passée
+                                    const isSnd = user.id === c.sender_id
+                                    const myArrived = isSnd ? !!c.sender_arrived : !!c.receiver_arrived
+                                    const rdvMs = c.proposed_time ? new Date(c.proposed_time).getTime() + (c.retard_min||0)*60*1000 : 0
+                                    const rdvPast = rdvMs > 0 ? rdvMs < Date.now() : false
+                                    const canTerminer = myArrived && rdvPast
+                                    const terminerReason = !myArrived
+                                      ? (lang==='en'?"Check in first (J'y suis)":'Clique d\'abord "J\'y suis !"')
+                                      : !rdvPast
+                                        ? (lang==='en'?'Wait for RDV time':'Attends l\'heure du RDV')
+                                        : ''
+                                    return (
+                                      <button onClick={()=>{
+                                        if (!canTerminer) {
+                                          showToast(`⚠️ ${terminerReason}`, C.orange)
+                                          return
+                                        }
+                                        setInlineFbSel(null)
+                                        setInlineFeedbackId(c.id)
+                                        // Mise à jour DB immédiate → déclenche realtime chez l'autre
+                                        if (!isMock) supabase.from('clutches').update({status:'completed'}).eq('id',c.id).then(()=>{})
+                                        setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'completed'}:cl))
+                                      }} style={{flex:1,padding:'12px 8px',
+                                        background:canTerminer?C.green:'rgba(45,189,126,.2)',
+                                        border:canTerminer?'none':'1px solid rgba(45,189,126,.3)',
+                                        borderRadius:10,color:canTerminer?'#fff':'rgba(45,189,126,.5)',
+                                        fontSize:12,fontWeight:900,
+                                        cursor:canTerminer?'pointer':'default',
+                                        fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative',zIndex:1}}>
+                                        ✓ {lang==='en'?'Done':'Terminer'}
+                                      </button>
+                                    )
+                                  })()}
+                                  <button onClick={()=>setCancelConfirmId(c.id)}
+                                    style={{flex:1,padding:'8px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:10,color:C.red,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                                    ✕ {lang==='en'?'Cancel':'Annuler'}
+                                  </button>
+                                </div>
                               </div>
                             )
                           )}
                           {effectiveStatus==='pending'&&isRec&&(
-                            <div style={{display:'flex',gap:8,marginTop:10}}>
+                            <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:10}}>
+                              {/* Contre-Clutch — proposer autre lieu/heure */}
+                              <button onClick={()=>{setCounterClutchId(c.id);setCounterVenue(c.venue||'');setCounterTime('');setCounterMsg('')}}
+                                style={{width:'100%',padding:'7px',background:'rgba(255,191,158,.07)',border:`1px dashed ${C.border}`,borderRadius:10,color:C.salmon,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',letterSpacing:0.2}}>
+                                ↩ {lang==='en'?'Counter-propose (other place/time)':'Contre-proposer (autre lieu/heure)'}
+                              </button>
+                              <div style={{display:'flex',gap:8}}>
                               <button onClick={async()=>{
                                 // 1. Marque comme confirmé LOCALEMENT (persiste même si RLS bloque)
                                 setLocalConfirmed(prev=>new Set([...prev,c.id]))
@@ -5628,18 +8012,19 @@ export default function App2() {
                                 //   USING (auth.uid() = sender_id OR auth.uid() = receiver_id)
                                 //   WITH CHECK (auth.uid() = sender_id OR auth.uid() = receiver_id);
                                 if(!isMock) {
-                                  const {error} = await supabase.from('clutches').update({status:'confirmed', updated_at: new Date().toISOString()}).eq('id',c.id)
+                                  const {error} = await supabase.from('clutches').update({status:'confirmed'}).eq('id',c.id)
                                   if (error) showToast('⚠️ Verrou error: '+error.message, C.red)
                                   loadClutches()
                                 }
-                              }} style={{flex:1,padding:'9px',background:`${C.green}20`,border:`1px solid ${C.green}55`,borderRadius:10,color:C.green,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🔒 Lock in</button>
+                              }} style={{flex:1,padding:'9px',background:`${C.green}20`,border:`1px solid ${C.green}55`,borderRadius:10,color:C.green,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🔒 {lang==='en'?'Lock in':'Verrouiller'}</button>
                               <button onClick={async()=>{
                                 // Optimistic update immédiat
                                 setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'declined'}:cl))
                                 if(!isMock) await supabase.from('clutches').update({status:'declined'}).eq('id',c.id)
-                                showToast('Clutch declined',C.whiteMid)
+                                showToast(lang==='en'?'Clutch declined':'Clutch refusé',C.whiteMid)
                                 loadClutches()
-                              }} style={{flex:1,padding:'9px',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✕ Decline</button>
+                              }} style={{flex:1,padding:'9px',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✕ {lang==='en'?'Decline':'Refuser'}</button>
+                              </div>
                             </div>
                           )}
                           </div>{/* fin padding 10px 13px */}
@@ -5651,22 +8036,42 @@ export default function App2() {
                       <div style={{marginTop:8}}>
                         <button onClick={()=>setShowHistory(v=>!v)}
                           style={{width:'100%',padding:'8px 12px',background:'rgba(255,255,255,.03)',border:`1px solid ${C.border}`,borderRadius:10,color:C.whiteMid,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                          <span>📁 History ({displayHist.length})</span>
+                          <span>📁 {lang==='en'?'History':'Historique'} ({displayHist.length})</span>
                           <span>{showHistory?'▲':'▼'}</span>
                         </button>
                         {showHistory&&displayHist.map((c:any)=>{
                           const isRec=c.receiver_id===user.id
                           const other=isRec?c.sender:c.receiver
-                          const sc=c.status==='declined'?C.red:C.whiteMid
-                          const sl=c.status==='declined'?'✕ Declined':c.status==='cancelled'?'↩ Cancelled':'Expired'
+                          const wasCancelledOnMe = isRec && c.status==='cancelled'
+                          const wasDeclinedOnMe = !isRec && c.status==='declined'
+                          const isMutualContact = c.status==='completed' && mutualContactIds.has(c.id)
+                          const sc=c.status==='completed'?C.green:c.status==='declined'?C.red:c.status==='cancelled'?C.orange:C.whiteMid
+                          const sl=c.status==='completed'
+                            ? (lang==='en'?'✓ Met up':'✓ RDV fait')
+                            : c.status==='declined'
+                            ? (isRec ? (lang==='en'?'✕ Declined':'✕ Refusé') : (lang==='en'?'✕ They declined':'✕ Refusé'))
+                            : c.status==='cancelled'
+                            ? (isRec ? (lang==='en'?'↩ Cancelled by them':'↩ Annulé') : (lang==='en'?'↩ You cancelled':'↩ Tu as annulé'))
+                            : (lang==='en'?'Expired':'Expiré')
                           return (
-                            <div key={c.id} style={{background:C.bgCard,border:`1px solid rgba(255,255,255,.06)`,borderRadius:12,marginTop:4,padding:'9px 11px',opacity:.55,display:'flex',gap:10,alignItems:'center'}}>
+                            <div key={c.id} style={{background:C.bgCard,border:`1px solid ${isMutualContact?'rgba(200,134,10,.3)':'rgba(255,255,255,.06)'}`,borderRadius:12,marginTop:4,padding:'9px 11px',opacity: isMutualContact?1:.65,display:'flex',gap:10,alignItems:'flex-start'}}>
                               <Av src={other?.photo_url} name={other?.name||'?'} size={30}/>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:11,fontWeight:600,color:C.whiteMid}}>{isRec?'↙':'↗'} {other?.name||'?'}</div>
+                                <div style={{fontSize:11,fontWeight:600,color:isMutualContact?C.salmon:C.whiteMid}}>{isRec?'↙':'↗'} {other?.name||'?'}</div>
                                 <div style={{fontSize:10,color:'rgba(255,255,255,.3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.venue||'–'}</div>
+                                {(wasCancelledOnMe||wasDeclinedOnMe)&&(
+                                  <div style={{fontSize:9,color:C.salmon,marginTop:3,opacity:.8}}>
+                                    {lang==='en'?'Their reliability score decreased.':'Leur score de fiabilité a diminué.'}
+                                  </div>
+                                )}
+                                {isMutualContact&&(
+                                  <button onClick={()=>{setChatClutch(c);setShowChat(true)}}
+                                    style={{marginTop:6,width:'100%',padding:'7px 10px',background:'rgba(200,134,10,.15)',border:'1px solid rgba(200,134,10,.4)',borderRadius:9,color:C.gold,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'center'}}>
+                                    💬 {lang==='en'?`Chat with ${other?.name||'...'}`:`Discuter avec ${other?.name||'...'}`}
+                                  </button>
+                                )}
                               </div>
-                              <span style={{fontSize:9,color:sc,whiteSpace:'nowrap'}}>{sl}</span>
+                              <span style={{fontSize:9,color:sc,whiteSpace:'nowrap',marginTop:2}}>{sl}</span>
                             </div>
                           )
                         })}
@@ -5674,6 +8079,78 @@ export default function App2() {
                     )}
                   </div>
                 </div>
+                )
+              })()}
+
+              {/* ── TAB : CONTACTS ── */}
+              {tab==='contacts' && (()=>{
+                const t2 = (k:string) => (lang==='fr' ? {
+                  'contacts.title':'Mes contacts',
+                  'contacts.empty':'Aucun contact pour l\'instant',
+                  'contacts.empty.sub':'Tes contacts apparaissent ici après un RDV réussi et un "Garder le contact" mutuel',
+                  'msg.new':'Nouveau message',
+                } : {
+                  'contacts.title':'My contacts',
+                  'contacts.empty':'No contacts yet',
+                  'contacts.empty.sub':'Contacts appear here after a successful meetup with mutual keep contact',
+                  'msg.new':'New message',
+                })[k] || k
+
+                // Contacts = clutches avec keep_contact mutuel
+                const contactClutches = (clutches as any[]).filter(c => mutualContactIds.has(c.id))
+
+                return (
+                  <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:'#2a1020',display:'flex',flexDirection:'column',overflowY:'auto'}}>
+                    {/* Header */}
+                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(env(safe-area-inset-top,8px) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
+                      <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
+                    </div>
+
+                    {/* Liste */}
+                    <div style={{flex:1,overflowY:'auto',padding:'8px 12px',WebkitOverflowScrolling:'touch' as any}}>
+                      {contactClutches.length === 0 ? (
+                        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'60vh',gap:12,textAlign:'center',padding:'0 32px'}}>
+                          <div style={{fontSize:48,marginBottom:8}}>💬</div>
+                          <div style={{fontSize:16,fontWeight:800,color:'#f5e8de'}}>{t2('contacts.empty')}</div>
+                          <div style={{fontSize:13,color:'rgba(255,255,255,.4)',lineHeight:1.5}}>{t2('contacts.empty.sub')}</div>
+                        </div>
+                      ) : contactClutches.map((c:any) => {
+                        const other = c.sender_id === user?.id ? c.receiver : c.sender
+                        const unread = unreadChats[c.id] || 0
+                        const otherName = other?.name || '?'
+                        const otherPhoto = other?.photo_url
+                        return (
+                          <div key={c.id} style={{marginBottom:8}}>
+                          <button onClick={()=>{
+                            setChatClutch(c)
+                            setShowChat(true)
+                            setUnreadChats(prev=>{const n={...prev};delete n[c.id];return n})
+                            setContactsUnread(prev=>Math.max(0,prev-unread))
+                          }} style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 12px',background:'rgba(255,255,255,.04)',border:`1px solid ${unread>0?'rgba(255,140,0,.4)':'rgba(255,191,158,.1)'}`,borderRadius:16,marginBottom:6,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative'}}>
+                            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(200,134,10,.2)',flexShrink:0,overflow:'hidden',border:`2px solid ${unread>0?'#FF8C00':'rgba(255,191,158,.2)'}`}}>
+                              {otherPhoto ? <img src={otherPhoto} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/> : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{otherName[0]?.toUpperCase()}</div>}
+                            </div>
+                            <div style={{flex:1,textAlign:'left'}}>
+                              <div style={{fontSize:15,fontWeight:800,color:'#f5e8de'}}>{otherName}</div>
+                              <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>RDV · {new Date(c.proposed_time||c.created_at).toLocaleDateString('fr-CH',{day:'numeric',month:'short'})}</div>
+                            </div>
+                            {unread > 0 && (
+                              <div style={{width:22,height:22,borderRadius:'50%',background:'#FF8C00',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#fff',flexShrink:0,boxShadow:'0 0 8px rgba(255,140,0,.6)'}}>
+                                {unread}
+                              </div>
+                            )}
+                            <div style={{color:'rgba(255,255,255,.3)',fontSize:18,flexShrink:0}}>›</div>
+                          </button>
+                          <button onClick={()=>setContactClutchTarget({...other,_clutchId:c.id})}
+                            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'10px',borderRadius:12,border:`1px solid ${C.gold}44`,background:`${C.gold}11`,color:C.gold,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation'}}>
+                            ✦ Proposer un RDV
+                          </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )
               })()}
 
@@ -5686,6 +8163,7 @@ export default function App2() {
                   lang={lang} setLang={setLang}
                   onSetAvailable={handleOuvrirFenetre}
                   isAvailable={!!(user as any).is_available}
+                  rdvBlocked={rdvBlocked}
                 />
               )}
 
@@ -5711,8 +8189,15 @@ export default function App2() {
                 // Messages non lus (déjà gérés par unreadChats, s'effacent à l'ouverture du chat)
                 const totalUnread = Object.values(unreadChats).reduce((a,b)=>a+(b as number),0)
 
+                const pendingRetard = (clutches as any[]).filter(c=>
+                  Number(c.retard_min) === 30 && c.retard_accepted == null &&
+                  c.retard_by && c.retard_by !== user?.id &&
+                  ['confirmed','accepted','checked_in'].includes(c.status)
+                ).length
+
                 const clutchBadge: TabBadge =
                   pendingRec > 0 ? {type:'clutch-new', count:pendingRec}  // 🔴 priorité max
+                  : pendingRetard > 0 ? {type:'retard'}                   // 🔴 retard 30min à valider
                   : totalUnread > 0 ? {type:'message', count:totalUnread} // 💬 messages
                   : newVerrou > 0 ? {type:'verrou'}                       // 🟢 verrou
                   : null  // rien si tout vu
@@ -5731,28 +8216,80 @@ export default function App2() {
                 // ── PRÉSENCES — pas de chiffre, juste vie/mort ──
                 // Point vert = des gens sont dispo. Pas de nombre (c'est info, pas notif)
                 const presenceBadge: TabBadge = profiles.length > 0 ? {type:'activity'} : null
+                const contactsBadge: TabBadge = contactsUnread > 0 ? {type:'contact-msg', count:contactsUnread} : null
 
                 return <TabBar tab={tab} set={setTab} lang={lang}
-                  badges={{clutchs: clutchBadge, evenements: evBadge, presences: presenceBadge}}/>
+                  badges={{clutchs: clutchBadge, evenements: evBadge, presences: presenceBadge, contacts: contactsBadge}}
+                  availInfo={{
+                    isAvail: !!availableRef,
+                    until: availableRef && user?.available_until ? new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : undefined,
+                    city: (user as any)?.available_city || undefined,
+                    rayon: rayon,
+                  }}
+                  onAvailClick={()=>{ if(availableRef){setTab('profil')} else {setFlow('carte')} }}/>
               })()}
             </>
           )}
 
-          {/* Banner Verrou actif — top bar */}
-          {flow==='app' && activeVerrou && !showVerrou && (
-            <ActiveVerrouBar
-              verrou={{...activeVerrou, my_id:user.id}}
-              onClick={()=>setTab('clutchs')}
-              lang={lang}
-            />
-          )}
-          {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV */}
-          {flow==='app' && activeVerrou && !showVerrou && (
+          {/* Banner Verrou actif — top bar (masqué si ProximityRadar déjà visible) */}
+          {flow==='app' && activeVerrou && !showVerrou && (()=>{
+            const diffMs = activeVerrou?.proposed_time ? new Date(activeVerrou.proposed_time).getTime() - Date.now() : Infinity
+            const radarActive = diffMs < 30*60*1000 && diffMs > -60*60*1000
+            return !radarActive ? (
+              <ActiveVerrouBar
+                verrou={{...activeVerrou, my_id:user.id}}
+                onClick={()=>setTab('clutchs')}
+                lang={lang}
+              />
+            ) : null
+          })()}
+          {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV. Masqué si feedback inline actif */}
+          {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && (
             <ProximityRadar
               verrou={{...activeVerrou}}
               userId={user.id}
               lang={lang}
+              supabase={supabase}
               onClick={()=>setTab('clutchs')}
+              onRetardAck={()=>{ setClutches(prev=>(prev as any[]).filter((c:any)=>c.id!==activeVerrou.id)); setTab('presences') }}
+              onCheckin={()=>{
+                if (checkinDone.has(activeVerrou.id)) return // une seule fois
+                setCheckinDone(prev=>new Set([...prev,activeVerrou.id]))
+                const doCheckin = async (gpsVerified: boolean) => {
+                  const isSnd = activeVerrou.sender_id === user.id
+                  const arrivedField = isSnd ? 'sender_arrived' : 'receiver_arrived'
+                  setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===activeVerrou.id?{...cl,[arrivedField]:true}:cl))
+                  await supabase.from('clutches').update({ [arrivedField]:true }).eq('id',activeVerrou.id)
+                  Sounds.checkin()
+                  showToast(gpsVerified?(lang==='en'?'✓ GPS verified 📍':'✓ Présence vérifiée GPS 📍'):(lang==='en'?'✓ Check-in done !':'✓ Check-in fait !'), C.green)
+                }
+                const vLat = (activeVerrou as any).venue_lat
+                const vLng = (activeVerrou as any).venue_lng
+                if (vLat && vLng && navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    pos => {
+                      const dist = haversineKm(pos.coords.latitude, pos.coords.longitude, vLat, vLng)
+                      if (dist > 0.10) { // > 100m
+                        showToast(`📍 Tu es à ${Math.round(dist*1000)}m du lieu — encore un peu !`, C.orange)
+                        // Laisse quand même checker mais non vérifié GPS
+                      }
+                      doCheckin(dist <= 0.10)
+                    },
+                    () => doCheckin(false),
+                    { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+                  )
+                } else {
+                  doCheckin(false)
+                }
+              }}
+              onTerminer={()=>{
+                _setTab('clutchs')
+                setInlineFbSel(null)
+                setInlineFeedbackId(activeVerrou.id)
+                // Mise à jour DB immédiate → déclenche realtime chez l'autre
+                supabase.from('clutches').update({status:'completed'}).eq('id',activeVerrou.id).then(()=>{})
+                setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===activeVerrou.id?{...cl,status:'completed'}:cl))
+              }}
             />
           )}
 
@@ -5768,7 +8305,21 @@ export default function App2() {
             const pendingClutch = withProfile.find((c:any)=>c.status==='pending')||null
             return <ProfileSheet
               profile={selProfile} userId={user.id}
-              onClutch={()=>{setShowProfileSheet(false);setShowSend(true)}}
+              onClutch={()=>{
+                if(pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK){
+                  setShowProfileSheet(false)
+                  setTab('clutchs')
+                  showToast(lang==='en'?'Give feedback on your past meetups first':'Donne d\'abord un feedback sur tes RDV passés',C.orange)
+                  return
+                }
+                // Bloquer pendant la fenêtre RDV active (1h avant → 2h après)
+                if(myRdvWindow){
+                  const until = new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
+                  showToast(`🔒 RDV en cours — tu peux clutcher après ${until}`,C.orange)
+                  return
+                }
+                setShowProfileSheet(false);setShowSend(true)
+              }}
               onClose={()=>setShowProfileSheet(false)} showToast={showToast}
               activeClutch={existingLock}
               pendingClutch={pendingClutch}
@@ -5776,8 +8327,16 @@ export default function App2() {
               userInterests={(user as any).interests||[]} lang={lang}/>
           })()}
           {showDelete&&user&&<DeleteModal userId={user.id} onDeleted={()=>{setShowDelete(false);setUser(null);setProfiles([]);setClutches([]);setScreen('login')}} onClose={()=>setShowDelete(false)} showToast={showToast}/>}
+          {/* Overlay bloquant feedback — aucune interaction possible tant que feedback non donné */}
+          {showFeedback&&feedbackClutch&&<div style={{position:'fixed',inset:0,zIndex:3999,background:'rgba(10,4,8,.92)',backdropFilter:'blur(4px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0',textAlign:'center',maxWidth:380}}>
+              <div style={{fontSize:28,marginBottom:8}}>🎯</div>
+              <div style={{fontSize:17,fontWeight:900,color:C.salmon,marginBottom:4}}>Comment s{"'"}est passé le RDV ?</div>
+              <div style={{fontSize:12,color:C.whiteMid}}>Donne ton avis pour débloquer l{"'"}app</div>
+            </div>
+          </div>}
           {showFeedback&&feedbackClutch&&user&&<FeedbackSheet
-            clutch={feedbackClutch} userId={user.id}
+            clutch={feedbackClutch} userId={user.id} lang={lang} pendingCount={pendingFeedbacks}
             onScore={async(delta)=>{
               const newScore = Math.max(0, Math.min(100, (userScore??user.reliability_score??80) + delta))
               setUserScore(newScore)
@@ -5786,14 +8345,91 @@ export default function App2() {
               if (delta>0) showToast(`🌟 +${delta} reliability pts → ${newScore}`, C.green)
               else showToast(`${delta} reliability pts → ${newScore}`, C.red)
             }}
-            onClose={(rating)=>{
+            onClose={async(rating)=>{
+              const doneId = feedbackClutch?.id
+              try { localStorage.setItem(`feedback_done_${doneId}`, String(Date.now())) } catch {}
+              // Masquage définitif immédiat — résiste à loadClutches()
+              if (doneId) {
+                addCompleted(doneId)
+                setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===doneId?{...cl,status:'completed'}:cl))
+              }
               setShowFeedback(false)
               setFeedbackClutch(null)
+              setTerminerClutchId(null)
+              showToast('✓ RDV terminé — merci !', C.green)
+              // Proposer de garder le contact après le feedback
+              const clutchForContact = (clutches as any[]).find((cl:any)=>cl.id===doneId) || feedbackClutch
+              if (clutchForContact) setTimeout(()=>setKeepContactClutch(clutchForContact), 400)
+              loadClutches()
+              // Si plus de créneau actif → proposer d'en ouvrir un nouveau (toast discret, pas de redirect forcée)
+              if (user && !(user.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date())) {
+                setTimeout(()=>showToast(lang==='en'?'Open a new slot to stay visible ✦':'Ouvre un nouveau créneau pour rester visible ✦', C.orange), 1500)
+              }
             }}
           />}
-          {showSend&&selProfile&&<SendModal from={user} to={selProfile} fromTime={fromTime} untilTime={untilTime} onClose={()=>setShowSend(false)} onSent={(_clutchId)=>{
+          {/* Modal "Garder le contact ?" — après feedback */}
+          {keepContactClutch&&user&&(()=>{
+            const isSnd = keepContactClutch.sender_id === user.id
+            const other = isSnd ? (keepContactClutch.receiver||keepContactClutch._receiver) : (keepContactClutch.sender||keepContactClutch._sender)
+            const otherName = other?.name || '...'
+            const otherPhoto = other?.photo_url
+            const handleAnswer = async (yes: boolean) => {
+              setKeepContactClutch(null)
+              try {
+                const _toId = isSnd ? keepContactClutch.receiver_id : keepContactClutch.sender_id
+                await supabase.from('rdv_feedbacks').upsert(
+                  {rdv_id: keepContactClutch.id, from_id: user.id, to_id: _toId, keep_contact: yes},
+                  {onConflict: 'rdv_id,from_id'}
+                )
+              } catch {}
+              if (!yes) { _setTab('presences'); return }
+              const otherId = isSnd ? keepContactClutch.receiver_id : keepContactClutch.sender_id
+              const {data:otherFb} = await supabase.from('rdv_feedbacks')
+                .select('keep_contact').eq('rdv_id',keepContactClutch.id).eq('from_id',otherId).maybeSingle()
+              if (otherFb?.keep_contact === true) {
+                setMutualContactIds(prev => new Set([...prev, keepContactClutch.id]))
+                showToast(`✦ Contact mutuel avec ${otherName} !`, C.gold)
+                _setTab('contacts')
+              } else {
+                setWaitingMutualContact({clutchId: keepContactClutch.id, clutch: keepContactClutch})
+                showToast(`En attente de ${otherName}...`, C.gold)
+                _setTab('presences')
+              }
+              loadClutches()
+            }
+            return (
+              <div style={{position:'fixed',inset:0,zIndex:4100,background:'rgba(10,4,8,.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={()=>setKeepContactClutch(null)}>
+                <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:'#2a1020',borderRadius:'20px 20px 0 0',padding:'28px 24px 48px',border:'1px solid rgba(255,191,158,.15)'}}>
+                  <div style={{textAlign:'center',marginBottom:24}}>
+                    {otherPhoto && <div style={{width:64,height:64,borderRadius:'50%',backgroundImage:`url(${otherPhoto})`,backgroundSize:'cover',backgroundPosition:'center',margin:'0 auto 12px',border:'3px solid rgba(255,191,158,.3)'}}/>}
+                    <div style={{fontSize:18,fontWeight:900,color:'#f5e8de',marginBottom:6}}>Garder le contact ?</div>
+                    <div style={{fontSize:13,color:'rgba(255,191,158,.7)'}}>Veux-tu rester en contact avec <strong style={{color:'#FFBF9E'}}>{otherName}</strong> ?</div>
+                  </div>
+                  <div style={{display:'flex',gap:12}}>
+                    <button onClick={()=>handleAnswer(false)}
+                      style={{flex:1,padding:'14px',borderRadius:14,border:'1px solid rgba(255,191,158,.2)',background:'transparent',color:'rgba(255,191,158,.6)',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                      Non merci
+                    </button>
+                    <button onClick={()=>handleAnswer(true)}
+                      style={{flex:2,padding:'14px',borderRadius:14,border:'none',background:'#C8860A',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(200,134,10,.4)'}}>
+                      Oui, garder contact ✦
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+          {contactClutchTarget&&user&&<ContactClutchModal from={user} to={contactClutchTarget} showToast={showToast}
+            onClose={()=>setContactClutchTarget(null)} onSent={()=>{setContactClutchTarget(null);loadClutches()}}/>}
+          {showSend&&selProfile&&<SendModal from={user} to={selProfile} fromTime={fromTime} untilTime={untilTime} lang={lang} onClose={()=>setShowSend(false)}
+            excludeWindow={activeVerrou?.proposed_time ? {
+              fromHH: new Date(new Date(activeVerrou.proposed_time).getTime() - TRUST_CONFIG.RDV_LOCK_BEFORE_MIN*60*1000).toTimeString().slice(0,5),
+              untilHH: new Date(new Date(activeVerrou.proposed_time).getTime() + TRUST_CONFIG.RDV_LOCK_AFTER_H*3600*1000).toTimeString().slice(0,5)
+            } : undefined}
+            onSent={(_clutchId)=>{
             setShowSend(false); setShowProfileSheet(false); setTab('presences'); setShowCelebration(true); loadClutches()
-          }} showToast={showToast}/>}
+          }} showToast={showToast} onTargetUnavailable={()=>{setShowSend(false);setShowProfileSheet(false);setSlotGoneProfile(selProfile)}}/>}
+          {slotGoneProfile&&<SlotGoneOverlay name={slotGoneProfile.name||''} avatar={(slotGoneProfile as any).photo_url||undefined} lang={lang} onDone={()=>{setSlotGoneProfile(null);setTab('presences')}}/>}
           {showCelebration&&<ClutchSent onDone={()=>setShowCelebration(false)} name={selProfile?.name||''}/>}
           {showVerrou&&<VerrouExplosion onDone={onVerrouDone} verrou={verrouData}/>}
           {/* Feedback flottant — visible sur tous les onglets */}
@@ -5807,8 +8443,80 @@ export default function App2() {
             }} title="Donner un feedback">💬</button>
           )}
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
+          {/* ── Contre-Clutch modal ── */}
+          {counterClutchId && (
+            <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.6)',backdropFilter:'blur(8px)'}} onClick={()=>setCounterClutchId(null)}>
+              <div onClick={e=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'24px 20px 48px',border:`1px solid ${C.border}`}}>
+                <div style={{textAlign:'center',marginBottom:16}}>
+                  <div style={{fontSize:18,fontWeight:900,color:C.salmon}}>↩ Contre-Clutch</div>
+                  <div style={{fontSize:12,color:C.whiteMid,marginTop:4}}>Propose un autre lieu ou une autre heure</div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  <div>
+                    <div style={{fontSize:11,color:C.whiteMid,marginBottom:4,fontWeight:600}}>📍 Lieu</div>
+                    <input value={counterVenue} onChange={e=>setCounterVenue(e.target.value)}
+                      placeholder="Ex : Café du Marché, Place de la Palud"
+                      style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,.07)',border:`1px solid ${C.border}`,borderRadius:10,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:C.whiteMid,marginBottom:4,fontWeight:600}}>🕐 Heure</div>
+                    <input type="time" value={counterTime} onChange={e=>setCounterTime(e.target.value)}
+                      style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,.07)',border:`1px solid ${C.border}`,borderRadius:10,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:C.whiteMid,marginBottom:4,fontWeight:600}}>💬 Message (optionnel)</div>
+                    <textarea value={counterMsg} onChange={e=>setCounterMsg(e.target.value)}
+                      placeholder="Ex : Je suis plutôt dans ce coin-là..."
+                      rows={2}
+                      style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,.07)',border:`1px solid ${C.border}`,borderRadius:10,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none',boxSizing:'border-box'}}/>
+                  </div>
+                  <button onClick={async()=>{
+                    if (!counterVenue.trim() || !counterTime || !user) { showToast('Lieu et heure requis', C.orange); return }
+                    const origClutch = (clutches as any[]).find((cl:any)=>cl.id===counterClutchId)
+                    if (!origClutch) return
+                    const otherId = origClutch.sender_id === user.id ? origClutch.receiver_id : origClutch.sender_id
+                    // Refuser l'original
+                    setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===counterClutchId?{...cl,status:'declined'}:cl))
+                    await supabase.from('clutches').update({status:'declined'}).eq('id',counterClutchId)
+                    // Créer le contre-clutch
+                    const today = new Date().toISOString().split('T')[0]
+                    const proposedIso = `${today}T${counterTime}:00`
+                    await supabase.from('clutches').insert({
+                      sender_id: user.id, receiver_id: otherId,
+                      venue: counterVenue.trim(),
+                      proposed_time: proposedIso,
+                      message: counterMsg.trim() || (lang==='fr'?'↩ Contre-Clutch — que dirais-tu de ça ?':'↩ Counter-Clutch — how about this instead?'),
+                      status:'pending',
+                      expires_at: new Date(Date.now()+2*3600*1000).toISOString(),
+                    })
+                    setCounterClutchId(null)
+                    loadClutches()
+                    showToast(lang==='fr'?'↩ Contre-Clutch envoyé !':'↩ Counter-Clutch sent!', C.salmon)
+                  }} style={{padding:'12px',background:`linear-gradient(135deg,${C.salmon},${C.orange})`,border:'none',borderRadius:12,color:C.bg,fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                    ↩ {lang==='en'?'Send Counter-Clutch':'Envoyer le Contre-Clutch'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {showChat&&chatClutch&&<ChatSheet clutch={chatClutch} userId={user.id} onClose={()=>setShowChat(false)} showToast={showToast} onMarkRead={(id)=>setUnreadChats(prev=>{const n={...prev};delete n[id];return n})}/>}
-          {incomingClutch&&<ClutchIncoming clutch={incomingClutch}
+          {incomingClutch&&<ClutchIncoming clutch={incomingClutch} lang={lang}
+            onCounter={async (venue, proposedTime)=>{
+              if (!incomingClutch.id?.startsWith('sim-') && user) {
+                await supabase.from('clutches').update({status:'declined'}).eq('id',incomingClutch.id)
+                await supabase.from('clutches').insert({
+                  sender_id: user.id,
+                  receiver_id: incomingClutch.sender_id || incomingClutch.sender?.id,
+                  venue,
+                  proposed_time: proposedTime,
+                  message: lang==='fr' ? `↩ Contre-Clutch : que dirais-tu de ça ?` : `↩ Counter-Clutch: how about this instead?`,
+                  status: 'pending',
+                  expires_at: new Date(Date.now()+2*3600*1000).toISOString(),
+                })
+                loadClutches()
+              }
+              setIncomingClutch(null)
+            }}
             onAccept={()=>{
               if (incomingClutch.id?.startsWith('sim-')) {
                 setVerrouData({venue:incomingClutch.venue||'Café Romand',name:incomingClutch.sender?.name||'',photo:incomingClutch.sender?.photo_url||null})
@@ -5816,7 +8524,7 @@ export default function App2() {
                 try { localStorage.setItem(`verrou_shown_${incomingClutch.id}`, String(Date.now())); localStorage.setItem(`clutch_locked_at_${incomingClutch.id}`, String(Date.now())) } catch {}
                 setTimeout(()=>setShowVerrou(true),100)
               } else {
-                supabase.from('clutches').update({status:'accepted',updated_at:new Date().toISOString()}).eq('id',incomingClutch.id).then(()=>{
+                supabase.from('clutches').update({status:'accepted'}).eq('id',incomingClutch.id).then(()=>{
                   setVerrouData({venue:incomingClutch.venue||'',name:incomingClutch.sender?.name||'',photo:incomingClutch.sender?.photo_url||null})
                   setIncomingClutch(null)
                   loadClutches()
@@ -5827,7 +8535,7 @@ export default function App2() {
             }}
             onDecline={()=>{
               if (!incomingClutch.id?.startsWith('sim-')) {
-                supabase.from('clutches').update({status:'declined',updated_at:new Date().toISOString()}).eq('id',incomingClutch.id).then(()=>loadClutches())
+                supabase.from('clutches').update({status:'declined'}).eq('id',incomingClutch.id).then(()=>loadClutches())
               }
               setIncomingClutch(null)
               setClutches(prev=>(prev as any[]).filter(c=>c.id!==incomingClutch.id) as any)
@@ -5837,5 +8545,109 @@ export default function App2() {
         </>
       )}
     </>
+  )
+}
+
+// ── CONTACT CLUTCH MODAL — RDV sans filtre dispo/geo, jusqu'à 14j ──
+function ContactClutchModal({ from, to, onClose, onSent, showToast }: {
+  from: Profile; to: any; onClose: ()=>void; onSent: ()=>void; showToast: (m:string,c:string)=>void
+}) {
+  const C2 = C
+  const [venueInput, setVenueInput] = useState('')
+  const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(0)
+  const [selectedHour, setSelectedHour] = useState(19)
+  const [selectedMin, setSelectedMin] = useState(0)
+
+  const days = Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i);return d})
+  const hours = Array.from({length:24},(_,i)=>i)
+  const mins = [0,15,30,45]
+
+  const handleSend = async () => {
+    if (!venueInput.trim()) { showToast('Indique un lieu', C2.orange); return }
+    setLoading(true)
+    const pt = new Date(days[selectedDate])
+    pt.setHours(selectedHour, selectedMin, 0, 0)
+    const {error} = await supabase.from('clutches').insert({
+      sender_id: from.id, receiver_id: to.id,
+      venue: venueInput.trim(),
+      message: msg || `On se revoit ? ${venueInput.trim()} — ${pt.toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long'})} à ${selectedHour}h${selectedMin>0?selectedMin:''}`,
+      proposed_time: pt.toISOString(),
+      expires_at: new Date(Date.now()+48*3600*1000).toISOString(),
+      status: 'pending',
+      is_contact_rdv: true,
+    })
+    setLoading(false)
+    if (error) { showToast('Erreur: '+error.message, C2.red); return }
+    showToast('✦ Proposition envoyée !', C2.gold)
+    onSent()
+  }
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:3000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.65)',backdropFilter:'blur(5px)'}} onClick={onClose}/>
+      <div style={{position:'relative',background:C2.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 40px',maxHeight:'88vh',overflowY:'auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:900,color:C2.white}}>✦ Proposer un RDV</div>
+            <div style={{fontSize:11,color:C2.gold,marginTop:2}}>Contact · sans contrainte horaire</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:C2.whiteMid,fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+
+        <div style={{display:'flex',gap:10,alignItems:'center',background:C2.bgCard,borderRadius:12,padding:'10px 12px',marginBottom:16,border:`1px solid ${C2.border}`}}>
+          <Av src={to.photo_url} name={to.name||'?'} size={38}/>
+          <div style={{fontSize:14,fontWeight:800,color:C2.white}}>{to.name}</div>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:C2.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Lieu</div>
+          <input value={venueInput} onChange={e=>setVenueInput(e.target.value)} placeholder="Café, restaurant, bar…"
+            style={{width:'100%',background:C2.whiteFaint,border:`1.5px solid ${C2.borderStrong}`,borderRadius:12,padding:'10px 14px',fontSize:13,color:C2.white,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:C2.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Date</div>
+          <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,WebkitOverflowScrolling:'touch' as any}}>
+            {days.map((d,i)=>(
+              <button key={i} onClick={()=>setSelectedDate(i)}
+                style={{flexShrink:0,padding:'8px 12px',borderRadius:10,border:`1.5px solid ${selectedDate===i?C2.gold:C2.border}`,background:selectedDate===i?`${C2.gold}22`:C2.whiteFaint,color:selectedDate===i?C2.gold:C2.whiteMid,fontSize:12,fontWeight:selectedDate===i?800:500,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                {i===0?'Auj.':i===1?'Dem.':d.toLocaleDateString('fr-CH',{weekday:'short',day:'numeric'})}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:C2.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Heure</div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <select value={selectedHour} onChange={e=>setSelectedHour(Number(e.target.value))}
+              style={{flex:1,background:C2.bgCard,border:`1.5px solid ${C2.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C2.white,outline:'none',fontFamily:'inherit',cursor:'pointer'}}>
+              {hours.map(h=><option key={h} value={h}>{String(h).padStart(2,'0')}h</option>)}
+            </select>
+            <span style={{color:C2.whiteMid,fontSize:16}}>:</span>
+            <select value={selectedMin} onChange={e=>setSelectedMin(Number(e.target.value))}
+              style={{flex:1,background:C2.bgCard,border:`1.5px solid ${C2.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C2.white,outline:'none',fontFamily:'inherit',cursor:'pointer'}}>
+              {mins.map(m=><option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}
+            </select>
+          </div>
+          <div style={{fontSize:11,color:C2.gold,marginTop:6,fontWeight:700}}>
+            → {selectedDate===0?'Aujourd\'hui':selectedDate===1?'Demain':days[selectedDate].toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long'})} à {String(selectedHour).padStart(2,'0')}h{selectedMin>0?String(selectedMin).padStart(2,'0'):''}
+          </div>
+        </div>
+
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:11,color:C2.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Message (optionnel)</div>
+          <textarea value={msg} onChange={e=>setMsg(e.target.value)} rows={2} placeholder="Un petit mot…"
+            style={{width:'100%',background:C2.whiteFaint,border:`1.5px solid ${C2.borderStrong}`,borderRadius:12,padding:'10px 14px',fontSize:13,color:C2.white,outline:'none',fontFamily:'inherit',resize:'none',boxSizing:'border-box'}}/>
+        </div>
+
+        <button onClick={handleSend} disabled={loading}
+          style={{width:'100%',padding:'15px',borderRadius:14,border:'none',background:C2.gold,color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(200,134,10,.4)',opacity:loading?.6:1}}>
+          {loading?'Envoi…':'✦ Envoyer la proposition'}
+        </button>
+      </div>
+    </div>
   )
 }

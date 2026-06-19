@@ -2,7 +2,7 @@
   "name": "Clutch — Rencontres spontanées",
   "short_name": "Clutch",
   "description": "Un vrai café dans les 18h. Réponds en 2h ou c'est libéré.",
-  "start_url": "/app",
+  "start_url": "/app2",
   "display": "standalone",
   "background_color": "#FDFAF7",
   "theme_color": "#5D1048",

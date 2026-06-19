@@ -76,6 +76,9 @@ Chaque choix technique doit fonctionner en natif iOS/Android via Capacitor.
 ### 7. Contrainte 18h structurelle
 Tout timing (slots, expiry, notifs) respecte la fenêtre 18h max.
 
+### 9. Slots horaires — marge volontaire
+Le sender peut proposer une heure légèrement en dehors de son propre créneau de dispo (ex: dispo jusqu'à 04h00, clutch proposé à 04h15). C'est une décision produit délibérée : on fait confiance aux gens pour gérer leur propre planning. L'intersection est une aide, pas une contrainte stricte.
+
 ### 8. ProximityRadar = temps, JAMAIS GPS
 Le radar montre le **temps restant** avant le RDV, JAMAIS la distance GPS à l'autre personne.
 Raison : triangularisation de position possible par un homme malveillant qui se déplace.

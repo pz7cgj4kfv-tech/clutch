@@ -5869,7 +5869,7 @@ export default function App2() {
   const initSlots = useMemo(() => makeSlots(), [])
   const [fromTime,setFromTime] = useState(() => initSlots[0] || '18:00')
   const [untilTime,setUntilTime] = useState(() => initSlots[4] || '20:00')
-  const [rayon,setRayon]       = useState(3)  // nombre, pas string
+  const [rayon,setRayon]       = useState(10)  // défaut 10km : couvre Lausanne + Morges/Renens/Pully (maximise les présences). Slider jusqu'à 100km.
 
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)
@@ -8443,6 +8443,9 @@ export default function App2() {
             const other = isSnd ? (keepContactClutch.receiver||keepContactClutch._receiver) : (keepContactClutch.sender||keepContactClutch._sender)
             const otherName = other?.name || '...'
             const otherPhoto = other?.photo_url
+            // #4 — cette personne est-elle DÉJÀ un contact mutuel (via un autre RDV) ?
+            const _otherId = isSnd ? keepContactClutch.receiver_id : keepContactClutch.sender_id
+            const alreadyContact = (clutches as any[]).some((cl:any)=> mutualContactIds.has(cl.id) && cl.id !== keepContactClutch.id && (cl.sender_id===_otherId || cl.receiver_id===_otherId))
             const handleAnswer = async (yes: boolean) => {
               setKeepContactClutch(null)
               try {
@@ -8472,8 +8475,8 @@ export default function App2() {
                 <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:'#2a1020',borderRadius:'20px 20px 0 0',padding:'28px 24px 48px',border:'1px solid rgba(255,191,158,.15)'}}>
                   <div style={{textAlign:'center',marginBottom:24}}>
                     {otherPhoto && <div style={{width:64,height:64,borderRadius:'50%',backgroundImage:`url(${otherPhoto})`,backgroundSize:'cover',backgroundPosition:'center',margin:'0 auto 12px',border:'3px solid rgba(255,191,158,.3)'}}/>}
-                    <div style={{fontSize:18,fontWeight:900,color:'#f5e8de',marginBottom:6}}>Garder le contact ?</div>
-                    <div style={{fontSize:13,color:'rgba(255,191,158,.7)'}}>Veux-tu rester en contact avec <strong style={{color:'#FFBF9E'}}>{otherName}</strong> ?</div>
+                    <div style={{fontSize:18,fontWeight:900,color:'#f5e8de',marginBottom:6}}>{alreadyContact ? '✦ Déjà dans tes contacts' : 'Garder le contact ?'}</div>
+                    <div style={{fontSize:13,color:'rgba(255,191,158,.7)'}}>{alreadyContact ? <>Tu as déjà <strong style={{color:'#FFBF9E'}}>{otherName}</strong> dans tes contacts.</> : <>Veux-tu rester en contact avec <strong style={{color:'#FFBF9E'}}>{otherName}</strong> ?</>}</div>
                   </div>
                   <div style={{display:'flex',gap:12}}>
                     <button onClick={()=>handleAnswer(false)}

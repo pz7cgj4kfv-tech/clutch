@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z40'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z41'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5402,12 +5402,19 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
         {bothArrived ? (
           <div style={{textAlign:'center',padding:'4px 0 2px'}}>
             <div style={{fontSize:14,fontWeight:900,color:'#16a34a',marginBottom:6}}>🎉 Les deux sur place !</div>
-            <button onClick={e=>{e.stopPropagation();onTerminer?.()}}
-              style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#16a34a',
-                color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
-                boxShadow:'0 3px 12px rgba(22,163,74,.4)',letterSpacing:.3}}>
-              ✓ Terminer le RDV
-            </button>
+            {past ? (
+              <button onClick={e=>{e.stopPropagation();onTerminer?.()}}
+                style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#16a34a',
+                  color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
+                  boxShadow:'0 3px 12px rgba(22,163,74,.4)',letterSpacing:.3}}>
+                ✓ Terminer le RDV
+              </button>
+            ) : (
+              <div style={{width:'100%',padding:'10px',borderRadius:12,background:'rgba(22,163,74,.12)',
+                border:'1px solid rgba(22,163,74,.3)',color:'#15803d',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
+                ⏳ Profitez du moment ! Vous pourrez clore le RDV à partir de l'heure prévue.
+              </div>
+            )}
           </div>
         ) : (
           <div style={{display:'flex',gap:6,marginTop:2}}>
@@ -5653,11 +5660,6 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
         <LookBtn v="F" label="Des femmes" icon="👩"/>
         <LookBtn v="M" label="Des hommes" icon="👨"/>
         <LookBtn v="ALL" label="Tout le monde" icon="🤝"/>
-      </div>
-      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-        <div style={{color:C.whiteMid,fontSize:12,lineHeight:1.6}}>
-          💡 Pour les femmes : Clutch est <strong style={{color:C.gold}}>toujours gratuit</strong>, quel que soit le plan choisi.
-        </div>
       </div>
     </div>,
 

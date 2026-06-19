@@ -28,11 +28,17 @@ const { error: e2, count: c2 } = await sb.from('clutches')
   .in('status', ['pending','accepted','confirmed','checked_in'])
 if (e2) console.error('⚠️ clutches:', e2.message); else console.log('✅ Clutchs annulés :', c2 ?? '?')
 
-// 2) Débloque mon Verrou + dispo
+// 2) Débloque mon Verrou (SANS me mettre hors-ligne — je reste dispo)
 const { error: e3 } = await sb.from('profiles')
-  .update({ rdv_locked_until: null, rdv_locked_from: null, is_available: false, available_until: null })
+  .update({ rdv_locked_until: null, rdv_locked_from: null })
   .eq('id', uid)
-if (e3) console.error('⚠️ profile:', e3.message); else console.log('✅ Verrou débloqué (rdv_locked_until = null)')
+if (e3) console.error('⚠️ profile:', e3.message); else console.log('✅ Verrou débloqué (dispo conservée)')
+
+// 2b) Nettoie les clutchs DECLINED récents → débloque le cooldown 48h (pour re-tester l'envoi)
+const { data: d2b } = await sb.from('clutches')
+  .update({ status: 'cancelled' }).eq('status','declined')
+  .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`).select('id')
+console.log('✅ Declined nettoyés (cooldown levé) :', d2b?.length ?? 0)
 
 // 3) Neutralise le piège "retard refusé" (cause du Verrou fantôme)
 const { data: d4, error: e4 } = await sb.from('clutches')

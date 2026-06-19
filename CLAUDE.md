@@ -187,18 +187,16 @@ Appeler `map.invalidateSize()` dans un `requestAnimationFrame` après montage.
 
 ---
 
-## 🔁 COMMANDES DEPLOY
+## 🔁 DEPLOY = AUTOMATIQUE (GitHub Action)
+
+⚠️ **NE PAS déployer à la main.** Une GitHub Action (`.github/workflows/deploy.yml`) build + déploie tout seul à chaque push sur `main`.
 
 ```bash
-# Depuis /Users/saugydavid/Documents/clutch
-npm run build
-
-# Copier dans le repo GitHub Pages
-cp -r out/. /Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io/
-
-# Commit + push
-cd /Users/saugydavid/Documents/pz7cgj4kfv-tech.github.io
-git add -A && git commit -m "deploy vXX.XX-X" && git push
+# Depuis /Users/saugydavid/Documents/clutch — c'est TOUT :
+git push origin main
+# → l'Action build (secrets Supabase GitHub) + déploie sur pz7cgj4kfv-tech.github.io (branche master)
+# → web à jour en ~1-2 min.
+# ❌ NE PAS faire cp out/ + commit sur le repo pages → conflits + corruption de refs (master 2).
 ```
 
 **Routes à vérifier après deploy :**

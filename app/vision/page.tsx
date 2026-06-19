@@ -1704,48 +1704,229 @@ const SectionGrowth = () => (
 // ─── Section : BUSINESS ──────────────────────────────────────────────────────
 const SectionBusiness = () => (
   <div>
-    <H n={1}>💰 Stratégie Business</H>
+    <H n={1}>💰 Stratégie Business & Projections</H>
 
+    {/* Modèle de revenus */}
     <Row>
       <Card color={C.green} glow>
-        <H n={2} c={C.green}>Freemium — Femmes</H>
+        <H n={2} c={C.green}>Free — Tout le monde</H>
         <div style={{fontSize:28,fontWeight:900,color:C.green,marginBottom:4}}>CHF 0.-</div>
-        <P>Gratuit, toujours. Éthique de conception.</P>
-        {['20 Clutchs actifs simultanés','Tous les modes','Events illimités','SOS + sécurité totale','Priorité dans l\'algo'].map(f=><Pill key={f} label={f} done/>)}
+        <P>Accès complet. Éthique de conception.</P>
+        {['3 Clutchs actifs simultanés','Tous les modes','Events illimités','SOS + sécurité totale','Score fiabilité visible'].map(f=><Pill key={f} label={f} done/>)}
       </Card>
       <Card color={C.gold} glow>
-        <H n={2} c={C.gold}>Premium — Hommes</H>
+        <H n={2} c={C.gold}>Premium</H>
         <div style={{fontSize:28,fontWeight:900,color:C.gold,marginBottom:4}}>CHF 19.90<span style={{fontSize:13}}>/mois</span></div>
-        <P>Mensuel. Sans engagement.</P>
-        {['5 Clutchs actifs (vs 3 free)','Voir qui a vu ton profil','Boosts de visibilité','Analytics envois','Badge premium visible'].map(f=><Pill key={f} label={f} done/>)}
+        <P>Sans engagement. Apple IAP.</P>
+        {['5 Clutchs actifs','Voir qui a vu ton profil','Boosts visibilité','Analytics envois','Badge premium','Priorité algo'].map(f=><Pill key={f} label={f} done/>)}
       </Card>
     </Row>
 
-    <Card>
-      <H n={2}>🎯 Scénarios financiers</H>
+    <Row>
+      <Card color={C.orange}>
+        <H n={2} c={C.orange}>⚡ Event Pay-per-use</H>
+        <div style={{fontSize:22,fontWeight:900,color:C.orange,marginBottom:4}}>CHF 4.90–9.90<span style={{fontSize:12}}>/event</span></div>
+        <P>Idée Jennifer (18.06.2026) ⭐⭐⭐ — Créer un event public sans abonnement. One-time IAP.</P>
+        {['20/50/100 participants selon tarif','Pas besoin d\'être Driver','Apéro, rando, afterwork','Aligné avec usage réel'].map(f=><Pill key={f} label={f}/>)}
+      </Card>
+      <Card color={C.salmon}>
+        <H n={2} c={C.salmon}>🍺 Clutch Driver</H>
+        <div style={{fontSize:22,fontWeight:900,color:C.salmon,marginBottom:4}}>CHF 200–500<span style={{fontSize:12}}>/mois</span></div>
+        <P>Partenaires bars/venues. Sponsorisent des soirées, boostent leur fréquentation.</P>
+        {['Events sponsorisés','Analytics fréquentation','Badge Driver visible','Clutchs recommandés vers leur lieu'].map(f=><Pill key={f} label={f}/>)}
+      </Card>
+    </Row>
+
+    {/* Marché adressable */}
+    <Card color={C.teal}>
+      <H n={2} c={C.teal}>🌍 Marché adressable — Chiffres réels</H>
       {[
-        {s:'Pessimiste', users:'100 h premium', mrr:'CHF 1 990', arr:'CHF 23 880'},
-        {s:'Moyen', users:'250 h premium', mrr:'CHF 4 975', arr:'CHF 59 700'},
-        {s:'Optimiste 6 mois', users:'500 h premium', mrr:'CHF 9 950', arr:'CHF 119 400'},
-        {s:'Optimiste 12 mois', users:'1000 h premium', mrr:'CHF 19 900', arr:'CHF 238 800'},
-      ].map(({s,users,mrr,arr})=>(
-        <div key={s} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr 1fr',gap:10,padding:'8px 0',borderBottom:`1px solid ${C.border}`,alignItems:'center'}}>
-          <span style={{fontSize:11,fontWeight:700,color:C.white}}>{s}</span>
-          <span style={{fontSize:11,color:C.mid}}>{users}</span>
-          <span style={{fontSize:12,fontWeight:700,color:C.gold}}>{mrr}/mois</span>
-          <span style={{fontSize:12,fontWeight:700,color:C.green}}>{arr}/an</span>
+        {zone:'Suisse romande', pop:'~500 000 (18–35 ans)', penetration:'Apps rencontres ~25% → 125 000 cible', note:'Lausanne = 50 000 dans la cible'},
+        {zone:'Suisse entière', pop:'~2 000 000 (18–35 ans)', penetration:'Zurich, Berne, Bâle — barrière langue', note:'Adaptation alémanique nécessaire'},
+        {zone:'Europe', pop:'~100M (18–35 ans)', penetration:'Paris, Berlin, Londres = priorité', note:'Concurrence locale forte (Hinge, Happn)'},
+        {zone:'Monde', pop:'~1,5 milliard (18–35 ans)', penetration:'Marchés avec culture café/rencontre physique', note:'Japon, Brésil, Australie = potentiel'},
+      ].map(({zone,pop,penetration,note})=>(
+        <div key={zone} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.white}}>{zone}</span>
+            <span style={{fontSize:11,fontWeight:700,color:C.teal}}>{pop}</span>
+          </div>
+          <div style={{fontSize:11,color:C.mid,marginBottom:2}}>{penetration}</div>
+          <div style={{fontSize:10,color:C.dim,fontStyle:'italic'}}>{note}</div>
         </div>
       ))}
     </Card>
 
+    {/* Masse critique */}
     <Card color={C.orange}>
-      <H n={2} c={C.orange}>💳 Revenue streams complémentaires</H>
-      <Idea emoji="🍺" title="Partenaires bars/lieux" desc="CHF 200–500/mois par lieu. Clutch recommande leur bar. Analytics fréquentation."/>
-      <Idea emoji="📍" title="Sponsored events" desc="Événements créés par des marques ou orgas. Ex: 'Apéro Nestlé Vevey ce soir'. Visibilité premium dans Events."/>
-      <Idea emoji="🚀" title="Driver (Clutch Agency)" desc="Pour les bars qui veulent booster leur soirée : Commander X Clutchs sponsorisés vers des profils compatibles."/>
-      <Idea emoji="💎" title="Clutch Gold (ultime)" desc="CHF 49.90/mois. Unlimited tout + 3 boosts/semaine + voir les 'pourquoi refus'."/>
+      <H n={2} c={C.orange}>⚠️ Masse critique — Le seuil qui change tout</H>
+      <P>Pour qu'un Clutch soit possible à Lausanne, il faut environ <strong style={{color:C.orange}}>50–100 users actifs simultanément</strong> dans un rayon de 3km. En dessous : l'app est morte. Au-dessus : effet réseau exponentiel.</P>
+      {[
+        {n:'~200 inscrits', label:'Seuil minimum viable (Lausanne centre)', color:C.salmon},
+        {n:'~500 actifs/mois', label:'Début de l\'effet réseau — les Clutchs marchent régulièrement', color:C.orange},
+        {n:'~2 000 actifs/mois', label:'App indispensable à Lausanne — bouche-à-oreille organique', color:C.gold},
+        {n:'~10 000 actifs/mois', label:'Expansion Genève possible — masse critique atteinte en romande', color:C.green},
+      ].map(({n,label,color})=>(
+        <div key={n} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:`1px solid ${C.border}`,alignItems:'center'}}>
+          <span style={{fontSize:13,fontWeight:900,color,minWidth:80}}>{n}</span>
+          <span style={{fontSize:11,color:C.mid}}>{label}</span>
+        </div>
+      ))}
     </Card>
 
+    {/* Projections Phase 1 — Suisse romande */}
+    <Card>
+      <H n={2}>📊 Phase 1 — Suisse romande (Lausanne → Genève)</H>
+      <P dim>CAC estimé CHF 5–15 par user (réseaux sociaux ciblés Lausanne). Churn apps rencontres : 40–60%/mois. Conversion premium : 3–8% des actifs.</P>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+          <thead>
+            <tr style={{borderBottom:`2px solid ${C.border}`}}>
+              {['Scénario','6 mois','12 mois','24 mois','MRR 24 mois'].map(h=>(
+                <th key={h} style={{padding:'8px 6px',textAlign:'left',color:C.dim,fontWeight:700}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              {s:'😟 Pessimiste', c:C.salmon, m6:'150 inscrits\n30 actifs\nCHF 0 MRR', m12:'400 inscrits\n80 actifs\n4 premium\nCHF 80/mois', m24:'800 inscrits\n150 actifs\n8 premium\nCHF 160/mois', mrr:'CHF 160'},
+              {s:'😐 Réaliste', c:C.gold, m6:'500 inscrits\n150 actifs\n6 premium\nCHF 120/mois', m12:'1 500 inscrits\n400 actifs\n20 premium\nCHF 400/mois', m24:'4 000 inscrits\n900 actifs\n54 premium\nCHF 1 075/mois', mrr:'CHF 1 075'},
+              {s:'🚀 Optimiste', c:C.green, m6:'1 200 inscrits\n400 actifs\n20 premium\nCHF 400/mois', m12:'4 000 inscrits\n1 200 actifs\n72 premium\nCHF 1 430/mois', m24:'12 000 inscrits\n3 000 actifs\n210 premium\nCHF 4 180/mois', mrr:'CHF 4 180'},
+            ].map(({s,c,m6,m12,m24,mrr})=>(
+              <tr key={s} style={{borderBottom:`1px solid ${C.border}`}}>
+                <td style={{padding:'10px 6px',fontWeight:800,color:c,whiteSpace:'nowrap'}}>{s}</td>
+                {[m6,m12,m24].map((v,i)=>(
+                  <td key={i} style={{padding:'10px 6px',color:C.mid,verticalAlign:'top'}}>
+                    {v.split('\n').map((l,j)=><div key={j} style={{marginBottom:2,color:j===v.split('\n').length-1?C.gold:C.mid}}>{l}</div>)}
+                  </td>
+                ))}
+                <td style={{padding:'10px 6px',fontWeight:900,color:c,fontSize:13}}>{mrr}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{marginTop:12,padding:10,background:`${C.orange}15`,borderRadius:8,fontSize:11,color:C.dim}}>
+        ⚡ Point mort (coûts fixes ~CHF 200/mois) : <strong style={{color:C.orange}}>11 abonnés premium</strong>. Atteignable en scénario réaliste à 12 mois.
+      </div>
+    </Card>
+
+    {/* Projections Phase 2 — Suisse entière */}
+    <Card color={C.blue}>
+      <H n={2} c={C.blue}>🇨🇭 Phase 2 — Suisse entière (déclencher à 2 000+ actifs romands)</H>
+      <P dim>Capital nécessaire : CHF 50–100k (marketing Zurich, adaptation allemande, 1 employé partiel). Timeline : 18–30 mois après lancement.</P>
+      {[
+        {h:'Zurich', desc:'1,4M habitants, culture "efficacité" compatible avec Clutch. Concurrence : Hinge bien implanté. Différenciateur : spontanéité vs planification.'},
+        {h:'Berne', desc:'Capitale fédérale, communauté franco-alémanique. Marché test idéal avant Zurich.'},
+        {h:'Bâle', desc:'City compacte, beaucoup de jeunes expats, très internationale. Culture bar/café forte.'},
+        {h:'KPI avant expansion', desc:'MAU Suisse romande ≥ 2 000 · MRR ≥ CHF 3 000 · Score fiabilité moyen ≥ 4.2/5 · Ratio H/F ≤ 60/40'},
+      ].map(({h,desc})=>(
+        <div key={h} style={{padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.white,marginBottom:3}}>→ {h}</div>
+          <div style={{fontSize:11,color:C.mid}}>{desc}</div>
+        </div>
+      ))}
+      <div style={{marginTop:12,padding:10,background:`${C.blue}15`,borderRadius:8}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.blue,marginBottom:4}}>Projections 5 ans — Suisse entière (scénario réaliste)</div>
+        <div style={{fontSize:13,fontWeight:900,color:C.gold}}>15 000 actifs/mois · 900 premium · CHF 17 910 MRR · CHF 215 000 ARR</div>
+      </div>
+    </Card>
+
+    {/* Phase 3 — Europe */}
+    <Card color={C.purple}>
+      <H n={2} c={C.purple}>🇪🇺 Phase 3 — Europe (déclencher à 10 000+ actifs CH)</H>
+      <P dim>Capital nécessaire : CHF 500k–2M (seed round ou bootstrapped lent). Timeline : 3–4 ans après lancement.</P>
+      {[
+        {ville:'Paris', why:'40M de sorties café/bar/an. Culture spontanéité forte. Masse critique facile dans arrondissements centraux.', risk:'Concurrence Fruitz, Once, Hinge très implantés.'},
+        {ville:'Londres', why:'Marché anglophone = plus grand potentiel presse tech. Expats = early adopters. Culture pub compatible.', risk:'CAC élevé, marché saturé.'},
+        {ville:'Berlin', why:'Culture événementielle unique. Jeunes expats, créatifs. Moins concurrentiel que Paris/Londres.', risk:'Méfiance apps très forte en Allemagne (RGPD culture).'},
+        {ville:'Amsterdam', why:'Anglophone de facto. Très jeune. Culture vélo/café = spontanéité.', risk:'Petit marché (900k habitants).'},
+      ].map(({ville,why,risk})=>(
+        <div key={ville} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:13,fontWeight:800,color:C.white,marginBottom:4}}>📍 {ville}</div>
+          <div style={{fontSize:11,color:C.mid,marginBottom:3}}>✅ {why}</div>
+          <div style={{fontSize:11,color:C.salmon}}>⚠️ {risk}</div>
+        </div>
+      ))}
+      <div style={{marginTop:12,padding:10,background:`${C.purple}15`,borderRadius:8}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.purple,marginBottom:4}}>Projections 5 ans — Europe (scénario réaliste, 3 villes)</div>
+        <div style={{fontSize:13,fontWeight:900,color:C.gold}}>80 000 actifs/mois · 4 000 premium · CHF 79 600 MRR · CHF 955 000 ARR</div>
+      </div>
+    </Card>
+
+    {/* Phase 4 — Monde */}
+    <Card color={C.salmon}>
+      <H n={2} c={C.salmon}>🌍 Phase 4 — Monde (horizon 5–7 ans)</H>
+      <P dim>Nécessite levée de fonds Series A (CHF 5–20M). Priorité aux marchés avec culture café/rencontre physique ET faible concurrence locale.</P>
+      {[
+        {marche:'Japon', note:'Culture "rencontre organisée" mais introvertie. Clutch pourrait libérer la spontanéité. Énorme marché apps (~40M 18-35). Localisation complexe.'},
+        {marche:'Brésil', note:'Culture festive, très sociale. São Paulo = 12M habitants. Faible pouvoir d\'achat mais volume massif. Prix à adapter (BRL 20–30).'},
+        {marche:'Australie', note:'Anglophone, culture bar forte, jeunes expats. Sydney/Melbourne = dense. CAC raisonnable.'},
+        {marche:'Canada', note:'Proximité culturelle FR (Québec) + EN. Toronto = hub tech. Tremplin vers USA éventuel.'},
+      ].map(({marche,note})=>(
+        <div key={marche} style={{padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.white,marginBottom:3}}>🌐 {marche}</div>
+          <div style={{fontSize:11,color:C.mid}}>{note}</div>
+        </div>
+      ))}
+    </Card>
+
+    {/* Tableau synthèse */}
+    <Card color={C.gold} glow>
+      <H n={2} c={C.gold}>📈 Tableau synthèse — Scénario réaliste</H>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+          <thead>
+            <tr style={{borderBottom:`2px solid ${C.gold}40`}}>
+              {['Phase','Horizon','Actifs/mois','Premium','MRR','Coûts/mois','Cash flow'].map(h=>(
+                <th key={h} style={{padding:'6px 8px',textAlign:'left',color:C.gold,fontWeight:700,fontSize:10}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              {p:'🇨🇭 Romande',h:'12 mois',a:'400',pr:'20',mrr:'CHF 400',c:'CHF 200',cf:'+CHF 200'},
+              {p:'🇨🇭 Romande',h:'24 mois',a:'900',pr:'54',mrr:'CHF 1 075',c:'CHF 300',cf:'+CHF 775'},
+              {p:'🇨🇭 Suisse',h:'36 mois',a:'3 000',pr:'150',mrr:'CHF 5 970',c:'CHF 2 000',cf:'+CHF 3 970'},
+              {p:'🇨🇭 Suisse',h:'48 mois',a:'8 000',pr:'400',mrr:'CHF 15 920',c:'CHF 8 000',cf:'+CHF 7 920'},
+              {p:'🇪🇺 Europe',h:'60 mois',a:'25 000',pr:'1 250',mrr:'CHF 49 750',c:'CHF 30 000',cf:'+CHF 19 750'},
+            ].map((r,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?`${C.gold}05`:'transparent'}}>
+                <td style={{padding:'8px',color:C.white,fontWeight:700,fontSize:10}}>{r.p}</td>
+                <td style={{padding:'8px',color:C.gold,fontWeight:800}}>{r.h}</td>
+                <td style={{padding:'8px',color:C.mid}}>{r.a}</td>
+                <td style={{padding:'8px',color:C.mid}}>{r.pr}</td>
+                <td style={{padding:'8px',color:C.gold,fontWeight:700}}>{r.mrr}</td>
+                <td style={{padding:'8px',color:C.salmon}}>{r.c}</td>
+                <td style={{padding:'8px',color:C.green,fontWeight:700}}>{r.cf}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Risques */}
+    <Card color={C.salmon}>
+      <H n={2} c={C.salmon}>🔥 Risques majeurs — Honnêtement</H>
+      {[
+        {r:'Masse critique non atteinte', desc:'Le risque #1. Si Lausanne ne dépasse pas 500 actifs, l\'app est un désert. Solution : concentrer 100% des efforts sur Lausanne centre avant d\'élargir.', level:'CRITIQUE'},
+        {r:'Ratio H/F déséquilibré', desc:'Si les hommes représentent >70% des users, les femmes partent, puis les hommes. L\'app meurt. Surveiller hebdomadairement.', level:'CRITIQUE'},
+        {r:'Tinder clone la feature', desc:'Tinder peut lancer "Tinder Now" demain. Fossé défensif : la friction vers le vrai RDV, le vocabulaire, la communauté locale.', level:'ÉLEVÉ'},
+        {r:'Pas de revenus pendant 12 mois', desc:'Avec 0 abonnés les 6 premiers mois, le projet tient sur la passion. Budget marketing requis : CHF 2 000–5 000 pour lancer Lausanne.', level:'ÉLEVÉ'},
+        {r:'Légal CH/LPD', desc:'Localisation GPS = donnée sensible. Consentement explicite obligatoire. Pas de position live stockée.', level:'MOYEN'},
+      ].map(({r,desc,level})=>(
+        <div key={r} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.white}}>{r}</span>
+            <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:level==='CRITIQUE'?`${C.salmon}30`:level==='ÉLEVÉ'?`${C.orange}30`:`${C.gold}30`,color:level==='CRITIQUE'?C.salmon:level==='ÉLEVÉ'?C.orange:C.gold}}>{level}</span>
+          </div>
+          <div style={{fontSize:11,color:C.mid}}>{desc}</div>
+        </div>
+      ))}
+    </Card>
+
+    {/* Coûts infra */}
     <Card>
       <H n={2}>💸 Coûts infrastructure</H>
       {[
@@ -1755,6 +1936,7 @@ const SectionBusiness = () => (
         {s:'OneSignal Push', c:'CHF 0/mois', l:'jusqu\'à 10 000 users'},
         {s:'Apple Developer', c:'CHF 99/an', l:'TestFlight + App Store'},
         {s:'Google Play', c:'CHF 25 (once)', l:'Play Store'},
+        {s:'Capgo (live updates)', c:'CHF 15/mois', l:'Mises à jour sans re-soumission Apple'},
       ].map(({s,c,l})=>(
         <div key={s} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid ${C.border}`}}>
           <div><span style={{fontSize:12,color:C.white,fontWeight:600}}>{s}</span><span style={{fontSize:11,color:C.dim,marginLeft:8}}>{l}</span></div>

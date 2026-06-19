@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'v18.06-Z35'
+const V = 'v18.06-Z36'
 
 // ─── ID Mel (seuil GPS élargi pour les tests) ────────────────────
 const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'

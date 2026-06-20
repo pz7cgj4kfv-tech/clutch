@@ -1,0 +1,23 @@
+Contexte : Clutch, app suisse (Lausanne) de rencontres SPONTANÉES vérifiées dans la vraie vie (pas un Tinder : vocabulaire Clutch/Verrou/Rendez-vous, fenêtre de dispo max 18h, système de réputation Lapin/J'y suis, sécurité des femmes au centre). On conçoit le système ÉVÉNEMENTS. Challenge-le de façon adversariale : trouve les failles légales (droit suisse LPD/FINMA, Apple), UX, et les angles de malveillance.
+
+NOTRE ARCHITECTURE ÉVÉNEMENTS (à démonter) :
+
+1. TAXONOMIE 4 niveaux : (a) Présence simple, (b) Présence + texte d'activité = "non-figé" (clutchable + contre-proposition OK), (c) Événement VERROUILLÉ 🔒 (activité figée + lieu + heure + capacité 2→N + bouton Rejoindre, pas de contre-proposition ; apparaît dans onglet Événements + dans Présences avec un cadenas), (d) Événement partenaire/établissement (pro, places, billetterie plus tard).
+
+2. ARGENT : Phase 1 = ZÉRO argent traité par Clutch. Les events "payants" (tarot, partage de coût d'un billet de concert) = paiement DIRECT entre personnes, hors-plateforme, Clutch affiche juste "CHF X payable sur place". Garde-fou : vérif identité/selfie pour events avec argent. Crypto maison (ClutchChain) = parquée, jugée trop risquée (FINMA).
+
+3. MONÉTISATION : gratuit (Hydrogène) = 2 events actifs max, jour-même (18h), ≤6 pers. Premium (Rhodium 19.90) = +48h, ≤10 pers. Pro/Hôte = events illimités, J-7, masqué des Présences. Abonnements nommés par éléments rares (Hydrogène/Or/Rhodium/Astate).
+
+4. FILTRES : zéro filtre obligatoire, résultats affichés direct triés par algo, chips de catégorie ADAPTATIFS (n'apparaissent que s'il y a des events dans le rayon) avec compteur. Max 2-3 filtres.
+
+5. ALGO V1 (anti-discrimination) : tri pondéré sur le COMPORTEMENT (fiabilité, distance, récence, intérêts communs, dispo qui chevauche), jamais sur traits protégés. "Voir 50 meilleurs d'abord" puis pagination (pas de plafond).
+
+6. MODÉRATION : Edge Function de modération du texte (insultes/obscène) avant publication + bouton Signaler.
+
+QUESTIONS POUR TOI (GPT) :
+- Quelles failles légales suisses on rate (responsabilité de l'hôte d'un event qui tourne mal ? assurance ? mineurs ?) ?
+- Le "partage de coût d'un billet hors-plateforme" nous expose-t-il quand même (intermédiation, fraude, Apple qui considère ça comme contournement de l'IAP) ?
+- Notre distinction non-figé/verrouillé est-elle claire pour un utilisateur lambda, ou trop subtile ?
+- Angles de malveillance qu'on n'a pas couverts (faux events pour appâter, hôte prédateur, events "privés chez moi") ?
+- Notre modèle de monétisation des events est-il bon, ou contre-productif pour la liquidité au lancement ?
+- Qu'est-ce qui te paraît le PLUS risqué ou le plus mal pensé ? Sois direct.

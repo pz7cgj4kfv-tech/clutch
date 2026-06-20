@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z41'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z42'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2672,7 +2672,7 @@ const GROUP_EVENTS_DEMO = [
 
 const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','🎬','🎨','🌿','🎲','🚴','🍺','💻','🌙','🎵','🧆','🏊','⛰️']
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2681,6 +2681,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   onClearInitialEvent?:()=>void;
   onPenalty?:(r:PenaltyReason)=>void;
   onOpenProfile?:(name:string,bio:string,photo:string|null)=>void;
+  userId?:string;
 }) {
   const t = useT(lang)
   const [dbEvents, setDbEvents] = useState<any[]>([])
@@ -2738,9 +2739,28 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const createGroupEvent = async () => {
     if (!newEvTitle.trim() || !newEvLieu.trim() || !newEvTime.trim()) return
     setCreating(true)
-    await new Promise(r => setTimeout(r, 700))
+    let realId = `g-user-${Date.now()}`
+    // Persistance Supabase (additif). Si la migration events_mvp n'est pas encore
+    // appliquée OU si l'insert échoue → on retombe sur l'event local (comportement actuel).
+    try {
+      if (userId) {
+        const { data: ins } = await supabase.from('events').insert({
+          title: newEvTitle.trim(), emoji: newEvEmoji, lieu: newEvLieu.trim(),
+          event_time: newEvTime.trim(), event_date: 'Ce soir', spots: newEvMax,
+          description: newEvDesc.trim() || 'Événement créé sur Clutch.',
+          tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'active',
+          active: true, created_by: userId, creator: 'Toi',
+        }).select('id').single()
+        if (ins?.id) {
+          realId = ins.id
+          // L'hôte compte comme 1er participant (le trigger met taken à jour)
+          await supabase.from('event_participants').insert({ event_id: realId, user_id: userId })
+        }
+      }
+    } catch { /* fallback local silencieux */ }
+    await new Promise(r => setTimeout(r, 300))
     const newEv = {
-      id: `g-user-${Date.now()}`,
+      id: realId,
       emoji: newEvEmoji,
       title: newEvTitle.trim(),
       creator: 'Toi',
@@ -7580,6 +7600,7 @@ export default function App2() {
                 initialEventId={openEventId}
                 onClearInitialEvent={()=>setOpenEventId(null)}
                 onPenalty={applyPenalty}
+                userId={user?.id}
                 onOpenProfile={(name,bio,photo)=>{
                   // Profil créateur enrichi (Anaïs = isCreator:true, allowClutch:false par défaut)
                   const isAnais = name.toLowerCase().includes('anaïs')||name.toLowerCase().includes('anais')

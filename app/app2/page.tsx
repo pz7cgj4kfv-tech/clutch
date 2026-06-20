@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z51'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z52'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4170,16 +4170,28 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   }
   useEffect(()=>{ load() },[])
 
-  const activate = async (bot:any, key:string) => {
+  const activateAt = async (bot:any, lat:number, lng:number, label:string) => {
     setBusy(bot.id)
-    const p = POS[key]; const r = radius[bot.id] ?? 10
+    const r = radius[bot.id] ?? 10
     const { data, error } = await supabase.from('profiles').update({
       is_available:true, available_until:new Date(Date.now()+6*3600*1000).toISOString(),
-      center_lat:p.lat, center_lng:p.lng, available_radius_km:r,
+      center_lat:lat, center_lng:lng, available_radius_km:r,
     }).eq('id', bot.id).select('id')
     setBusy(null)
     if (error || !data?.length) { showToast('❌ Échec — la migration bots est-elle appliquée ?', C.red); return }
-    showToast(`✓ ${bot.name} en ligne · ${p.label} · ${r}km`, C.green); load()
+    showToast(`✓ ${bot.name} en ligne · ${label} · ${r}km`, C.green); setAddrRes(a=>({...a,[bot.id]:[]})); load()
+  }
+  const activate = (bot:any, key:string) => { const p = POS[key]; return activateAt(bot, p.lat, p.lng, p.label) }
+  // Géocodage adresse (Nominatim — même API que les RDV)
+  const [addr, setAddr] = useState<Record<string,string>>({})
+  const [addrRes, setAddrRes] = useState<Record<string,any[]>>({})
+  const searchAddr = async (botId:string) => {
+    const q = (addr[botId]||'').trim(); if (q.length < 3) return
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`)
+      const j = (await res.json())||[]
+      setAddrRes(a=>({...a,[botId]: j}))
+    } catch { showToast('Recherche adresse indisponible', C.red) }
   }
   const deactivate = async (bot:any) => {
     setBusy(bot.id)
@@ -4250,27 +4262,57 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Aucun bot (migration appliquée ?)</div>}
         {bots.map(bot=>(
           <div key={bot.id} style={{background:C.bgCard,border:`1px solid ${bot.is_available?C.green:C.border}`,borderRadius:14,padding:'12px',marginBottom:10}}>
+            {(()=>{ const TL = bot.account_type==='premium'?'Rhodium':bot.account_type==='standard'?'Or':bot.account_type==='elite'?'Astate':'Hydrogène'; return (
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{fontSize:14,fontWeight:800,color:C.white}}>{bot.name} <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>{bot.gender==='woman'?'♀':bot.gender==='man'?'♂':''} · {bot.age||'?'}a · {bot.account_type==='premium'?'Rhodium':'Hydrogène'}</span></div>
-              <div style={{fontSize:10,fontWeight:800,color:bot.is_available?C.green:C.whiteMid}}>{bot.is_available?'EN LIGNE':'hors ligne'}</div>
+              <div style={{fontSize:14,fontWeight:800,color:C.white}}>{bot.name} <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>{bot.gender==='woman'?'♀':bot.gender==='man'?'♂':''} · {bot.age||'?'}a · {TL}</span></div>
+              {/* Statut cliquable = toggle en ligne/hors ligne */}
+              <button onClick={()=>bot.is_available?deactivate(bot):activate(bot,'me')} disabled={!!busy}
+                style={{fontSize:10,fontWeight:800,padding:'4px 9px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',
+                  border:`1px solid ${bot.is_available?C.green:C.border}`,background:bot.is_available?'rgba(45,189,126,.15)':'transparent',color:bot.is_available?C.green:C.whiteMid}}>
+                {bot.is_available?'🟢 EN LIGNE':'⚪ hors ligne'}
+              </button>
             </div>
-            {/* Position */}
+            )})()}
+            {/* Position par presets */}
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>ACTIVER À :</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6,alignItems:'center'}}>
               <Btn onClick={()=>activate(bot,'me')} bg={C.salmonFaint} col={C.salmon}>📍 Sur moi</Btn>
               <Btn onClick={()=>activate(bot,'near')} bg={C.salmonFaint} col={C.salmon}>🚶 Proche 500m</Btn>
-              <Btn onClick={()=>activate(bot,'morges')} bg={C.salmonFaint} col={C.salmon}>🚗 Morges 12km</Btn>
-              <input type="number" placeholder="rayon" value={radius[bot.id]??10} onChange={e=>setRadius(r=>({...r,[bot.id]:Number(e.target.value)}))}
-                style={{width:54,padding:'6px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit'}}/>
+              <Btn onClick={()=>activate(bot,'morges')} bg={C.salmonFaint} col={C.salmon}>🚗 Morges</Btn>
+              <span style={{fontSize:10,color:C.whiteMid}}>rayon</span>
+              <input type="number" value={radius[bot.id]??10} onChange={e=>setRadius(r=>({...r,[bot.id]:Number(e.target.value)}))}
+                style={{width:48,padding:'6px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit'}}/>
+              <span style={{fontSize:10,color:C.whiteMid}}>km</span>
             </div>
-            {/* Réglages */}
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+            {/* Position par adresse (Nominatim) */}
+            <div style={{display:'flex',gap:6,marginBottom:6}}>
+              <input value={addr[bot.id]||''} onChange={e=>setAddr(a=>({...a,[bot.id]:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')searchAddr(bot.id)}}
+                placeholder="Adresse (ex: Gare de Nyon)…"
+                style={{flex:1,padding:'7px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit',outline:'none'}}/>
+              <Btn onClick={()=>searchAddr(bot.id)} bg={C.salmonFaint} col={C.salmon}>🔍</Btn>
+            </div>
+            {(addrRes[bot.id]||[]).length>0 && (
+              <div style={{marginBottom:8,background:C.bg,borderRadius:8,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+                {(addrRes[bot.id]||[]).map((r:any,ri:number)=>(
+                  <div key={ri} onClick={()=>activateAt(bot, parseFloat(r.lat), parseFloat(r.lon), (r.display_name||'').split(',').slice(0,2).join(','))}
+                    style={{padding:'8px 10px',fontSize:11,color:C.white,cursor:'pointer',borderBottom:ri<(addrRes[bot.id]||[]).length-1?`1px solid ${C.border}`:'none'}}>
+                    📍 {(r.display_name||'').split(',').slice(0,3).join(',')}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Réglages : âge + type de compte */}
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}>
               <Btn onClick={()=>patchBot(bot,{age:(bot.age||25)+1},`${bot.name} : ${(bot.age||25)+1} ans`)}>âge +1</Btn>
               <Btn onClick={()=>patchBot(bot,{age:Math.max(18,(bot.age||25)-1)},`${bot.name} : ${Math.max(18,(bot.age||25)-1)} ans`)}>âge −1</Btn>
-              <Btn onClick={()=>patchBot(bot,{account_type:bot.account_type==='premium'?'free':'premium'},`${bot.name} : ${bot.account_type==='premium'?'Hydrogène':'Rhodium'}`)}>{bot.account_type==='premium'?'→ Hydrogène':'→ Rhodium (premium)'}</Btn>
-              {bot.is_available
-                ? <Btn onClick={()=>deactivate(bot)} bg="rgba(239,68,68,.15)" col="#f87171">⏻ Désactiver</Btn>
-                : null}
+              {bot.is_available && <Btn onClick={()=>deactivate(bot)} bg="rgba(239,68,68,.15)" col="#f87171">⏻ Désactiver</Btn>}
+            </div>
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>TYPE DE COMPTE :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              {[['free','Hydrogène'],['standard','Or'],['premium','Rhodium'],['elite','Astate']].map(([v,lab])=>(
+                <Btn key={v} onClick={()=>patchBot(bot,{account_type:v},`${bot.name} : ${lab}`)}
+                  bg={bot.account_type===v||(v==='free'&&!bot.account_type)?C.gold:C.bgCard} col={bot.account_type===v||(v==='free'&&!bot.account_type)?'#1a0810':C.white}>{lab}</Btn>
+              ))}
             </div>
             {/* Flow RDV */}
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>FLOW RDV (après l'avoir clutché) :</div>

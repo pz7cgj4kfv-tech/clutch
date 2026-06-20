@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z54'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z55'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8220,8 +8220,8 @@ export default function App2() {
                                       </span>
                                     )}
                                   </button>
-                                  {/* Retard — 15min auto / 30min avec accept/refuse */}
-                                  {c.proposed_time && new Date(c.proposed_time).getTime() + 5*60*1000 > Date.now() && (()=>{
+                                  {/* Retard — 15min auto / 30min avec accept/refuse. Masqué si je suis déjà arrivé (J'y suis) */}
+                                  {c.proposed_time && new Date(c.proposed_time).getTime() + 5*60*1000 > Date.now() && !(user.id===c.sender_id ? c.sender_arrived : c.receiver_arrived) && (()=>{
                                     const iDeclared = c.retard_by === user?.id
                                     const otherDeclared = c.retard_min && c.retard_by && c.retard_by !== user?.id
                                     const pending30 = otherDeclared && c.retard_min === 30 && c.retard_accepted == null
@@ -8336,10 +8336,13 @@ export default function App2() {
                                       </button>
                                     )
                                   })()}
+                                  {/* Annuler masqué une fois sur place (J'y suis) : on ne peut plus annuler, seulement Terminer */}
+                                  {!(user.id===c.sender_id ? c.sender_arrived : c.receiver_arrived) && (
                                   <button onClick={()=>setCancelConfirmId(c.id)}
                                     style={{flex:1,padding:'8px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:10,color:C.red,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                                     ✕ {lang==='en'?'Cancel':'Annuler'}
                                   </button>
+                                  )}
                                 </div>
                               </div>
                             )

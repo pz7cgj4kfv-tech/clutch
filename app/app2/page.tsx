@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z42'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z43'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2118,10 +2118,15 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:
   const [showCounter, setShowCounter] = useState(false)
   const [counterVenue, setCounterVenue] = useState('')
   const [counterTime, setCounterTime] = useState('')
-  const counterSlots = Array.from({length:12},(_,i)=>{
-    const d = new Date(Date.now()+(i+1)*30*60*1000)
-    return { label:d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}), iso:d.toISOString() }
-  })
+  const counterSlots = (()=>{
+    // Créneaux RONDS (:00 ou :30), à partir du prochain créneau rond — plus de 2h08/2h38
+    const start = new Date(); start.setSeconds(0,0)
+    start.setMinutes(start.getMinutes() < 30 ? 30 : 60, 0, 0)
+    return Array.from({length:12},(_,i)=>{
+      const d = new Date(start.getTime()+i*30*60*1000)
+      return { label:d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}), iso:d.toISOString() }
+    })
+  })()
   useEffect(()=>{
     if ('vibrate' in navigator) navigator.vibrate([150,80,150,80,300])
     const t1 = setTimeout(()=>setPh(1), 80)

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z55'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z56'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4243,6 +4243,16 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}
     showToast(`✓ ${bot.name} est au RDV (J'y suis) ✅`,C.green)
   }
+  const rdvNow = async (bot:any) => {
+    setBusy(bot.id)
+    const c = await findVerrou(bot.id)
+    if (!c) { setBusy(null); showToast(`Pas de Verrou actif pour ${bot.name}`,C.orange); return }
+    const patch:any = { proposed_time: new Date(Date.now()-60*1000).toISOString() } // -1min → radar visible
+    if (c.venue_lat==null) { patch.venue_lat = myLat; patch.venue_lng = myLng } // lieu GPS si absent
+    const { data } = await supabase.from('clutches').update(patch).eq('id',c.id).select('id')
+    setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}
+    showToast(`✓ RDV de ${bot.name} mis à maintenant — le radar s'affiche 📡`,C.green)
+  }
 
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
     <button onClick={onClick} disabled={!!busy} style={{padding:'7px 10px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:busy?.6:1}}>{children}</button>
@@ -4318,6 +4328,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>FLOW RDV (après l'avoir clutché) :</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
               <Btn onClick={()=>acceptClutch(bot)} bg="rgba(45,189,126,.15)" col={C.green}>✓ Accepter clutch</Btn>
+              <Btn onClick={()=>rdvNow(bot)} bg={C.salmonFaint} col={C.salmon}>🕐 RDV maintenant</Btn>
               <Btn onClick={()=>approach(bot)}>📡 Rapprocher</Btn>
               <Btn onClick={()=>arrive(bot)} bg="rgba(45,189,126,.15)" col={C.green}>📍 Au RDV (J'y suis)</Btn>
             </div>

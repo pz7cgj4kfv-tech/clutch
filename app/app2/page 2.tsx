@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z59'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z57'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4288,7 +4288,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Aucun bot (migration appliquée ?)</div>}
         {bots.map(bot=>(
           <div key={bot.id} style={{background:C.bgCard,border:`1px solid ${bot.is_available?C.green:C.border}`,borderRadius:14,padding:'12px',marginBottom:10}}>
-            {(()=>{ const TL = bot.account_type==='Rh'?'Rhodium':bot.account_type==='Au'?'Or':bot.account_type==='At'?'Astate':'Hydrogène'; return (
+            {(()=>{ const TL = bot.account_type==='premium'?'Rhodium':bot.account_type==='standard'?'Or':bot.account_type==='elite'?'Astate':'Hydrogène'; return (
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontSize:14,fontWeight:800,color:C.white}}>{bot.name} <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>{bot.gender==='woman'?'♀':bot.gender==='man'?'♂':''} · {bot.age||'?'}a · {TL}</span></div>
               {/* Statut cliquable = toggle en ligne/hors ligne */}
@@ -4335,9 +4335,9 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             </div>
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>TYPE DE COMPTE :</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-              {[['H','Hydrogène'],['Au','Or'],['Rh','Rhodium'],['At','Astate']].map(([v,lab])=>(
+              {[['free','Hydrogène'],['standard','Or'],['premium','Rhodium'],['elite','Astate']].map(([v,lab])=>(
                 <Btn key={v} onClick={()=>patchBot(bot,{account_type:v},`${bot.name} : ${lab}`)}
-                  bg={bot.account_type===v||(v==='H'&&!['Au','Rh','At'].includes(bot.account_type))?C.gold:C.bgCard} col={bot.account_type===v||(v==='H'&&!['Au','Rh','At'].includes(bot.account_type))?'#1a0810':C.white}>{lab}</Btn>
+                  bg={bot.account_type===v||(v==='free'&&!bot.account_type)?C.gold:C.bgCard} col={bot.account_type===v||(v==='free'&&!bot.account_type)?'#1a0810':C.white}>{lab}</Btn>
               ))}
             </div>
             {/* Flow RDV */}
@@ -4436,27 +4436,20 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     setTimeout(()=>{setSosSaving(false); showToast('✓ Contacts SOS sauvegardés', C.green)}, 300)
   }
   const triggerSOS = () => {
-    const pseudo = (user as any).name || 'Quelqu\'un'
     const valid = sosContacts.filter(c=>c.phone.trim())
-    const fire = (locTxt:string) => {
-      const text = `🆘 ALERTE Clutch — ${pseudo} a besoin d'aide.${locTxt}`
-      // 1 clic → feuille de partage native (SMS, WhatsApp, Mail, Telegram… l'user choisit). Minimum de manip.
-      if ((navigator as any).share) {
-        (navigator as any).share({ title: 'Alerte SOS Clutch', text }).catch(()=>{})
-      } else if (valid.length) {
-        const nums = valid.map(c=>c.phone.trim()).join(',')  // fallback SMS multi-destinataires (format iOS)
-        window.location.href = `sms:/open?addresses=${encodeURIComponent(nums)}&body=${encodeURIComponent(text)}`
-      } else {
-        showToast('Ajoute un contact ou active le partage', C.red)
-      }
+    if (!valid.length) { showToast('Ajoute au moins un numéro de contact', C.red); return }
+    const send = (locTxt:string) => {
+      const body = encodeURIComponent(`🆘 ALERTE Clutch — j'ai besoin d'aide.${locTxt}`)
+      const nums = valid.map(c=>c.phone.trim()).join(',')
+      window.location.href = `sms:${nums}&body=${body}`  // iOS : numéros séparés par virgule + &body
     }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => fire(` Ma position : https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
-        () => fire(''),
-        { timeout: 6000, enableHighAccuracy: true }
+        pos => send(` Ma position : https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
+        () => send(''),
+        { timeout: 5000 }
       )
-    } else fire('')
+    } else send('')
   }
 
   // Mode réception (pour les femmes) — persisté localStorage
@@ -5049,14 +5042,10 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           </button>
           <button onClick={triggerSOS}
             style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'#ef4444',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 12px rgba(239,68,68,.4)',letterSpacing:.3}}>
-            🆘 Alerter mes contacts (1 clic)
-          </button>
-          <button onClick={()=>{window.location.href='tel:112'}}
-            style={{width:'100%',padding:'12px',borderRadius:12,border:'1.5px solid #ef4444',background:'transparent',color:'#ef4444',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-            📞 Urgences / Police (112)
+            🆘 Déclencher l'alerte SOS
           </button>
           <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',lineHeight:1.5}}>
-            « Alerter » → partage natif (SMS, WhatsApp, Mail…) ton message + ta position GPS. Tu choisis l'app et valides l'envoi.
+            Ouvre ton app SMS pré-remplie (message + position). Tu valides l'envoi.
           </div>
         </div>
       </div>

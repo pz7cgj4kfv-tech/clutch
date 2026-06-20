@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z67'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z68'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8734,12 +8734,8 @@ export default function App2() {
                         const otherPhoto = other?.photo_url
                         return (
                           <div key={c.id} style={{marginBottom:8}}>
-                          <button onClick={()=>{
-                            setChatClutch(c)
-                            setShowChat(true)
-                            setUnreadChats(prev=>{const n={...prev};delete n[c.id];return n})
-                            setContactsUnread(prev=>Math.max(0,prev-unread))
-                          }} style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 12px',background:'rgba(255,255,255,.04)',border:`1px solid ${unread>0?'rgba(255,140,0,.4)':'rgba(255,191,158,.1)'}`,borderRadius:16,marginBottom:6,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative'}}>
+                          {/* Pas de chat (philosophie Clutch) : le clic ouvre le PROFIL → de là on peut proposer un RDV */}
+                          <button onClick={()=>{ if(other){setSelProfile(other);setShowProfileSheet(true)} }} style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 12px',background:'rgba(255,255,255,.04)',border:`1px solid rgba(255,191,158,.1)`,borderRadius:16,marginBottom:6,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative'}}>
                             <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(200,134,10,.2)',flexShrink:0,overflow:'hidden',border:`2px solid ${unread>0?'#FF8C00':'rgba(255,191,158,.2)'}`}}>
                               {otherPhoto ? <img src={otherPhoto} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/> : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{otherName[0]?.toUpperCase()}</div>}
                             </div>

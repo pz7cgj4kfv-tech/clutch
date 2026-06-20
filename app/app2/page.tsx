@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z49'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z50'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6240,6 +6240,12 @@ export default function App2() {
     const {data, error} = await q
     if (!error && data) {
       const real = data.map(enrichProfile)
+      // Badge 🔒 événement : marquer les profils qui hébergent un événement actif
+      try {
+        const { data: evs } = await supabase.from('events').select('id,created_by,emoji').eq('active',true).not('created_by','is',null)
+        const hostMap = new Map((evs||[]).map((e:any)=>[e.created_by, e]))
+        real.forEach((p:any)=>{ const e:any = hostMap.get(p.id); if(e){ p._hasEvent=true; p._eventId=e.id; p._eventEmoji=e.emoji||'📅' } })
+      } catch {}
       // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible
       const maxBot = {
         id: 'gpsbotma-0000-0000-0000-000000000001',

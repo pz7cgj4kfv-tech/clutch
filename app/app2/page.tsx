@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z64'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z65'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4314,7 +4314,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     await supabase.from('profiles').update({ is_available:false }).eq('is_bot', true)
     setBusy(null); showToast('Tous les bots désactivés', C.orange); load()
   }
-  // Efface MES interactions avec les bots (clutchs actifs + lapins) → ils réapparaissent dans Présences
+  // RESET COMPLET : efface MES interactions avec les bots (clutchs + lapins) + les remet propres (dé-Driver, déverrouille)
   const clearBotInteractions = async () => {
     setBusy('all')
     const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot', true)
@@ -4324,8 +4324,10 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       await supabase.from('clutches').update({status:'cancelled'}).in('sender_id', botIds).in('status', ACT)
       await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id', botIds).in('status', ACT)
       await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id).in('to_id', botIds).eq('outcome','absent')
+      await supabase.from('profiles').update({ account_type:'H' }).in('id', botIds).eq('account_type','driver')
+      await supabase.from('profiles').update({ rdv_locked_until:null, rdv_locked_from:null }).in('id', botIds)
     }
-    setBusy(null); showToast('✓ Clutchs + lapins avec les bots effacés — ils réapparaissent', C.green)
+    setBusy(null); showToast('✓ Reset complet — bots débloqués, ils réapparaissent', C.green); load()
   }
   const resetMyOnboarding = async () => {
     if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
@@ -4383,7 +4385,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         {/* Actions globales */}
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
-          <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Effacer mes clutchs/lapins</Btn>
+          <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
           <Btn onClick={resetMyOnboarding} bg={C.salmonFaint} col={C.salmon}>👤 Refaire mon inscription</Btn>
         </div>
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Chargement…</div>}

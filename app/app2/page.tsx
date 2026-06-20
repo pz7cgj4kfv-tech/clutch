@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z44'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z45'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8647,8 +8647,8 @@ export default function App2() {
           {incomingClutch&&<ClutchIncoming clutch={incomingClutch} lang={lang}
             onCounter={async (venue, proposedTime)=>{
               if (!incomingClutch.id?.startsWith('sim-') && user) {
-                await supabase.from('clutches').update({status:'declined'}).eq('id',incomingClutch.id)
-                await supabase.from('clutches').insert({
+                // Insert d'abord : si ça échoue, on ne décline pas l'original (on ne le perd pas)
+                const { error } = await supabase.from('clutches').insert({
                   sender_id: user.id,
                   receiver_id: incomingClutch.sender_id || incomingClutch.sender?.id,
                   venue,
@@ -8657,6 +8657,12 @@ export default function App2() {
                   status: 'pending',
                   expires_at: new Date(Date.now()+2*3600*1000).toISOString(),
                 })
+                if (error) {
+                  const dup = error.code==='23505' || /clutch_pair_unique|duplicate/i.test(error.message||'')
+                  showToast(dup ? (lang==='fr'?'Tu as déjà un Clutch en cours avec cette personne ✦':'You already have an active Clutch with this person ✦') : 'Erreur: '+error.message, C.orange)
+                  return
+                }
+                await supabase.from('clutches').update({status:'declined'}).eq('id',incomingClutch.id)
                 loadClutches()
               }
               setIncomingClutch(null)

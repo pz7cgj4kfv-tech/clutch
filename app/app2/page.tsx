@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z50'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z51'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6955,11 +6955,19 @@ export default function App2() {
     return '📍 À distance'
   }
 
+  // Personnes avec qui j'ai déjà un Clutch actif (envoyé OU reçu) → masquées des Présences
+  const activeClutchPartnerIds = new Set(
+    (clutches as any[])
+      .filter(c => ['pending','accepted','confirmed','checked_in'].includes(c.status))
+      .map(c => c.sender_id===user?.id ? c.receiver_id : c.sender_id)
+  )
   const filtered = (!availableRef ? [] : profiles).filter(p => {
     // Toujours inclure les bots GPS de test (ignorent tous les filtres)
     if ((p as any)._isGpsTestBot) return true
     // Masquer le partenaire de Verrou actif (on a déjà un RDV ensemble)
     if (activeVerrouPartnerId && (p as any).id === activeVerrouPartnerId) return false
+    // Masquer les personnes déjà clutchées (clutch en attente ou actif) — évite le doublon
+    if (activeClutchPartnerIds.has((p as any).id)) return false
     // Filtre genre
     if (filterGender !== 'all') {
       const gk = genderKey((p as any).gender)

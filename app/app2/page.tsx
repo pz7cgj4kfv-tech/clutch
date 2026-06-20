@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z62'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z63'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4531,28 +4531,44 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     try { localStorage.setItem(sosKey, JSON.stringify({contacts:clean})) } catch {}
     setTimeout(()=>{setSosSaving(false); showToast('✓ Contacts SOS sauvegardés', C.green)}, 300)
   }
-  const triggerSOS = () => {
+  const sosWatchRef = useRef<number|null>(null)
+  const [sosLiveToken, setSosLiveToken] = useState<string|null>(null)
+  const triggerSOS = async () => {
     const pseudo = (user as any).name || 'Quelqu\'un'
     const valid = sosContacts.filter(c=>c.phone.trim())
-    const fire = (locTxt:string) => {
-      const text = `🆘 ALERTE Clutch — ${pseudo} a besoin d'aide.${locTxt}`
-      // 1 clic → feuille de partage native (SMS, WhatsApp, Mail, Telegram… l'user choisit). Minimum de manip.
-      if ((navigator as any).share) {
-        (navigator as any).share({ title: 'Alerte SOS Clutch', text }).catch(()=>{})
-      } else if (valid.length) {
-        const nums = valid.map(c=>c.phone.trim()).join(',')  // fallback SMS multi-destinataires (format iOS)
-        window.location.href = `sms:/open?addresses=${encodeURIComponent(nums)}&body=${encodeURIComponent(text)}`
-      } else {
-        showToast('Ajoute un contact ou active le partage', C.red)
-      }
-    }
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => fire(` Ma position : https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
-        () => fire(''),
-        { timeout: 6000, enableHighAccuracy: true }
+    // 1) Créer la session live (si la table sos_sessions existe — sinon fallback position statique)
+    let token:string|null = null
+    try {
+      const { data } = await supabase.from('sos_sessions').insert({ user_id: user.id, user_name: pseudo, active: true }).select('token').single()
+      token = (data as any)?.token || null
+    } catch {}
+    // 2) Suivi de position EN CONTINU
+    if (token && navigator.geolocation) {
+      if (sosWatchRef.current!=null) navigator.geolocation.clearWatch(sosWatchRef.current)
+      sosWatchRef.current = navigator.geolocation.watchPosition(
+        pos => { supabase.from('sos_sessions').update({ lat:pos.coords.latitude, lng:pos.coords.longitude, updated_at:new Date().toISOString() }).eq('token', token as string).then(()=>{}) },
+        ()=>{}, { enableHighAccuracy:true, maximumAge:5000 }
       )
-    } else fire('')
+      setSosLiveToken(token)
+    }
+    // 3) Partager (1 clic → SMS/WhatsApp/Mail/Telegram). Si lien live dispo, on partage le lien.
+    const link = token ? `${window.location.origin}/sos?t=${token}` : ''
+    const share = (locTxt:string) => {
+      const text = token
+        ? `🆘 ALERTE Clutch — ${pseudo} a besoin d'aide. Suis ma position EN DIRECT : ${link}`
+        : `🆘 ALERTE Clutch — ${pseudo} a besoin d'aide.${locTxt}`
+      if ((navigator as any).share) (navigator as any).share({ title:'Alerte SOS Clutch', text }).catch(()=>{})
+      else if (valid.length) window.location.href = `sms:/open?addresses=${encodeURIComponent(valid.map(c=>c.phone.trim()).join(','))}&body=${encodeURIComponent(text)}`
+      else showToast('Ajoute un contact ou active le partage', C.red)
+    }
+    if (token) share('')
+    else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos=>share(` Ma position : https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`), ()=>share(''), { timeout:6000, enableHighAccuracy:true })
+    else share('')
+  }
+  const stopSOS = async () => {
+    if (sosWatchRef.current!=null && navigator.geolocation) { navigator.geolocation.clearWatch(sosWatchRef.current); sosWatchRef.current=null }
+    if (sosLiveToken) { try { await supabase.from('sos_sessions').update({ active:false }).eq('token', sosLiveToken) } catch {} ; setSosLiveToken(null) }
+    showToast('Alerte SOS arrêtée', C.orange)
   }
 
   // Mode réception (pour les femmes) — persisté localStorage
@@ -5156,6 +5172,12 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'#ef4444',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 12px rgba(239,68,68,.4)',letterSpacing:.3}}>
             🆘 Alerter mes contacts (1 clic)
           </button>
+          {sosLiveToken && (
+            <button onClick={stopSOS}
+              style={{width:'100%',padding:'11px',borderRadius:12,border:`1px solid ${C.border}`,background:'rgba(239,68,68,.12)',color:'#f87171',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+              ⏹ Arrêter le suivi en direct (SOS actif 🔴)
+            </button>
+          )}
           <button onClick={()=>{window.location.href='tel:112'}}
             style={{width:'100%',padding:'12px',borderRadius:12,border:'1.5px solid #ef4444',background:'transparent',color:'#ef4444',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
             📞 Urgences / Police (112)

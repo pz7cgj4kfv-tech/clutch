@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z70'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z71'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4625,6 +4625,23 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     setExtraPhotos(updated)
     try { localStorage.setItem(storageKey, JSON.stringify(updated)) } catch {}
   }
+  // Échange 2 photos. idx -1 = la PRINCIPALE (photo_url). Permet de promouvoir une photo en principale.
+  const swapPhotos = async (a:number, b:number) => {
+    if (a===b) { setSwapFromIdx(null); return }
+    const pa = a===-1 ? (user.photo_url||null) : (extraPhotos[a]||null)
+    const pb = b===-1 ? (user.photo_url||null) : (extraPhotos[b]||null)
+    const upd = [...extraPhotos]
+    let newMain = user.photo_url || null
+    if (a===-1) newMain = pb; else upd[a] = pb
+    if (b===-1) newMain = pa; else upd[b] = pa
+    setExtraPhotos(upd); try { localStorage.setItem(storageKey, JSON.stringify(upd)) } catch {}
+    if ((newMain||null) !== (user.photo_url||null)) {
+      await supabase.from('profiles').update({ photo_url: newMain }).eq('id', user.id)
+      onUserUpdate({ ...user, photo_url: newMain } as Profile)
+    }
+    setSwapFromIdx(null)
+    showToast('✓ Photos réordonnées', C.green)
+  }
 
   useEffect(() => {
     // Charger favoris
@@ -4769,41 +4786,47 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       <div>
         {/* Photos */}
         <div style={{marginBottom:20}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>📷 Photos (1+5)</div>
+          <div style={{fontSize:10,fontWeight:700,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>📷 Tes photos (5 max)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:5}}>
-            <div style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',border:`1.5px solid ${user.photo_url?C.orange+'66':C.border}`,cursor:'pointer',background:C.bgCard}}
-              onClick={()=>fileRef.current?.click()}>
+            {/* Slot PRINCIPALE (idx -1) */}
+            {(()=>{ const isSel = swapFromIdx===-1; const isSwap = swapFromIdx!==null; return (
+            <div style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',border:`1.5px solid ${isSel?C.orange:user.photo_url?C.orange+'66':C.border}`,cursor:'pointer',background:C.bgCard,transform:isSel?'scale(0.96)':'scale(1)',transition:'transform .15s'}}
+              onClick={()=>{ if(isSwap){ swapPhotos(swapFromIdx as number,-1); return } user.photo_url ? setSwapFromIdx(-1) : fileRef.current?.click() }}>
               {user.photo_url
-                ? <img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                ? <img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none'}}/>
                 : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,color:C.whiteMid,opacity:.4}}>+</div>}
-              <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(0,0,0,.45)',borderRadius:5,padding:'2px 5px'}}>Principal</div>
+              <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(200,134,10,.85)',borderRadius:5,padding:'2px 5px'}}>★ Principale</div>
             </div>
-            {[0,1,2,3,4].map(i=>{
-              const photo = extraPhotos[Math.min(i,3)] ?? null
+            )})()}
+            {/* 4 slots EXTRAS (idx 0..3) */}
+            {[0,1,2,3].map(i=>{
+              const photo = extraPhotos[i] ?? null
               const isSelected = swapFromIdx === i
               const isSwapping = swapFromIdx !== null
               return (
                 <div key={i} style={{position:'relative',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',border:`1.5px solid ${isSelected?C.orange:photo?C.borderStrong:C.border}`,cursor:'pointer',background:C.bgCard,transform:isSelected?'scale(0.96)':'scale(1)',transition:'transform .15s'}}
                   onClick={()=>{
-                    if (isSwapping && swapFromIdx !== null) {
-                      if (swapFromIdx === i) { setSwapFromIdx(null); return }
-                      const upd=[...extraPhotos]; const fi=Math.min(swapFromIdx,3); const ti=Math.min(i,3); const tmp=upd[fi]; upd[fi]=upd[ti]; upd[ti]=tmp
-                      setExtraPhotos(upd); try{localStorage.setItem(storageKey,JSON.stringify(upd))}catch{}; setSwapFromIdx(null)
-                    } else { photo ? setSwapFromIdx(i) : extraRefs[Math.min(i,3)]?.current?.click() }
+                    if (isSwapping) { swapPhotos(swapFromIdx as number, i); return }
+                    photo ? setSwapFromIdx(i) : extraRefs[i]?.current?.click()
                   }}>
                   {photo
                     ? <><img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none'}}/>
-                        {!isSelected&&<button onClick={e=>{e.stopPropagation();removeExtra(Math.min(i,3))}} style={{position:'absolute',top:4,right:4,background:'rgba(0,0,0,.7)',border:'none',color:'#fff',width:18,height:18,borderRadius:'50%',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>}
+                        {!isSelected&&<button onClick={e=>{e.stopPropagation();removeExtra(i)}} style={{position:'absolute',top:4,right:4,background:'rgba(0,0,0,.7)',border:'none',color:'#fff',width:18,height:18,borderRadius:'50%',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>}
                       </>
                     : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:C.whiteMid,opacity:.3}}>+</div>}
                   <div style={{position:'absolute',bottom:4,left:5,fontSize:9,fontWeight:700,color:'rgba(255,255,255,.7)',background:'rgba(0,0,0,.4)',borderRadius:4,padding:'1px 5px'}}>{i+2}</div>
-                  <input ref={i<4?extraRefs[i]:undefined} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0])uploadExtra(e.target.files[0],Math.min(i,3))}}/>
+                  <input ref={extraRefs[i]} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0])uploadExtra(e.target.files[0],i)}}/>
                 </div>
               )
             })}
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0]){pickPhoto(e.target.files[0]);e.target.value=''}}}/>
-          {swapFromIdx!==null&&<button onClick={()=>setSwapFromIdx(null)} style={{width:'100%',marginTop:6,padding:'6px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕ Annuler</button>}
+          {swapFromIdx!==null
+            ? <div style={{marginTop:6,display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{flex:1,fontSize:11,color:C.gold,fontWeight:700}}>👆 Tape une autre photo pour échanger (ou la mettre en principale)</span>
+                <button onClick={()=>setSwapFromIdx(null)} style={{padding:'6px 10px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+              </div>
+            : <div style={{marginTop:6,fontSize:10,color:C.whiteMid,opacity:.7}}>Tape une photo pour la sélectionner, puis une autre pour les échanger. La 1ʳᵉ = principale.</div>}
         </div>
 
         {/* À propos */}

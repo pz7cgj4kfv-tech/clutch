@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z65'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z66'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4323,7 +4323,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       const ACT = ['pending','accepted','confirmed','checked_in']
       await supabase.from('clutches').update({status:'cancelled'}).in('sender_id', botIds).in('status', ACT)
       await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id', botIds).in('status', ACT)
-      await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id).in('to_id', botIds).eq('outcome','absent')
+      await supabase.from('rdv_feedbacks').update({outcome:'on_time'}).eq('from_id', user.id).in('to_id', botIds).eq('outcome','absent')
       await supabase.from('profiles').update({ account_type:'H' }).in('id', botIds).eq('account_type','driver')
       await supabase.from('profiles').update({ rdv_locked_until:null, rdv_locked_from:null }).in('id', botIds)
     }

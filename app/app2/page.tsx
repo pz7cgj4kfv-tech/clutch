@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z61'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z62'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4147,6 +4147,62 @@ function FieldRow({ icon, label, value, gk, placeholder, isEditing, onTap, locke
 }
 
 // ═════════════════════════════════════════════════════════════
+// 📷 PHOTO CROPPER — recadrer/zoomer la photo avant upload (déplacer + zoom)
+// ═════════════════════════════════════════════════════════════
+function PhotoCropper({ src, onCancel, onSave }:{ src:string; onCancel:()=>void; onSave:(blob:Blob)=>void }) {
+  const VIEW = 300, OUT = 600
+  const imgRef = useRef<HTMLImageElement|null>(null)
+  const [scale, setScale] = useState(1)
+  const [pos, setPos] = useState({x:0,y:0})
+  const [nat, setNat] = useState({w:0,h:0})
+  const dragRef = useRef<{x:number;y:number;ox:number;oy:number}|null>(null)
+  const [saving, setSaving] = useState(false)
+  const baseScale = nat.w&&nat.h ? Math.max(VIEW/nat.w, VIEW/nat.h) : 1
+  const dispW = nat.w * baseScale * scale
+  const dispH = nat.h * baseScale * scale
+  const clampPos = (p:{x:number;y:number}) => {
+    const maxX = Math.max(0,(dispW - VIEW)/2), maxY = Math.max(0,(dispH - VIEW)/2)
+    return { x: Math.max(-maxX, Math.min(maxX, p.x)), y: Math.max(-maxY, Math.min(maxY, p.y)) }
+  }
+  useEffect(()=>{ setPos(p=>clampPos(p)) // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, nat])
+  const down = (cx:number,cy:number) => { dragRef.current = {x:cx,y:cy,ox:pos.x,oy:pos.y} }
+  const move = (cx:number,cy:number) => { const d=dragRef.current; if(!d)return; setPos(clampPos({x:d.ox+(cx-d.x), y:d.oy+(cy-d.y)})) }
+  const up = () => { dragRef.current=null }
+  const save = () => {
+    const img = imgRef.current; if(!img){onCancel();return}
+    setSaving(true)
+    const canvas = document.createElement('canvas'); canvas.width=OUT; canvas.height=OUT
+    const ctx = canvas.getContext('2d'); if(!ctx){setSaving(false);return}
+    const r = OUT/VIEW, drawW = dispW*r, drawH = dispH*r
+    const dx = OUT/2 + pos.x*r - drawW/2, dy = OUT/2 + pos.y*r - drawH/2
+    ctx.drawImage(img, dx, dy, drawW, drawH)
+    canvas.toBlob(b=>{ setSaving(false); if(b) onSave(b); else onCancel() }, 'image/jpeg', 0.9)
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:10000,background:'rgba(8,5,16,.96)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:20,padding:20}}>
+      <div style={{color:C.white,fontSize:15,fontWeight:800}}>Recadre ta photo</div>
+      <div style={{width:VIEW,height:VIEW,borderRadius:'50%',overflow:'hidden',position:'relative',border:`3px solid ${C.salmon}`,touchAction:'none',cursor:'grab'}}
+        onMouseDown={e=>down(e.clientX,e.clientY)} onMouseMove={e=>move(e.clientX,e.clientY)} onMouseUp={up} onMouseLeave={up}
+        onTouchStart={e=>down(e.touches[0].clientX,e.touches[0].clientY)} onTouchMove={e=>move(e.touches[0].clientX,e.touches[0].clientY)} onTouchEnd={up}>
+        <img ref={imgRef} src={src} alt="" draggable={false}
+          onLoad={e=>setNat({w:(e.target as HTMLImageElement).naturalWidth,h:(e.target as HTMLImageElement).naturalHeight})}
+          style={{position:'absolute',left:'50%',top:'50%',width:dispW,height:dispH,maxWidth:'none',
+            transform:`translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,userSelect:'none',pointerEvents:'none'}}/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10,width:VIEW}}>
+        <span style={{fontSize:16}}>🔍</span>
+        <input type="range" min={1} max={3} step={0.01} value={scale} onChange={e=>setScale(Number(e.target.value))} style={{flex:1,accentColor:C.salmon}}/>
+      </div>
+      <div style={{display:'flex',gap:10,width:VIEW}}>
+        <button onClick={onCancel} style={{flex:1,padding:'12px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+        <button onClick={save} disabled={saving||!nat.w} style={{flex:2,padding:'12px',borderRadius:12,border:'none',background:C.salmon,color:C.bg,fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:saving||!nat.w?.6:1}}>{saving?'…':'✓ Valider'}</button>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
 // 🤖 BOT LAB — panneau admin pour piloter les bots et tout tester seul
 // Nécessite la migration 20260620_bots.sql (is_bot + policies admin)
 // ═════════════════════════════════════════════════════════════
@@ -4445,6 +4501,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [favorites, setFavorites] = useState<Profile[]>([])
   const [blocked, setBlocked] = useState<Profile[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+  const [cropSrc, setCropSrc] = useState<string|null>(null)  // photo en cours de recadrage
   // Multi-photos (jusqu'à 4 photos en plus de l'avatar principal = 5 au total)
   const storageKey = `clutch_photos_${user.id}`
   const [extraPhotos, setExtraPhotos] = useState<(string|null)[]>(()=>{
@@ -4602,14 +4659,22 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     onUserUpdate({...user, [field]: value} as any)
   }
 
-  const uploadPhoto = async (file: File) => {
-    const ext = file.name.split('.').pop()
-    const path = `${user.id}/avatar.${ext}`
-    const {error:upErr} = await supabase.storage.from('avatars').upload(path, file, {upsert:true})
-    if (upErr) { showToast('Upload error',C.red); return }
+  // Lit le fichier choisi → ouvre le cropper (au lieu d'uploader direct)
+  const pickPhoto = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => setCropSrc(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+  // Upload le blob recadré (toujours avatar.jpg + cache-bust pour forcer le rechargement)
+  const uploadBlob = async (blob: Blob) => {
+    setCropSrc(null)
+    const path = `${user.id}/avatar.jpg`
+    const {error:upErr} = await supabase.storage.from('avatars').upload(path, blob, {upsert:true, contentType:'image/jpeg'})
+    if (upErr) { showToast('Erreur upload',C.red); return }
     const {data:{publicUrl}} = supabase.storage.from('avatars').getPublicUrl(path)
-    const {data} = await supabase.from('profiles').update({photo_url:publicUrl}).eq('id',user.id).select().single()
-    if (data) { onUserUpdate(data as Profile); showToast('✓ Photo updated',C.green) }
+    const url = `${publicUrl}?t=${Date.now()}`
+    const {data} = await supabase.from('profiles').update({photo_url:url}).eq('id',user.id).select().single()
+    if (data) { onUserUpdate(data as Profile); showToast('✓ Photo mise à jour',C.green) }
   }
 
   const unblock = async (blockedId:string) => {
@@ -4710,7 +4775,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               )
             })}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0])uploadPhoto(e.target.files[0])}}/>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0]){pickPhoto(e.target.files[0]);e.target.value=''}}}/>
+          {cropSrc && <PhotoCropper src={cropSrc} onCancel={()=>setCropSrc(null)} onSave={uploadBlob}/>}
           {swapFromIdx!==null&&<button onClick={()=>setSwapFromIdx(null)} style={{width:'100%',marginTop:6,padding:'6px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕ Annuler</button>}
         </div>
 
@@ -5920,6 +5986,7 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
   const [saving, setSaving] = useState(false)
   // Champs
   const [photoUrl, setPhotoUrl] = useState(user.photo_url||'')
+  const [cropSrc, setCropSrc] = useState<string|null>(null)
   const [name, setName] = useState(user.name||'')
   const [age, setAge] = useState<string>(user.age?(user.age+''):'')
   const [gender, setGender] = useState<'M'|'F'|'NB'>((user as any).gender||'')
@@ -5938,13 +6005,18 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
   ]
   const TOTAL = 5
 
-  const uploadPhoto = async (file:File) => {
-    const ext = file.name.split('.').pop()
-    const path = `${user.id}/avatar.${ext}`
-    const {error} = await supabase.storage.from('avatars').upload(path, file, {upsert:true})
+  const pickPhoto = (file:File) => {
+    const reader = new FileReader()
+    reader.onload = () => setCropSrc(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+  const uploadBlob = async (blob:Blob) => {
+    setCropSrc(null)
+    const path = `${user.id}/avatar.jpg`
+    const {error} = await supabase.storage.from('avatars').upload(path, blob, {upsert:true, contentType:'image/jpeg'})
     if (error) { showToast('Erreur upload photo',C.red); return }
     const {data:{publicUrl}} = supabase.storage.from('avatars').getPublicUrl(path)
-    setPhotoUrl(publicUrl)
+    setPhotoUrl(`${publicUrl}?t=${Date.now()}`)
   }
 
   const saveAndContinue = async () => {
@@ -6005,7 +6077,8 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
           }
         </div>
         <div style={{color:C.gold,fontSize:13,fontWeight:600}}>{photoUrl?'Changer la photo':'Choisir une photo'}</div>
-        <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files?.[0]&&uploadPhoto(e.target.files[0])}/>
+        <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0]){pickPhoto(e.target.files[0]);e.target.value=''}}}/>
+        {cropSrc && <PhotoCropper src={cropSrc} onCancel={()=>setCropSrc(null)} onSave={uploadBlob}/>}
       </label>
       {photoUrl && <div style={{color:'#4ade80',fontSize:12,textAlign:'center'}}>✓ Photo ajoutée</div>}
     </div>,

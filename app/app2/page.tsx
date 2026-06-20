@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z60'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z61'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4264,6 +4264,38 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     try { localStorage.removeItem('clutch_onboarding_done') } catch {}
     showToast("✓ Déconnecte-toi puis reconnecte-toi → l'inscription recommence", C.orange)
   }
+  // Le bot M'ENVOIE un Clutch (tester la réception + le contre-clutch)
+  const meClutch = async (bot:any) => {
+    setBusy(bot.id)
+    const { error } = await supabase.from('clutches').insert({
+      sender_id: bot.id, receiver_id: user.id,
+      venue: 'Café du Marché · Place de la Palud, Lausanne', venue_lat: 46.5210, venue_lng: 6.6340,
+      proposed_time: new Date(Date.now()+30*60*1000).toISOString(),
+      expires_at: new Date(Date.now()+2*3600*1000).toISOString(),
+      status: 'pending', message: `Un café ? — ${bot.name}`,
+    })
+    setBusy(null)
+    if (error) { showToast('❌ Échec — policy clutches_bot_admin ?', C.red); return }
+    showToast(`✓ ${bot.name} t'a envoyé un Clutch — va dans l'app 📨`, C.green)
+  }
+  // Le bot CRÉE un événement (tester l'onglet Events rempli + badge 🔒). Nécessite la policy events_bot_admin.
+  const createBotEvent = async (bot:any) => {
+    setBusy(bot.id)
+    const { error } = await supabase.from('events').insert({
+      title: `${bot.name} — Apéro découverte`, emoji:'🍷', lieu:'Café du Marché, Lausanne',
+      event_time:'19:00', event_date:'Ce soir', spots:6, taken:0,
+      description:'Événement de test créé par un bot.', tags:['groupe'], ev_gender:'X',
+      type:'user', status:'pending', active:true, created_by: bot.id, creator: bot.name,
+    })
+    setBusy(null)
+    if (error) { showToast('❌ Applique le SQL events_bot_admin (cf message)', C.red); return }
+    showToast(`✓ ${bot.name} a créé un event 🎟️ (onglet Événements + badge 🔒)`, C.green)
+  }
+  // Toggle Clutch Driver (rôle organisateur : masqué des Présences, visible seulement dans Events)
+  const toggleDriver = (bot:any) => {
+    const isDriver = bot.account_type === 'driver'
+    patchBot(bot, { account_type: isDriver ? 'H' : 'driver' }, `${bot.name} : ${isDriver?'Membre normal':'Clutch Driver 🚗 (masqué des Présences)'}`)
+  }
 
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
     <button onClick={onClick} disabled={!!busy} style={{padding:'7px 10px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:busy?.6:1}}>{children}</button>
@@ -4337,8 +4369,15 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
               {[['H','Hydrogène'],['Au','Or'],['Rh','Rhodium'],['At','Astate']].map(([v,lab])=>(
                 <Btn key={v} onClick={()=>patchBot(bot,{account_type:v},`${bot.name} : ${lab}`)}
-                  bg={bot.account_type===v||(v==='H'&&!['Au','Rh','At'].includes(bot.account_type))?C.gold:C.bgCard} col={bot.account_type===v||(v==='H'&&!['Au','Rh','At'].includes(bot.account_type))?'#1a0810':C.white}>{lab}</Btn>
+                  bg={bot.account_type===v||(v==='H'&&!['Au','Rh','At','driver'].includes(bot.account_type))?C.gold:C.bgCard} col={bot.account_type===v||(v==='H'&&!['Au','Rh','At','driver'].includes(bot.account_type))?'#1a0810':C.white}>{lab}</Btn>
               ))}
+            </div>
+            {/* Scénarios */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>SCÉNARIOS :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              <Btn onClick={()=>meClutch(bot)} bg={C.salmonFaint} col={C.salmon}>📨 Me clutcher</Btn>
+              <Btn onClick={()=>createBotEvent(bot)} bg={C.salmonFaint} col={C.salmon}>🎟️ Créer un event</Btn>
+              <Btn onClick={()=>toggleDriver(bot)} bg={bot.account_type==='driver'?C.gold:C.bgCard} col={bot.account_type==='driver'?'#1a0810':C.white}>🚗 {bot.account_type==='driver'?'Driver ✓':'Clutch Driver'}</Btn>
             </div>
             {/* Flow RDV */}
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>FLOW RDV (après l'avoir clutché) :</div>
@@ -7113,6 +7152,8 @@ export default function App2() {
     if (activeClutchPartnerIds.has((p as any).id)) return false
     // Masquer les personnes à qui j'ai mis un lapin (no-show) — elles ne réapparaissent pas
     if (lapinIds.has((p as any).id)) return false
+    // Clutch Driver = rôle organisateur → masqué des Présences (visible uniquement dans Événements)
+    if ((p as any).account_type === 'driver') return false
     // Filtre genre
     if (filterGender !== 'all') {
       const gk = genderKey((p as any).gender)

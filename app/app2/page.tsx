@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z83'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z84'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1067,21 +1067,21 @@ function Splash({ onDone }:{onDone:()=>void}) {
         .htag{opacity:${ph>=3?1:0};transition:opacity .8s ease .1s;}
       `}</style>
       <svg width="245" viewBox="30 140 230 210" xmlns="http://www.w3.org/2000/svg">
-        <g className="hb"><path fill="#FFBF9E" d="M185.38,206.473l10.697-10.695l-36.604-36.604l-10.696,10.697l-0.806,32.382l-8.621,0.29l0.862-34.607c0.027-1.104,0.478-2.156,1.26-2.938l14.957-14.957c1.682-1.682,4.408-1.682,6.089,0l42.692,42.691c1.681,1.682,1.681,4.408,0,6.089l-14.959,14.958c-0.781,0.781-1.831,1.231-2.937,1.259l-85.845,2.14l-10.696,10.696l36.604,36.603l10.696-10.697l0.802-32.189l8.617-0.141l-0.854,34.266c-0.028,1.104-0.478,2.156-1.261,2.938l-14.957,14.957c-1.681,1.682-4.407,1.682-6.089,0l-42.69-42.691c-1.683-1.682-1.683-4.408,0-6.089l14.957-14.958c0.781-0.781,1.832-1.232,2.938-1.259L185.38,206.473z"/></g>
-        <g className="ht"><polygon fill="#E27C00" points="153.217,202.325 183.263,201.578 188.846,195.994 182.948,190.122 153.521,190.121"/></g>
-        <g className="hb2"><polygon fill="#E27C00" points="127.452,257.386 133.035,251.803 133.422,236.09 106.192,236.09"/></g>
+        <g className="hb"><path fill="#EB6BB0" d="M185.38,206.473l10.697-10.695l-36.604-36.604l-10.696,10.697l-0.806,32.382l-8.621,0.29l0.862-34.607c0.027-1.104,0.478-2.156,1.26-2.938l14.957-14.957c1.682-1.682,4.408-1.682,6.089,0l42.692,42.691c1.681,1.682,1.681,4.408,0,6.089l-14.959,14.958c-0.781,0.781-1.831,1.231-2.937,1.259l-85.845,2.14l-10.696,10.696l36.604,36.603l10.696-10.697l0.802-32.189l8.617-0.141l-0.854,34.266c-0.028,1.104-0.478,2.156-1.261,2.938l-14.957,14.957c-1.681,1.682-4.407,1.682-6.089,0l-42.69-42.691c-1.683-1.682-1.683-4.408,0-6.089l14.957-14.958c0.781-0.781,1.832-1.232,2.938-1.259L185.38,206.473z"/></g>
+        <g className="ht"><polygon fill="#77BC1F" points="153.217,202.325 183.263,201.578 188.846,195.994 182.948,190.122 153.521,190.121"/></g>
+        <g className="hb2"><polygon fill="#77BC1F" points="127.452,257.386 133.035,251.803 133.422,236.09 106.192,236.09"/></g>
         <g className="hc">
-          <path fill="#FFBF9E" d="M58.82,317.094c0-9.375,5.157-15.151,13.532-15.151c6.837,0,12.073,4.538,12.514,10.814h-5.877c-0.58-3.318-3.198-5.497-6.637-5.497c-4.537,0-7.355,3.758-7.355,9.834c0,6.077,2.818,9.855,7.376,9.855c3.458,0,6.057-2.039,6.636-5.217h5.877c-0.499,6.236-5.577,10.533-12.533,10.533C63.997,332.266,58.82,326.489,58.82,317.094z"/>
-          <path fill="#FFBF9E" d="M109.315,331.526h-18.87v-28.845h6.037v23.588h12.833V331.526z"/>
-          <path fill="#FFBF9E" d="M120.391,320.952c0,3.638,2.179,5.956,6.037,5.956c3.877,0,6.057-2.318,6.057-5.956v-18.271h6.036v18.891c0,6.396-4.697,10.693-12.093,10.693c-7.376,0-12.074-4.297-12.074-10.693v-18.891h6.037V320.952z"/>
+          <path fill="#D76FA9" d="M58.82,317.094c0-9.375,5.157-15.151,13.532-15.151c6.837,0,12.073,4.538,12.514,10.814h-5.877c-0.58-3.318-3.198-5.497-6.637-5.497c-4.537,0-7.355,3.758-7.355,9.834c0,6.077,2.818,9.855,7.376,9.855c3.458,0,6.057-2.039,6.636-5.217h5.877c-0.499,6.236-5.577,10.533-12.533,10.533C63.997,332.266,58.82,326.489,58.82,317.094z"/>
+          <path fill="#D76FA9" d="M109.315,331.526h-18.87v-28.845h6.037v23.588h12.833V331.526z"/>
+          <path fill="#D76FA9" d="M120.391,320.952c0,3.638,2.179,5.956,6.037,5.956c3.877,0,6.057-2.318,6.057-5.956v-18.271h6.036v18.891c0,6.396-4.697,10.693-12.093,10.693c-7.376,0-12.074-4.297-12.074-10.693v-18.891h6.037V320.952z"/>
         </g>
         <g className="htch">
-          <path fill="#E27C00" d="M152.555,331.526V307.84h-8.655v-5.158h23.348v5.158h-8.655v23.687H152.555z"/>
-          <path fill="#E27C00" d="M170.207,317.094c0-9.375,5.157-15.151,13.532-15.151c6.837,0,12.073,4.538,12.514,10.814h-5.877c-0.58-3.318-3.198-5.497-6.637-5.497c-4.537,0-7.355,3.758-7.355,9.834c0,6.077,2.818,9.855,7.376,9.855c3.458,0,6.057-2.039,6.636-5.217h5.877c-0.499,6.236-5.577,10.533-12.533,10.533C175.384,332.266,170.207,326.489,170.207,317.094z"/>
-          <path fill="#E27C00" d="M220.861,331.526v-12.054h-12.992v12.054h-6.037v-28.845h6.037v11.635h12.992v-11.635h6.037v28.845H220.861z"/>
+          <path fill="#77BC1F" d="M152.555,331.526V307.84h-8.655v-5.158h23.348v5.158h-8.655v23.687H152.555z"/>
+          <path fill="#77BC1F" d="M170.207,317.094c0-9.375,5.157-15.151,13.532-15.151c6.837,0,12.073,4.538,12.514,10.814h-5.877c-0.58-3.318-3.198-5.497-6.637-5.497c-4.537,0-7.355,3.758-7.355,9.834c0,6.077,2.818,9.855,7.376,9.855c3.458,0,6.057-2.039,6.636-5.217h5.877c-0.499,6.236-5.577,10.533-12.533,10.533C175.384,332.266,170.207,326.489,170.207,317.094z"/>
+          <path fill="#77BC1F" d="M220.861,331.526v-12.054h-12.992v12.054h-6.037v-28.845h6.037v11.635h12.992v-11.635h6.037v28.845H220.861z"/>
         </g>
       </svg>
-      <p className="htag" style={{fontFamily:'-apple-system,sans-serif',fontSize:12,fontWeight:600,letterSpacing:'0.22em',textTransform:'uppercase',color:'rgba(255,191,158,0.6)',marginTop:10}}>Someone's waiting</p>
+      <p className="htag" style={{fontFamily:'-apple-system,sans-serif',fontSize:12,fontWeight:600,letterSpacing:'0.22em',textTransform:'uppercase',color:'rgba(235,107,176,0.85)',marginTop:10}}>Someone's waiting</p>
     </div>
   )
 }
@@ -9299,11 +9299,10 @@ export default function App2() {
             @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
           `}</style>
           <button className="cl-fab" onClick={()=>{setFlow('app');setTab('presences');activateLive()}} aria-label="Clutch Live — les gens autour de toi" style={{
-            position:'fixed', bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:16,
-            zIndex:1200, width:46, height:46, borderRadius:'50%',
-            background:'rgba(255,255,255,0.13)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
-            border:'1px solid rgba(255,191,158,.4)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-          }}><ClutchMark size={32}/></button>
+            position:'fixed', bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:14,
+            zIndex:1200, width:56, height:56, borderRadius:'50%',
+            background:'transparent', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+          }}><img src="/icons/mel/QuickClutch.svg" width={56} height={56} alt="" style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))'}}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (

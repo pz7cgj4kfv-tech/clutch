@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z84'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z85'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3008,8 +3008,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.65)',backdropFilter:'blur(4px)'}} onClick={()=>setSelEv(null)}/>
           {/* Sheet = flex column, hauteur fixe, scroll sur le corps uniquement */}
           <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
-            {/* Header fixe */}
-            <div style={{flexShrink:0,padding:'14px 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            {/* Header fixe — padding safe-area pour ne pas passer sous l'encoche */}
+            <div style={{flexShrink:0,padding:'calc(env(safe-area-inset-top,0px) + 14px) 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:26}}>{selEv.emoji}</span>
                 <div>
@@ -8424,38 +8424,9 @@ export default function App2() {
                     </div>
                   </div>
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId ? 180 : 14}}>
-                    {/* Mes inscriptions événements */}
-                    {registeredEvents.size > 0 && (
-                      <div style={{marginBottom:16,background:`${C.orange}0A`,border:`1px solid ${C.orange}33`,borderRadius:14,padding:'12px 14px'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
-                          <span style={{fontSize:15}}>📅</span>
-                          <span style={{fontSize:11,fontWeight:900,color:C.orange,letterSpacing:'.08em',textTransform:'uppercase'}}>{lang==='en'?'My Events':'Mes événements'}</span>
-                          <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:`${C.orange}88`,background:`${C.orange}15`,padding:'2px 7px',borderRadius:20}}>{registeredEvents.size}</span>
-                        </div>
-                        {MOCK_EVENTS.filter(ev=>registeredEvents.has(ev.id)).map(ev=>(
-                          <div key={ev.id} onClick={()=>{setTab('evenements');setOpenEventId(ev.id)}}
-                            style={{background:C.bgCard,border:`1px solid ${C.orange}22`,borderRadius:10,padding:'9px 12px',marginBottom:5,display:'flex',gap:10,alignItems:'center',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}>
-                            <span style={{fontSize:20,flexShrink:0}}>{ev.emoji}</span>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:12,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.title}</div>
-                              <div style={{fontSize:10,color:C.whiteMid}}>{ev.date} · {ev.time} · {(ev.lieu||'').split(',')[0]}</div>
-                            </div>
-                            <span style={{fontSize:11,color:`${C.orange}88`,flexShrink:0}}>→</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Séparateur clutchs personnels */}
-                    {registeredEvents.size>0&&actifs.length>0&&(
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-                        <div style={{flex:1,height:1,background:C.border}}/>
-                        <span style={{fontSize:10,fontWeight:900,color:C.salmon,letterSpacing:'.08em',textTransform:'uppercase',opacity:.7}}>⚡ My Clutches</span>
-                        <div style={{flex:1,height:1,background:C.border}}/>
-                      </div>
-                    )}
+                    {/* Events rejoints → visibles UNIQUEMENT dans l'onglet Événements (séparation events/clutchs, décision David). On ne mélange plus. */}
                     {/* Clutchs actifs */}
-                    {actifs.length===0&&registeredEvents.size===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
-                    {actifs.length===0&&registeredEvents.size>0&&<div style={{textAlign:'center',padding:'16px',color:C.whiteMid,fontSize:11,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`}}>{t('clutchs.empty.events')}</div>}
+                    {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
                     {actifs.map((c:any)=>{
                       const isRec=c.receiver_id===user.id
                       const other=isRec?c.sender:c.receiver
@@ -8528,7 +8499,7 @@ export default function App2() {
                               if (!r.bad) setTimeout(()=>setKeepContactClutch(clutchSnap), 500)
                               // 4. DB en arrière-plan (clutch déjà 'completed' depuis le clic Terminer)
                               if (!isMock) {
-                                supabase.from('rdv_feedbacks').upsert({rdv_id:c.id,from_id:user.id,to_id:c.sender_id===user.id?c.receiver_id:c.sender_id,outcome:selFb,keep_contact:null},{onConflict:'rdv_id,from_id'}).then(()=>{})
+                                supabase.from('rdv_feedbacks').upsert({rdv_id:c.id,from_id:user.id,to_id:c.sender_id===user.id?c.receiver_id:c.sender_id,outcome:selFb},{onConflict:'rdv_id,from_id'}).then(()=>{})  // NE PAS toucher keep_contact ici (race avec le modal "Garder le contact" qui l'écrasait à null)
                                 const newScore = Math.max(0,Math.min(100,(user?.reliability_score??80)+r.pts))
                                 setUser(prev=>prev?{...prev,reliability_score:newScore}:prev)
                                 supabase.from('profiles').update({reliability_score:newScore}).eq('id',user.id).then(()=>{})

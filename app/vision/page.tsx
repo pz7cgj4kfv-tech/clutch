@@ -88,7 +88,7 @@ const CDay = {
   blue: '#1a5fa0', purple: '#6040b0', teal: '#0a7a6a',
 }
 
-const PASS = 'vision2026'
+const PASS = 'hctulc'  // « clutch » à l'envers — gate plein-page de /vision
 const SECRET_PASS = 'saw7'
 
 const H = ({n,c,children}:any) => {
@@ -3252,6 +3252,10 @@ export default function VisionPage() {
   const [secretErr, setSecretErr] = useState(false)
   const [secretAuth, setSecretAuth] = useState(false)
   const [isDay, setIsDay] = useState(false)
+  // Gate plein-page : /vision n'est plus public
+  const [pageAuth, setPageAuth] = useState(false)
+  const [pageInput, setPageInput] = useState('')
+  const [pageErr, setPageErr] = useState(false)
 
   React.useEffect(() => {
     const h = new Date().getHours()
@@ -3262,6 +3266,27 @@ export default function VisionPage() {
   Object.assign(C, isDay ? CDay : CDark)
 
   const SectionComp = SECTION_CONTENT[tab]
+
+  // ── Gate plein-page (/vision n'est plus public) ──
+  if (!pageAuth) {
+    const check = () => { if (pageInput === PASS) setPageAuth(true); else setPageErr(true) }
+    return (
+      <div style={{minHeight:'100vh',background:'#080510',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',padding:20}}>
+        <div style={{background:'#120d1e',border:'1px solid rgba(200,134,10,.3)',borderRadius:16,padding:32,width:300,maxWidth:'100%',textAlign:'center'}}>
+          <div style={{fontSize:26,marginBottom:8}}>🔒</div>
+          <div style={{fontSize:15,fontWeight:900,color:'#C8860A',marginBottom:4}}>Vision 2026</div>
+          <div style={{fontSize:11,color:'rgba(232,224,240,.4)',marginBottom:20}}>Bible produit interne · accès restreint</div>
+          <input autoFocus type="password" value={pageInput}
+            onChange={e=>{setPageInput(e.target.value);setPageErr(false)}}
+            onKeyDown={e=>{if(e.key==='Enter')check()}}
+            placeholder="mot de passe"
+            style={{background:'#1a1228',border:`2px solid ${pageErr?'#f87171':'rgba(200,134,10,.4)'}`,borderRadius:10,padding:'10px 16px',color:'#e8e0f0',fontSize:14,width:'100%',outline:'none',textAlign:'center',boxSizing:'border-box',marginBottom:8}}/>
+          {pageErr && <div style={{fontSize:11,color:'#f87171',marginBottom:8}}>Code incorrect</div>}
+          <button onClick={check} style={{background:'#C8860A',color:'#0f0810',border:'none',borderRadius:10,padding:'10px 24px',fontWeight:800,fontSize:13,cursor:'pointer',width:'100%'}}>Entrer</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:'system-ui',color:C.white}}>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z43'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z44'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1850,7 +1850,17 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
       duration_minutes:isQuickDate?60:null
     }).select('id').single()
     setLoading(false)
-    if(error){showToast('Erreur: '+error.message,C.red);return}
+    if(error){
+      const dup = error.code==='23505' || /clutch_pair_unique|duplicate/i.test(error.message||'')
+      const self = error.code==='23514' || /no_self_clutch/i.test(error.message||'')
+      const friendly = dup
+        ? (lang==='fr'?'Tu as déjà un Clutch en cours avec cette personne ✦':'You already have an active Clutch with this person ✦')
+        : self
+        ? (lang==='fr'?'Impossible de te clutcher toi-même 😄':'You can\'t clutch yourself 😄')
+        : 'Erreur: '+error.message
+      showToast(friendly, dup||self ? C.orange : C.red)
+      return
+    }
     onSent(inserted?.id)
   }
 
@@ -2116,7 +2126,7 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:
   const isFr = inLang !== 'en'
   const [ph, setPh] = useState(0)
   const [showCounter, setShowCounter] = useState(false)
-  const [counterVenue, setCounterVenue] = useState('')
+  const [counterVenue, setCounterVenue] = useState(clutch?.venue || '')  // pré-rempli avec le lieu proposé par l'autre (C1)
   const [counterTime, setCounterTime] = useState('')
   const counterSlots = (()=>{
     // Créneaux RONDS (:00 ou :30), à partir du prochain créneau rond — plus de 2h08/2h38
@@ -2753,7 +2763,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           title: newEvTitle.trim(), emoji: newEvEmoji, lieu: newEvLieu.trim(),
           event_time: newEvTime.trim(), event_date: 'Ce soir', spots: newEvMax,
           description: newEvDesc.trim() || 'Événement créé sur Clutch.',
-          tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'active',
+          tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'pending',
           active: true, created_by: userId, creator: 'Toi',
         }).select('id').single()
         if (ins?.id) {

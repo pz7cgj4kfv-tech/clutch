@@ -148,6 +148,7 @@ const Idea = ({emoji,title,desc,badge}:{emoji:string;title:string;desc:string;ba
 const SECTIONS = [
   { id:'map',       icon:'🗺', label:'Map' },
   { id:'confiance', icon:'🏆', label:'Confiance' },
+  { id:'strategie', icon:'🧭', label:'Stratégie' },
   { id:'live',      icon:'⚡', label:'En prod' },
   { id:'sprint',    icon:'📋', label:'Sprint' },
   { id:'ux',        icon:'📋', label:'UX Détail' },
@@ -3112,9 +3113,68 @@ const SectionConfiance = () => {
   )
 }
 
+// ─── Section : STRATÉGIE 2026 (synthèse audit GPT + décisions) ───────────────
+const SectionStrategie = () => {
+  const card = (border:string):React.CSSProperties => ({ background:'#120d1e', borderRadius:16, padding:'18px', marginBottom:14, border:`1px solid ${border}` })
+  const h = (t:string,c='#C8860A'):React.CSSProperties => ({ fontSize:14, fontWeight:900, color:c, marginBottom:10, textTransform:'uppercase' as const, letterSpacing:'.05em' })
+  const p:React.CSSProperties = { fontSize:13, color:'rgba(232,224,240,.75)', lineHeight:1.7, margin:'0 0 8px' }
+  const why:React.CSSProperties = { fontSize:11, color:'rgba(200,134,10,.75)', fontStyle:'italic', lineHeight:1.6, marginTop:4 }
+  return (
+    <div style={{minHeight:'100vh',background:'#080510',fontFamily:'system-ui',color:'#e8e0f0',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
+      <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🧭 Stratégie 2026</div>
+      <div style={{fontSize:12,color:'rgba(232,224,240,.5)',marginBottom:20,lineHeight:1.6}}>Synthèse des audits GPT (20.06) + décisions. Légende : <b style={{color:'#4ade80'}}>✅ retenu</b> · <b style={{color:'#f87171'}}>❌ écarté</b> · <b style={{color:'#fbbf24'}}>🟡 à décider</b></div>
+
+      <div style={card('rgba(74,222,128,.3)')}>
+        <div style={h('Positionnement','#4ade80')}>🎯 Ce qu'est Clutch</div>
+        <p style={p}>Le vrai produit n'est PAS les profils → c'est <b style={{color:'#fff'}}>Disponibilité + Confiance + Timing</b>. Flow inversé vs Tinder : Dispo→Rencontre→(éventuel contact). L'app fait SORTIR les gens, ne les capture pas. <b style={{color:'#4ade80'}}>Clutch Live = feature signature</b> (le « bouton Live »).</p>
+        <div style={why}>Pourquoi : c'est ce qui nous rend différents et mémorables. « La vraie vie, maintenant. »</div>
+      </div>
+
+      <div style={card('rgba(74,222,128,.4)')}>
+        <div style={h('Scope V1 — 1er août','#4ade80')}>✅ La discipline (décision)</div>
+        <p style={p}><b style={{color:'#4ade80'}}>✅ V1 = présence simple + Clutch Drivers + événements (basiques) + confiance + sécurité femmes.</b></p>
+        <p style={p}><b style={{color:'#f87171'}}>❌ Reporté V2 : modes multiples (Amical/Pro/Parents), premium avancé, crypto, paiements events.</b></p>
+        <div style={why}>Pourquoi : le piège mortel = « tout ajouter → personne ne comprend ». On gagne Lausanne d'abord, on débloque le reste une bataille à la fois (roadmap : Dating+Amis → Events → Business → Créateurs → Mentorat → Sport/Covoit).</div>
+      </div>
+
+      <div style={card('rgba(248,113,113,.3)')}>
+        <div style={h('Le piège','#f87171')}>⚠️ Ne pas devenir « Tinder + réglages »</div>
+        <p style={p}>Rester « la plateforme de rencontres réelles les plus fiables ». Apple ne simplifie pas les possibilités, il simplifie l'<b style={{color:'#fff'}}>ACCÈS</b> aux possibilités → Profil en 3 niveaux (N1 visible : profil/dispo/confiance/abo · N2 : préférences/sécurité/filtres · N3 : experts/créateur/partenaire).</p>
+        <div style={why}>Pourquoi : éviter le « cockpit d'avion » à 40 options. 🟡 À appliquer dans la refonte profil.</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.25)')}>
+        <div style={h('Sécurité femmes')}>👩 Le plus gros levier business</div>
+        <p style={p}>Filtres de réception granulaires : qui peut me Clutcher (tous / fiables / vérifiés / contacts communs / femmes / pro) · nb max simultané · distance · écart d'âge · horaires. Vérif identité multi-niveaux (email→selfie vidéo→pièce optionnelle→certifié), <b style={{color:'#fff'}}>jamais la pièce obligatoire</b> mais filtre premium « certifiés uniquement ».</p>
+        <div style={why}>Pourquoi : la sécurité (pas l'IA ni le design) est le vrai différenciateur vs Tinder/Bumble.</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.25)')}>
+        <div style={h('Lancement & KPI')}>🚀 Comment démarrer (cible 1er août)</div>
+        <p style={p}>Soirée Clutch où <b style={{color:'#fff'}}>l'événement EST le concept</b> (pas un DJ à 10k) : 300 pers, inscription, profils vérifiés, plusieurs univers. Croissance ville par ville (Lausanne→Genève→…). <b style={{color:'#fff'}}>Vrai KPI = nb de vraies rencontres/semaine</b>, pas le nb de comptes.</p>
+        <div style={why}>Pourquoi : la densité locale est le seul vrai risque (ville vide = produit mort).</div>
+      </div>
+
+      <div style={card('rgba(251,191,36,.3)')}>
+        <div style={h('Projections','#fbbf24')}>📊 Réalisme financier</div>
+        <p style={p}><b style={{color:'#f87171'}}>❌ Conversion 35% = erreur GPT.</b> <b style={{color:'#4ade80'}}>✅ Réaliste = 2 à 8%</b> (10% = déjà très bon en social). Business plan sur 2-8%, le reste = bonus.</p>
+        <p style={p}>Plus gros potentiel revenu = <b style={{color:'#fff'}}>les événements</b> (bars/salles/festivals paient pour la visibilité), pas les abos. → mais B2B complexe = V2.</p>
+        <p style={p}>Scénarios romands : 5k users→~7k CHF/m · 20k→~30k · 50k→~75k · 150k→~225k.</p>
+      </div>
+
+      <div style={card('rgba(162,139,250,.3)')}>
+        <div style={h('Vision plateforme (V3+)','#a78bfa')}>🌍 Le futur (à débloquer, PAS lancer)</div>
+        <p style={p}>Clutch = potentiellement « <b style={{color:'#fff'}}>le protocole de rencontre du monde réel</b> » (aucun dominant pour « voir quelqu'un en vrai aujourd'hui »). Déclinaisons futures : Friends, Business (« 3 entrepreneurs dispo dans 2h »), Mentor, Senior, Sport, Study, Help, Ride, Travel. Attaque un problème géant : <b style={{color:'#fff'}}>la solitude</b>.</p>
+        <div style={why}>🟡 Vision long terme. Discipline absolue : une promesse à la fois. Mentalité Polsia (1 pers + IA = travail de 10-50) mais produit centré humain réel.</div>
+      </div>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   map: SectionMap,
   confiance: SectionConfiance,
+  strategie: SectionStrategie,
   live: SectionLive,
   sprint: SectionSprint,
   ux: SectionUXFlow,

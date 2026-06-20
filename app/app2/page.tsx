@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z53'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z54'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6747,12 +6747,14 @@ export default function App2() {
     }
   }, [user?.id, loadClutches, notifyNewClutch])
 
-  // ── Polling toutes les 5s : loadClutches (mise à jour générale) ──
+  // ── Polling : loadClutches toutes les 5s + loadProfiles toutes les 10s ──
+  // (loadProfiles rafraîchit la liste Présences → les nouveaux profils/bots dispo apparaissent sans recharger)
   useEffect(() => {
     if (!user?.id) return
     const t = setInterval(() => loadClutches(), 5000)
-    return () => clearInterval(t)
-  }, [user?.id, loadClutches])
+    const tp = setInterval(() => loadProfiles(), 10000)
+    return () => { clearInterval(t); clearInterval(tp) }
+  }, [user?.id, loadClutches, loadProfiles])
 
   // ── Polling feedback User 2 : standalone, sans closure stale ──
   // Cherche clutchs completed pas encore traités → ouvre feedback

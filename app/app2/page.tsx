@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z73'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z74'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4275,6 +4275,15 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     if (error||!data?.length) { showToast('❌ Échec — policy clutches_bot_admin ?', C.red); return }
     showToast(`✓ ${bot.name} a accepté → Verrou ! 🔒`, C.green)
   }
+  const refuseClutch = async (bot:any) => {
+    setBusy(bot.id)
+    const { data:cl } = await supabase.from('clutches').select('id').eq('receiver_id', bot.id).eq('status','pending').order('created_at',{ascending:false}).limit(1)
+    if (!cl?.length) { setBusy(null); showToast(`Aucun clutch en attente pour ${bot.name}`,C.orange); return }
+    const { data, error } = await supabase.from('clutches').update({ status:'declined' }).eq('id', cl[0].id).select('id')
+    setBusy(null)
+    if (error||!data?.length) { showToast('❌ Échec — policy clutches_bot_admin ?', C.red); return }
+    showToast(`✕ ${bot.name} a refusé → cooldown 48h`, C.orange)
+  }
   const findVerrou = async (botId:string) => {
     const { data:cl } = await supabase.from('clutches')
       .select('id,venue_lat,venue_lng,sender_id,receiver_id,sender_cur_lat,sender_cur_lng,receiver_cur_lat,receiver_cur_lng')
@@ -4463,6 +4472,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>FLOW RDV (après l'avoir clutché) :</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
               <Btn onClick={()=>acceptClutch(bot)} bg="rgba(45,189,126,.15)" col={C.green}>✓ Accepter clutch</Btn>
+              <Btn onClick={()=>refuseClutch(bot)} bg="rgba(220,80,80,.12)" col={C.red}>✕ Refuser (cooldown 48h)</Btn>
               <Btn onClick={()=>rdvNow(bot)} bg={C.salmonFaint} col={C.salmon}>🕐 RDV maintenant</Btn>
               <Btn onClick={()=>approach(bot)}>📡 Rapprocher</Btn>
               <Btn onClick={()=>arrive(bot)} bg="rgba(45,189,126,.15)" col={C.green}>📍 Au RDV (J'y suis)</Btn>

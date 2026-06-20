@@ -201,6 +201,16 @@ export default function LabPage() {
     if (error) { showToast('❌ Applique le SQL events_bot_admin', C.red); return }
     showToast(`✓ ${bot.name} a créé un event 🎟️`, C.green)
   }
+  const botCancelEvent = async (bot:any) => {
+    setBusy(bot.id)
+    const { data: evs } = await supabase.from('events').select('id,title').eq('created_by', bot.id).eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast(`${bot.name} n'a aucun event actif (crée-en un 🎟️)`, C.gold); return }
+    const ev = evs[0]
+    await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
+    const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', bot.id).maybeSingle()
+    await supabase.from('profiles').update({ reliability_score: Math.max(0,((p as any)?.reliability_score??100)-10) }).eq('id', bot.id)
+    setBusy(null); showToast(`🚫 ${bot.name} a annulé "${ev.title}" → inscrits libérés, ${bot.name} pénalisé`, C.gold); load()
+  }
   const toggleDriver = (bot:any) => {
     const isDriver = bot.account_type === 'driver'
     patchBot(bot, { account_type: isDriver ? 'H' : 'driver' }, `${bot.name} : ${isDriver?'Membre normal':'Clutch Driver 🚗 (masqué des Présences)'}`)
@@ -397,6 +407,7 @@ export default function LabPage() {
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
                 <Btn onClick={()=>meClutch(bot)} bg={C.salmonFaint} col={C.salmon}>📨 Me clutcher</Btn>
                 <Btn onClick={()=>createBotEvent(bot)} bg={C.salmonFaint} col={C.salmon}>🎟️ Créer un event</Btn>
+                <Btn onClick={()=>botCancelEvent(bot)} bg="rgba(220,106,106,.12)" col={C.red}>🚫 Annuler son event (flake)</Btn>
                 <Btn onClick={()=>toggleDriver(bot)} bg={bot.account_type==='driver'?C.gold:C.bgCard} col={bot.account_type==='driver'?'#1a0810':C.white}>🚗 {bot.account_type==='driver'?'Driver ✓':'Clutch Driver'}</Btn>
               </div>
 

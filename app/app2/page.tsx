@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z78'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z79'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2703,6 +2703,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const t = useT(lang)
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [evLoading, setEvLoading] = useState(true)
+  const [cancelledNotice, setCancelledNotice] = useState<string|null>(null)
 
   useEffect(() => {
     supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
@@ -2712,11 +2713,29 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       })
   }, [])
 
+  // Détection « créateur a flaké » : un event où JE suis inscrit a été annulé → notice + auto-libération (aucune pénalité pour moi)
+  useEffect(() => {
+    if (!userId) return
+    ;(async () => {
+      const { data: parts } = await supabase.from('event_participants').select('event_id').eq('user_id', userId)
+      const ids = (parts||[]).map((p:any)=>p.event_id)
+      if (!ids.length) return
+      const { data: cancelled } = await supabase.from('events').select('id,title,created_by').in('id', ids).eq('status','cancelled')
+      const mine = (cancelled||[]).filter((c:any)=>c.created_by!==userId)  // pas mes propres annulations
+      if (mine.length) {
+        setCancelledNotice(mine.map((c:any)=>c.title).join(' · '))
+        await supabase.from('event_participants').delete().eq('user_id', userId).in('event_id', mine.map((c:any)=>c.id))
+        setRegistered((prev:Set<string>)=>{ const n=new Set(prev); mine.forEach((c:any)=>n.delete(c.id)); return n })
+      }
+    })()
+  }, [userId])
+
   const partnerEvents = dbEvents.length > 0 ? dbEvents.map(e => ({
     id: e.id,
     emoji: e.emoji || '🎉',
     title: e.title,
     creator: e.creator,
+    created_by: e.created_by,
     creatorBio: e.creator_bio,
     creatorPhoto: e.creator_photo,
     certified: e.certified,
@@ -2840,6 +2859,28 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   })
 
   const isRealEvent = (id:any) => typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
+  const [cancelling, setCancelling] = useState(false)
+  // Le CRÉATEUR annule son événement (= flake). Règle produit : les inscrits sont LIBÉRÉS
+  // sans pénalité ; c'est le créateur qui perd des points de fiabilité (il a planté le groupe).
+  const cancelMyEvent = async (ev: any) => {
+    if (!confirm("Annuler cet événement ?\n\nLes inscrits seront libérés (AUCUNE pénalité pour eux). Toi, organisateur·ice, tu perds des points de fiabilité pour avoir annulé.")) return
+    setCancelling(true)
+    try {
+      if (isRealEvent(ev.id)) {
+        // On NE supprime PAS les inscrits ici : on marque l'event 'cancelled'. Chaque inscrit
+        // le détecte à l'ouverture des Événements → notice « tu es libéré » + auto-désinscription.
+        await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
+        if (userId) {                                                                       // pénalité créateur (-10)
+          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()
+          const cur = (p as any)?.reliability_score ?? 100
+          await supabase.from('profiles').update({ reliability_score: Math.max(0, cur-10) }).eq('id', userId)
+        }
+      }
+    } catch {}
+    setDbEvents(prev => prev.filter(e => e.id !== ev.id))
+    setUserGroupEvents(prev => prev.filter(e => e.id !== ev.id))
+    setCancelling(false); setSelEv(null)
+  }
   const doRegister = async (ev: any) => {
     if (registered.has(ev.id)) return
     setRegistering(true)
@@ -2892,6 +2933,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
+        {cancelledNotice && (
+          <div style={{background:'rgba(220,80,80,.1)',border:`1px solid ${C.red}44`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'flex-start',gap:8}}>
+            <span style={{fontSize:16}}>🚫</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.white}}>{lang==='en'?'Event cancelled by the organizer':'Événement annulé par l\'organisateur·ice'}</div>
+              <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{cancelledNotice} — {lang==='en'?'you\'ve been freed, no penalty for you.':'tu es libéré·e, aucune pénalité pour toi.'}</div>
+            </div>
+            <button onClick={()=>setCancelledNotice(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:16,cursor:'pointer',padding:0}}>✕</button>
+          </div>
+        )}
         {filteredEvs.length===0 && (
           <div style={{textAlign:'center',padding:'50px 20px',color:C.whiteMid}}>
             <div style={{fontSize:28,marginBottom:8}}>📅</div>
@@ -3100,7 +3151,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
             {/* CTA fixe en bas — padding-bottom = tab bar (72) + safe area + marge */}
             <div style={{flexShrink:0,padding:'8px 20px calc(max(env(safe-area-inset-bottom,0px),0px) + 88px)',borderTop:`1px solid ${C.border}`,background:C.bgSheet}}>
-              {registered.has(selEv.id)
+              {((selEv.created_by && userId && selEv.created_by===userId) || selEv.creator==='Toi') ? (
+                <div>
+                  <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
+                  <button onClick={()=>cancelMyEvent(selEv)} disabled={cancelling}
+                    style={{width:'100%',padding:'14px',background:'rgba(220,80,80,.12)',border:`1px solid ${C.red}55`,borderRadius:16,color:C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:cancelling?0.6:1}}>
+                    {cancelling?'…':(lang==='en'?'🚫 Cancel this event':"🚫 Annuler l'événement")}
+                  </button>
+                  <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginTop:6,lineHeight:1.4}}>{lang==='en'?'Registered people are freed (no penalty for them). You lose reliability points for cancelling.':'Les inscrits sont libérés (aucune pénalité pour eux). Toi, tu perds des points de fiabilité.'}</div>
+                </div>
+              ) : (
+              registered.has(selEv.id)
                 ? (unregConfirmId===selEv.id ? (
                     /* ── Confirmation inline désinscription — même style que annulation clutch ── */
                     <div style={{background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.3)',borderRadius:14,padding:'12px 14px'}}>
@@ -3171,7 +3232,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                     {registering?'…':(selEv as any).isGroupe?'👥 Rejoindre le groupe':t('events.register')}
                   </button>
                 )
-              }
+              )}
               {selEv.price!=='Entrée libre'&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 Pay on-site · {selEv.price}</div>}
             </div>
           </div>
@@ -4409,6 +4470,17 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     if (error) { showToast('❌ Applique le SQL events_bot_admin (cf message)', C.red); return }
     showToast(`✓ ${bot.name} a créé un event 🎟️ (onglet Événements + badge 🔒)`, C.green)
   }
+  // Le bot CRÉATEUR annule son event (flake) → libère les inscrits (dont toi) + pénalise le bot
+  const botCancelEvent = async (bot:any) => {
+    setBusy(bot.id)
+    const { data: evs } = await supabase.from('events').select('id,title').eq('created_by', bot.id).eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast(`${bot.name} n'a aucun event actif (crée-en un 🎟️)`, C.orange); return }
+    const ev = evs[0]
+    await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
+    const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', bot.id).maybeSingle()
+    await supabase.from('profiles').update({ reliability_score: Math.max(0,((p as any)?.reliability_score??100)-10) }).eq('id', bot.id)
+    setBusy(null); showToast(`🚫 ${bot.name} a annulé "${ev.title}" → inscrits libérés, ${bot.name} pénalisé`, C.orange); load()
+  }
   // Toggle Clutch Driver (rôle organisateur : masqué des Présences, visible seulement dans Events)
   const toggleDriver = (bot:any) => {
     const isDriver = bot.account_type === 'driver'
@@ -4531,6 +4603,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
               <Btn onClick={()=>meClutch(bot)} bg={C.salmonFaint} col={C.salmon}>📨 Me clutcher</Btn>
               <Btn onClick={()=>createBotEvent(bot)} bg={C.salmonFaint} col={C.salmon}>🎟️ Créer un event</Btn>
+              <Btn onClick={()=>botCancelEvent(bot)} bg="rgba(220,80,80,.12)" col={C.red}>🚫 Annuler son event (flake)</Btn>
               <Btn onClick={()=>toggleDriver(bot)} bg={bot.account_type==='driver'?C.gold:C.bgCard} col={bot.account_type==='driver'?'#1a0810':C.white}>🚗 {bot.account_type==='driver'?'Driver ✓':'Clutch Driver'}</Btn>
             </div>
             {/* Flow RDV */}

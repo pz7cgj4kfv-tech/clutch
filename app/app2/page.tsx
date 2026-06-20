@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z68'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z69'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5194,9 +5194,9 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               ⏹ Arrêter le suivi en direct (SOS actif 🔴)
             </button>
           )}
-          <button onClick={()=>{window.location.href='tel:112'}}
+          <button onClick={()=>{window.location.href='tel:117'}}
             style={{width:'100%',padding:'12px',borderRadius:12,border:'1.5px solid #ef4444',background:'transparent',color:'#ef4444',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-            📞 Urgences / Police (112)
+            📞 Police (117)
           </button>
           <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',lineHeight:1.5}}>
             « Alerter » → partage natif (SMS, WhatsApp, Mail…) ton message + ta position GPS. Tu choisis l'app et valides l'envoi.
@@ -5289,16 +5289,18 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     subscription:'Mon abonnement', preferences:'Préférences',
     security:'Sécurité & SOS', legal:'Légal', contact:'Nous contacter',
   }
-  const subPageContent: Record<string,React.ReactNode> = {
-    edit_profil: <PageEditProfil/>,
-    seeking: <PageSeeking/>,
-    favorites: <PageFavorites/>,
-    ghosted: <PageGhosted/>,
-    subscription: <PageSubscription/>,
-    preferences: <PagePreferences/>,
-    security: <PageSecurity/>,
-    legal: <PageLegal/>,
-    contact: <PageContact/>,
+  // ⚠️ On stocke les FONCTIONS (pas <Page/>) et on appelle la sélectionnée au rendu.
+  // Sinon chaque frappe recrée le composant → input démonté → le clavier se ferme. (Aucun hook dans ces pages.)
+  const subPageContent: Record<string,()=>React.ReactNode> = {
+    edit_profil: PageEditProfil,
+    seeking: PageSeeking,
+    favorites: PageFavorites,
+    ghosted: PageGhosted,
+    subscription: PageSubscription,
+    preferences: PagePreferences,
+    security: PageSecurity,
+    legal: PageLegal,
+    contact: PageContact,
   }
 
   return (
@@ -5462,7 +5464,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             <div style={{width:60}}/>
           </div>
           <div style={{padding:'12px 16px 32px'}}>
-            {subPageContent[profilePage]}
+            {subPageContent[profilePage]?.()}
           </div>
         </div>
       )}

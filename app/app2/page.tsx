@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z48'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z49'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4146,6 +4146,146 @@ function FieldRow({ icon, label, value, gk, placeholder, isEditing, onTap, locke
   )
 }
 
+// ═════════════════════════════════════════════════════════════
+// 🤖 BOT LAB — panneau admin pour piloter les bots et tout tester seul
+// Nécessite la migration 20260620_bots.sql (is_bot + policies admin)
+// ═════════════════════════════════════════════════════════════
+function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showToast:(m:string,c?:string)=>void }) {
+  const [bots, setBots] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string|null>(null)
+  const [radius, setRadius] = useState<Record<string,number>>({})
+  const myLat = user?.center_lat ?? 46.5197
+  const myLng = user?.center_lng ?? 6.6323
+  const POS:Record<string,{lat:number,lng:number,label:string}> = {
+    me:    { lat: myLat,        lng: myLng,        label:'Sur moi' },
+    near:  { lat: myLat+0.0045, lng: myLng+0.0030, label:'Proche ~500m' },
+    morges:{ lat: 46.5094,      lng: 6.4983,       label:'Morges ~12km' },
+  }
+  const load = async () => {
+    const { data } = await supabase.from('profiles')
+      .select('id,name,gender,age,is_available,center_lat,available_radius_km,account_type')
+      .eq('is_bot', true).order('name')
+    setBots(data||[]); setLoading(false)
+  }
+  useEffect(()=>{ load() },[])
+
+  const activate = async (bot:any, key:string) => {
+    setBusy(bot.id)
+    const p = POS[key]; const r = radius[bot.id] ?? 10
+    const { data, error } = await supabase.from('profiles').update({
+      is_available:true, available_until:new Date(Date.now()+6*3600*1000).toISOString(),
+      center_lat:p.lat, center_lng:p.lng, available_radius_km:r,
+    }).eq('id', bot.id).select('id')
+    setBusy(null)
+    if (error || !data?.length) { showToast('❌ Échec — la migration bots est-elle appliquée ?', C.red); return }
+    showToast(`✓ ${bot.name} en ligne · ${p.label} · ${r}km`, C.green); load()
+  }
+  const deactivate = async (bot:any) => {
+    setBusy(bot.id)
+    const { data } = await supabase.from('profiles').update({ is_available:false }).eq('id', bot.id).select('id')
+    setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}; showToast(`${bot.name} hors ligne`); load()
+  }
+  const patchBot = async (bot:any, patch:any, msg:string) => {
+    const { data } = await supabase.from('profiles').update(patch).eq('id', bot.id).select('id')
+    if(!data?.length){showToast('❌ Échec',C.red);return}; showToast(msg,C.green); load()
+  }
+  const acceptClutch = async (bot:any) => {
+    setBusy(bot.id)
+    const { data:cl } = await supabase.from('clutches').select('id').eq('receiver_id', bot.id).eq('status','pending').order('created_at',{ascending:false}).limit(1)
+    if (!cl?.length) { setBusy(null); showToast(`Aucun clutch en attente pour ${bot.name}`,C.orange); return }
+    const { data, error } = await supabase.from('clutches').update({ status:'accepted' }).eq('id', cl[0].id).select('id')
+    setBusy(null)
+    if (error||!data?.length) { showToast('❌ Échec — policy clutches_bot_admin ?', C.red); return }
+    showToast(`✓ ${bot.name} a accepté → Verrou ! 🔒`, C.green)
+  }
+  const findVerrou = async (botId:string) => {
+    const { data:cl } = await supabase.from('clutches')
+      .select('id,venue_lat,venue_lng,sender_id,receiver_id,sender_cur_lat,sender_cur_lng,receiver_cur_lat,receiver_cur_lng')
+      .or(`sender_id.eq.${botId},receiver_id.eq.${botId}`).in('status',['accepted','confirmed','checked_in'])
+      .order('created_at',{ascending:false}).limit(1)
+    return cl?.[0] || null
+  }
+  const approach = async (bot:any) => {
+    setBusy(bot.id)
+    const c = await findVerrou(bot.id)
+    if (!c || !c.venue_lat) { setBusy(null); showToast(`Pas de Verrou actif (avec lieu GPS) pour ${bot.name}`,C.orange); return }
+    const isSnd = c.sender_id===bot.id
+    const curLat = (isSnd?c.sender_cur_lat:c.receiver_cur_lat) ?? bot.center_lat ?? (c.venue_lat+0.02)
+    const curLng = (isSnd?c.sender_cur_lng:c.receiver_cur_lng) ?? (c.venue_lng+0.02)
+    const nLat = curLat + (c.venue_lat-curLat)*0.6
+    const nLng = curLng + (c.venue_lng-curLng)*0.6
+    const patch = isSnd ? {sender_cur_lat:nLat,sender_cur_lng:nLng} : {receiver_cur_lat:nLat,receiver_cur_lng:nLng}
+    const { data } = await supabase.from('clutches').update(patch).eq('id',c.id).select('id')
+    setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}
+    showToast(`${bot.name} se rapproche du lieu… 📡`,C.green)
+  }
+  const arrive = async (bot:any) => {
+    setBusy(bot.id)
+    const c = await findVerrou(bot.id)
+    if (!c) { setBusy(null); showToast(`Pas de Verrou actif pour ${bot.name}`,C.orange); return }
+    const isSnd = c.sender_id===bot.id
+    const patch = isSnd ? {sender_arrived:true, sender_cur_lat:c.venue_lat, sender_cur_lng:c.venue_lng}
+                        : {receiver_arrived:true, receiver_cur_lat:c.venue_lat, receiver_cur_lng:c.venue_lng}
+    const { data } = await supabase.from('clutches').update(patch).eq('id',c.id).select('id')
+    setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}
+    showToast(`✓ ${bot.name} est au RDV (J'y suis) ✅`,C.green)
+  }
+
+  const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
+    <button onClick={onClick} disabled={!!busy} style={{padding:'7px 10px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:busy?.6:1}}>{children}</button>
+  )
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+      <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',zIndex:2}}>
+        <div style={{fontSize:16,fontWeight:900,color:C.white}}>🤖 Générateur de bots</div>
+        <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer'}}>✕</button>
+      </div>
+      <div style={{padding:'12px 16px 40px'}}>
+        <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
+          ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
+        </div>
+        {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Chargement…</div>}
+        {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Aucun bot (migration appliquée ?)</div>}
+        {bots.map(bot=>(
+          <div key={bot.id} style={{background:C.bgCard,border:`1px solid ${bot.is_available?C.green:C.border}`,borderRadius:14,padding:'12px',marginBottom:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div style={{fontSize:14,fontWeight:800,color:C.white}}>{bot.name} <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>{bot.gender==='woman'?'♀':bot.gender==='man'?'♂':''} · {bot.age||'?'}a · {bot.account_type==='premium'?'Rhodium':'Hydrogène'}</span></div>
+              <div style={{fontSize:10,fontWeight:800,color:bot.is_available?C.green:C.whiteMid}}>{bot.is_available?'EN LIGNE':'hors ligne'}</div>
+            </div>
+            {/* Position */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>ACTIVER À :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              <Btn onClick={()=>activate(bot,'me')} bg={C.salmonFaint} col={C.salmon}>📍 Sur moi</Btn>
+              <Btn onClick={()=>activate(bot,'near')} bg={C.salmonFaint} col={C.salmon}>🚶 Proche 500m</Btn>
+              <Btn onClick={()=>activate(bot,'morges')} bg={C.salmonFaint} col={C.salmon}>🚗 Morges 12km</Btn>
+              <input type="number" placeholder="rayon" value={radius[bot.id]??10} onChange={e=>setRadius(r=>({...r,[bot.id]:Number(e.target.value)}))}
+                style={{width:54,padding:'6px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit'}}/>
+            </div>
+            {/* Réglages */}
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              <Btn onClick={()=>patchBot(bot,{age:(bot.age||25)+1},`${bot.name} : ${(bot.age||25)+1} ans`)}>âge +1</Btn>
+              <Btn onClick={()=>patchBot(bot,{age:Math.max(18,(bot.age||25)-1)},`${bot.name} : ${Math.max(18,(bot.age||25)-1)} ans`)}>âge −1</Btn>
+              <Btn onClick={()=>patchBot(bot,{account_type:bot.account_type==='premium'?'free':'premium'},`${bot.name} : ${bot.account_type==='premium'?'Hydrogène':'Rhodium'}`)}>{bot.account_type==='premium'?'→ Hydrogène':'→ Rhodium (premium)'}</Btn>
+              {bot.is_available
+                ? <Btn onClick={()=>deactivate(bot)} bg="rgba(239,68,68,.15)" col="#f87171">⏻ Désactiver</Btn>
+                : null}
+            </div>
+            {/* Flow RDV */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>FLOW RDV (après l'avoir clutché) :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              <Btn onClick={()=>acceptClutch(bot)} bg="rgba(45,189,126,.15)" col={C.green}>✓ Accepter clutch</Btn>
+              <Btn onClick={()=>approach(bot)}>📡 Rapprocher</Btn>
+              <Btn onClick={()=>arrive(bot)} bg="rgba(45,189,126,.15)" col={C.green}>📍 Au RDV (J'y suis)</Btn>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable, rdvBlocked, onFeedback }:{
   user:Profile; flow:AppFlow; setFlow:(f:AppFlow)=>void;
   signOut:()=>void; setShowDelete:(v:boolean)=>void;
@@ -4155,6 +4295,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 }) {
   const [profileSubTab, setProfileSubTab] = useState<'profil'|'settings'>('profil')
   const [profilePage, setProfilePage] = useState<string|null>(null)
+  const [showBotLab, setShowBotLab] = useState(false)
+  const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
   const [editField, setEditField] = useState<string|null>(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(user.name||'')
@@ -4888,6 +5030,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   return (
     <>
+    {showBotLab && <BotLab user={user} onClose={()=>setShowBotLab(false)} showToast={showToast}/>}
     <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'0 0 32px'}}>
 
       {/* ─── HERO ─── */}
@@ -5009,6 +5152,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
             showToast('✅ Reset effectué — recharge l\'app',C.orange)
           }}/>
+          {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
         </MCard>
 
         {/* ── Footer pro / business (version + Lausanne 🇨🇭 + feedback bêta) ── */}

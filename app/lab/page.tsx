@@ -255,7 +255,7 @@ export default function LabPage() {
     const { data: evs } = await supabase.from('events').select('id,title,spots,created_by').eq('active',true).order('created_at',{ascending:false}).limit(1)
     if (!evs?.length) { setBusy(null); showToast("Aucun event actif — crée-en un d'abord (🎟️)", C.gold); return }
     const ev = evs[0]
-    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
+    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)))  // remplit jusqu'à COMPLET (test liste d'attente)
     const botIds = (botRows||[]).map((b:any)=>b.id)
     let inserted=0
     for (const bid of botIds) {
@@ -266,6 +266,19 @@ export default function LabPage() {
     setBusy(null)
     if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
     else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
+  }
+  const freeEventSpot = async () => {
+    setBusy('all')
+    const { data: evs } = await supabase.from('events').select('id,title').eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast("Aucun event actif", C.gold); return }
+    const ev = evs[0]
+    const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const botIds = new Set((bots||[]).map((b:any)=>b.id))
+    const { data: parts } = await supabase.from('event_participants').select('user_id').eq('event_id', ev.id)
+    const botPart = (parts||[]).find((p:any)=>botIds.has(p.user_id))
+    if (!botPart) { setBusy(null); showToast("Aucun bot inscrit à retirer", C.gold); return }
+    await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', botPart.user_id)
+    setBusy(null); showToast(`🪑 1 place libérée sur "${ev.title}"`, C.green)
   }
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
@@ -313,7 +326,8 @@ export default function LabPage() {
         <div style={{display:'flex',gap:8,marginBottom:18,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(220,106,106,.12)" col={C.red}>🔄 Désactiver tous</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque)</Btn>
-          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir le dernier event de bots</Btn>
+          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir (complet)</Btn>
+          <Btn onClick={freeEventSpot} bg={C.salmonFaint} col={C.salmon}>🪑 Libérer une place</Btn>
         </div>
 
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:30}}>Chargement des bots…</div>}

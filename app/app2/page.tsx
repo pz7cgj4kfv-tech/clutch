@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z86'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z87'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2962,6 +2962,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <button onClick={()=>setCancelledNotice(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:16,cursor:'pointer',padding:0}}>✕</button>
           </div>
         )}
+        {/* Place libérée : event où je suis sur liste d'attente ET où une place s'est ouverte */}
+        {events.filter((ev:any)=>waitlist.has(ev.id) && ev.taken < ev.spots && !registered.has(ev.id)).map((ev:any)=>(
+          <div key={'freed-'+ev.id} style={{background:`${C.green}12`,border:`1px solid ${C.green}55`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:18}}>🎉</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.green}}>{lang==='en'?'A spot opened up!':'Une place s\'est libérée !'}</div>
+              <div style={{fontSize:11,color:C.whiteMid,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.title}</div>
+            </div>
+            <button onClick={()=>{ setWaitlist((prev:Set<string>)=>{const n=new Set(prev);n.delete(ev.id);return n}); doRegister(ev) }}
+              style={{flexShrink:0,padding:'8px 12px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+              {lang==='en'?'Join now':'Rejoindre'}
+            </button>
+          </div>
+        ))}
         {filteredEvs.length===0 && (
           <div style={{textAlign:'center',padding:'50px 20px',color:C.whiteMid}}>
             <div style={{fontSize:28,marginBottom:8}}>📅</div>
@@ -3240,13 +3254,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   /* Complet — liste d'attente */
                   waitlist.has(selEv.id) ? (
                     <div style={{textAlign:'center',padding:'14px',background:`${C.orange}14`,border:`1px solid ${C.orange}33`,borderRadius:14}}>
-                      <div style={{fontSize:13,fontWeight:800,color:C.orange}}>📋 On the waitlist</div>
-                      <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>You'll be notified if a spot opens up</div>
+                      <div style={{fontSize:13,fontWeight:800,color:C.orange}}>📋 {lang==='en'?'On the waitlist':'Sur la liste d\'attente'}</div>
+                      <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>{lang==='en'?'You\'ll be notified if a spot opens up':'Tu seras prévenu·e si une place se libère'}</div>
                     </div>
                   ) : (
                     <button onClick={()=>setWaitlist((prev:Set<string>)=>new Set([...prev,selEv.id]))}
                       style={{width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.orange}`,borderRadius:16,color:C.orange,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-                      📋 Join waitlist
+                      📋 {lang==='en'?'Join waitlist':'Rejoindre la liste d\'attente'}
                     </button>
                   )
                 ) : (
@@ -4458,7 +4472,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const { data: evs } = await supabase.from('events').select('id,title,spots,created_by').eq('active',true).order('created_at',{ascending:false}).limit(1)
     if (!evs?.length) { setBusy(null); showToast("Aucun event actif — crée-en un d'abord (🎟️)", C.orange); return }
     const ev = evs[0]
-    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
+    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)))  // remplit jusqu'à COMPLET (test liste d'attente)
     const botIds = (botRows||[]).map((b:any)=>b.id)
     let inserted=0
     for (const bid of botIds) {
@@ -4470,6 +4484,20 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     setBusy(null)
     if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
     else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
+  }
+  // Libère UNE place sur le dernier event (retire 1 bot inscrit) → tester la notice "place libérée"
+  const freeEventSpot = async () => {
+    setBusy('all')
+    const { data: evs } = await supabase.from('events').select('id,title').eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast("Aucun event actif", C.orange); return }
+    const ev = evs[0]
+    const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const botIds = new Set((bots||[]).map((b:any)=>b.id))
+    const { data: parts } = await supabase.from('event_participants').select('user_id').eq('event_id', ev.id)
+    const botPart = (parts||[]).find((p:any)=>botIds.has(p.user_id))
+    if (!botPart) { setBusy(null); showToast("Aucun bot inscrit à retirer", C.orange); return }
+    await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', botPart.user_id)
+    setBusy(null); showToast(`🪑 1 place libérée sur "${ev.title}"`, C.green)
   }
   const resetMyOnboarding = async () => {
     if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
@@ -4547,7 +4575,8 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
-          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir le dernier event de bots</Btn>
+          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir (complet)</Btn>
+          <Btn onClick={freeEventSpot} bg={C.salmonFaint} col={C.salmon}>🪑 Libérer une place</Btn>
           <Btn onClick={resetMyOnboarding} bg={C.salmonFaint} col={C.salmon}>👤 Refaire mon inscription</Btn>
         </div>
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Chargement…</div>}

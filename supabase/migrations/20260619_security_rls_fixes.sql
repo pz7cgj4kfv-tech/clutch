@@ -35,8 +35,11 @@ CREATE POLICY user_feedbacks_select_admin ON user_feedbacks
 -- DB-05 🟡 — anti-doublon + self-Clutch enforced en JS seulement
 -- (contournable via appel API direct). On verrouille en base.
 -- ─────────────────────────────────────────────────────────────
-ALTER TABLE clutches
-  ADD CONSTRAINT IF NOT EXISTS no_self_clutch CHECK (sender_id != receiver_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'no_self_clutch') THEN
+    ALTER TABLE clutches ADD CONSTRAINT no_self_clutch CHECK (sender_id != receiver_id);
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS clutch_pair_unique
   ON clutches(sender_id, receiver_id)

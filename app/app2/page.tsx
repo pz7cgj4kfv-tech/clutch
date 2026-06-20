@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z76'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z77'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4230,7 +4230,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   }
   const load = async () => {
     const { data } = await supabase.from('profiles')
-      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until')
+      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until,available_modes')
       .eq('is_bot', true).order('name')
     setBots(data||[]); setLoading(false)
   }
@@ -4396,6 +4396,14 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const isDriver = bot.account_type === 'driver'
     patchBot(bot, { account_type: isDriver ? 'H' : 'driver' }, `${bot.name} : ${isDriver?'Membre normal':'Clutch Driver 🚗 (masqué des Présences)'}`)
   }
+  // Mode de rencontre (available_modes) — multi-select, parent exclusif (= exclut les non-parents)
+  const toggleBotMode = (bot:any, key:string) => {
+    const cur:string[] = Array.isArray(bot.available_modes) ? bot.available_modes : []
+    let next:string[]
+    if (key==='parent') next = cur.includes('parent') ? [] : ['parent']
+    else { const without = cur.filter(x=>x!==key && x!=='parent'); next = cur.includes(key) ? without : [...without, key] }
+    patchBot(bot, { available_modes: next.length?next:null }, `${bot.name} modes : ${next.join(', ')||'aucun'}`)
+  }
 
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
     <button onClick={onClick} disabled={!!busy} style={{padding:'7px 10px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:busy?.6:1}}>{children}</button>
@@ -4489,6 +4497,14 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
               {[['F','♀ Femmes'],['M','♂ Hommes'],['ALL','Tout le monde']].map(([v,lab])=>{
                 const sel = (bot.looking_for||'ALL')===v || (v==='ALL'&&!['M','F'].includes(bot.looking_for))
                 return <Btn key={v} onClick={()=>patchBot(bot,{looking_for:v},`${bot.name} cherche : ${lab}`)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
+              })}
+            </div>
+            {/* Mode de rencontre (available_modes) */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>MODE (intersection · parent = exclusif) :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              {[['romantic','💕 Romance'],['friend','🤝 Amitié'],['pro','💼 Pro'],['parent','👶 Parents']].map(([v,lab])=>{
+                const sel = Array.isArray(bot.available_modes) && bot.available_modes.includes(v)
+                return <Btn key={v} onClick={()=>toggleBotMode(bot,v)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
               })}
             </div>
             {/* Scénarios */}
@@ -7230,6 +7246,7 @@ export default function App2() {
       center_lat:meetupPos[0],
       center_lng:meetupPos[1],
       available_radius_km:Math.round(rayon),
+      available_modes: seekModes.length ? seekModes : null,
       pref_age_min: parseInt(ageMin) || 18,
       pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
       ...(intentMsg ? {bio:intentMsg} : {}),
@@ -7252,6 +7269,7 @@ export default function App2() {
         center_lat:meetupPos[0],
         center_lng:meetupPos[1],
         available_radius_km:Math.round(rayon),
+        available_modes: seekModes.length ? seekModes : null,
         pref_age_min: parseInt(ageMin) || 18,
         pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
         name: (user as any).name || 'Utilisateur',
@@ -7265,7 +7283,7 @@ export default function App2() {
       }
     }
 
-    setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon}:prev)
+    setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon,available_modes:(seekModes.length?seekModes:null)} as any:prev)
     showToast(`✦ Fenêtre ouverte · ${city} · ${Math.round(rayon)} km`,C.green)
     requestNotificationPermission()
     setFlow('app')
@@ -7346,6 +7364,16 @@ export default function App2() {
       if (theirSeek === 'M' || theirSeek === 'F') {
         const myGk = genderKey((user as any)?.gender)
         if (myGk !== 'X' && myGk !== theirSeek) return false
+      }
+    }
+    // Filtre MODE — intersection : on se voit si on partage ≥1 mode (Romance/Amitié/Pro/Parent).
+    // Parent est exclusif côté UI (['parent'] seul) → ne matche que d'autres parents = exclut le reste.
+    // Garde-fou rollout : si un côté n'a aucun mode défini → pas de filtre (ne casse pas les users actuels).
+    {
+      const myModes:string[] = Array.isArray((user as any)?.available_modes) ? (user as any).available_modes : []
+      const theirModes:string[] = Array.isArray((p as any).available_modes) ? (p as any).available_modes : []
+      if (myModes.length && theirModes.length) {
+        if (!myModes.some(m => theirModes.includes(m))) return false
       }
     }
     // Filtre âge — bidirectionnel

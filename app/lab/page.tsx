@@ -62,7 +62,7 @@ export default function LabPage() {
   const load = async () => {
     setLoading(true)
     const { data } = await supabase.from('profiles')
-      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until')
+      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until,available_modes')
       .eq('is_bot', true).order('name')
     setBots(data||[]); setLoading(false)
   }
@@ -204,6 +204,13 @@ export default function LabPage() {
   const toggleDriver = (bot:any) => {
     const isDriver = bot.account_type === 'driver'
     patchBot(bot, { account_type: isDriver ? 'H' : 'driver' }, `${bot.name} : ${isDriver?'Membre normal':'Clutch Driver 🚗 (masqué des Présences)'}`)
+  }
+  const toggleBotMode = (bot:any, key:string) => {
+    const cur:string[] = Array.isArray(bot.available_modes) ? bot.available_modes : []
+    let next:string[]
+    if (key==='parent') next = cur.includes('parent') ? [] : ['parent']
+    else { const without = cur.filter(x=>x!==key && x!=='parent'); next = cur.includes(key) ? without : [...without, key] }
+    patchBot(bot, { available_modes: next.length?next:null }, `${bot.name} modes : ${next.join(', ')||'aucun'}`)
   }
   const deactivateAll = async () => {
     setBusy('all')
@@ -356,6 +363,15 @@ export default function LabPage() {
                 {[['F','♀ Femmes'],['M','♂ Hommes'],['ALL','Tout le monde']].map(([v,lab])=>{
                   const sel = (seek||'ALL')===v || (v==='ALL'&&!['M','F'].includes(seek))
                   return <Btn key={v} onClick={()=>patchBot(bot,{looking_for:v},`${bot.name} cherche : ${lab}`)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
+                })}
+              </div>
+
+              {/* Mode de rencontre */}
+              <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>MODE (intersection · parent = exclusif) :</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                {[['romantic','💕 Romance'],['friend','🤝 Amitié'],['pro','💼 Pro'],['parent','👶 Parents']].map(([v,lab])=>{
+                  const sel = Array.isArray(bot.available_modes) && bot.available_modes.includes(v)
+                  return <Btn key={v} onClick={()=>toggleBotMode(bot,v)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
                 })}
               </div>
 

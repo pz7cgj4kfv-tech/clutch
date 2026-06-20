@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z66'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z67'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9011,6 +9011,8 @@ export default function App2() {
                   {rdv_id: keepContactClutch.id, from_id: user.id, to_id: _toId, keep_contact: yes},
                   {onConflict: 'rdv_id,from_id'}
                 )
+                // Réciprocité auto pour les BOTS (la policy admin rdv_feedbacks_bot_admin l'autorise ; pour un vrai humain la RLS bloque → sans effet)
+                if (yes) { try { await supabase.from('rdv_feedbacks').upsert({rdv_id: keepContactClutch.id, from_id: _toId, to_id: user.id, outcome:'on_time', keep_contact: true},{onConflict:'rdv_id,from_id'}) } catch {} }
               } catch {}
               if (!yes) { _setTab('presences'); return }
               const otherId = isSnd ? keepContactClutch.receiver_id : keepContactClutch.sender_id

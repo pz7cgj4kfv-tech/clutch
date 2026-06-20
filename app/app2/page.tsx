@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z81'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z82'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3247,7 +3247,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   )
                 ) : (
                   <button onClick={()=>doRegister(selEv)} disabled={registering}
-                    style={{width:'100%',padding:'15px',background:`linear-gradient(135deg,${C.salmon},${C.orange})`,border:'none',borderRadius:16,color:C.bordeaux,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:registering?.7:1}}>
+                    style={{width:'100%',padding:'15px',background:C.plum,border:'none',borderRadius:16,color:C.onAccent,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:registering?.7:1}}>
                     {registering?'…':(selEv as any).isGroupe?'👥 Rejoindre le groupe':t('events.register')}
                   </button>
                 )
@@ -3891,7 +3891,7 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
             </div>
             {submitErr && <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(220,80,80,.12)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,textAlign:'center'}}>{lang==='en'?'Could not save — please try again':'Enregistrement impossible — réessaie'}</div>}
             <button onClick={submit} disabled={!selected}
-              style={{width:'100%',padding:'14px',background:selected?`linear-gradient(135deg,${C.salmon},${C.orange})`:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
+              style={{width:'100%',padding:'14px',background:selected?C.plum:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
               {lang==='en'?'Send feedback':'Envoyer le feedback'}
             </button>
           </>
@@ -4151,7 +4151,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
           ) : (
             <>
               <button onClick={onClutch}
-                style={{width:'100%',padding:'16px',background:`linear-gradient(135deg,${C.salmon},${C.orange})`,border:'none',borderRadius:16,color:C.bg,fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 4px 20px ${C.orange}44`}}>
+                style={{width:'100%',padding:'16px',background:C.plum,border:'none',borderRadius:16,color:C.bg,fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 4px 20px ${C.orange}44`}}>
                 ⚡ Clutcher {firstName}
               </button>
               <div style={{display:'flex',gap:8}}>
@@ -9354,7 +9354,7 @@ export default function App2() {
                     setCounterClutchId(null)
                     loadClutches()
                     showToast(lang==='fr'?'↩ Contre-Clutch envoyé !':'↩ Counter-Clutch sent!', C.salmon)
-                  }} style={{padding:'12px',background:`linear-gradient(135deg,${C.salmon},${C.orange})`,border:'none',borderRadius:12,color:C.bg,fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                  }} style={{padding:'12px',background:C.plum,border:'none',borderRadius:12,color:C.bg,fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
                     ↩ {lang==='en'?'Send Counter-Clutch':'Envoyer le Contre-Clutch'}
                   </button>
                 </div>

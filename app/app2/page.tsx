@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z52'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z53'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6024,6 +6024,7 @@ export default function App2() {
   const [unreadRetards, setUnreadRetards] = useState<Set<string>>(new Set()) // clutchId → nb msgs non lus
   const [user,setUser]       = useState<Profile|null>(null)
   const [profiles,setProfiles] = useState<Profile[]>([])
+  const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
@@ -6287,6 +6288,11 @@ export default function App2() {
         const { data: evs } = await supabase.from('events').select('id,created_by,emoji').eq('active',true).not('created_by','is',null)
         const hostMap = new Map((evs||[]).map((e:any)=>[e.created_by, e]))
         real.forEach((p:any)=>{ const e:any = hostMap.get(p.id); if(e){ p._hasEvent=true; p._eventId=e.id; p._eventEmoji=e.emoji||'📅' } })
+      } catch {}
+      // Lapins : personnes à qui J'AI mis un "absent" (no-show) → ne plus jamais les afficher en présences
+      try {
+        const { data: lap } = await supabase.from('rdv_feedbacks').select('to_id').eq('from_id', user.id).eq('outcome','absent')
+        setLapinIds(new Set((lap||[]).map((f:any)=>f.to_id)))
       } catch {}
       // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible
       const maxBot = {
@@ -7010,6 +7016,8 @@ export default function App2() {
     if (activeVerrouPartnerId && (p as any).id === activeVerrouPartnerId) return false
     // Masquer les personnes déjà clutchées (clutch en attente ou actif) — évite le doublon
     if (activeClutchPartnerIds.has((p as any).id)) return false
+    // Masquer les personnes à qui j'ai mis un lapin (no-show) — elles ne réapparaissent pas
+    if (lapinIds.has((p as any).id)) return false
     // Filtre genre
     if (filterGender !== 'all') {
       const gk = genderKey((p as any).gender)

@@ -3069,6 +3069,37 @@ const SectionSecret = () => (
     <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🧠 Analyse psychologique</div>
     <div style={{fontSize:13,color:'rgba(232,224,240,.5)',marginBottom:32}}>Synthèse Claude + GPT-4o · Mis à jour à chaque session · 17.06.2026</div>
 
+    {/* 🚨 ANTI-VOL & LANCEMENT — zone gatée, jamais publique */}
+    <div style={{background:'#1a0d0d',borderRadius:16,padding:'20px',marginBottom:16,border:'1px solid rgba(248,113,113,.4)'}}>
+      <div style={{fontSize:15,fontWeight:900,color:'#f87171',marginBottom:6}}>🚨 PROTÉGER L'IDÉE — à lire avant tout lancement</div>
+      <div style={{fontSize:12,color:'rgba(232,224,240,.6)',lineHeight:1.7,marginBottom:14}}>
+        Vérité dure : <strong style={{color:'#fca5a5'}}>on ne protège pas une idée</strong> (un concept n'est pas brevetable). On protège l'<strong style={{color:'#fca5a5'}}>exécution + la marque + le réseau + la vitesse</strong>. Le vrai fossé = être le premier à atteindre la masse critique à Lausanne.
+      </div>
+      {[
+        {t:'1. Vitesse vers la masse critique',d:'500-1000 actifs à Lausanne, avec assez de femmes. Le réseau local EST le moat. Premier avec de la liquidité = gagne la ville.'},
+        {t:'2. Déposer la marque IGE',d:'« Clutch » + logo + vocabulaire (Clutch/Verrou) à l\'IGE (~CHF 550) AVANT toute pub.'},
+        {t:'3. NDA',d:'Pour quiconque voit la vision complète (Jennifer, devs, partenaires).'},
+        {t:'4. Garder la secret sauce hors public',d:'Algo, mécanique de réputation, psychologie premium, roadmap → JAMAIS sur pages publiques ni marketing. (Rappel : /vision est PUBLIC sauf cette zone-ci.)'},
+        {t:'5. Lancer vite dans UNE ville',d:'Capter la liquidité avant que les concurrents réagissent. Fenêtre estimée : 6-12 mois.'},
+      ].map(({t,d})=>(
+        <div key={t} style={{padding:'8px 0',borderBottom:'1px solid rgba(248,113,113,.12)'}}>
+          <div style={{fontSize:12,fontWeight:800,color:'#fca5a5',marginBottom:2}}>{t}</div>
+          <div style={{fontSize:11,color:'rgba(232,224,240,.55)',lineHeight:1.6}}>{d}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* 🎉 SÉQUENCE DE LANCEMENT */}
+    <div style={{background:'#0d1a12',borderRadius:16,padding:'20px',marginBottom:16,border:'1px solid rgba(74,222,128,.3)'}}>
+      <div style={{fontSize:15,fontWeight:900,color:'#4ade80',marginBottom:10}}>🎉 Séquence de lancement</div>
+      <div style={{fontSize:12,color:'rgba(232,224,240,.7)',lineHeight:1.8}}>
+        <strong style={{color:'#4ade80'}}>Waitlist</strong> (anticipation + mesure demande) → <strong style={{color:'#4ade80'}}>soirée seed</strong> → <strong style={{color:'#4ade80'}}>inviter par vagues</strong> (densité contrôlée) → <strong style={{color:'#4ade80'}}>push PR</strong> → ouverture.
+      </div>
+      <div style={{fontSize:11,color:'rgba(232,224,240,.5)',lineHeight:1.7,marginTop:10,paddingTop:10,borderTop:'1px solid rgba(74,222,128,.15)'}}>
+        ⚠️ Récompense early adopters : <strong style={{color:'#86efac'}}>« Badge Fondateur » permanent + 3 mois premium</strong>, PAS 1 an gratuit (sacrifie le revenu des plus engagés + churn à la fin). Le statut fidélise mieux qu'un cadeau coûteux.
+      </div>
+    </div>
+
     {/* Bloc identité */}
     <div style={{background:'#120d1e',borderRadius:16,padding:'20px',marginBottom:16,border:'1px solid rgba(200,134,10,.2)'}}>
       <div style={{fontSize:13,fontWeight:800,color:'#C8860A',marginBottom:12,textTransform:'uppercase',letterSpacing:'.07em'}}>Profil identitaire</div>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z79'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z80'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2705,12 +2705,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [evLoading, setEvLoading] = useState(true)
   const [cancelledNotice, setCancelledNotice] = useState<string|null>(null)
 
+  const loadEvents = async () => {
+    const { data } = await supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
+    setDbEvents(data || [])
+    setEvLoading(false)
+  }
   useEffect(() => {
-    supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
-      .then(({ data }) => {
-        setDbEvents(data || [])
-        setEvLoading(false)
-      })
+    loadEvents()
+    const t = setInterval(loadEvents, 10000)  // refresh : un event créé (par toi/bot) apparaît sans recharger
+    return () => clearInterval(t)
   }, [])
 
   // Détection « créateur a flaké » : un event où JE suis inscrit a été annulé → notice + auto-libération (aucune pénalité pour moi)
@@ -2751,6 +2754,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     evGender: e.ev_gender || 'X',
     eventPhotos: e.event_photos || [],
     eventPhotoEmojis: e.event_photo_emojis || [],
+    isGroupe: e.type==='user',   // events créés par un user/bot = events de groupe
     reviews: [],
   })) : MOCK_EVENTS
 
@@ -2758,8 +2762,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [userGroupEvents, setUserGroupEvents] = useState<any[]>(GROUP_EVENTS_DEMO)
   const [groupJoined, setGroupJoined] = useState<Set<string>>(new Set())
 
-  // Fusion : partenaires + groupe
-  const events = [...partnerEvents, ...userGroupEvents]
+  // Fusion : partenaires/DB + groupe local — dédoublonné par id (la version DB prime sur la locale)
+  const events = (() => {
+    const seen = new Set(partnerEvents.map((e:any)=>e.id))
+    return [...partnerEvents, ...userGroupEvents.filter((e:any)=>!seen.has(e.id))]
+  })()
 
   // Création event groupe
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -2818,11 +2825,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       eventPhotoEmojis: [newEvEmoji],
       reviews: [],
     }
-    setUserGroupEvents(prev => [newEv, ...prev])
+    // Si persisté en DB → il reviendra via loadEvents (dédoublonné). Sinon (fallback) → on garde la version locale.
+    if (!isRealEvent(realId)) setUserGroupEvents(prev => [newEv, ...prev])
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
     setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6)
+    loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
   const [selEv, setSelEv] = useState<any|null>(()=>
@@ -2870,8 +2879,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         // On NE supprime PAS les inscrits ici : on marque l'event 'cancelled'. Chaque inscrit
         // le détecte à l'ouverture des Événements → notice « tu es libéré » + auto-désinscription.
         await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
-        if (userId) {                                                                       // pénalité créateur (-10)
-          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()
+        if (userId) {
+          await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', userId)  // nettoie ma propre inscription d'hôte
+          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()  // pénalité créateur (-10)
           const cur = (p as any)?.reliability_score ?? 100
           await supabase.from('profiles').update({ reliability_score: Math.max(0, cur-10) }).eq('id', userId)
         }
@@ -2888,7 +2898,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
     await new Promise(r=>setTimeout(r,400))
     setRegistered((prev:Set<string>)=>new Set([...prev,ev.id]))
+    // Compteur optimiste : +1 inscrit tout de suite (le trigger DB le confirme, loadEvents resynchronise)
+    setSelEv((s:any)=> s && s.id===ev.id ? {...s, taken:(s.taken||0)+1} : s)
+    setUserGroupEvents(prev=>prev.map((e:any)=>e.id===ev.id?{...e,taken:(e.taken||0)+1}:e))
     setRegistering(false)
+    loadEvents()
     // Auto-ferme la sheet après 1.5s (laisse voir la confirmation)
     setTimeout(() => setSelEv(null), 1500)
   }
@@ -3151,7 +3165,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
             {/* CTA fixe en bas — padding-bottom = tab bar (72) + safe area + marge */}
             <div style={{flexShrink:0,padding:'8px 20px calc(max(env(safe-area-inset-bottom,0px),0px) + 88px)',borderTop:`1px solid ${C.border}`,background:C.bgSheet}}>
-              {((selEv.created_by && userId && selEv.created_by===userId) || selEv.creator==='Toi') ? (
+              {(selEv.created_by ? (!!userId && selEv.created_by===userId) : selEv.creator==='Toi') ? (
                 <div>
                   <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
                   <button onClick={()=>cancelMyEvent(selEv)} disabled={cancelling}
@@ -3233,7 +3247,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   </button>
                 )
               )}
-              {selEv.price!=='Entrée libre'&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 Pay on-site · {selEv.price}</div>}
+              {selEv.price&&!['Entrée libre','Gratuit','Free',''].includes(selEv.price)&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 Pay on-site · {selEv.price}</div>}
             </div>
           </div>
         </div>
@@ -4308,8 +4322,10 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const r = radius[bot.id] ?? 10
     // Créneau : si réglé, on respecte ; sinon maintenant → +6h (et available_from=now obligatoire pour le filtre horaire)
     const sf = slotFrom[bot.id], su = slotUntil[bot.id]
-    const fromISO  = slotISO(sf, Date.now())
-    const untilISO = slotISO(su, Date.now()+6*3600*1000)
+    let fromMs  = new Date(slotISO(sf, Date.now())).getTime()
+    let untilMs = new Date(slotISO(su, Date.now()+6*3600*1000)).getTime()
+    if (untilMs <= fromMs) untilMs += 24*3600*1000   // créneau qui passe minuit (ex: 23:00 → 02:00)
+    const fromISO = new Date(fromMs).toISOString(), untilISO = new Date(untilMs).toISOString()
     const { data, error } = await supabase.from('profiles').update({
       is_available:true, available_from:fromISO, available_until:untilISO,
       center_lat:lat, center_lng:lng, available_radius_km:r,
@@ -4416,8 +4432,16 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       await supabase.from('rdv_feedbacks').update({outcome:'on_time'}).eq('from_id', user.id).in('to_id', botIds).eq('outcome','absent')
       await supabase.from('profiles').update({ account_type:'H' }).in('id', botIds).eq('account_type','driver')
       await supabase.from('profiles').update({ rdv_locked_until:null, rdv_locked_from:null }).in('id', botIds)
+      // Nettoyage des events de test créés par les bots + désinscription des bots des events d'autrui
+      const { data: botEvs } = await supabase.from('events').select('id').in('created_by', botIds)
+      const evIds = (botEvs||[]).map((e:any)=>e.id)
+      if (evIds.length) {
+        await supabase.from('event_participants').delete().in('event_id', evIds)
+        await supabase.from('events').delete().in('id', evIds)
+      }
+      await supabase.from('event_participants').delete().in('user_id', botIds)
     }
-    setBusy(null); showToast('✓ Reset complet — bots débloqués, ils réapparaissent', C.green); load()
+    setBusy(null); showToast('✓ Reset complet — bots, events de test & lapins nettoyés', C.green); load()
   }
   // Remplir le DERNIER event actif avec N bots (tester compteur places / min_participants / créateur qui flake)
   const fillEventWithBots = async () => {
@@ -4427,15 +4451,16 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const ev = evs[0]
     const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
     const botIds = (botRows||[]).map((b:any)=>b.id)
-    let ok=0
+    let inserted=0
     for (const bid of botIds) {
       const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid })
-      if (!error) ok++
+      if (!error) inserted++   // les doublons (déjà inscrits) échouent silencieusement, normal
     }
+    // taken est recalculé par le trigger DB ; on lit juste le total pour le message
     const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
-    await supabase.from('events').update({ taken: count ?? ok }).eq('id', ev.id)
     setBusy(null)
-    showToast(ok? `✓ ${ok} bots inscrits à "${ev.title}" (${count} au total)` : "❌ Applique la SQL event_participants_bot_admin", ok?C.green:C.red)
+    if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
+    else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
   }
   const resetMyOnboarding = async () => {
     if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
@@ -6710,7 +6735,8 @@ export default function App2() {
       try {
         const { data: lap } = await supabase.from('rdv_feedbacks').select('to_id,submitted_at').eq('from_id', user.id).eq('outcome','absent')
         const cutoff = Date.now() - 48*3600*1000
-        const recent = (lap||[]).filter((f:any)=>{ const ts = f.submitted_at ? new Date(f.submitted_at).getTime() : Date.now(); return ts >= cutoff })
+        // submitted_at NULL → on NE masque PAS (fallback 0, pas Date.now() qui masquerait à vie)
+        const recent = (lap||[]).filter((f:any)=>{ const ts = f.submitted_at ? new Date(f.submitted_at).getTime() : 0; return ts >= cutoff })
         setLapinIds(new Set(recent.map((f:any)=>f.to_id)))
       } catch {}
       // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible

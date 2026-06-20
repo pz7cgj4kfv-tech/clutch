@@ -88,8 +88,10 @@ export default function LabPage() {
   const activateAt = async (bot:any, lat:number, lng:number, label:string) => {
     setBusy(bot.id)
     const r = radius[bot.id] ?? 10
-    const fromISO  = slotISO(slotFrom[bot.id], Date.now())
-    const untilISO = slotISO(slotUntil[bot.id], Date.now()+6*3600*1000)
+    let fromMs  = new Date(slotISO(slotFrom[bot.id], Date.now())).getTime()
+    let untilMs = new Date(slotISO(slotUntil[bot.id], Date.now()+6*3600*1000)).getTime()
+    if (untilMs <= fromMs) untilMs += 24*3600*1000   // créneau qui passe minuit
+    const fromISO = new Date(fromMs).toISOString(), untilISO = new Date(untilMs).toISOString()
     const { data, error } = await supabase.from('profiles').update({
       is_available:true, available_from:fromISO, available_until:untilISO,
       center_lat:lat, center_lng:lng, available_radius_km:r,
@@ -238,8 +240,15 @@ export default function LabPage() {
       if (uid) await supabase.from('rdv_feedbacks').update({outcome:'on_time'}).eq('from_id', uid).in('to_id', botIds).eq('outcome','absent')
       await supabase.from('profiles').update({ account_type:'H' }).in('id', botIds).eq('account_type','driver')
       await supabase.from('profiles').update({ rdv_locked_until:null, rdv_locked_from:null }).in('id', botIds)
+      const { data: botEvs } = await supabase.from('events').select('id').in('created_by', botIds)
+      const evIds = (botEvs||[]).map((e:any)=>e.id)
+      if (evIds.length) {
+        await supabase.from('event_participants').delete().in('event_id', evIds)
+        await supabase.from('events').delete().in('id', evIds)
+      }
+      await supabase.from('event_participants').delete().in('user_id', botIds)
     }
-    setBusy(null); showToast('✓ Reset complet — bots débloqués', C.green); load()
+    setBusy(null); showToast('✓ Reset complet — bots, events de test & lapins nettoyés', C.green); load()
   }
   const fillEventWithBots = async () => {
     setBusy('all')
@@ -248,15 +257,15 @@ export default function LabPage() {
     const ev = evs[0]
     const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
     const botIds = (botRows||[]).map((b:any)=>b.id)
-    let ok=0
+    let inserted=0
     for (const bid of botIds) {
       const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid })
-      if (!error) ok++
+      if (!error) inserted++
     }
     const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
-    await supabase.from('events').update({ taken: count ?? ok }).eq('id', ev.id)
     setBusy(null)
-    showToast(ok? `✓ ${ok} bots inscrits à "${ev.title}" (${count} au total)` : "❌ Applique la SQL event_participants_bot_admin", ok?C.green:C.red)
+    if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
+    else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
   }
 
   // ── UI helpers ───────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z85'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z86'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2968,38 +2968,42 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{fontSize:13,fontWeight:700,color:C.white}}>No events in this category</div>
           </div>
         )}
-        {filteredEvs.map(ev=>(
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,marginBottom:10,cursor:'pointer',overflow:'hidden'}}>
-            <div style={{padding:'13px 14px',display:'flex',gap:12,alignItems:'center'}}>
-              <div style={{fontSize:28,width:44,height:44,borderRadius:12,background:C.salmonFaint,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ev.emoji}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
-                  <span style={{fontSize:13,fontWeight:800}}>{ev.title}</span>
-                  {ev.certified&&<span style={{fontSize:9,background:C.orangeFaint,color:C.orange,border:`1px solid ${C.orange}44`,borderRadius:6,padding:'1px 5px',fontWeight:800,flexShrink:0}}>✓ CERTIFIED</span>}
-                  {(ev as any).isGroupe&&<span style={{fontSize:9,background:'rgba(96,165,250,0.15)',color:'#60a5fa',border:'1px solid rgba(96,165,250,0.3)',borderRadius:6,padding:'1px 5px',fontWeight:800,flexShrink:0}}>👥 GROUPE</span>}
-                </div>
-                <div style={{fontSize:11,color:C.whiteMid,display:'flex',alignItems:'center',gap:3,flexWrap:'wrap'}}>
-                  {(ev as any).creatorPhoto && <img src={(ev as any).creatorPhoto} alt="" style={{width:16,height:16,borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>}
-                  <span>{t('ev.by')} <strong style={{color:C.salmon}}>{ev.creator}</strong> · {ev.time} · {(ev.lieu||'').split(',')[0]}</span>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                  <div style={{fontSize:11,color:ev.taken/ev.spots>.8?C.orange:C.whiteMid}}>{ev.taken}/{ev.spots} {lang==='en'?'registered':'inscrit·es'}</div>
-                  <div style={{flex:1,height:3,borderRadius:2,background:`${C.whiteFaint}`,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${ev.taken/ev.spots*100}%`,background:ev.taken/ev.spots>.8?C.orange:C.green,borderRadius:2}}/>
-                  </div>
+        {filteredEvs.map(ev=>{
+          const photo = (ev as any).eventPhotos?.[0]
+          const isImg = photo && String(photo).startsWith('http')
+          const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))
+          return (
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:18,marginBottom:14,cursor:'pointer',overflow:'hidden',boxShadow:'0 3px 14px rgba(83,41,67,.07)'}}>
+            {/* Photo bannière (Mel — events photo-forward) */}
+            <div style={{position:'relative',height:152,background:isImg?'#e9e4e7':(photo||`linear-gradient(135deg,${C.plum},${C.bgSheet})`),display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {isImg && <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/>}
+              {!isImg && <span style={{fontSize:54}}>{ev.emoji}</span>}
+              <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.5) 0%,rgba(0,0,0,.12) 35%,transparent 60%)'}}/>
+              <div style={{position:'absolute',top:10,left:10,display:'flex',gap:6}}>
+                {ev.certified&&<span style={{fontSize:9,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:6,padding:'2px 7px',fontWeight:800}}>✓ CERTIFIED</span>}
+                {(ev as any).isGroupe&&<span style={{fontSize:9,background:'rgba(255,255,255,.95)',color:C.plum,borderRadius:6,padding:'2px 7px',fontWeight:800}}>👥 GROUPE</span>}
+              </div>
+              {registered.has(ev.id)&&<span style={{position:'absolute',top:10,right:10,fontSize:9,background:C.green,color:'#fff',borderRadius:6,padding:'2px 7px',fontWeight:800}}>✓ INSCRIT·E</span>}
+              <div style={{position:'absolute',bottom:9,left:13,right:13,display:'flex',alignItems:'flex-end',gap:8}}>
+                <span style={{fontSize:30,flexShrink:0,filter:'drop-shadow(0 1px 3px rgba(0,0,0,.5))'}}>{ev.emoji}</span>
+                <div style={{fontSize:17,fontWeight:900,color:'#fff',textShadow:'0 1px 5px rgba(0,0,0,.6)',lineHeight:1.15}}>{ev.title}</div>
+              </div>
+            </div>
+            {/* Infos sous la photo */}
+            <div style={{padding:'10px 14px 12px'}}>
+              <div style={{fontSize:11,color:C.whiteMid,display:'flex',alignItems:'center',gap:5,marginBottom:8,flexWrap:'wrap'}}>
+                {(ev as any).creatorPhoto && <img src={(ev as any).creatorPhoto} alt="" style={{width:18,height:18,borderRadius:'50%',objectFit:'cover'}}/>}
+                <span>{t('ev.by')} <strong style={{color:C.plum}}>{ev.creator}</strong> · {ev.time} · {(ev.lieu||'').split(',')[0]}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{fontSize:11,fontWeight:700,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots} {lang==='en'?'registered':'inscrit·es'}</div>
+                <div style={{flex:1,height:4,borderRadius:2,background:C.border,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green,borderRadius:2}}/>
                 </div>
               </div>
-              {(ev as any).eventPhotos?.[0] && (
-                <div style={{width:52,height:52,borderRadius:8,flexShrink:0,overflow:'hidden',border:`1px solid ${C.border}`}}>
-                  {(ev as any).eventPhotos[0].startsWith('http')
-                    ? <img src={(ev as any).eventPhotos[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                    : <div style={{width:'100%',height:'100%',background:(ev as any).eventPhotos[0]}}/>
-                  }
-                </div>
-              )}
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {/* Détail événement — bottom sheet scrollable */}

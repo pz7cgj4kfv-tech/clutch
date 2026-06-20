@@ -3167,6 +3167,15 @@ const SectionStrategie = () => {
         <p style={p}>Clutch = potentiellement « <b style={{color:'#fff'}}>le protocole de rencontre du monde réel</b> » (aucun dominant pour « voir quelqu'un en vrai aujourd'hui »). Déclinaisons futures : Friends, Business (« 3 entrepreneurs dispo dans 2h »), Mentor, Senior, Sport, Study, Help, Ride, Travel. Attaque un problème géant : <b style={{color:'#fff'}}>la solitude</b>.</p>
         <div style={why}>🟡 Vision long terme. Discipline absolue : une promesse à la fois. Mentalité Polsia (1 pers + IA = travail de 10-50) mais produit centré humain réel.</div>
       </div>
+
+      <div style={card('rgba(200,134,10,.25)')}>
+        <div style={h('Lieux partenaires & affinités')}>💡 Idées 20.06 (David)</div>
+        <p style={p}><b style={{color:'#4ade80'}}>✅ Lieux partenaires / pub :</b> établissements qui paient pour apparaître, OU mise en avant par valeurs (local, restaurant végan). = compte Établissement. Colle à GPT (revenu = events/partenaires). Phase V2.</p>
+        <p style={p}><b style={{color:'#4ade80'}}>✅ Clubs par affinité positive (V2) :</b> Clutch Végan / végan-friendly, sport, intérêts. Filtre « qui peut rejoindre » (façon nomadtable). Positif, fédérateur, on-brand.</p>
+        <p style={p}><b style={{color:'#fbbf24'}}>🟡 Filtre « Femmes & non-binaires » :</b> filtre de SÉCURITÉ établi (pas politique). À cadrer sobrement (sécurité femmes = gros levier). À trancher David+Mel.</p>
+        <p style={p}><b style={{color:'#f87171'}}>❌ Filtre « non-vaccinés » / idéologique : NON.</b> Piège réputationnel + rejet App Store + crée des groupes ciblables (le risque malveillance). À éviter absolument.</p>
+        <div style={why}>⚠️ Tout groupe « exclusif » = une cible. Si clubs → membres vérifiés only + lieux publics + pas de listing public + report. Le women-only protège ; l'idéologique expose.</div>
+      </div>
     </div>
   )
 }

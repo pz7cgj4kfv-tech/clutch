@@ -5,7 +5,10 @@
 // island). Cette page s'ouvre sur navigateur, layout propre, on choisit un bot
 // et son panneau s'ouvre avec tous les contrôles. Réutilise EXACTEMENT la même
 // logique Supabase que le BotLab in-app (policies bot-admin).
-// Réservé aux admins (uids bot-admin). Auth email/mot de passe.
+// SÉCURITÉ : pas de mot de passe forcé (demande David). On utilise la session
+// Supabase déjà présente dans CE navigateur (partagée avec /app2, même origine).
+// Les écritures restent protégées par les RLS bot-admin : sans session admin,
+// elles échouent proprement (toast d'erreur). Login en REPLI optionnel seulement.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -16,15 +19,11 @@ const C = {
   green:'#22c55e', red:'#dc6a6a', gold:'#E27C00', salmon:'#FFBF9E',
   salmonFaint:'rgba(255,191,158,0.12)',
 }
-const ADMIN_UIDS = [
-  'bad38f3e-87df-40e0-a2d2-75c03b58d72b',
-  '409e83dc-dda8-42c3-bb98-3ea900857d35',
-  '9626a0ba-037f-49dd-9957-ebd37e58a864',
-]
 
 export default function LabPage() {
   const [uid, setUid] = useState<string|null>(null)
   const [checking, setChecking] = useState(true)
+  const [showLogin, setShowLogin] = useState(false)
   const [email, setEmail] = useState('')
   const [pwd, setPwd] = useState('')
   const [loginErr, setLoginErr] = useState('')
@@ -35,21 +34,19 @@ export default function LabPage() {
   const [busy, setBusy] = useState<string|null>(null)
   const [expanded, setExpanded] = useState<string|null>(null)
   const [radius, setRadius] = useState<Record<string,number>>({})
+  const [slotFrom, setSlotFrom] = useState<Record<string,string>>({})
+  const [slotUntil, setSlotUntil] = useState<Record<string,string>>({})
   const [addr, setAddr] = useState<Record<string,string>>({})
   const [addrRes, setAddrRes] = useState<Record<string,any[]>>({})
   const [toast, setToast] = useState<{msg:string,color:string}|null>(null)
-  // Position "Sur moi" = position du profil admin (là où son app le place)
   const [myLat, setMyLat] = useState(46.5197)
   const [myLng, setMyLng] = useState(6.6323)
 
   const showToast = (msg:string, color=C.salmon) => { setToast({msg,color}); setTimeout(()=>setToast(null), 2800) }
 
-  // ── Auth ───────────────────────────────────────────────────────────────────
+  // ── Session (pas de password forcé) ──────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({data})=>{
-      const u = data.session?.user
-      setUid(u?.id || null); setChecking(false)
-    })
+    supabase.auth.getSession().then(({data})=>{ setUid(data.session?.user?.id || null); setChecking(false) })
   }, [])
 
   const doLogin = async () => {
@@ -57,43 +54,48 @@ export default function LabPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd })
     setLoggingIn(false)
     if (error) { setLoginErr(error.message); return }
-    setUid(data.user?.id || null)
+    setUid(data.user?.id || null); setShowLogin(false)
   }
   const logout = async () => { await supabase.auth.signOut(); setUid(null); setBots([]) }
 
-  const isAdmin = !!uid && ADMIN_UIDS.includes(uid)
-
-  // ── Chargement bots + position admin ─────────────────────────────────────────
+  // ── Chargement bots + position du profil connecté ────────────────────────────
   const load = async () => {
+    setLoading(true)
     const { data } = await supabase.from('profiles')
-      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type')
+      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until')
       .eq('is_bot', true).order('name')
     setBots(data||[]); setLoading(false)
   }
   useEffect(() => {
-    if (!isAdmin) return
-    setLoading(true); load()
-    supabase.from('profiles').select('center_lat,center_lng').eq('id', uid).maybeSingle().then(({data})=>{
+    load()
+    if (uid) supabase.from('profiles').select('center_lat,center_lng').eq('id', uid).maybeSingle().then(({data})=>{
       if (data?.center_lat) { setMyLat(data.center_lat); setMyLng(data.center_lng) }
     })
-  }, [isAdmin, uid])
+  }, [uid])
 
   const POS = () => ({
     me:    { lat: myLat,        lng: myLng,        label:'Sur moi' },
     near:  { lat: myLat+0.0045, lng: myLng+0.0030, label:'Proche ~500m' },
     morges:{ lat: 46.5094,      lng: 6.4983,       label:'Morges ~12km' },
   })
+  const slotISO = (hhmm:string|undefined, fallbackMs:number) => {
+    if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return new Date(fallbackMs).toISOString()
+    const [h,m] = hhmm.split(':').map(Number)
+    const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
+  }
 
   // ── Actions bots (mêmes que BotLab in-app) ───────────────────────────────────
   const activateAt = async (bot:any, lat:number, lng:number, label:string) => {
     setBusy(bot.id)
     const r = radius[bot.id] ?? 10
+    const fromISO  = slotISO(slotFrom[bot.id], Date.now())
+    const untilISO = slotISO(slotUntil[bot.id], Date.now()+6*3600*1000)
     const { data, error } = await supabase.from('profiles').update({
-      is_available:true, available_until:new Date(Date.now()+6*3600*1000).toISOString(),
+      is_available:true, available_from:fromISO, available_until:untilISO,
       center_lat:lat, center_lng:lng, available_radius_km:r,
     }).eq('id', bot.id).select('id')
     setBusy(null)
-    if (error || !data?.length) { showToast('❌ Échec — migration bots appliquée ?', C.red); return }
+    if (error || !data?.length) { showToast('❌ Échec — connecte-toi (admin) ou migration manquante', C.red); return }
     showToast(`✓ ${bot.name} en ligne · ${label} · ${r}km`, C.green); setAddrRes(a=>({...a,[bot.id]:[]})); load()
   }
   const activate = (bot:any, key:'me'|'near'|'morges') => { const p = POS()[key]; return activateAt(bot, p.lat, p.lng, p.label) }
@@ -174,6 +176,7 @@ export default function LabPage() {
     showToast(`✓ RDV de ${bot.name} → maintenant, le radar s'affiche 📡`,C.green)
   }
   const meClutch = async (bot:any) => {
+    if (!uid) { showToast('Connecte-toi pour recevoir un clutch', C.gold); return }
     setBusy(bot.id)
     const { error } = await supabase.from('clutches').insert({
       sender_id: bot.id, receiver_id: uid,
@@ -215,7 +218,7 @@ export default function LabPage() {
       const ACT = ['pending','accepted','confirmed','checked_in']
       await supabase.from('clutches').update({status:'cancelled'}).in('sender_id', botIds).in('status', ACT)
       await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id', botIds).in('status', ACT)
-      await supabase.from('rdv_feedbacks').update({outcome:'on_time'}).eq('from_id', uid).in('to_id', botIds).eq('outcome','absent')
+      if (uid) await supabase.from('rdv_feedbacks').update({outcome:'on_time'}).eq('from_id', uid).in('to_id', botIds).eq('outcome','absent')
       await supabase.from('profiles').update({ account_type:'H' }).in('id', botIds).eq('account_type','driver')
       await supabase.from('profiles').update({ rdv_locked_until:null, rdv_locked_from:null }).in('id', botIds)
     }
@@ -226,28 +229,10 @@ export default function LabPage() {
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
     <button onClick={onClick} disabled={!!busy} style={{padding:'8px 11px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:12,fontWeight:700,cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{children}</button>
   )
+  const inp:React.CSSProperties = {width:'100%',boxSizing:'border-box',padding:'12px 14px',marginBottom:10,borderRadius:10,border:`1px solid ${C.border}`,background:C.bgInput,color:C.white,fontSize:14,outline:'none',fontFamily:'inherit'}
   const wrap:React.CSSProperties = { minHeight:'100vh', background:C.bg, color:C.white, fontFamily:'system-ui,-apple-system,sans-serif' }
 
-  // ── Écrans ───────────────────────────────────────────────────────────────────
   if (checking) return <div style={{...wrap,display:'flex',alignItems:'center',justifyContent:'center'}}>Chargement…</div>
-
-  if (!isAdmin) return (
-    <div style={{...wrap,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-      <div style={{width:'100%',maxWidth:380,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:18,padding:'28px 24px'}}>
-        <div style={{fontSize:26,fontWeight:900,marginBottom:4}}>🤖 Clutch Lab</div>
-        <div style={{fontSize:13,color:C.whiteMid,marginBottom:20}}>Générateur de bots — accès admin</div>
-        {uid && !isAdmin && <div style={{fontSize:12,color:C.red,marginBottom:14}}>Ce compte n'est pas admin. <button onClick={logout} style={{background:'none',border:'none',color:C.salmon,textDecoration:'underline',cursor:'pointer',fontSize:12}}>Changer de compte</button></div>}
-        {!uid && <>
-          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email"
-            style={{width:'100%',boxSizing:'border-box',padding:'12px 14px',marginBottom:10,borderRadius:10,border:`1px solid ${C.border}`,background:C.bgInput,color:C.white,fontSize:14,outline:'none',fontFamily:'inherit'}}/>
-          <input value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doLogin()}} placeholder="Mot de passe" type="password" autoComplete="current-password"
-            style={{width:'100%',boxSizing:'border-box',padding:'12px 14px',marginBottom:14,borderRadius:10,border:`1px solid ${C.border}`,background:C.bgInput,color:C.white,fontSize:14,outline:'none',fontFamily:'inherit'}}/>
-          {loginErr && <div style={{fontSize:12,color:C.red,marginBottom:12}}>{loginErr}</div>}
-          <button onClick={doLogin} disabled={loggingIn} style={{width:'100%',padding:'13px',borderRadius:12,border:'none',background:C.gold,color:'#1a0810',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:loggingIn?0.6:1}}>{loggingIn?'…':'Se connecter'}</button>
-        </>}
-      </div>
-    </div>
-  )
 
   const onlineCount = bots.filter(b=>b.is_available).length
 
@@ -259,36 +244,48 @@ export default function LabPage() {
       <div style={{position:'sticky',top:0,zIndex:10,background:'rgba(42,16,32,0.95)',backdropFilter:'blur(10px)',borderBottom:`1px solid ${C.border}`,padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
           <div style={{fontSize:18,fontWeight:900}}>🤖 Clutch Lab</div>
-          <div style={{fontSize:11,color:C.whiteMid}}>{bots.length} bots · {onlineCount} en ligne</div>
+          <div style={{fontSize:11,color:C.whiteMid}}>{bots.length} bots · {onlineCount} en ligne · {uid?'connecté ✓':'non connecté'}</div>
         </div>
-        <button onClick={logout} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.whiteMid,fontSize:12,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>Déconnexion</button>
+        {uid
+          ? <button onClick={logout} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.whiteMid,fontSize:12,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>Déconnexion</button>
+          : <button onClick={()=>setShowLogin(s=>!s)} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.salmon,fontSize:12,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>Se connecter</button>}
       </div>
 
       <div style={{maxWidth:680,margin:'0 auto',padding:'16px 20px 60px'}}>
+        {/* Login repli (optionnel, seulement si pas de session et demandé) */}
+        {!uid && showLogin && (
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16}}>
+            <div style={{fontSize:12,color:C.whiteMid,marginBottom:10}}>Connecte-toi avec ton compte de test (admin) pour piloter les bots.</div>
+            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" style={inp}/>
+            <input value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doLogin()}} placeholder="Mot de passe" type="password" autoComplete="current-password" style={inp}/>
+            {loginErr && <div style={{fontSize:12,color:C.red,marginBottom:10}}>{loginErr}</div>}
+            <button onClick={doLogin} disabled={loggingIn} style={{width:'100%',padding:'12px',borderRadius:12,border:'none',background:C.gold,color:'#1a0810',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:loggingIn?0.6:1}}>{loggingIn?'…':'Se connecter'}</button>
+          </div>
+        )}
+
         <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.6,marginBottom:16,background:C.bgCard,borderRadius:12,padding:'12px 14px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot → il apparaît dans tes Présences (app). ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> ×3-4 (regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
         </div>
 
-        {/* Actions globales */}
         <div style={{display:'flex',gap:8,marginBottom:18,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(220,106,106,.12)" col={C.red}>🔄 Désactiver tous</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque)</Btn>
         </div>
 
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:30}}>Chargement des bots…</div>}
-        {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:30}}>Aucun bot (migration appliquée ?)</div>}
+        {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:30}}>Aucun bot (connecte-toi / migration appliquée ?)</div>}
 
         {bots.map(bot=>{
           const open = expanded===bot.id
           const TL = bot.account_type==='Rh'?'Rhodium':bot.account_type==='Au'?'Or':bot.account_type==='At'?'Astate':bot.account_type==='driver'?'Clutch Driver':'Hydrogène'
           const isH = !['Au','Rh','At','driver'].includes(bot.account_type)
+          const seek = bot.looking_for
           return (
           <div key={bot.id} style={{background:C.bgCard,border:`1px solid ${bot.is_available?C.green:C.border}`,borderRadius:14,marginBottom:10,overflow:'hidden'}}>
-            {/* En-tête cliquable → ouvre/ferme le panneau du bot */}
             <button onClick={()=>setExpanded(open?null:bot.id)}
               style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,padding:'14px',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:13,width:10,height:10,borderRadius:'50%',background:bot.is_available?C.green:'rgba(255,255,255,.15)',display:'inline-block'}}/>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                <span style={{width:10,height:10,borderRadius:'50%',background:bot.is_available?C.green:'rgba(255,255,255,.15)',display:'inline-block'}}/>
                 <span style={{fontSize:15,fontWeight:800,color:C.white}}>{bot.name}</span>
                 <span style={{fontSize:12,color:C.whiteMid}}>{bot.gender==='woman'?'♀':bot.gender==='man'?'♂':''} · {bot.age||'?'}a · {TL}</span>
                 {bot.account_type==='driver' && <span style={{fontSize:9,fontWeight:900,padding:'1px 6px',borderRadius:10,background:'#FF5FA222',color:'#FF5FA2',border:'1px solid #FF5FA244'}}>✦ CD</span>}
@@ -297,7 +294,6 @@ export default function LabPage() {
             </button>
 
             {open && <div style={{padding:'0 14px 14px'}}>
-              {/* Statut toggle rapide */}
               <button onClick={()=>bot.is_available?deactivate(bot):activate(bot,'me')} disabled={!!busy}
                 style={{fontSize:11,fontWeight:800,padding:'6px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
                   border:`1px solid ${bot.is_available?C.green:C.border}`,background:bot.is_available?'rgba(45,189,126,.15)':'transparent',color:bot.is_available?C.green:C.whiteMid}}>
@@ -332,6 +328,15 @@ export default function LabPage() {
                 </div>
               )}
 
+              {/* Créneau horaire */}
+              <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>CRÉNEAU (vide = maintenant → +6h) :</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
+                <input type="time" value={slotFrom[bot.id]||''} onChange={e=>setSlotFrom(s=>({...s,[bot.id]:e.target.value}))} style={{padding:'7px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bgInput,color:C.white,fontSize:12,fontFamily:'inherit'}}/>
+                <span style={{fontSize:12,color:C.whiteMid}}>→</span>
+                <input type="time" value={slotUntil[bot.id]||''} onChange={e=>setSlotUntil(s=>({...s,[bot.id]:e.target.value}))} style={{padding:'7px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bgInput,color:C.white,fontSize:12,fontFamily:'inherit'}}/>
+                <Btn onClick={()=>activateAt(bot, bot.center_lat??myLat, bot.center_lng??myLng, 'créneau')} bg={C.salmonFaint} col={C.salmon}>⏱ Appliquer</Btn>
+              </div>
+
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
                 <Btn onClick={()=>patchBot(bot,{age:(bot.age||25)+1},`${bot.name} : ${(bot.age||25)+1} ans`)}>âge +1</Btn>
                 <Btn onClick={()=>patchBot(bot,{age:Math.max(18,(bot.age||25)-1)},`${bot.name} : ${Math.max(18,(bot.age||25)-1)} ans`)}>âge −1</Btn>
@@ -342,6 +347,15 @@ export default function LabPage() {
                 {[['H','Hydrogène'],['Au','Or'],['Rh','Rhodium'],['At','Astate']].map(([v,lab])=>{
                   const sel = bot.account_type===v || (v==='H'&&isH)
                   return <Btn key={v} onClick={()=>patchBot(bot,{account_type:v},`${bot.name} : ${lab}`)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
+                })}
+              </div>
+
+              {/* Genre recherché */}
+              <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>CHERCHE (genre) :</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                {[['F','♀ Femmes'],['M','♂ Hommes'],['ALL','Tout le monde']].map(([v,lab])=>{
+                  const sel = (seek||'ALL')===v || (v==='ALL'&&!['M','F'].includes(seek))
+                  return <Btn key={v} onClick={()=>patchBot(bot,{looking_for:v},`${bot.name} cherche : ${lab}`)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
                 })}
               </div>
 

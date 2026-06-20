@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z75'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z76'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4219,6 +4219,8 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string|null>(null)
   const [radius, setRadius] = useState<Record<string,number>>({})
+  const [slotFrom, setSlotFrom] = useState<Record<string,string>>({})
+  const [slotUntil, setSlotUntil] = useState<Record<string,string>>({})
   const myLat = user?.center_lat ?? 46.5197
   const myLng = user?.center_lng ?? 6.6323
   const POS:Record<string,{lat:number,lng:number,label:string}> = {
@@ -4228,17 +4230,27 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   }
   const load = async () => {
     const { data } = await supabase.from('profiles')
-      .select('id,name,gender,age,is_available,center_lat,available_radius_km,account_type')
+      .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until')
       .eq('is_bot', true).order('name')
     setBots(data||[]); setLoading(false)
   }
   useEffect(()=>{ load() },[])
 
+  // Construit un ISO aujourd'hui à partir de "HH:MM" (ou null → défaut)
+  const slotISO = (hhmm:string|undefined, fallbackMs:number) => {
+    if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return new Date(fallbackMs).toISOString()
+    const [h,m] = hhmm.split(':').map(Number)
+    const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
+  }
   const activateAt = async (bot:any, lat:number, lng:number, label:string) => {
     setBusy(bot.id)
     const r = radius[bot.id] ?? 10
+    // Créneau : si réglé, on respecte ; sinon maintenant → +6h (et available_from=now obligatoire pour le filtre horaire)
+    const sf = slotFrom[bot.id], su = slotUntil[bot.id]
+    const fromISO  = slotISO(sf, Date.now())
+    const untilISO = slotISO(su, Date.now()+6*3600*1000)
     const { data, error } = await supabase.from('profiles').update({
-      is_available:true, available_until:new Date(Date.now()+6*3600*1000).toISOString(),
+      is_available:true, available_from:fromISO, available_until:untilISO,
       center_lat:lat, center_lng:lng, available_radius_km:r,
     }).eq('id', bot.id).select('id')
     setBusy(null)
@@ -4391,11 +4403,11 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:9999,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
-      <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',zIndex:2}}>
+      <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',zIndex:2}}>
         <div style={{fontSize:16,fontWeight:900,color:C.white}}>🤖 Générateur de bots</div>
-        <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer'}}>✕</button>
+        <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer',padding:'4px 4px 4px 12px'}}>✕</button>
       </div>
-      <div style={{padding:'12px 16px 40px'}}>
+      <div style={{padding:'12px 16px calc(env(safe-area-inset-bottom, 0px) + 60px)'}}>
         <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
         </div>
@@ -4448,6 +4460,16 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
                 ))}
               </div>
             )}
+            {/* Créneau horaire (available_from → available_until) — pour tester le filtre de chevauchement + la fenêtre RDV */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>CRÉNEAU (laisser vide = maintenant → +6h) :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8,alignItems:'center'}}>
+              <input type="time" value={slotFrom[bot.id]||''} onChange={e=>setSlotFrom(s=>({...s,[bot.id]:e.target.value}))}
+                style={{padding:'6px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit'}}/>
+              <span style={{fontSize:11,color:C.whiteMid}}>→</span>
+              <input type="time" value={slotUntil[bot.id]||''} onChange={e=>setSlotUntil(s=>({...s,[bot.id]:e.target.value}))}
+                style={{padding:'6px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,fontSize:11,fontFamily:'inherit'}}/>
+              <Btn onClick={()=>activateAt(bot, bot.center_lat??myLat, bot.center_lng??myLng, 'créneau')} bg={C.salmonFaint} col={C.salmon}>⏱ Appliquer le créneau</Btn>
+            </div>
             {/* Réglages : âge + type de compte */}
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}>
               <Btn onClick={()=>patchBot(bot,{age:(bot.age||25)+1},`${bot.name} : ${(bot.age||25)+1} ans`)}>âge +1</Btn>
@@ -4460,6 +4482,14 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
                 <Btn key={v} onClick={()=>patchBot(bot,{account_type:v},`${bot.name} : ${lab}`)}
                   bg={bot.account_type===v||(v==='H'&&!['Au','Rh','At','driver'].includes(bot.account_type))?C.gold:C.bgCard} col={bot.account_type===v||(v==='H'&&!['Au','Rh','At','driver'].includes(bot.account_type))?'#1a0810':C.white}>{lab}</Btn>
               ))}
+            </div>
+            {/* Genre recherché (looking_for) — pour tester le filtre genre symétrique */}
+            <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>CHERCHE (genre) :</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              {[['F','♀ Femmes'],['M','♂ Hommes'],['ALL','Tout le monde']].map(([v,lab])=>{
+                const sel = (bot.looking_for||'ALL')===v || (v==='ALL'&&!['M','F'].includes(bot.looking_for))
+                return <Btn key={v} onClick={()=>patchBot(bot,{looking_for:v},`${bot.name} cherche : ${lab}`)} bg={sel?C.gold:C.bgCard} col={sel?'#1a0810':C.white}>{lab}</Btn>
+              })}
             </div>
             {/* Scénarios */}
             <div style={{fontSize:9,color:C.whiteMid,letterSpacing:'.06em',marginBottom:5}}>SCÉNARIOS :</div>
@@ -7303,10 +7333,20 @@ export default function App2() {
     if (lapinIds.has((p as any).id)) return false
     // Clutch Driver = rôle organisateur → masqué des Présences (visible uniquement dans Événements)
     if ((p as any).account_type === 'driver') return false
-    // Filtre genre
+    // Filtre genre (MA préférence d'affichage)
     if (filterGender !== 'all') {
       const gk = genderKey((p as any).gender)
       if (gk !== 'X' && gk !== filterGender) return false
+    }
+    // Symétrie genre : est-ce que MON genre entre dans CE QU'ILS cherchent ?
+    // looking_for est surchargé (parfois 'romance'/'friendship'/'pro' = mode) → on ne filtre QUE
+    // si la valeur est explicitement 'M'/'F' (genre recherché). 'ALL'/mode/null = pas de filtre.
+    {
+      const theirSeek = (p as any).looking_for
+      if (theirSeek === 'M' || theirSeek === 'F') {
+        const myGk = genderKey((user as any)?.gender)
+        if (myGk !== 'X' && myGk !== theirSeek) return false
+      }
     }
     // Filtre âge — bidirectionnel
     const theirAge = (p as any).age ? parseInt((p as any).age) : null

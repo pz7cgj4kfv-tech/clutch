@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z57'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z58'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4416,13 +4416,40 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   // SOS — contacts d'urgence (persistés en localStorage)
   const sosKey = `clutch_sos_${user.id}`
-  const [sosName, setSosName] = useState(()=>{ try{return JSON.parse(localStorage.getItem(sosKey)||'{}').name||''}catch{return ''} })
-  const [sosPhone, setSosPhone] = useState(()=>{ try{return JSON.parse(localStorage.getItem(sosKey)||'{}').phone||''}catch{return ''} })
+  const [sosContacts, setSosContacts] = useState<{name:string;phone:string}[]>(()=>{
+    try {
+      const raw = JSON.parse(localStorage.getItem(sosKey)||'{}')
+      if (Array.isArray(raw.contacts) && raw.contacts.length) return raw.contacts.slice(0,3)
+      if (raw.name || raw.phone) return [{name:raw.name||'',phone:raw.phone||''}]  // migration ancien format 1 contact
+    } catch {}
+    return [{name:'',phone:''}]
+  })
   const [sosSaving, setSosSaving] = useState(false)
+  const setSosField = (i:number, field:'name'|'phone', val:string) => setSosContacts(cs=>cs.map((c,j)=>j===i?{...c,[field]:val}:c))
+  const addSosContact = () => setSosContacts(cs=>cs.length<3?[...cs,{name:'',phone:''}]:cs)
+  const removeSosContact = (i:number) => setSosContacts(cs=>cs.length>1?cs.filter((_,j)=>j!==i):cs)
+  const sosName = sosContacts[0]?.name || ''  // compat affichage MRow
   const saveSos = () => {
     setSosSaving(true)
-    try { localStorage.setItem(sosKey, JSON.stringify({name:sosName.trim(), phone:sosPhone.trim()})) } catch {}
-    setTimeout(()=>{setSosSaving(false); showToast('✓ Contact SOS sauvegardé', C.green)}, 300)
+    const clean = sosContacts.filter(c=>c.name.trim()||c.phone.trim())
+    try { localStorage.setItem(sosKey, JSON.stringify({contacts:clean})) } catch {}
+    setTimeout(()=>{setSosSaving(false); showToast('✓ Contacts SOS sauvegardés', C.green)}, 300)
+  }
+  const triggerSOS = () => {
+    const valid = sosContacts.filter(c=>c.phone.trim())
+    if (!valid.length) { showToast('Ajoute au moins un numéro de contact', C.red); return }
+    const send = (locTxt:string) => {
+      const body = encodeURIComponent(`🆘 ALERTE Clutch — j'ai besoin d'aide.${locTxt}`)
+      const nums = valid.map(c=>c.phone.trim()).join(',')
+      window.location.href = `sms:${nums}&body=${body}`  // iOS : numéros séparés par virgule + &body
+    }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => send(` Ma position : https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
+        () => send(''),
+        { timeout: 5000 }
+      )
+    } else send('')
   }
 
   // Mode réception (pour les femmes) — persisté localStorage
@@ -4984,19 +5011,42 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const PageSecurity = () => (
     <div>
       <div style={{background:'rgba(248,113,113,0.06)',border:'1.5px solid rgba(248,113,113,0.25)',borderRadius:14,padding:'16px',marginBottom:12}}>
-        <div style={{fontSize:14,fontWeight:800,color:'#f87171',marginBottom:8}}>🆘 Contact d'urgence</div>
+        <div style={{fontSize:14,fontWeight:800,color:'#f87171',marginBottom:8}}>🆘 Contacts d'urgence <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>({sosContacts.length}/3)</span></div>
         <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.6,marginBottom:14}}>
-          En cas de problème, appuie longuement sur le logo Clutch → SOS → ton contact est prévenu avec ta position.
+          En cas de problème, déclenche l'alerte → un SMS part vers tes contacts avec ta position GPS. Jusqu'à 3 contacts de confiance.
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          <input value={sosName} onChange={e=>setSosName(e.target.value)} placeholder="Nom du contact (ex: Maman)"
-            style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
-          <input value={sosPhone} onChange={e=>setSosPhone(e.target.value)} placeholder="Numéro (+41…)" type="tel"
-            style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
-          <button onClick={saveSos} disabled={sosSaving||!sosName.trim()||!sosPhone.trim()}
-            style={{width:'100%',padding:'12px',borderRadius:12,border:'none',background:'#f87171',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:sosSaving||!sosName.trim()||!sosPhone.trim()?.5:1}}>
-            {sosSaving?'Sauvegarde…':'💾 Sauvegarder'}
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {sosContacts.map((c,i)=>(
+            <div key={i} style={{display:'flex',gap:6,alignItems:'center'}}>
+              <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                <input value={c.name} onChange={e=>setSosField(i,'name',e.target.value)} placeholder={`Nom (ex: ${i===0?'Maman':i===1?'Amie':'Frère'})`}
+                  style={{width:'100%',padding:'10px 13px',borderRadius:11,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+                <input value={c.phone} onChange={e=>setSosField(i,'phone',e.target.value)} placeholder="Numéro (+41…)" type="tel"
+                  style={{width:'100%',padding:'10px 13px',borderRadius:11,border:'1.5px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.05)',color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+              </div>
+              {sosContacts.length>1 && (
+                <button onClick={()=>removeSosContact(i)} title="Retirer"
+                  style={{flexShrink:0,width:32,height:32,borderRadius:'50%',border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:16,cursor:'pointer',fontFamily:'inherit'}}>×</button>
+              )}
+            </div>
+          ))}
+          {sosContacts.length<3 && (
+            <button onClick={addSosContact}
+              style={{padding:'9px',borderRadius:11,border:`1px dashed ${C.salmon}66`,background:'transparent',color:C.salmon,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+              + Ajouter un contact
+            </button>
+          )}
+          <button onClick={saveSos} disabled={sosSaving}
+            style={{width:'100%',padding:'12px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.white,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:sosSaving?.5:1}}>
+            {sosSaving?'Sauvegarde…':'💾 Sauvegarder les contacts'}
           </button>
+          <button onClick={triggerSOS}
+            style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'#ef4444',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 12px rgba(239,68,68,.4)',letterSpacing:.3}}>
+            🆘 Déclencher l'alerte SOS
+          </button>
+          <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',lineHeight:1.5}}>
+            Ouvre ton app SMS pré-remplie (message + position). Tu valides l'envoi.
+          </div>
         </div>
       </div>
       {(()=>{

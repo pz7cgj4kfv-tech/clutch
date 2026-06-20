@@ -4,8 +4,22 @@
  * NE JAMAIS utiliser #ef4444, #000, #0a0a0a, etc. dans le code UI.
  * Toujours importer depuis ce fichier.
  *
- * Palette extraite du logo officiel Clutch (fond prune, icône pêche, texte or)
+ * ⚠️ NOUVELLE IDENTITÉ MEL (20 juin 2026) — thème BLANC. Voir `mel` ci-dessous.
+ * L'ancienne palette sombre (prune+orange) reste pour l'app actuelle tant que la
+ * migration thème blanc n'est pas faite. brand.mel = cible design validée Mel.
  */
+
+// ── PALETTE OFFICIELLE MEL (20.06.2026) — thème blanc ────────────────────────
+export const mel = {
+  plum:    '#532943',   // Pantone 5115 C — prune foncé : nav active, splash, logo, ombres profondes
+  pink:    '#EB6BAF',   // Pantone 218 C — rose : labels actifs, "CLU", accents, CTA
+  green:   '#77BC1F',   // Pantone 368 C — vert : "TCH", Contacts actif, validations
+  ink70:   '#6F6F6E',   // noir 70% — texte fort : prénom, âge, description
+  ink40:   '#B2B2B2',   // noir 40% — gris : rond, étoiles, pin, titres de page, horaire, lieu
+  white:   '#FFFFFF',   // fond, fond profil
+  shadow15:'#E3E3E3',   // noir 15% — ombres des éléments, contour progressif
+  plumDark:'#2C1020',   // ombre sous le logo (contour progressif)
+} as const
 
 export const brand = {
   // ── Backgrounds ──────────────────────────────────────────────────────────

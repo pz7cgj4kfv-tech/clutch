@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z80'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z81'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -98,18 +98,23 @@ const Sounds = {
 }
 
 // ─── Palette — fond = splash (#542A44), cohérence totale ────────
+// ── THÈME BLANC MEL (20.06.2026) — remap sémantique de C ──────────────────────
+// bg=blanc · white=texte foncé · whiteMid/salmon=gris · bordeaux=prune (CTA/actif)
+// orange=rose (accent) · green=vert Mel · border=gris clair.
 const C = {
-  bg:'#542A44',          // fond principal = même que splash/page-zéro
-  bgCard:'#7A3D65',      // cartes — boosté pour contraste outdoor
-  bgSheet:'#6A3358',     // bottom sheets
-  bordeaux:'#3D1A33',    // accent sombre (boutons, ombres)
-  bordeauxLight:'#7A3D65', // accent moyen
-  salmon:'#FFBF9E', salmonFaint:'rgba(255,191,158,0.15)', salmonMid:'rgba(255,191,158,0.5)',
-  orange:'#E27C00', orangeFaint:'rgba(226,124,0,0.15)',
-  white:'#FFFFFF', whiteMid:'rgba(255,255,255,0.82)', whiteFaint:'rgba(255,191,158,0.12)',
-  border:'rgba(255,191,158,0.30)', borderStrong:'rgba(255,191,158,0.55)',
-  green:'#2DBD7E', red:'#ef4444',
-  gold:'C.gold',
+  bg:'#FFFFFF',          // fond principal (blanc)
+  bgCard:'#FFFFFF',      // cartes (blanc + bordure/ombre pour séparer)
+  bgSheet:'#FFFFFF',     // bottom sheets
+  bordeaux:'#532943',    // prune — accent fort, CTA, onglet actif, ombres
+  bordeauxLight:'#6E3A5C',
+  salmon:'#6F6F6E', salmonFaint:'rgba(83,41,67,0.06)', salmonMid:'#B2B2B2',
+  orange:'#EB6BAF', orangeFaint:'rgba(235,107,175,0.12)',
+  white:'#4A2A3D', whiteMid:'#6F6F6E', whiteFaint:'rgba(83,41,67,0.05)',
+  border:'#E3E3E3', borderStrong:'#B2B2B2',
+  green:'#77BC1F', red:'#dc2626',
+  gold:'#EB6BAF',
+  // tokens additionnels thème blanc
+  plum:'#532943', pink:'#EB6BAF', ink:'#6F6F6E', grayIcon:'#B2B2B2', onAccent:'#FFFFFF',
 }
 
 // ─── Config fiabilité — TOUTES les pondérations ici, jamais inline ─
@@ -1094,7 +1099,7 @@ function Input({ label,...props }:{label:string}&React.InputHTMLAttributes<HTMLI
 }
 function Btn({children,variant='primary',loading,...props}:{children:React.ReactNode;variant?:'primary'|'secondary';loading?:boolean}&React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const p=variant==='primary'
-  return <button {...props} disabled={loading||props.disabled} style={{width:'100%',padding:'15px',background:p?C.salmon:'transparent',color:p?C.bg:C.whiteMid,border:p?'none':`1px solid ${C.border}`,borderRadius:14,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:loading?.7:1,...props.style}}>{loading?'…':children}</button>
+  return <button {...props} disabled={loading||props.disabled} style={{width:'100%',padding:'15px',background:p?C.plum:'transparent',color:p?C.onAccent:C.whiteMid,border:p?'none':`1px solid ${C.border}`,borderRadius:14,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:loading?.7:1,...props.style}}>{loading?'…':children}</button>
 }
 
 function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>void;onRegister:()=>void;showToast:(m:string,c?:string)=>void}) {
@@ -1104,7 +1109,7 @@ function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>vo
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px'}}>
       <div style={{width:'100%',maxWidth:360}}>
         <div style={{textAlign:'center',marginBottom:40}}>
-          <div style={{fontSize:36,fontWeight:900,letterSpacing:'-.05em',color:C.salmon,marginBottom:6}}>CLU<span style={{color:C.orange}}>TCH</span></div>
+          <div style={{fontSize:36,fontWeight:900,letterSpacing:'-.05em',color:C.pink,marginBottom:6}}>CLU<span style={{color:C.green}}>TCH</span></div>
           <div style={{fontSize:12,color:C.whiteMid,letterSpacing:'.15em',textTransform:'uppercase'}}>Welcome</div>
         </div>
         <Input label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com" onKeyDown={e=>e.key==='Enter'&&login()}/>
@@ -1192,7 +1197,7 @@ function RegisterScreen({onSuccess,onLogin,showToast}:{onSuccess:(p:Profile)=>vo
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',overflowY:'auto'}}>
       <div style={{width:'100%',maxWidth:360}}>
         <div style={{textAlign:'center',marginBottom:28}}>
-          <div style={{fontSize:36,fontWeight:900,letterSpacing:'-.05em',color:C.salmon,marginBottom:6}}>CLU<span style={{color:C.orange}}>TCH</span></div>
+          <div style={{fontSize:36,fontWeight:900,letterSpacing:'-.05em',color:C.pink,marginBottom:6}}>CLU<span style={{color:C.green}}>TCH</span></div>
           <div style={{fontSize:12,color:C.whiteMid}}>Create your account — 1 minute</div>
         </div>
 
@@ -2237,7 +2242,7 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:
               <select
                 value={counterTime}
                 onChange={e=>setCounterTime(e.target.value)}
-                style={{padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'#2a1020',color:counterTime?C.white:C.whiteMid,fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'}}
+                style={{padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:counterTime?C.white:C.whiteMid,fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'}}
               >
                 <option value="">{isFr?'Choisir une heure…':'Pick a time…'}</option>
                 {counterSlots.map(s=><option key={s.iso} value={s.iso}>{s.label}</option>)}
@@ -8936,7 +8941,7 @@ export default function App2() {
                 const contactClutches = [..._byPerson.values()]
 
                 return (
-                  <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:'#2a1020',display:'flex',flexDirection:'column',overflowY:'auto'}}>
+                  <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
                     {/* Header */}
                     <div style={{padding:'16px 16px 12px',paddingTop:'calc(env(safe-area-inset-top,8px) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
                       <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
@@ -9251,7 +9256,7 @@ export default function App2() {
             }
             return (
               <div style={{position:'fixed',inset:0,zIndex:4100,background:'rgba(10,4,8,.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={()=>setKeepContactClutch(null)}>
-                <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:'#2a1020',borderRadius:'20px 20px 0 0',padding:'28px 24px 48px',border:'1px solid rgba(255,191,158,.15)'}}>
+                <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'20px 20px 0 0',padding:'28px 24px 48px',border:`1px solid ${C.border}`,boxShadow:'0 -8px 30px rgba(0,0,0,.12)'}}>
                   <div style={{textAlign:'center',marginBottom:24}}>
                     {otherPhoto && <div style={{width:64,height:64,borderRadius:'50%',backgroundImage:`url(${otherPhoto})`,backgroundSize:'cover',backgroundPosition:'center',margin:'0 auto 12px',border:'3px solid rgba(255,191,158,.3)'}}/>}
                     <div style={{fontSize:18,fontWeight:900,color:'#f5e8de',marginBottom:6}}>{alreadyContact ? '✦ Déjà dans tes contacts' : 'Garder le contact ?'}</div>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z56'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z57'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4253,6 +4253,17 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     setBusy(null); if(!data?.length){showToast('❌ Échec',C.red);return}
     showToast(`✓ RDV de ${bot.name} mis à maintenant — le radar s'affiche 📡`,C.green)
   }
+  const deactivateAll = async () => {
+    setBusy('all')
+    await supabase.from('profiles').update({ is_available:false }).eq('is_bot', true)
+    setBusy(null); showToast('Tous les bots désactivés', C.orange); load()
+  }
+  const resetMyOnboarding = async () => {
+    if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
+    await supabase.from('profiles').update({ photo_url:null, age:null, gender:null, is_available:false }).eq('id', user.id)
+    try { localStorage.removeItem('clutch_onboarding_done') } catch {}
+    showToast("✓ Déconnecte-toi puis reconnecte-toi → l'inscription recommence", C.orange)
+  }
 
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
     <button onClick={onClick} disabled={!!busy} style={{padding:'7px 10px',borderRadius:9,border:`1px solid ${C.border}`,background:bg,color:col,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:busy?.6:1}}>{children}</button>
@@ -4267,6 +4278,11 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       <div style={{padding:'12px 16px 40px'}}>
         <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
+        </div>
+        {/* Actions globales */}
+        <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+          <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
+          <Btn onClick={resetMyOnboarding} bg={C.salmonFaint} col={C.salmon}>👤 Refaire mon inscription</Btn>
         </div>
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Chargement…</div>}
         {!loading && bots.length===0 && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Aucun bot (migration appliquée ?)</div>}

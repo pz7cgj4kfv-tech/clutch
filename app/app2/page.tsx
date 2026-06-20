@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z59'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z60'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5180,15 +5180,20 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
       </div>
 
-      {/* ─── SCORE FIABILITÉ ─── */}
-      <div style={{padding:'10px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
-        <div style={{flex:1,height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${user.reliability_score??100}%`,background:(user.reliability_score??100)>=80?C.green:C.orange,borderRadius:2,transition:'width .4s'}}/>
-        </div>
-        <span style={{fontSize:11,fontWeight:800,color:(user.reliability_score??100)>=80?C.green:C.orange,flexShrink:0}}>
-          Fiabilité {user.reliability_score??100}/100
-        </span>
-      </div>
+      {/* ─── BADGE FIABILITÉ (badge, pas chiffre — audit GPT + ADN : on ne montre jamais la note brute) ─── */}
+      {(()=>{
+        const rs = user.reliability_score ?? 100
+        const lvl = rs>=90?{e:'🏆',t:'Exemplaire',c:C.green}:rs>=75?{e:'⭐',t:'Très fiable',c:C.green}:rs>=50?{e:'🟢',t:'Fiable',c:C.green}:rs>=30?{e:'🌿',t:'En construction',c:C.orange}:{e:'🌱',t:'Nouveau membre',c:C.orange}
+        return (
+          <div style={{padding:'10px 16px 4px',display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:14}}>{lvl.e}</span>
+            <span style={{fontSize:12,fontWeight:800,color:lvl.c,flexShrink:0}}>{lvl.t}</span>
+            <div style={{flex:1,height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${rs}%`,background:lvl.c,borderRadius:2,transition:'width .4s'}}/>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ─── BARRE COMPLÉTION ─── */}
       {(()=>{

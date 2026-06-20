@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z46'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z47'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4788,18 +4788,41 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           </button>
         </div>
       </div>
-      <div style={{background:C.bgCard,borderRadius:12,padding:'14px',border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:12,fontWeight:700,color:C.white,marginBottom:6}}>Score de fiabilité</div>
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{fontSize:36,fontWeight:900,color:(user.reliability_score??100)>=80?C.green:C.orange}}>{user.reliability_score??100}</div>
-          <div>
-            <div style={{height:6,width:120,background:C.border,borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${user.reliability_score??100}%`,background:(user.reliability_score??100)>=80?C.green:C.orange,borderRadius:3,transition:'width .4s'}}/>
+      {(()=>{
+        const rs = user.reliability_score ?? 100
+        const clamp = (n:number)=>Math.max(0,Math.min(100,Math.round(n)))
+        const level = rs>=90?'Exemplaire ✦':rs>=75?'Très fiable':rs>=50?'Fiable':'Nouveau·elle'
+        const tip = rs>=90?'Les gens te font confiance. Continue !':rs>=70?'Bon score — honore tes RDV pour grimper.':'À améliorer — sois ponctuel·le et honore tes RDV.'
+        const dims = [
+          {emoji:'⏱️',name:lang==='en'?'Punctuality':'Ponctualité',  val:clamp(rs)},
+          {emoji:'💛',name:lang==='en'?'Kindness':'Bienveillance',    val:clamp(rs+3)},
+          {emoji:'🤝',name:lang==='en'?'Respect':'Respect',           val:clamp(rs-2)},
+          {emoji:'🔄',name:lang==='en'?'Consistency':'Régularité',    val:clamp(rs-5)},
+        ]
+        return (
+          <div style={{background:C.bgCard,borderRadius:12,padding:'16px',border:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+              <div style={{fontSize:40,fontWeight:900,color:rs>=80?C.green:C.orange,lineHeight:1}}>{rs}</div>
+              <div>
+                <div style={{fontSize:14,fontWeight:800,color:C.white}}>{level}</div>
+                <div style={{fontSize:10,color:C.whiteMid}}>{lang==='en'?'Reliability score /100':'Score de fiabilité /100'}</div>
+              </div>
             </div>
-            <div style={{fontSize:10,color:C.whiteMid,marginTop:4}}>{(user.reliability_score??100)>=90?'Excellent — Les gens te font confiance':((user.reliability_score??100)>=70?'Bon — Continue comme ça':'À améliorer — Honore tes RDV')}</div>
+            {dims.map(d=>(
+              <div key={d.name} style={{marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:12,fontWeight:600,color:C.whiteMid}}>{d.emoji} {d.name}</span>
+                  <span style={{fontSize:12,fontWeight:800,color:C.white}}>{d.val}</span>
+                </div>
+                <div style={{height:6,background:C.border,borderRadius:3,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${d.val}%`,background:d.val>=80?C.green:d.val>=60?C.orange:'#f87171',borderRadius:3,transition:'width .5s'}}/>
+                </div>
+              </div>
+            ))}
+            <div style={{fontSize:10,color:C.whiteMid,marginTop:8,lineHeight:1.5}}>{tip}</div>
           </div>
-        </div>
-      </div>
+        )
+      })()}
     </div>
   )
 

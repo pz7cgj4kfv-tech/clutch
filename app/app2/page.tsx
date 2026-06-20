@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z45'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z46'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2746,7 +2746,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvTitle, setNewEvTitle] = useState('')
   const [newEvLieu, setNewEvLieu] = useState('')
   const [newEvTime, setNewEvTime] = useState('')
-  const [newEvMax, setNewEvMax] = useState(8)
+  const [newEvMax, setNewEvMax] = useState(6)
   const [newEvDesc, setNewEvDesc] = useState('')
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -2801,7 +2801,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(8)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6)
   }
 
   const [selEv, setSelEv] = useState<any|null>(()=>
@@ -2837,10 +2837,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     return true
   })
 
+  const isRealEvent = (id:any) => typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
   const doRegister = async (ev: any) => {
     if (registered.has(ev.id)) return
     setRegistering(true)
-    await new Promise(r=>setTimeout(r,600))
+    // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
+    try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
+    await new Promise(r=>setTimeout(r,400))
     setRegistered((prev:Set<string>)=>new Set([...prev,ev.id]))
     setRegistering(false)
     // Auto-ferme la sheet après 1.5s (laisse voir la confirmation)
@@ -2853,7 +2856,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:6}}>{t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
           <button onClick={()=>setShowCreateGroup(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',borderRadius:20,background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-            <span style={{fontSize:14,lineHeight:1}}>+</span> Créer un groupe
+            <span style={{fontSize:14,lineHeight:1}}>+</span> Organiser
           </button>
         </div>
         {/* Filtres avec compteurs dynamiques */}
@@ -3118,7 +3121,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                               <div style={{fontSize:11,fontWeight:700,color:colors[level]}}>{p.emoji} {lang==='en'?'Penalty':'Pénalité'}: {lang==='en'?labels[level]:['Aucune','Mineure','Significative','Sévère'][level]}</div>
                             </div>
                             <div style={{display:'flex',gap:8}}>
-                              <button onClick={()=>{
+                              <button onClick={async()=>{
+                                try { if (isRealEvent(selEv.id) && userId) await supabase.from('event_participants').delete().eq('event_id',selEv.id).eq('user_id',userId) } catch {}
                                 setRegistered((prev:Set<string>)=>{const n=new Set(prev);n.delete(selEv.id);return n})
                                 onPenalty?.(reason)
                                 setUnregConfirmId(null)
@@ -3178,7 +3182,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             {/* Handle */}
             <div style={{width:36,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 18px'}}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-              <div style={{fontSize:16,fontWeight:900}}>👥 Créer un événement groupe</div>
+              <div style={{fontSize:16,fontWeight:900}}>🎟️ Organiser un événement</div>
               <button onClick={()=>setShowCreateGroup(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
             </div>
 
@@ -3219,8 +3223,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvTime?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
               </div>
               <div>
-                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 MAX PARTICIPANTS : <span style={{color:C.salmon}}>{newEvMax}</span></div>
-                <input type='range' min={3} max={20} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
+                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 PLACES : <span style={{color:C.salmon}}>{newEvMax}</span> <span style={{color:C.whiteMid,fontWeight:600}}>· dès 2</span></div>
+                <input type='range' min={2} max={6} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
                   style={{width:'100%',marginTop:14,accentColor:C.salmon}}/>
               </div>
             </div>
@@ -3237,7 +3241,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               style={{width:'100%',padding:'15px',borderRadius:14,background:newEvTitle&&newEvLieu&&newEvTime?C.salmon:'rgba(255,191,158,0.2)',border:'none',color:newEvTitle&&newEvLieu&&newEvTime?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:newEvTitle&&newEvLieu&&newEvTime?'pointer':'default',fontFamily:'inherit',transition:'all .2s'}}>
               {creating?'Création...':`✦ Publier l\'événement`}
             </button>
-            <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Visible dans Événements · Expire automatiquement après 18h</div>
+            <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Lieu public · 18+ · Visible dans Événements · Expire après 18h</div>
           </div>
         </div>
       )}

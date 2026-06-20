@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z72'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z73'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -161,6 +161,8 @@ function getAccountBadge(profile: any): {label:string; color:string; emoji:strin
     return {label:'Admin', color:'#F59E0B', emoji:'👑'}
   if (profile?.account_type === 'friend')
     return {label:'Friend', color:'#3B82F6', emoji:'💙'}
+  if (profile?.account_type === 'driver')
+    return {label:'Clutch Driver', color:'#FF5FA2', emoji:'✦'}  // CD rose — organisateur d'événements (différencier des membres)
   return null
 }
 function genderKey(g?: string|null): GenderKey {
@@ -2995,7 +2997,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 style={{background:C.bgCard,borderRadius:12,padding:'10px 14px',marginBottom:12,display:'flex',gap:10,alignItems:'center',cursor:'pointer',WebkitTapHighlightColor:'transparent',border:`1px solid ${C.border}`}}>
                 <Av src={selEv.creatorPhoto} name={selEv.creator} size={44}/>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:800}}>{selEv.creator} <span style={{fontSize:10,color:C.whiteMid}}>· Organizer</span></div>
+                  <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{selEv.creator}
+                    <span style={{fontSize:9,fontWeight:900,padding:'1px 6px',borderRadius:10,background:'#FF5FA222',color:'#FF5FA2',border:'1px solid #FF5FA244'}}>✦ CD</span>
+                    <span style={{fontSize:10,color:C.whiteMid}}>· Organizer</span></div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{selEv.creatorBio}</div>
                 </div>
                 <span style={{fontSize:11,color:C.salmon}}>→</span>

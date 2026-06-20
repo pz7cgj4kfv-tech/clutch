@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z71'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z72'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3703,6 +3703,7 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
   const other = clutch.sender_id===userId ? clutch.receiver : clutch.sender
   const [selected,setSelected] = useState<string|null>(null)
   const [done,setDone] = useState(false)
+  const [submitErr,setSubmitErr] = useState(false)
   const gpsVerified = !!(clutch as any).checkin_verified
 
   // 3 outcomes — objectifs, décision Mel + David 15.06.2026
@@ -3720,11 +3721,10 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
   const submit = async () => {
     if (!selected) return
     const r = OUTCOMES.find(r=>r.key===selected)!
-    try { localStorage.setItem(`feedback_done_${clutch.id}`, String(Date.now())) } catch {}
     const otherId = clutch.sender_id===userId ? clutch.receiver_id : clutch.sender_id
     const revealAt = new Date(Date.now() + TRUST_CONFIG.REVEAL_DELAY_HOURS * 60 * 60 * 1000).toISOString()
     // Nouveau système : rdv_feedbacks (double-révélation)
-    await supabase.from('rdv_feedbacks').upsert({
+    const { error: fbErr } = await supabase.from('rdv_feedbacks').upsert({
       rdv_id: clutch.id,
       from_id: userId,
       to_id: otherId,
@@ -3732,6 +3732,9 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
       revealed_at: revealAt,
       is_revealed: false,
     }, { onConflict: 'rdv_id,from_id' })
+    // Ne marquer "fait" que si l'écriture a réussi → sinon l'utilisateur pourra re-soumettre (pas de perte silencieuse)
+    if (!fbErr) { try { localStorage.setItem(`feedback_done_${clutch.id}`, String(Date.now())) } catch {} }
+    else { setSubmitErr(true); return }
     await supabase.from('feedback').upsert({
       clutch_id: clutch.id,
       given_by: userId,
@@ -3802,6 +3805,7 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
                 )
               })}
             </div>
+            {submitErr && <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(220,80,80,.12)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,textAlign:'center'}}>{lang==='en'?'Could not save — please try again':'Enregistrement impossible — réessaie'}</div>}
             <button onClick={submit} disabled={!selected}
               style={{width:'100%',padding:'14px',background:selected?`linear-gradient(135deg,${C.salmon},${C.orange})`:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
               {lang==='en'?'Send feedback':'Envoyer le feedback'}
@@ -4678,21 +4682,18 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       payload.gender = genderDbVal
       // NOTE: has_kids / kids_ages n'existent pas encore en DB → ne pas inclure
       // TODO: ajouter ces colonnes dans Supabase quand Mode Amitié sera implémenté
-      const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().single()
+      const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().maybeSingle()
       setSavingEdit(false)
-      if (error) {
-        // Si la colonne gender n'existe pas, retry AVEC gender (Supabase ignore colonnes inconnues parfois)
-        // → on loggue l'erreur mais on met quand même à jour l'état local avec le genre
-        console.warn('[Profile] save error:', error.message)
+      if (error || !data) {
+        // Erreur (colonne inconnue) OU 0 ligne (profil absent/RLS) → retry minimal + upsert fallback (ne jamais perdre la sauvegarde en silence)
+        if (error) console.warn('[Profile] save error:', error.message)
         const {data:d2} = await supabase.from('profiles').update({
           name:payload.name, bio:payload.bio, gender:genderDbVal
-        }).eq('id',user.id).select().single()
-        if (d2) {
-          // Forcer le genre dans l'objet retourné si absent
-          const merged = {...d2, gender: (d2 as any).gender ?? genderDbVal, languages: editLanguages}
-          onUserUpdate(merged as Profile); setEditing(false); showToast('✓ Profile updated',C.green)
-        } else showToast('Save error',C.red)
-      } else if (data) {
+        }).eq('id',user.id).select().maybeSingle()
+        if (!d2) { await supabase.from('profiles').upsert({ id:user.id, name:payload.name, bio:payload.bio, gender:genderDbVal }) }
+        const merged = {...user, ...(d2||{}), gender: genderDbVal, languages: editLanguages, name: payload.name, bio: payload.bio}
+        onUserUpdate(merged as Profile); setEditing(false); showToast('✓ Profile updated',C.green)
+      } else {
         // Forcer le genre dans l'objet retourné si absent
         const merged = {...data, gender: (data as any).gender ?? genderDbVal, languages: editLanguages}
         onUserUpdate(merged as Profile); setEditing(false); showToast('✓ Profile updated',C.green)
@@ -4717,8 +4718,14 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert:true, contentType: file.type||undefined })
     if (error) { showToast('Erreur upload : '+error.message, C.red); return }
     const { data:{ publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-    const { data } = await supabase.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id).select().single()
-    if (data) { onUserUpdate(data as Profile); showToast('✓ Photo mise à jour ✓', C.green) }
+    const { data, error: upErr } = await supabase.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id).select().maybeSingle()
+    if (!upErr && (!data)) {
+      // 0 ligne modifiée (ligne profiles absente/RLS) → upsert fallback pour ne jamais perdre la photo en silence
+      await supabase.from('profiles').upsert({ id: user.id, photo_url: publicUrl })
+    }
+    // On met TOUJOURS à jour l'état local (la photo est uploadée, l'URL est valide)
+    onUserUpdate({ ...user, photo_url: publicUrl } as Profile)
+    showToast('✓ Photo mise à jour ✓', C.green)
   }
 
   const unblock = async (blockedId:string) => {
@@ -6547,10 +6554,12 @@ export default function App2() {
         const hostMap = new Map((evs||[]).map((e:any)=>[e.created_by, e]))
         real.forEach((p:any)=>{ const e:any = hostMap.get(p.id); if(e){ p._hasEvent=true; p._eventId=e.id; p._eventEmoji=e.emoji||'📅' } })
       } catch {}
-      // Lapins : personnes à qui J'AI mis un "absent" (no-show) → ne plus jamais les afficher en présences
+      // Lapins : personnes à qui J'AI mis un "absent" (no-show) → masquées des présences pendant 48h (cooldown, pas à vie : une erreur/imprévu ne doit pas bannir quelqu'un définitivement — cf audit confiance)
       try {
-        const { data: lap } = await supabase.from('rdv_feedbacks').select('to_id').eq('from_id', user.id).eq('outcome','absent')
-        setLapinIds(new Set((lap||[]).map((f:any)=>f.to_id)))
+        const { data: lap } = await supabase.from('rdv_feedbacks').select('to_id,submitted_at').eq('from_id', user.id).eq('outcome','absent')
+        const cutoff = Date.now() - 48*3600*1000
+        const recent = (lap||[]).filter((f:any)=>{ const ts = f.submitted_at ? new Date(f.submitted_at).getTime() : Date.now(); return ts >= cutoff })
+        setLapinIds(new Set(recent.map((f:any)=>f.to_id)))
       } catch {}
       // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible
       const maxBot = {

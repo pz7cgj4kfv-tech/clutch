@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z82'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z83'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1426,19 +1426,19 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
       )}
       {/* Barre d'onglets — design clair (fond blanc cassé + cercles + pastille active violette).
           Transitoire : le reste de l'app passera au clair avec les couleurs de Mel. */}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:'rgba(248,243,237,0.97)',borderTop:'1px solid rgba(0,0,0,.06)',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
+      <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:'rgba(255,255,255,0.97)',borderTop:'1px solid #E3E3E3',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
           const isProfil = id==='profil'
-          const dotBase: React.CSSProperties = {position:'absolute',top:-2,right:-2,width:11,height:11,borderRadius:'50%',border:'2px solid #f8f3ed',zIndex:2}
+          const dotBase: React.CSSProperties = {position:'absolute',top:-2,right:-2,width:11,height:11,borderRadius:'50%',border:'2px solid #fff',zIndex:2}
           return (
             <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
-              <div style={{position:'relative',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:isActive?'#542A44':'transparent',border:isActive?'none':'1.5px solid rgba(0,0,0,.13)',boxShadow:isActive?'0 4px 12px rgba(84,42,68,.4)':'none',transition:'all .2s'}}>
-                <TabSvg id={id} size={23} active={isActive} filter={isActive?'brightness(0) invert(1)':'brightness(0) opacity(0.42)'}/>
+              <div style={{position:'relative',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={46} height={46} alt="" style={{display:'block'}}/>
                 {/* Pastille dispo sur Profil */}
                 {isProfil&&availInfo&&(
-                  <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #f8f3ed',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
+                  <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #fff',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
                 )}
                 {/* Badge — différencié par type */}
                 {badge && (()=>{
@@ -1451,7 +1451,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
                   return null
                 })()}
               </div>
-              <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?'#542A44':'rgba(0,0,0,0.4)',letterSpacing:'.04em'}}>{label}</div>
+              <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?'#EB6BAF':'rgba(0,0,0,0.4)',letterSpacing:'.04em'}}>{label}</div>
             </button>
           )
         })}

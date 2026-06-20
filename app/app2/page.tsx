@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z47'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z48'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5640,23 +5640,29 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
       return
     }
     setSaving(true)
+    // gender mappé vers les valeurs acceptées par la contrainte DB (man/woman/nb)
+    const dbGender = gender==='M'?'man':gender==='F'?'woman':'nb'
     const payload:any = {
       name: name.trim(),
       age: parseInt(age)||null,
-      gender,
+      gender: dbGender,
       looking_for: lookingFor,
+      // bio : on garde la catégorie métier si le métier libre est vide (la colonne job_category n'existe pas)
       bio: bio.trim()||null,
-      job: job.trim()||null,
-      job_category: jobCategory||null,
+      job: job.trim()||jobCategory||null,
       photo_url: photoUrl||null,
       available_city: city||'Lausanne',
-      setup_complete: true,
     }
-    const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().single()
+    // update + fallback upsert si la ligne profil n'existe pas encore (bug Supabase .update() silencieux)
+    let {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().maybeSingle()
+    if (!error && !data) {
+      const up = await supabase.from('profiles').upsert({ id:user.id, ...payload }).select().maybeSingle()
+      data = up.data; error = up.error
+    }
     setSaving(false)
     if (error) { showToast('Erreur sauvegarde: '+error.message, C.red); return }
     showToast('✓ Profil créé !', C.green)
-    onDone(data as Profile)
+    onDone((data || {...user, ...payload}) as Profile)
   }
 
   const GenderBtn = ({v,label}:{v:'M'|'F'|'NB',label:string}) => (

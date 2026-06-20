@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z69'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z70'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4692,21 +4692,16 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   }
 
   // Lit le fichier choisi → ouvre le cropper (au lieu d'uploader direct)
-  const pickPhoto = (file: File) => {
-    const reader = new FileReader()
-    reader.onload = () => setCropSrc(reader.result as string)
-    reader.readAsDataURL(file)
-  }
-  // Upload le blob recadré (toujours avatar.jpg + cache-bust pour forcer le rechargement)
-  const uploadBlob = async (blob: Blob) => {
-    setCropSrc(null)
-    const path = `${user.id}/avatar.jpg`
-    const {error:upErr} = await supabase.storage.from('avatars').upload(path, blob, {upsert:true, contentType:'image/jpeg'})
-    if (upErr) { showToast('Erreur upload',C.red); return }
-    const {data:{publicUrl}} = supabase.storage.from('avatars').getPublicUrl(path)
-    const url = `${publicUrl}?t=${Date.now()}`
-    const {data} = await supabase.from('profiles').update({photo_url:url}).eq('id',user.id).select().single()
-    if (data) { onUserUpdate(data as Profile); showToast('✓ Photo mise à jour',C.green) }
+  // Upload DIRECT et fiable (fichier unique horodaté → pas de cache CDN, pas d'écrasement d'une vieille image)
+  const pickPhoto = async (file: File) => {
+    showToast('Upload de la photo…', C.salmon)
+    const ext = ((file.name.split('.').pop()||'jpg').toLowerCase().match(/[a-z0-9]+/)?.[0]) || 'jpg'
+    const path = `${user.id}/avatar_${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert:true, contentType: file.type||undefined })
+    if (error) { showToast('Erreur upload : '+error.message, C.red); return }
+    const { data:{ publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+    const { data } = await supabase.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id).select().single()
+    if (data) { onUserUpdate(data as Profile); showToast('✓ Photo mise à jour ✓', C.green) }
   }
 
   const unblock = async (blockedId:string) => {
@@ -4808,7 +4803,6 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             })}
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0]){pickPhoto(e.target.files[0]);e.target.value=''}}}/>
-          {cropSrc && <PhotoCropper src={cropSrc} onCancel={()=>setCropSrc(null)} onSave={uploadBlob}/>}
           {swapFromIdx!==null&&<button onClick={()=>setSwapFromIdx(null)} style={{width:'100%',marginTop:6,padding:'6px',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕ Annuler</button>}
         </div>
 
@@ -6045,18 +6039,15 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
   ]
   const TOTAL = 5
 
-  const pickPhoto = (file:File) => {
-    const reader = new FileReader()
-    reader.onload = () => setCropSrc(reader.result as string)
-    reader.readAsDataURL(file)
-  }
-  const uploadBlob = async (blob:Blob) => {
-    setCropSrc(null)
-    const path = `${user.id}/avatar.jpg`
-    const {error} = await supabase.storage.from('avatars').upload(path, blob, {upsert:true, contentType:'image/jpeg'})
-    if (error) { showToast('Erreur upload photo',C.red); return }
+  const pickPhoto = async (file:File) => {
+    showToast('Upload de la photo…', C.salmon)
+    const ext = ((file.name.split('.').pop()||'jpg').toLowerCase().match(/[a-z0-9]+/)?.[0]) || 'jpg'
+    const path = `${user.id}/avatar_${Date.now()}.${ext}`
+    const {error} = await supabase.storage.from('avatars').upload(path, file, {upsert:true, contentType:file.type||undefined})
+    if (error) { showToast('Erreur upload photo : '+error.message,C.red); return }
     const {data:{publicUrl}} = supabase.storage.from('avatars').getPublicUrl(path)
-    setPhotoUrl(`${publicUrl}?t=${Date.now()}`)
+    setPhotoUrl(publicUrl)
+    showToast('✓ Photo ajoutée', C.green)
   }
 
   const saveAndContinue = async () => {
@@ -6118,7 +6109,6 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
         </div>
         <div style={{color:C.gold,fontSize:13,fontWeight:600}}>{photoUrl?'Changer la photo':'Choisir une photo'}</div>
         <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files?.[0]){pickPhoto(e.target.files[0]);e.target.value=''}}}/>
-        {cropSrc && <PhotoCropper src={cropSrc} onCancel={()=>setCropSrc(null)} onSave={uploadBlob}/>}
       </label>
       {photoUrl && <div style={{color:'#4ade80',fontSize:12,textAlign:'center'}}>✓ Photo ajoutée</div>}
     </div>,

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z77'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z78'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4358,6 +4358,24 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     }
     setBusy(null); showToast('✓ Reset complet — bots débloqués, ils réapparaissent', C.green); load()
   }
+  // Remplir le DERNIER event actif avec N bots (tester compteur places / min_participants / créateur qui flake)
+  const fillEventWithBots = async () => {
+    setBusy('all')
+    const { data: evs } = await supabase.from('events').select('id,title,spots,created_by').eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast("Aucun event actif — crée-en un d'abord (🎟️)", C.orange); return }
+    const ev = evs[0]
+    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
+    const botIds = (botRows||[]).map((b:any)=>b.id)
+    let ok=0
+    for (const bid of botIds) {
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid })
+      if (!error) ok++
+    }
+    const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
+    await supabase.from('events').update({ taken: count ?? ok }).eq('id', ev.id)
+    setBusy(null)
+    showToast(ok? `✓ ${ok} bots inscrits à "${ev.title}" (${count} au total)` : "❌ Applique la SQL event_participants_bot_admin", ok?C.green:C.red)
+  }
   const resetMyOnboarding = async () => {
     if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
     await supabase.from('profiles').update({ photo_url:null, age:null, gender:null, is_available:false }).eq('id', user.id)
@@ -4423,6 +4441,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
+          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir le dernier event de bots</Btn>
           <Btn onClick={resetMyOnboarding} bg={C.salmonFaint} col={C.salmon}>👤 Refaire mon inscription</Btn>
         </div>
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:20}}>Chargement…</div>}

@@ -231,6 +231,23 @@ export default function LabPage() {
     }
     setBusy(null); showToast('✓ Reset complet — bots débloqués', C.green); load()
   }
+  const fillEventWithBots = async () => {
+    setBusy('all')
+    const { data: evs } = await supabase.from('events').select('id,title,spots,created_by').eq('active',true).order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast("Aucun event actif — crée-en un d'abord (🎟️)", C.gold); return }
+    const ev = evs[0]
+    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)-1))
+    const botIds = (botRows||[]).map((b:any)=>b.id)
+    let ok=0
+    for (const bid of botIds) {
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid })
+      if (!error) ok++
+    }
+    const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
+    await supabase.from('events').update({ taken: count ?? ok }).eq('id', ev.id)
+    setBusy(null)
+    showToast(ok? `✓ ${ok} bots inscrits à "${ev.title}" (${count} au total)` : "❌ Applique la SQL event_participants_bot_admin", ok?C.green:C.red)
+  }
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
   const Btn = ({onClick,children,bg=C.bgCard,col=C.white}:any)=>(
@@ -277,6 +294,7 @@ export default function LabPage() {
         <div style={{display:'flex',gap:8,marginBottom:18,flexWrap:'wrap'}}>
           <Btn onClick={deactivateAll} bg="rgba(220,106,106,.12)" col={C.red}>🔄 Désactiver tous</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque)</Btn>
+          <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir le dernier event de bots</Btn>
         </div>
 
         {loading && <div style={{color:C.whiteMid,textAlign:'center',padding:30}}>Chargement des bots…</div>}

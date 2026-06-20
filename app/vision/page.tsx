@@ -147,6 +147,7 @@ const Idea = ({emoji,title,desc,badge}:{emoji:string;title:string;desc:string;ba
 
 const SECTIONS = [
   { id:'map',       icon:'🗺', label:'Map' },
+  { id:'confiance', icon:'🏆', label:'Confiance' },
   { id:'live',      icon:'⚡', label:'En prod' },
   { id:'sprint',    icon:'📋', label:'Sprint' },
   { id:'ux',        icon:'📋', label:'UX Détail' },
@@ -3035,8 +3036,85 @@ const SectionSQLTests = () => (
   </div>
 )
 
+// ─── Section : SYSTÈME DE CONFIANCE (chantier produit n°1) ───────────────────
+const SectionConfiance = () => {
+  const card = (border:string):React.CSSProperties => ({ background:'#120d1e', borderRadius:16, padding:'18px', marginBottom:14, border:`1px solid ${border}` })
+  const h = (t:string,c='#C8860A'):React.CSSProperties => ({ fontSize:14, fontWeight:900, color:c, marginBottom:10, textTransform:'uppercase' as const, letterSpacing:'.05em' })
+  const p:React.CSSProperties = { fontSize:13, color:'rgba(232,224,240,.75)', lineHeight:1.7, margin:'0 0 8px' }
+  const why:React.CSSProperties = { fontSize:11, color:'rgba(200,134,10,.75)', fontStyle:'italic', lineHeight:1.6, marginTop:4 }
+  const Badge = ({e,t,c}:{e:string;t:string;c:string}) => <span style={{display:'inline-flex',alignItems:'center',gap:5,background:`${c}18`,border:`1px solid ${c}55`,color:c,borderRadius:20,padding:'4px 11px',fontSize:12,fontWeight:700,margin:'0 6px 6px 0'}}>{e} {t}</span>
+  return (
+    <div style={{minHeight:'100vh',background:'#080510',fontFamily:'system-ui',color:'#e8e0f0',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
+      <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🏆 Système de Confiance</div>
+      <div style={{fontSize:12,color:'rgba(232,224,240,.5)',marginBottom:8}}>Le chantier produit n°1 — ce qui rend Clutch incopiable. (GPT + Claude convergent : + important que l'algo.)</div>
+      <div style={{fontSize:11,color:'rgba(232,224,240,.45)',marginBottom:20,lineHeight:1.6}}>Légende décisions : <b style={{color:'#4ade80'}}>✅ retenu</b> · <b style={{color:'#f87171'}}>❌ écarté</b> · <b style={{color:'#fbbf24'}}>🟡 à décider</b></div>
+
+      <div style={card('rgba(200,134,10,.3)')}>
+        <div style={h('La question unique')}>🎯 La question unique</div>
+        <p style={p}>Le système ne note PAS les gens. Il répond à <b style={{color:'#fff'}}>une seule question</b> : « Est-ce que cette personne fait généralement ce qu'elle annonce ? »</p>
+        <div style={why}>Pourquoi : une personne peut être formidable pour l'un, catastrophique pour l'autre. Noter la qualité humaine = subjectif, manipulable, vengeance, discrimination. La fiabilité comportementale est objective et mesurable.</div>
+      </div>
+
+      <div style={card('rgba(248,113,113,.3)')}>
+        <div style={h('Ce qu\'on n\'affiche JAMAIS','#f87171')}>❌ Jamais affiché</div>
+        <p style={p}>Note /5 · avis · commentaires publics · nb de RDV/refus/ghostings · <b style={{color:'#fff'}}>le chiffre du score</b> (ex 73/100).</p>
+        <div style={why}>Pourquoi : tout chiffre/avis devient manipulable et source de jugement social. Les gens « jouent » avec le chiffre.</div>
+      </div>
+
+      <div style={card('rgba(74,222,128,.3)')}>
+        <div style={h('Ce qu\'on affiche : des badges','#4ade80')}>✅ Badges positifs & subtils</div>
+        <div style={{margin:'4px 0 8px'}}>
+          <Badge e="🌱" t="Nouveau" c="#fbbf24"/><Badge e="🌿" t="En construction" c="#fbbf24"/><Badge e="🟢" t="Fiable" c="#4ade80"/><Badge e="⭐" t="Très fiable" c="#4ade80"/><Badge e="🏆" t="Exemplaire" c="#C8860A"/>
+        </div>
+        <div style={why}>Pourquoi : façon Apple (« tout semble fonctionner »). On montre le résultat, jamais la formule. Tout est positif → pas de stigmatisation. ✅ Appliqué Z60 (le hero profil affiche le badge, plus le chiffre).</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.2)')}>
+        <div style={h('Deux réputations')}>🧮 Architecture en 2 couches</div>
+        <p style={p}><b style={{color:'#fff'}}>1. VISIBLE = simple</b> : 1 badge parmi 4-5 niveaux. Tout ce que l'user et les autres voient.</p>
+        <p style={p}><b style={{color:'#fff'}}>2. CACHÉE = complexe</b> : des dizaines de variables internes. L'user ne voit jamais la formule (comme Uber / Airbnb / anti-fraude bancaire).</p>
+        <div style={why}>Pourquoi : la simplicité protège l'UX et empêche le gaming ; la complexité cachée donne la robustesse.</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.2)')}>
+        <div style={h('3 niveaux de mesure')}>📊 Comment on mesure</div>
+        <p style={p}><b style={{color:'#fff'}}>1. Présence confirmée</b> : a ouvert une dispo, accepté un Clutch, cliqué « J'y suis ».</p>
+        <p style={p}><b style={{color:'#fff'}}>2. Preuve passive</b> : GPS cohérent avec le lieu, durée minimale. Pas de tracking permanent — juste des signaux.</p>
+        <p style={p}><b style={{color:'#fff'}}>3. Validation mutuelle</b> : après le RDV, une seule question → « La rencontre a-t-elle eu lieu ? » (oui/non).</p>
+        <div style={why}>Pourquoi « eu lieu ? » et pas « comment c'était ? » : on mesure le fait, pas le ressenti (invérifiable, source de conflit). 🟡 À faire : simplifier le feedback actuel (À l'heure/Est venu/Lapin) vers « eu lieu ? ».</div>
+      </div>
+
+      <div style={card('rgba(248,113,113,.4)')}>
+        <div style={h('Règle absolue anti-manipulation','#f87171')}>🔒 La règle d'or</div>
+        <p style={p}><b style={{color:'#fff'}}>Aucun utilisateur ne peut faire baisser SEUL la réputation d'un autre. Jamais.</b> Un signal négatif exige toujours : répétition + incohérence + preuves techniques (GPS/heure) + historique.</p>
+        <div style={why}>Pourquoi : sans ça → ex jaloux, vengeance après rejet, compétition, discrimination. C'est la faille qui tue tous les systèmes de notation.</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.2)')}>
+        <div style={h('Score lent + détection lapin')}>🐢 Lent et juste</div>
+        <p style={p}>50 RDV parfaits + 1 annulation = <b style={{color:'#4ade80'}}>rien</b>. 3 lapins de suite = <b style={{color:'#f87171'}}>signal</b>.</p>
+        <p style={p}><b style={{color:'#fff'}}>Lapin intelligent :</b> Julie dit « j'étais là », Thomas dit « non » → le système ne sanctionne personne, il OBSERVE (GPS, heure, historique : 38 RDV validés vs 2 annulations récentes → il comprend).</p>
+        <div style={why}>Pourquoi : une erreur ne doit jamais tuer quelqu'un. La fiabilité est une tendance, pas un événement.</div>
+      </div>
+
+      <div style={card('rgba(200,134,10,.2)')}>
+        <div style={h('Variables cachées')}>🔍 Le moteur (invisible)</div>
+        <p style={p}>Présence réelle · respect des engagements (accepte puis vient/annule) · ponctualité · taux de finalisation (% Clutchs → RDV) · fiabilité GPS · ancienneté/régularité · vérifications (email/tél/selfie vidéo/identité) · events (réalisés vs annulés).</p>
+        <div style={why}>🟡 À construire : moteur de score caché (Edge Function pondérée, lente, anti-manipulation = DB-06). Le score actuel est un simple nombre JS → à remplacer.</div>
+      </div>
+
+      <div style={card('rgba(74,222,128,.3)')}>
+        <div style={h('Philosophie','#4ade80')}>🎯 La ligne directrice</div>
+        <p style={{...p,fontSize:14,color:'#fff'}}>Construire un <b style={{color:'#4ade80'}}>système de crédibilité comportementale</b>, PAS un système social. « Fait-elle ce qu'elle annonce ? » — pas « est-elle sympa ? »</p>
+        <div style={why}>C'est la distinction qui décide du destin de Clutch : app correcte vs app exceptionnelle.</div>
+      </div>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   map: SectionMap,
+  confiance: SectionConfiance,
   live: SectionLive,
   sprint: SectionSprint,
   ux: SectionUXFlow,

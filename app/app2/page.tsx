@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z88'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z89'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3001,9 +3001,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 {(ev as any).isGroupe&&<span style={{fontSize:9,background:'rgba(255,255,255,.95)',color:C.plum,borderRadius:6,padding:'2px 7px',fontWeight:800}}>👥 GROUPE</span>}
               </div>
               {registered.has(ev.id)&&<span style={{position:'absolute',top:10,right:10,fontSize:9,background:C.green,color:'#fff',borderRadius:6,padding:'2px 7px',fontWeight:800}}>✓ INSCRIT·E</span>}
-              <div style={{position:'absolute',bottom:9,left:13,right:13,display:'flex',alignItems:'flex-end',gap:8}}>
-                <span style={{fontSize:30,flexShrink:0,filter:'drop-shadow(0 1px 3px rgba(0,0,0,.5))'}}>{ev.emoji}</span>
-                <div style={{fontSize:17,fontWeight:900,color:'#fff',textShadow:'0 1px 5px rgba(0,0,0,.6)',lineHeight:1.15}}>{ev.title}</div>
+              <div style={{position:'absolute',bottom:9,left:13,right:13}}>
+                <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:10,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.45)',backdropFilter:'blur(4px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time}{ev.date&&ev.date!=='Ce soir'?'':' · ce soir'}</span>
+                  {ev.lieu&&<span style={{fontSize:10,fontWeight:700,color:'#fff',background:'rgba(0,0,0,.45)',backdropFilter:'blur(4px)',borderRadius:20,padding:'3px 9px',maxWidth:'70%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'').split(',')[0]}</span>}
+                </div>
+                <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
+                  <span style={{fontSize:30,flexShrink:0,filter:'drop-shadow(0 1px 3px rgba(0,0,0,.5))'}}>{ev.emoji}</span>
+                  <div style={{fontSize:17,fontWeight:900,color:'#fff',textShadow:'0 1px 5px rgba(0,0,0,.6)',lineHeight:1.15}}>{ev.title}</div>
+                </div>
               </div>
             </div>
             {/* Infos sous la photo */}
@@ -6553,7 +6559,8 @@ export default function App2() {
   const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
-  const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean}|null>(null)
+  const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number}|null>(null)
+  const fabRaf = useRef<number>(0)
   const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
   const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
   const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
@@ -9310,10 +9317,18 @@ export default function App2() {
             .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
             @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
           `}</style>
-          <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — déplace-moi où tu veux"
-            onPointerDown={(e)=>{ const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false} }}
-            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const sz=46; const nx=Math.min(window.innerWidth-sz-6,Math.max(6,d.ox+dx)); const ny=Math.min(window.innerHeight-sz-6,Math.max(6,d.oy+dy)); setFabPos({x:nx,y:ny}); } }}
-            onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(d&&!d.moved){ setFlow('app');setTab('presences');activateLive() } else if(d&&d.moved){ setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
+          <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — lance-moi où tu veux"
+            onPointerDown={(e)=>{ cancelAnimationFrame(fabRaf.current); const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0} }}
+            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp; const sz=46; const nx=Math.min(window.innerWidth-sz-6,Math.max(6,d.ox+dx)); const ny=Math.min(window.innerHeight-sz-6,Math.max(6,d.oy+dy)); setFabPos({x:nx,y:ny}); } }}
+            onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(!d)return; if(!d.moved){ setFlow('app');setTab('presences');activateLive(); return }
+              // 🏓 Lancer : glisse avec friction + rebond sur les bords, puis se cale
+              const sz=46, friction=0.94, bounce=0.62; let vx=d.vx, vy=d.vy;
+              const step=()=>{ setFabPos(p=>{ if(!p)return p; let x=p.x+vx, y=p.y+vy; const maxX=window.innerWidth-sz-6, maxY=window.innerHeight-sz-6;
+                if(x<6){x=6;vx=-vx*bounce} else if(x>maxX){x=maxX;vx=-vx*bounce}
+                if(y<6){y=6;vy=-vy*bounce} else if(y>maxY){y=maxY;vy=-vy*bounce}
+                return {x,y} }); vx*=friction; vy*=friction;
+                if(Math.hypot(vx,vy)>0.4){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } };
+              if(Math.hypot(vx,vy)>0.6){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
             style={{
             position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:14}),
             zIndex:1200, width:46, height:46, borderRadius:'50%', touchAction:'none',

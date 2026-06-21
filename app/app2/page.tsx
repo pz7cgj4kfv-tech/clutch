@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x118'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x119'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2713,7 +2713,23 @@ const GROUP_EVENTS_DEMO = [
 
 const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','🎬','🎨','🌿','🎲','🚴','🍺','💻','🌙','🎵','🧆','🏊','⛰️']
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, isCertified }:{
+// ── Inscriptions aux événements : durée + anti-chevauchement (décision David 21.06) ──
+// (a) plafond 2 events actifs · (b) durée obligatoire à la création (défaut 2h si inconnue)
+const MAX_ACTIVE_EVENTS = 2
+const EVENT_DUR_OPTS = [{h:1,label:'1h'},{h:2,label:'2h'},{h:3,label:'3h'},{h:5,label:'Soirée'}]
+const eventDurH = (ev:any):number => { const d=Number(ev?.durationH); return d>0 ? d : 2 } // défaut 2h
+const eventDurLabel = (ev:any):string => { const d=eventDurH(ev); return d>=5?'Soirée':`~${d}h` }
+// Extrait l'heure de début en minutes depuis minuit depuis une string libre ("19:30", "19h30", "Ce soir 20h")
+function parseEventMinutes(t:string|undefined):number|null {
+  if(!t) return null
+  const m = String(t).match(/(\d{1,2})\s*[h:.]\s*(\d{2})?/)
+  if(!m) return null
+  const hh = Number(m[1]); const mm = m[2]?Number(m[2]):0
+  if(hh>23||mm>59) return null
+  return hh*60+mm
+}
+
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, isCertified, showToast }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2724,6 +2740,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   onOpenProfile?:(name:string,bio:string,photo:string|null)=>void;
   userId?:string;
   isCertified?:boolean;
+  showToast?:(m:string,c?:string)=>void;
 }) {
   const t = useT(lang)
   const [dbEvents, setDbEvents] = useState<any[]>([])
@@ -2799,6 +2816,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvTitle, setNewEvTitle] = useState('')
   const [newEvLieu, setNewEvLieu] = useState('')
   const [newEvTime, setNewEvTime] = useState('')
+  const [newEvDur, setNewEvDur] = useState(2) // durée en heures (David : obligatoire)
   const [newEvMax, setNewEvMax] = useState(6)
   const [newEvDesc, setNewEvDesc] = useState('')
   const [creating, setCreating] = useState(false)
@@ -2842,6 +2860,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       taken: 1,
       price: 'Gratuit',
       bring: null,
+      durationH: newEvDur,
       description: newEvDesc.trim() || 'Événement créé sur Clutch.',
       tags: ['groupe'],
       evGender: 'X',
@@ -2855,7 +2874,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
@@ -2941,6 +2960,28 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   }
   const doRegister = async (ev: any) => {
     if (registered.has(ev.id)) return
+    const EN = lang==='en'
+    // (a) Plafond : max 2 inscriptions actives simultanées
+    const myActive = events.filter((e:any)=>registered.has(e.id))
+    if (myActive.length >= MAX_ACTIVE_EVENTS) {
+      showToast?.(EN?`Max ${MAX_ACTIVE_EVENTS} events at once — leave one first`:`Max ${MAX_ACTIVE_EVENTS} événements à la fois — désinscris-toi d'un d'abord`, C.orange)
+      return
+    }
+    // (b) Anti-chevauchement : même jour + créneaux [début, début+durée] qui se recouvrent
+    const aStart = parseEventMinutes(ev.time)
+    if (aStart != null) {
+      const aEnd = aStart + eventDurH(ev)*60
+      const clash = myActive.find((e:any)=>{
+        if ((e.date||'') !== (ev.date||'')) return false
+        const bStart = parseEventMinutes(e.time); if (bStart == null) return false
+        const bEnd = bStart + eventDurH(e)*60
+        return aStart < bEnd && bStart < aEnd   // recouvrement
+      })
+      if (clash) {
+        showToast?.(EN?`Overlaps with "${clash.title}" (${clash.time})`:`Chevauche « ${clash.title} » (${clash.time})`, C.orange)
+        return
+      }
+    }
     setRegistering(true)
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
     try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
@@ -3120,7 +3161,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{position:'absolute',bottom:7,left:9,right:9}}>
                 {/* Infos qui claquent sur la photo : heure BIEN visible + lieu (David) */}
                 <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginBottom:4}}>
-                  <span style={{fontSize:11.5,fontWeight:900,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time}</span>
+                  <span style={{fontSize:11.5,fontWeight:900,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time} · {eventDurLabel(ev)}</span>
                   {ev.lieu && <span style={{fontSize:10.5,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px',maxWidth:'62%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'').split(',')[0]}</span>}
                 </div>
                 <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
@@ -3217,7 +3258,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <span style={{fontSize:26}}>{selEv.emoji}</span>
                 <div>
                   <div style={{fontSize:15,fontWeight:900}}>{selEv.title}</div>
-                  <div style={{fontSize:11,color:C.whiteMid}}>{selEv.date} · {selEv.time}</div>
+                  <div style={{fontSize:11,color:C.whiteMid}}>{selEv.date} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
                 </div>
               </div>
               <button onClick={()=>setSelEv(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
@@ -3513,6 +3554,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 PLACES : <span style={{color:C.salmon}}>{newEvMax}</span> <span style={{color:C.whiteMid,fontWeight:600}}>· dès 2</span></div>
                 <input type='range' min={2} max={6} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
                   style={{width:'100%',marginTop:14,accentColor:C.salmon}}/>
+              </div>
+            </div>
+
+            {/* Champ : Durée (obligatoire — sert à éviter les inscriptions qui se chevauchent) */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>⏱ COMBIEN DE TEMPS <span style={{color:C.whiteMid,fontWeight:600}}>· évite les chevauchements</span></div>
+              <div style={{display:'flex',gap:7}}>
+                {EVENT_DUR_OPTS.map(o=>(
+                  <button key={o.h} onClick={()=>setNewEvDur(o.h)}
+                    style={{flex:1,padding:'10px 0',borderRadius:11,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+                      border:`1.5px solid ${newEvDur===o.h?C.salmon:C.border}`,background:newEvDur===o.h?C.salmonFaint:'transparent',color:newEvDur===o.h?C.salmon:C.whiteMid}}>
+                    {o.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -9488,6 +9543,7 @@ export default function App2() {
                 onClearInitialEvent={()=>setOpenEventId(null)}
                 onPenalty={applyPenalty}
                 userId={user?.id}
+                showToast={showToast}
                 isCertified={!!(user as any)?.is_certified}
                 onOpenProfile={(name,bio,photo)=>{
                   // Profil créateur enrichi (Anaïs = isCreator:true, allowClutch:false par défaut)

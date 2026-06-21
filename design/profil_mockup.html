@@ -99,8 +99,11 @@
     <div class="door" onclick="go('s-secu')"><div class="ic" style="background:#53294318">🔒</div><div class="x"><div class="ti">Sécurité & confidentialité</div><div class="su">Visibilité, SOS, bloqués, certif</div></div><span class="ch">›</span></div>
     <div class="door" onclick="go('s-compte')"><div class="ic" style="background:#f0e6ef">⚙️</div><div class="x"><div class="ti">Mon compte</div><div class="su">Abonnement, fiabilité, favoris, légal</div></div><span class="ch">›</span></div>
     <div style="text-align:center;padding:24px 24px 8px;border-top:1px solid var(--line);margin-top:18px">
-      <div style="font-size:13px;font-style:italic;color:#b09aa6;letter-spacing:.02em">« Réunir ce qui était séparé. »</div>
-      <div style="font-size:10px;color:#cfc6cc;margin-top:8px">Clutch · 0xFA · Lausanne, Suisse 🇨🇭</div>
+      <div onclick="document.getElementById('secret').style.maxHeight=document.getElementById('secret').style.maxHeight?'':'120px'" style="font-size:13px;font-style:italic;color:#b09aa6;letter-spacing:.02em;cursor:pointer">« Réunir ce qui était séparé. »</div>
+      <div id="secret" style="max-height:0;overflow:hidden;transition:max-height .4s">
+        <div style="font-size:11px;color:#a98ea0;margin-top:10px;line-height:1.55;background:#faf6f9;border-radius:12px;padding:11px 13px">🗝️ <b>Tu as trouvé.</b><br>Le mot « algèbre » vient de <b>al-jabr</b> — au IXᵉ siècle, ça voulait dire « réunir ce qui était séparé ». Retrouver l'inconnu, le <i>x</i> qu'on cherche.<br>C'est exactement ce que fait Clutch. 🟣</div>
+      </div>
+      <div style="font-size:10px;color:#cfc6cc;margin-top:10px">Clutch · 0xFA · Lausanne, Suisse 🇨🇭</div>
     </div>
     <!-- ADMIN NOTE (visible David + Mel uniquement) -->
     <div style="margin:10px 16px;border:1px dashed #dc2626;background:#dc262608;border-radius:12px;padding:10px 12px">

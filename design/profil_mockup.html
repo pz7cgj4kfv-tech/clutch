@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clutch — Profil (poupées russes)</title>
+<style>
+  :root{--plum:#532943;--pink:#EB6BAF;--green:#77BC1F;--ink:#3a2230;--gray:#8a8a8a;--line:#ececf0;--bg:#fff;--soft:#f6f4f6}
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'Segoe UI',Inter,sans-serif;-webkit-tap-highlight-color:transparent}
+  body{background:#d9d2d6;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:20px}
+  .phone{width:380px;height:800px;background:var(--bg);border-radius:42px;overflow:hidden;box-shadow:0 25px 70px rgba(0,0,0,.35);border:9px solid #15101a;position:relative}
+  .screens{position:relative;width:100%;height:100%;overflow:hidden}
+  .screen{position:absolute;inset:0;background:var(--bg);overflow-y:auto;transition:transform .32s cubic-bezier(.3,1,.4,1);padding-bottom:30px}
+  .screen.in{transform:translateX(100%)}
+  .hdrbar{position:sticky;top:0;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);z-index:5}
+  .back{font-size:20px;color:var(--plum);cursor:pointer;font-weight:700}
+  .hdrbar .t{font-size:17px;font-weight:800;color:var(--ink)}
+  /* carte identité */
+  .id{padding:18px 16px 6px;display:flex;gap:14px;align-items:center}
+  .pic{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#caa,#a88);object-fit:cover;flex-shrink:0;box-shadow:0 3px 10px rgba(83,41,67,.15)}
+  .id .nm{font-size:21px;font-weight:900;color:var(--ink)}
+  .id .meta{font-size:13px;color:var(--gray);margin-top:2px}
+  .badges{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .b{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px}
+  .b.f{background:#77BC1F22;color:#5a9416}.b.c{background:#EB6BAF22;color:#c44d8e}
+  .prog{margin:10px 16px;background:var(--soft);border-radius:12px;padding:10px 13px;display:flex;align-items:center;gap:10px}
+  .prog .bar{flex:1;height:6px;background:#e6e0e4;border-radius:3px;overflow:hidden}
+  .prog .bar i{display:block;height:100%;width:80%;background:linear-gradient(90deg,var(--pink),var(--plum))}
+  .prog .pc{font-size:12px;font-weight:800;color:var(--plum)}
+  /* bloc vedette : ce que je cherche maintenant */
+  .feat{margin:8px 16px 4px;background:linear-gradient(135deg,#fbf3f8,#f3f9ee);border:1px solid #f0e6ef;border-radius:18px;padding:14px}
+  .feat .lab{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--plum);margin-bottom:10px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:700;padding:6px 11px;border-radius:20px;border:1.5px solid var(--line);color:var(--gray);background:#fff;cursor:pointer}
+  .chip.on{border-color:var(--plum);color:#fff;background:var(--plum)}
+  .moment{margin-top:11px;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px dashed var(--pink);border-radius:14px;padding:9px 12px;cursor:pointer}
+  .moment .e{font-size:18px}.moment .x{flex:1}.moment .ti{font-size:13px;font-weight:800;color:var(--ink)}.moment .su{font-size:11px;color:var(--gray)}
+  .moment .exp{font-size:9px;font-weight:800;color:var(--pink);background:#EB6BAF18;border-radius:10px;padding:2px 7px}
+  /* portes */
+  .sec{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);margin:18px 16px 6px}
+  .door{display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--line);background:#fff}
+  .door:active{background:var(--soft)}
+  .door .ic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+  .door .x{flex:1;min-width:0}
+  .door .ti{font-size:15px;font-weight:800;color:var(--ink)}
+  .door .su{font-size:12px;color:var(--gray);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .door .ch{color:#c9c2c7;font-size:19px}
+  /* contenu sous-écran : réglages simples + avancé */
+  .row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .row .l{font-size:14px;font-weight:600;color:var(--ink)}
+  .row .v{font-size:13px;color:var(--gray)}
+  .tog{width:44px;height:26px;border-radius:13px;background:#ddd;position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
+  .tog.on{background:var(--green)}.tog i{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}.tog.on i{left:20px}
+  .adv{margin:14px 16px;background:var(--soft);border-radius:14px;overflow:hidden}
+  .adv .h{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;font-weight:800;color:var(--plum)}
+  .adv .body{max-height:0;overflow:hidden;transition:max-height .3s}
+  .adv.open .body{max-height:400px}
+  .adv .body .row{border-bottom:1px solid #ececec;padding:12px 14px}
+  .algopick{display:flex;gap:8px;padding:14px 16px}
+  .algopick .o{flex:1;border:1.5px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center;cursor:pointer}
+  .algopick .o.on{border-color:var(--plum);background:#fbf3f8}
+  .algopick .o .e{font-size:22px}.algopick .o .t{font-size:11px;font-weight:800;color:var(--ink);margin-top:5px}
+  .train{margin:6px 16px 0;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center}
+  .train .q{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px}
+  .train .btns{display:flex;gap:10px;justify-content:center}
+  .train .tb{width:54px;height:54px;border-radius:50%;border:1.5px solid var(--line);font-size:22px;cursor:pointer;background:#fff}
+  .note{font-size:11px;color:var(--gray);padding:14px 16px;line-height:1.5}
+  .hint{text-align:center;color:#666;font-size:12px;margin:14px 0 0}
+</style></head><body>
+<div>
+<div class="phone"><div class="screens" id="screens">
+
+  <!-- ÉCRAN 1 : profil principal -->
+  <div class="screen" id="s-home">
+    <div class="hdrbar"><div class="t" style="font-size:20px">Profil <span style="font-size:9px;color:#bbb">0xFA</span></div></div>
+    <div class="id">
+      <img class="pic" src="https://randomuser.me/api/portraits/men/41.jpg">
+      <div><div class="nm">David</div><div class="meta">34 ans · ♂ Lausanne</div>
+        <div class="badges"><span class="b f">🏆 Fiable</span><span class="b c">✓ Certifié</span></div></div>
+    </div>
+    <div class="prog"><span class="pc">80%</span><div class="bar"><i></i></div><span style="font-size:11px;color:#999">Compléter</span></div>
+
+    <div class="feat">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="lab" style="margin:0">⚡ Ce que je cherche en ce moment</div>
+        <span style="font-size:9px;font-weight:800;color:#5a9416;background:#77BC1F18;border-radius:10px;padding:2px 8px;white-space:nowrap">↺ reset dans 18h</span>
+      </div>
+      <div class="chips">
+        <span class="chip on">💕 Romance</span><span class="chip on">🤝 Amitié</span><span class="chip">💼 Pro</span><span class="chip">👶 Parents</span><span class="chip">🤲 Entraide</span>
+      </div>
+      <div class="moment" onclick="go('s-moment')">
+        <span class="e">🌙</span><div class="x"><div class="ti">Mode du moment</div><div class="su">Une préférence éphémère pour aujourd'hui</div></div><span class="exp">expire demain</span>
+      </div>
+      <div style="font-size:10px;color:#a99;margin-top:9px;text-align:center;line-height:1.4">↺ Ces envies <b style="color:#8a7">s'effacent toutes seules</b> — tu ne restes jamais coincé dans un filtre.</div>
+    </div>
+
+    <div class="sec">Mon profil</div>
+    <div class="door" onclick="go('s-moi')"><div class="ic" style="background:#EB6BAF18">🧬</div><div class="x"><div class="ti">Moi</div><div class="su">Photos, bio, intérêts, langues…</div></div><span class="ch">›</span></div>
+    <div class="door" onclick="go('s-cherche')"><div class="ic" style="background:#53294318">🎯</div><div class="x"><div class="ti">Ce que je cherche</div><div class="su">Genre, modes, âge, distance</div></div><span class="ch">›</span></div>
+    <div class="door" onclick="go('s-algo')"><div class="ic" style="background:#77BC1F18">✨</div><div class="x"><div class="ti">Mon Clutch <span style="font-size:9px;color:#c44d8e;background:#EB6BAF18;padding:1px 6px;border-radius:8px">l'algo</span></div><div class="su">Comment on me propose des gens</div></div><span class="ch">›</span></div>
+
+    <div class="sec">Sécurité & compte</div>
+    <div class="door" onclick="go('s-secu')"><div class="ic" style="background:#53294318">🔒</div><div class="x"><div class="ti">Sécurité & confidentialité</div><div class="su">Visibilité, SOS, bloqués, certif</div></div><span class="ch">›</span></div>
+    <div class="door" onclick="go('s-compte')"><div class="ic" style="background:#f0e6ef">⚙️</div><div class="x"><div class="ti">Mon compte</div><div class="su">Abonnement, fiabilité, favoris, légal</div></div><span class="ch">›</span></div>
+    <div style="text-align:center;padding:22px 24px 6px;border-top:1px solid var(--line);margin-top:18px">
+      <div style="font-size:18px;letter-spacing:.05em;color:#532943;font-weight:900">الجبر</div>
+      <div style="font-size:10px;color:#b3a8af;margin-top:5px;line-height:1.5"><b>al-jabr</b> — la racine du mot « algèbre ».<br>Au IXᵉ siècle, ça voulait dire « <b>réunir ce qui était séparé</b> ».<br>C'est tout Clutch.</div>
+    </div>
+    <div class="hint">👆 Tape une porte → ça s'ouvre en profondeur (poupées russes). Simple en surface.</div>
+  </div>
+
+  <!-- ÉCRAN : Mon Clutch (algo) — la pièce fun + profonde -->
+  <div class="screen in" id="s-algo">
+    <div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Mon Clutch · l'algo</div></div>
+    <div class="note">Tu choisis <b>comment Clutch te propose des gens</b>. Par défaut on optimise pour toi — mais tu peux régler.</div>
+    <div class="algopick">
+      <div class="o on"><div class="e">📍</div><div class="t">Proximité</div></div>
+      <div class="o"><div class="e">🧩</div><div class="t">Compatibilité</div></div>
+      <div class="o"><div class="e">🎲</div><div class="t">Découverte</div></div>
+    </div>
+    <div class="sec">Entraîne ton Clutch</div>
+    <div class="train"><div class="q">« Tu préférerais voir… »<br><span style="color:#999;font-weight:500;font-size:12px">quelqu'un tout près, ou très compatible ?</span></div>
+      <div class="btns"><button class="tb">📍</button><button class="tb">🧩</button></div>
+      <div style="font-size:10px;color:#aaa;margin-top:10px">Plus tu réponds, mieux Clutch te comprend 🪄</div>
+    </div>
+    <div class="adv" id="adv1"><div class="h" onclick="document.getElementById('adv1').classList.toggle('open')"><span>⚙️ Avancé — pondérations & tests</span><span>⌄</span></div>
+      <div class="body">
+        <div class="row"><span class="l">Test de personnalité</span><span class="v">Non fait ›</span></div>
+        <div class="row"><span class="l">Poids de la fiabilité</span><span class="v">Élevé ›</span></div>
+        <div class="row"><span class="l">Réinitialiser mon algo</span><span class="v" style="color:#c44d8e">↺</span></div>
+      </div>
+    </div>
+    <div class="note">🔒 Éthique : ton algo ne sert jamais à te rendre accro pour rien — il sert à te faire <b>sortir voir des gens</b>.</div>
+  </div>
+
+  <!-- ÉCRAN : Ce que je cherche -->
+  <div class="screen in" id="s-cherche">
+    <div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Ce que je cherche</div></div>
+    <div class="note" style="background:#77BC1F12;margin:14px 16px;border-radius:14px;color:#5a7a2e">↺ <b>Tes filtres « du moment » s'effacent après 18h.</b> Tu repars ouvert·e à chaque fois — jamais coincé·e.</div>
+    <div style="font-size:11px;font-weight:800;color:#5a9416;padding:4px 16px 0">⚡ ÉPHÉMÈRE (se réinitialise)</div>
+    <div class="row"><span class="l">Modes <span style="font-size:9px;color:#5a9416;background:#77BC1F18;border-radius:8px;padding:1px 6px">↺ 18h</span></span><span class="v">Romance · Amitié ›</span></div>
+    <div class="row"><span class="l">Distance <span style="font-size:9px;color:#5a9416;background:#77BC1F18;border-radius:8px;padding:1px 6px">↺ 18h</span></span><span class="v">Dans la ville ›</span></div>
+    <div style="font-size:11px;font-weight:800;color:#999;padding:14px 16px 0">📌 PERSISTANT (qui tu es)</div>
+    <div class="row"><span class="l">Genre recherché</span><span class="v">Tout le monde ›</span></div>
+    <div class="row"><span class="l">Âge</span><span class="v">25 – 40 ›</span></div>
+    <div class="adv" id="adv2"><div class="h" onclick="document.getElementById('adv2').classList.toggle('open')"><span>⚙️ Avancé — filtres fins</span><span>⌄</span></div>
+      <div class="body">
+        <div class="row"><span class="l">Exclure non-certifiés</span><div class="tog"><i></i></div></div>
+        <div class="row"><span class="l">Que des profils avec photo</span><div class="tog on"><i></i></div></div>
+        <div class="row"><span class="l">Intérêts en commun min.</span><span class="v">Aucun ›</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉCRAN : Moi -->
+  <div class="screen in" id="s-moi">
+    <div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Moi</div></div>
+    <div class="row"><span class="l">Photos</span><span class="v">3 ›</span></div>
+    <div class="row"><span class="l">Bio</span><span class="v">« Montagne, mer… » ›</span></div>
+    <div class="row"><span class="l">Intérêts</span><span class="v">5 ›</span></div>
+    <div class="row"><span class="l">Langues</span><span class="v">FR · EN ›</span></div>
+    <div class="adv" id="adv3"><div class="h" onclick="document.getElementById('adv3').classList.toggle('open')"><span>⚙️ Avancé — détails & perso</span><span>⌄</span></div>
+      <div class="body">
+        <div class="row"><span class="l">Taille, signe, etc.</span><span class="v">›</span></div>
+        <div class="row"><span class="l">Test de personnalité</span><span class="v">Commencer ›</span></div>
+        <div class="row"><span class="l">✨ Touche perso (astro…)</span><span class="v">Off ›</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉCRANS simples secu / compte / moment -->
+  <div class="screen in" id="s-secu"><div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Sécurité & confidentialité</div></div>
+    <div class="row"><span class="l">Qui peut me voir</span><span class="v">Selon ma dispo ›</span></div>
+    <div class="row"><span class="l">Mode invisible</span><div class="tog"><i></i></div></div>
+    <div class="row"><span class="l">Contacts SOS</span><span class="v">2 ›</span></div>
+    <div class="row"><span class="l">Bloqués</span><span class="v">0 ›</span></div>
+    <div class="row"><span class="l">Certification selfie</span><span class="v" style="color:#5a9416">✓ Fait</span></div></div>
+
+  <div class="screen in" id="s-compte"><div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Mon compte</div></div>
+    <div class="row"><span class="l">Abonnement</span><span class="v">Gratuit · Premium ›</span></div>
+    <div class="row"><span class="l">Ma fiabilité</span><span class="v">🏆 Exemplaire ›</span></div>
+    <div class="row"><span class="l">Notifications</span><span class="v">Activées ›</span></div>
+    <div class="row"><span class="l">Favoris</span><span class="v">4 ›</span></div>
+    <div class="row"><span class="l">Thème</span><span class="v">Clair ›</span></div>
+    <div class="row"><span class="l">Langue</span><span class="v">Français ›</span></div>
+    <div class="row"><span class="l">Légal & données</span><span class="v">›</span></div>
+    <div class="row"><span class="l" style="color:#c44d8e">Supprimer mon compte</span><span class="v">›</span></div></div>
+
+  <div class="screen in" id="s-moment"><div class="hdrbar"><span class="back" onclick="back()">‹</span><div class="t">Mode du moment 🌙</div></div>
+    <div class="note">Une envie <b>ponctuelle</b>, juste pour aujourd'hui. Ça <b>disparaît demain</b> — pas de pression.</div>
+    <div class="chips" style="padding:0 16px;gap:8px">
+      <span class="chip on">🥾 Juste une balade</span><span class="chip">☕ Un café tranquille</span><span class="chip">🎉 Sortir ce soir</span><span class="chip">🐕 Avec mon chien</span><span class="chip">🧘 Quelque chose de calme</span></div>
+    <div class="note">À minuit, ton mode du moment s'efface. Demain, tu en choisis un autre — ou pas.</div></div>
+
+</div></div>
+<div class="hint" style="color:#5a4a54">Mockup Profil « poupées russes » — simple dessus, profond dessous</div>
+</div>
+<script>
+let stack=['s-home'];
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('in')); document.getElementById(id).classList.remove('in'); }
+function go(id){ stack.push(id); show(id); }
+function back(){ if(stack.length>1){ stack.pop(); show(stack[stack.length-1]); } }
+show('s-home');
+</script>
+</body></html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clutch — Système de Fiabilité · Dossier de décision complet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --prune: #3D1A33;
+    --prune-light: #542A44;
+    --salmon: #FFBF9E;
+    --or: #E27C00;
+    --green: #2DBD7E;
+    --red: #C0392B;
+    --blue: #2980B9;
+    --text: #1a1a1a;
+    --muted: #555;
+    --border: #ddd;
+    --bg-light: #f9f8f7;
+    --bg-warn: #fffbf0;
+    --bg-danger: #fff5f5;
+    --bg-success: #f0faf5;
+    --bg-info: #f0f6ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    background: white;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 56px;
+  }
+
+  @media print {
+    body { padding: 24px 32px; font-size: 12px; }
+    .no-print { display: none !important; }
+    h1 { font-size: 22px !important; }
+    h2 { font-size: 16px !important; }
+    h3 { font-size: 14px !important; }
+    .page-break { page-break-before: always; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  /* PRINT BUTTON */
+  .print-btn {
+    position: fixed; top: 20px; right: 20px;
+    background: var(--prune); color: white;
+    border: none; border-radius: 8px; padding: 10px 18px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .print-btn:hover { background: var(--prune-light); }
+
+  /* COVER */
+  .cover {
+    border-left: 4px solid var(--prune);
+    padding: 24px 28px;
+    margin-bottom: 40px;
+    background: var(--bg-light);
+    border-radius: 0 8px 8px 0;
+  }
+  .cover-tag { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .cover h1 { font-size: 26px; font-weight: 700; color: var(--prune); line-height: 1.25; margin-bottom: 8px; }
+  .cover-sub { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+  .cover-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .cover-meta span { display: flex; align-items: center; gap: 4px; }
+
+  /* TOC */
+  .toc { background: var(--bg-light); border-radius: 8px; padding: 20px 24px; margin-bottom: 36px; }
+  .toc-title { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .toc ol { padding-left: 18px; }
+  .toc li { font-size: 13px; color: var(--muted); margin: 4px 0; }
+  .toc li a { color: var(--prune); text-decoration: none; }
+  .toc li a:hover { text-decoration: underline; }
+  .toc .sub { font-size: 12px; color: #888; list-style: none; padding-left: 16px; margin-top: 2px; }
+
+  /* TYPOGRAPHY */
+  h2 { font-size: 18px; font-weight: 700; color: var(--prune); margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--prune); }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 8px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .06em; }
+  p { margin-bottom: 12px; color: var(--text); }
+  ul, ol { padding-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  strong { font-weight: 600; }
+  em { font-style: italic; color: var(--muted); }
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px; }
+
+  /* CARDS */
+  .card { border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }
+  .card-warn { background: var(--bg-warn); border-color: #f0c060; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-danger { background: var(--bg-danger); border-color: #e8a0a0; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-success { background: var(--bg-success); border-color: #80d0a8; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-info { background: var(--bg-info); border-color: #90b8e0; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+
+  /* DECISION TABLE */
+  .decision-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  .decision-table th { background: var(--prune); color: white; padding: 8px 12px; text-align: left; font-weight: 600; font-size: 12px; }
+  .decision-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .decision-table tr:last-child td { border-bottom: none; }
+  .decision-table tr:nth-child(even) td { background: var(--bg-light); }
+  .chosen { background: #e8f5ee !important; border-left: 3px solid var(--green); }
+  .rejected { opacity: .7; }
+
+  /* FORMULA */
+  .formula-block { background: #f5f3ff; border: 1px solid #c8b8f0; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; color: #2d1a5e; overflow-x: auto; }
+
+  /* SCENARIO */
+  .scenario { border-left: 3px solid var(--prune); padding: 12px 16px; margin-bottom: 16px; background: var(--bg-light); border-radius: 0 6px 6px 0; }
+  .scenario-tag { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--prune); margin-bottom: 4px; }
+  .scenario h4 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; text-transform: none; letter-spacing: 0; }
+  .scenario p { margin-bottom: 6px; font-size: 13px; }
+
+  /* TAGS */
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin: 2px 2px 2px 0; }
+  .tag-green { background: #d4f5e4; color: #0d6b3d; }
+  .tag-red { background: #fde8e8; color: #922; }
+  .tag-amber { background: #fef3d0; color: #7a4f00; }
+  .tag-blue { background: #ddeeff; color: #1a5a99; }
+  .tag-purple { background: #ede8ff; color: #4a2d99; }
+  .tag-gray { background: #eee; color: #555; }
+
+  /* DEFINITION */
+  .def { border-left: 3px solid var(--blue); padding: 8px 14px; margin: 8px 0; background: var(--bg-info); border-radius: 0 4px 4px 0; }
+  .def-term { font-weight: 700; font-size: 13px; color: var(--blue); }
+  .def-text { font-size: 13px; color: var(--text); }
+
+  /* LEVELS */
+  .level-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+  .level-stars { font-size: 16px; min-width: 48px; }
+  .level-info { flex: 1; }
+  .level-name { font-weight: 700; font-size: 14px; }
+  .level-cond { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .level-pts { font-size: 12px; font-weight: 600; color: var(--prune); text-align: right; min-width: 80px; }
+
+  /* OUTCOMES */
+  .outcome-row { display: grid; grid-template-columns: 32px 1fr 120px 120px 80px; gap: 8px; align-items: start; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .outcome-head { font-weight: 700; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .outcome-neg { color: var(--red); font-weight: 700; }
+  .outcome-pos { color: var(--green); font-weight: 700; }
+  .outcome-neu { color: var(--muted); }
+
+  /* SEPARATOR */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  .section-num { color: var(--prune); font-weight: 700; margin-right: 6px; }
+
+  /* FOOTNOTE */
+  .footnote { font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px; padding-top: 12px; }
+
+  /* HIGHLIGHT */
+  .highlight { background: #fff9c4; padding: 1px 4px; border-radius: 3px; }
+
+  /* COMPARISON GRID */
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+
+  /* QUOTE */
+  blockquote { border-left: 3px solid var(--salmon); padding: 10px 16px; color: var(--muted); font-style: italic; background: #fff8f4; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">⬇ Enregistrer en PDF</button>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-tag">Dossier de décision produit · Confidentiel</div>
+  <h1>Clutch — Système de Fiabilité<br>Architecture, raisonnement et justification complète</h1>
+  <div class="cover-sub">Ce document présente l'intégralité du processus de réflexion ayant conduit au système de Fiabilité de Clutch — de la définition du problème jusqu'aux choix techniques, mathématiques, éthiques et juridiques finaux. Il justifie chaque décision en exposant les alternatives rejetées et leurs raisons.</div>
+  <div class="cover-meta">
+    <span>📅 Juin 2026</span>
+    <span>📍 Lausanne, Suisse</span>
+    <span>✉ david.saugy@gmail.com</span>
+    <span>🔢 Version 1.0 — Architecture figée</span>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <div class="toc-title">Sommaire</div>
+  <ol>
+    <li><a href="#s1">Contexte produit — qu'est-ce que Clutch ?</a></li>
+    <li><a href="#s2">Définition du problème de fiabilité</a></li>
+    <li><a href="#s3">Les 6 familles de systèmes étudiées</a>
+      <ul class="sub">
+        <li>Score en pourcentage · Niveaux de confiance · Badges positifs · Score caché · Dépôt · ELO social</li>
+      </ul>
+    </li>
+    <li><a href="#s4">Pourquoi nous avons rejeté chaque alternative</a></li>
+    <li><a href="#s5">Le système retenu — architecture complète</a></li>
+    <li><a href="#s6">Mathématiques — calcul bayésien et pondérations</a></li>
+    <li><a href="#s7">Les 7 outcomes du feedback — justification de chacun</a></li>
+    <li><a href="#s8">Le Soft Gate — mécanique des 3 paliers</a></li>
+    <li><a href="#s9">GPS check-in optionnel — légalité et technique</a></li>
+    <li><a href="#s10">Scénarios edge cases — 8 situations limites</a></li>
+    <li><a href="#s11">Analyse éthique</a></li>
+    <li><a href="#s12">Analyse juridique — LPD suisse</a></li>
+    <li><a href="#s13">Analyse psychologique</a></li>
+    <li><a href="#s14">Implémentation technique</a></li>
+    <li><a href="#s15">Ce qui est modifiable — feuille de route</a></li>
+    <li><a href="#s16">Glossaire</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s1"><span class="section-num">1.</span> Contexte produit</h2>
+
+<p><strong>Clutch</strong> est une application de rencontres spontanées basée à Lausanne, Suisse. Sa proposition de valeur centrale la différencie radicalement des applications de rencontres classiques :</p>
+
+<div class="card-success">
+  <div class="card-title">Le concept Clutch en une phrase</div>
+  <p style="margin:0">Quand deux personnes sont disponibles au même moment et au même endroit, elles peuvent se proposer un rendez-vous réel dans les <strong>18 heures maximum</strong>. Pas de messagerie infinie. Pas de profil à swiper. Un Verrou = un RDV.</p>
+</div>
+
+<p>L'application repose sur trois entités fondamentales :</p>
+<ul>
+  <li><strong>Clutch</strong> — demande de rendez-vous spontané envoyée par une personne à une autre</li>
+  <li><strong>Verrou</strong> — acceptation mutuelle du Clutch, transformant la demande en rendez-vous confirmé</li>
+  <li><strong>Fenêtre de disponibilité</strong> — créneau horaire (max 18h) pendant lequel un utilisateur se déclare disponible</li>
+</ul>
+
+<p>La contrainte temporelle de 18h n'est pas un détail d'implémentation : c'est l'ADN du produit. Relâcher cette contrainte transformerait Clutch en une application de rencontres ordinaire.</p>
+
+<div class="card-warn">
+  <div class="card-title">⚠️ Asymétrie de genre — contrainte de conception non négociable</div>
+  <p style="margin:0">Les femmes utilisent Clutch gratuitement, par décision éthique (et non marketing). Sans parité femmes-hommes, la plateforme s'effondre. Chaque décision de conception doit être auditée du point de vue d'une femme de 23 ans, seule à Lausanne le soir.</p>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s2"><span class="section-num">2.</span> Définition du problème de fiabilité</h2>
+
+<h3>2.1 Le problème central</h3>
+
+<p>Clutch n'a de valeur que si les gens se présentent réellement à leurs rendez-vous. Un <em>no-show</em> (absence sans prévenir au rendez-vous) nuit à trois entités simultanément :</p>
+<ol>
+  <li><strong>La personne laissée en attente</strong> — temps perdu, sentiment de rejet, perte de confiance dans la plateforme</li>
+  <li><strong>La plateforme</strong> — chaque no-show non sanctionné est un signal que ghosting est acceptable</li>
+  <li><strong>L'écosystème global</strong> — les plateformes où le ghosting est normalisé (Tinder, Bumble) perdent précisément la valeur que Clutch cherche à créer</li>
+</ol>
+
+<h3>2.2 Les tensions fondamentales</h3>
+
+<p>Le problème de fiabilité sur une plateforme de rencontres est structurellement différent du même problème sur Uber ou Airbnb pour trois raisons :</p>
+
+<div class="cmp">
+  <div class="card">
+    <div class="card-title">Uber / Airbnb</div>
+    <ul style="font-size:13px; margin:0">
+      <li>Transaction commerciale avec engagement financier</li>
+      <li>Rôles asymétriques clairs (chauffeur / passager)</li>
+      <li>Preuves objectives disponibles (GPS, paiement, trajet)</li>
+      <li>La non-venue a un coût immédiat mesurable</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Clutch</div>
+    <ul style="font-size:13px; margin:0">
+      <li>Engagement émotionnel / social, pas financier</li>
+      <li>Rôles symétriques (les deux se proposent mutuellement)</li>
+      <li>Preuves objectives quasi inexistantes (pas de GPS live, LPD)</li>
+      <li>La non-venue peut avoir des causes légitimes (sécurité, urgence)</li>
+    </ul>
+  </div>
+</div>
+
+<p>Ces différences génèrent cinq tensions fondamentales qui ont structuré tout notre raisonnement :</p>
+
+<table class="decision-table">
+  <tr><th>Tension</th><th>Pôle A</th><th>Pôle B</th></tr>
+  <tr><td><strong>Accountability vs Anti-surveillance</strong></td><td>Sans conséquences, le ghosting devient norme</td><td>Un score de comportement social peut devenir dystopique</td></tr>
+  <tr><td><strong>Symétrie vs Asymétrie de pouvoir</strong></td><td>Les deux parties méritent de pouvoir signaler</td><td>Un harceleur peut utiliser le signal comme vengeance</td></tr>
+  <tr><td><strong>Friction utile vs Friction paralysante</strong></td><td>La friction vers le vrai RDV est une feature Clutch</td><td>Trop de friction post-RDV tue l'engagement</td></tr>
+  <tr><td><strong>Transparence vs Discrimination</strong></td><td>Les utilisateurs veulent savoir à qui ils ont affaire</td><td>Un score visible peut créer de la discrimination</td></tr>
+  <tr><td><strong>Précision vs Simplicité</strong></td><td>Un système multi-dimensionnel est plus juste</td><td>Un score simple est plus compréhensible et respecté</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s3"><span class="section-num">3.</span> Les 6 familles de systèmes étudiées</h2>
+
+<p>Avant de décider, nous avons cartographié systématiquement les familles de systèmes existants, en nous appuyant sur l'analyse comparative de plateformes établies (Uber, Airbnb, Hinge, BlaBlaCar, Bumble) et sur une consultation multi-IA (Claude Sonnet + GPT-4o).</p>
+
+<h3>Système 1 — Score en pourcentage brut</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">Un nombre entre 0 et 100% affiché sur le profil, calculé comme le ratio RDV honorés / RDV confirmés.</span></div>
+<p><strong>Exemple d'affichage :</strong> <code>Fiabilité : 94%</code></p>
+<p><strong>Avantages :</strong> Compréhensible immédiatement · Incite directement au bon comportement · Scalable · Technique simple</p>
+<p><strong>Problèmes :</strong></p>
+<ul>
+  <li><em>Effet "mort sociale"</em> — un score de 60% rend un profil quasi-inutilisable, même si 3 RDV sur 5 ont eu lieu pour des raisons légitimes (urgences, maladies)</li>
+  <li><em>Micro-discrimination</em> — les utilisateurs filtrent inconsciemment par tranche de %, créant une stratification sociale</li>
+  <li><em>Instabilité statistique</em> — 1 absence sur 2 RDV = 50% ; 9 absences sur 10 = aussi 10%. La signifiance statistique est absente des petits échantillons</li>
+  <li><em>Biais d'ancrage</em> — les utilisateurs s'accrochent au chiffre plutôt qu'au contexte</li>
+  <li><em>Reset de compte</em> — tout utilisateur peut supprimer son compte et repartir à 100%</li>
+</ul>
+
+<h3>Système 2 — Niveaux de confiance (notre choix, voir §5)</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">Catégories nommées (Nouveau, Fiable, Très fiable, Exemplaire) calculées à partir d'un score interne, jamais affiché directement.</span></div>
+<p>Voir section 5 pour le détail complet.</p>
+
+<h3>Système 3 — Badges positifs uniquement</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">Affichage uniquement de récompenses positives (badges "Toujours présent", "10 rencontres honorées") sans aucune notation négative visible.</span></div>
+<p><strong>Exemple :</strong> Hinge ("We met"), certains jeux vidéo (succès/achievements)</p>
+<p><strong>Avantages :</strong> Psychologiquement positif · Aucun risque de "mort sociale" · Très compatible LPD</p>
+<p><strong>Problème rédhibitoire :</strong> Ne détecte pas les ghosteurs systématiques. Un utilisateur qui confirme 20 Verrous sans jamais venir n'accumule aucun badge, mais son absence d'information est invisible des autres. Le système ne protège personne.</p>
+
+<h3>Système 4 — Score caché interne</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">L'algorithme calcule un score interne multi-facteurs mais n'affiche à l'utilisateur qu'un label vague ("Fiabilité élevée") sans aucun détail.</span></div>
+<p><strong>Exemple :</strong> Uber (les chauffeurs ne connaissent pas leur score exact) · Airbnb Superhost (critères partiellement opaques)</p>
+<p><strong>Avantages :</strong> Très puissant opérationnellement · Résistant à la manipulation</p>
+<p><strong>Problème :</strong> Opacité totale = incompatibilité avec le droit à la transparence algorithmique (Art. 25 LPD suisse) et RGPD Art. 22 si l'algorithme a un impact significatif sur l'individu</p>
+
+<h3>Système 5 — Dépôt de réputation (crédits)</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">Chaque Verrou "consomme" 1 crédit. Un no-show fait perdre le crédit. La présence le récupère. Les crédits s'accumulent ou se dépensent comme une monnaie.</span></div>
+<p><strong>Exemple :</strong> Certaines plateformes de coworking · Systèmes de caution dans la location</p>
+<p><strong>Avantages :</strong> Le ghosting chute immédiatement car il a un coût tangible</p>
+<p><strong>Problèmes :</strong> Crée un système de pré-paiement comportemental potentiellement discriminatoire · Friction excessive · Incompatible avec la gratuité des femmes (comment gérer les crédits différemment selon le genre ?) · Lourdeur technique</p>
+
+<h3>Système 6 — ELO social</h3>
+<div class="def"><span class="def-term">Définition :</span> <span class="def-text">Système inspiré du classement ELO aux échecs. La valeur d'une confirmation dépend de la fiabilité de la personne qui confirme. Être évalué positivement par un utilisateur très fiable vaut plus qu'une évaluation d'un utilisateur peu fiable.</span></div>
+<p><strong>Avantages :</strong> Extrêmement robuste contre la manipulation · Un réseau de ghosteurs se dévalue lui-même</p>
+<p><strong>Problème :</strong> Complexité mathématique importante · Incompréhensible pour l'utilisateur moyen · Impossible à expliquer simplement ("pourquoi mon score a-t-il baissé alors que tout s'est bien passé ?") · Disproportionné pour un MVP avec moins de 1 000 utilisateurs</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s4"><span class="section-num">4.</span> Pourquoi nous avons rejeté chaque alternative</h2>
+
+<table class="decision-table">
+  <tr><th>Système</th><th>Raison principale du rejet</th><th>Ce qu'on en a gardé</th></tr>
+  <tr class="rejected"><td>Score % brut</td><td>Discrimination + mort sociale + instabilité statistique</td><td>L'idée d'un score numérique interne (caché)</td></tr>
+  <tr class="rejected"><td>Badges positifs seuls</td><td>Ne protège pas des ghosteurs systématiques</td><td>Le vocabulaire positif pour les labels affichés</td></tr>
+  <tr class="rejected"><td>Score caché total</td><td>Opacité illégale (LPD/RGPD) + méfiance utilisateur</td><td>L'opacité du calcul interne (pas du label)</td></tr>
+  <tr class="rejected"><td>Dépôt de crédits</td><td>Friction excessive + incompatible gratuité femmes</td><td>L'idée que les actions ont un coût comportemental</td></tr>
+  <tr class="rejected"><td>ELO social</td><td>Trop complexe pour MVP, incompréhensible</td><td>Le principe bayésien de pondération par historique</td></tr>
+  <tr class="chosen"><td><strong>Niveaux de confiance + score interne</strong></td><td>—</td><td><strong>Système retenu — voir §5</strong></td></tr>
+</table>
+
+<p>Le système retenu est un <strong>hybride</strong> qui emprunte le meilleur de chaque famille tout en évitant leurs défauts :</p>
+<ul>
+  <li>Du <em>score %</em> : la précision du calcul interne</li>
+  <li>Des <em>badges positifs</em> : le vocabulaire encourageant des labels affichés</li>
+  <li>Du <em>score caché</em> : l'opacité partielle du calcul (protège contre la manipulation)</li>
+  <li>Du <em>dépôt</em> : les actions négatives ont un coût réel</li>
+  <li>de l'<em>ELO</em> : le principe bayésien (l'historique long pèse plus)</li>
+</ul>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s5"><span class="section-num">5.</span> Le système retenu — architecture complète</h2>
+
+<h3>5.1 Principe directeur</h3>
+
+<blockquote>Inciter les bonnes pratiques plutôt que punir les mauvaises. Rendre les règles du jeu claires. Ne jamais créer de sentiment de surveillance.</blockquote>
+
+<p>Ce principe interdit :</p>
+<ul>
+  <li>L'affichage d'un nombre brut (% ou points) sur le profil public</li>
+  <li>Le blocage total de l'application (mur dur)</li>
+  <li>La collecte de données de localisation continue</li>
+  <li>La révélation de qui a donné quel feedback</li>
+</ul>
+
+<h3>5.2 Les 4 niveaux de confiance</h3>
+
+<p>Tout utilisateur voit sur son profil (et sur les profils des autres) un niveau parmi quatre. Jamais le score brut.</p>
+
+<div class="level-row"><div class="level-stars">◦</div><div class="level-info"><div class="level-name">Nouveau</div><div class="level-cond">Moins de 3 rendez-vous confirmés. Donnée insuffisante pour évaluer.</div></div><div class="level-pts">Score non calculé</div></div>
+<div class="level-row"><div class="level-stars">✦</div><div class="level-info"><div class="level-name">Fiable</div><div class="level-cond">≥ 3 RDV · Score effectif ≥ 10 points</div></div><div class="level-pts">Seuil bas</div></div>
+<div class="level-row"><div class="level-stars">✦✦</div><div class="level-info"><div class="level-name">Très fiable</div><div class="level-cond">≥ 15 RDV · Score effectif ≥ 30 pts · ≤ 1 no-show récent</div></div><div class="level-pts">Seuil intermédiaire</div></div>
+<div class="level-row"><div class="level-stars">✦✦✦</div><div class="level-info"><div class="level-name">Exemplaire</div><div class="level-cond">≥ 25 RDV · Score effectif ≥ 60 pts · ≥ 5 check-ins GPS · 0 no-show récent</div></div><div class="level-pts">Seuil élevé</div></div>
+
+<p><strong>Affichage sur le profil :</strong> <code>✦✦ Très fiable · 18 rencontres</code> — le compteur de RDV est affiché pour donner du contexte statistique sans révéler le score.</p>
+
+<p><strong>Justification du choix de 4 niveaux (pas 3, pas 7) :</strong> 3 niveaux seraient trop peu discriminants (trop de personnes au niveau médian). 7 niveaux créeraient une granularité perçue comme un % déguisé. 4 niveaux offrent un gradient clair, mémorisable, et suffisamment large pour refléter des comportements réellement différents.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s6"><span class="section-num">6.</span> Mathématiques — calcul bayésien et pondérations</h2>
+
+<h3>6.1 Pourquoi un calcul bayésien ?</h3>
+
+<div class="def">
+  <span class="def-term">Inférence bayésienne (définition simplifiée) :</span>
+  <span class="def-text"> Méthode statistique qui pondère les nouvelles données selon la quantité de données existantes. Plus on a d'observations, plus chaque nouvelle observation a de poids. Avec peu d'observations, on reste "humble" sur nos conclusions.</span>
+</div>
+
+<p>Sans pondération bayésienne :</p>
+<ul>
+  <li>Utilisateur A : 1 RDV, 1 absence → score = 0 (catastrophique, injuste)</li>
+  <li>Utilisateur B : 100 RDV, 1 absence → score = 99% (juste)</li>
+</ul>
+
+<p>Avec pondération bayésienne, les deux scores sont ramenés à leur juste valeur statistique :</p>
+
+<div class="formula-block">
+poids_bayésien   = min(1, nombre_rdv / BAYES_FULL_AT)
+                   où BAYES_FULL_AT = 10 (paramètre)
+
+score_effectif   = score_brut × poids_bayésien
+
+Exemples :
+  1 RDV  → poids = 0.10 → score_effectif = score_brut × 10%
+  5 RDV  → poids = 0.50 → score_effectif = score_brut × 50%
+  10 RDV → poids = 1.00 → score_effectif = score_brut × 100% (poids plein)
+</div>
+
+<h3>6.2 Tableau complet des pondérations</h3>
+
+<p>Toutes les valeurs sont regroupées dans une constante <code>TRUST_CONFIG</code> dans le code. Modifier une valeur ici ne nécessite pas de modifier l'affichage.</p>
+
+<div class="outcome-row outcome-head">
+  <div>Emoji</div><div>Événement déclencheur</div><div>Impact sur l'émetteur</div><div>Impact sur le destinataire</div><div>Valeur</div>
+</div>
+<div class="outcome-row">
+  <div>📍</div><div><strong>GPS check-in confirmé</strong> — présence vérifiée à &lt;300m</div><div class="outcome-pos">+3 pts</div><div class="outcome-neu">—</div><div><code>GPS_CHECKIN</code></div>
+</div>
+<div class="outcome-row">
+  <div>✅</div><div><strong>Double feedback positif</strong> — les deux confirment</div><div class="outcome-pos">+2 pts</div><div class="outcome-pos">+2 pts</div><div><code>DOUBLE_POSITIVE</code></div>
+</div>
+<div class="outcome-row">
+  <div>👍</div><div><strong>Feedback positif unilatéral</strong> — un seul côté</div><div class="outcome-pos">+1 pt</div><div class="outcome-pos">+1 pt</div><div><code>SINGLE_POSITIVE</code></div>
+</div>
+<div class="outcome-row">
+  <div>⏰</div><div><strong>Annulation responsable</strong> — plus de 2h avant le RDV</div><div class="outcome-neu">0 pt</div><div class="outcome-neu">0 pt</div><div>—</div>
+</div>
+<div class="outcome-row">
+  <div>❌</div><div><strong>Annulation tardive</strong> — moins de 30 min avant</div><div class="outcome-neg">−2 pts</div><div class="outcome-neu">—</div><div><code>CANCEL_LATE</code></div>
+</div>
+<div class="outcome-row">
+  <div>⏱</div><div><strong>Retard signalé</strong> — plus de 20 min de retard</div><div class="outcome-neu">0 pt</div><div class="outcome-neg">−1 pt</div><div><code>LATE_REPORTED</code></div>
+</div>
+<div class="outcome-row">
+  <div>🚶</div><div><strong>Parti·e après 2 min</strong> — venu·e puis reparti·e aussitôt</div><div class="outcome-neu">0 pt</div><div class="outcome-neg">−4 pts</div><div><code>LEFT_EARLY</code></div>
+</div>
+<div class="outcome-row">
+  <div>🐰</div><div><strong>No-show signalé</strong> — l'autre dit "absent"</div><div class="outcome-neu">0 pt</div><div class="outcome-neg">−5 pts</div><div><code>NOSHOW_REPORTED</code></div>
+</div>
+<div class="outcome-row">
+  <div>👻</div><div><strong>Auto-déclaration fantôme</strong> — "je n'y suis pas allé·e"</div><div class="outcome-neg">−3 pts (soi)</div><div class="outcome-neu">—</div><div><code>SELF_GHOST</code></div>
+</div>
+<div class="outcome-row">
+  <div>🤐</div><div><strong>Silence total</strong> — aucun feedback après 24h (auto-close)</div><div class="outcome-neg">−1 pt</div><div class="outcome-neg">−1 pt</div><div><code>SILENCE_AUTO</code></div>
+</div>
+<div class="outcome-row">
+  <div>🛡️</div><div><strong>Signal d'insécurité</strong> — traitement spécial</div><div class="outcome-neu">0 pt (protégé)</div><div class="outcome-neg">Flag + −10 pts</div><div>Spécial</div>
+</div>
+
+<h3>6.3 Justification de chaque pondération</h3>
+
+<p><strong>GPS check-in = +3 pts (le plus élevé des positifs)</strong><br>
+C'est le seul signal non-déclaratif, donc non-manipulable. Être physiquement présent à &lt;300m du lieu est une preuve objective. Il mérite donc une récompense supérieure aux feedbacks déclaratifs.</p>
+
+<p><strong>Double positif = +2 pts, Unilatéral = +1 pt</strong><br>
+La concordance des deux feedbacks est plus fiable qu'un seul. Le double positif a plus de valeur car il représente un consensus indépendant.</p>
+
+<p><strong>No-show signalé = −5 pts (la pénalité la plus forte)</strong><br>
+C'est le comportement le plus dommageable pour l'autre personne et pour la plateforme. Laisser quelqu'un attendre sans prévenir est un acte unilatéral de manquement à un engagement social.</p>
+
+<p><strong>Auto-fantôme = −3 pts (moins que no-show)</strong><br>
+L'honnêteté est récompensée par rapport au ghosting passif. Quelqu'un qui admet son manquement démontre une capacité de réflexivité qui, statistiquement, prédit un meilleur comportement futur.</p>
+
+<p><strong>Parti·e après 2 min = −4 pts (plus grave que retard)</strong><br>
+Se présenter puis repartir immédiatement est un acte délibéré, potentiellement blessant, qui nécessite un déplacement de l'autre. C'est différent et plus grave qu'un simple retard.</p>
+
+<p><strong>Annulation &gt;2h = 0 pt</strong><br>
+Prévenir suffit. Imposer une pénalité pour une annulation anticipée découragerait les annulations proactives, poussant les gens à ne pas prévenir (pire).</p>
+
+<p><strong>Silence auto = −1 pt (faible)</strong><br>
+Pas donner de feedback n'est pas forcément un signe de mauvaise foi (oubli, manque de temps). La pénalité est faible mais réelle, pour encourager la participation au système sans la forcer absolument.</p>
+
+<h3>6.4 Formule de calcul du niveau</h3>
+
+<div class="formula-block">
+niveau = f(score_effectif, rdv_count, gps_count, recent_noshows)
+
+où :
+  score_effectif  = score_brut × min(1, rdv_count / 10)
+
+  "NOUVEAU"        si rdv_count &lt; 3
+  "FIABLE"         si rdv_count ≥ 3 ET score_effectif ≥ 10
+  "TRÈS FIABLE"    si rdv_count ≥ 15 ET score_effectif ≥ 30 ET recent_noshows ≤ 1
+  "EXEMPLAIRE"     si rdv_count ≥ 25 ET score_effectif ≥ 60
+                     ET gps_count ≥ 5 ET recent_noshows = 0
+
+Note : les conditions sont toutes cumulatives (ET logique, pas OU).
+</div>
+
+<h3>6.5 Traitement des conflits symétriques</h3>
+
+<p>Cas : Alice dit "l'autre n'est pas venu" et Bob dit la même chose. Les deux peuvent avoir raison (décalage temporel) ou l'un ment.</p>
+
+<div class="formula-block">
+Résolution par poids bayésien historique :
+
+  Si alice.rdv_count ≥ bob.rdv_count × 2 :
+    → alice est crue davantage
+    → bob reçoit pénalité pleine (−5 pts)
+    → alice reçoit 0 pt
+
+  Si historiques similaires (ratio &lt; 2) :
+    → impact réduit des deux côtés
+    → alice : −1 pt, bob : −1 pt (pénalité douce partagée)
+
+  Si 🛡️ insécurité de l'un des deux :
+    → session entièrement neutralisée
+    → aucun impact pour la personne ayant signalé l'insécurité
+</div>
+
+<p><strong>Justification :</strong> Ce système imite ce que ferait un juge raisonnable — croire davantage la personne avec un long historique positif. Il n'est pas parfait, mais il est explicite et auditable. Uber utilise le même principe.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s7"><span class="section-num">7.</span> Les 7 outcomes du feedback</h2>
+
+<p>Lors d'un rendez-vous passé, chaque utilisateur dispose de 7 options mutuellement exclusives. Le feedback est soumis et reste <strong>caché pendant 3 heures</strong> avant d'être révélé simultanément aux deux parties.</p>
+
+<div class="card-info">
+  <div class="card-title">Pourquoi cacher les feedbacks 3 heures ?</div>
+  <p style="margin:0">Inspiré du système Airbnb (48h dans leur cas). Sans délai, le premier à soumettre influence le second. Une personne qui voit que l'autre a mis "absent" va répondre par vengeance "absent" même si le RDV s'est bien passé. La révélation simultanée supprime mécaniquement la possibilité de vengeance. Nous avons choisi 3h plutôt que 48h : assez long pour éviter la vengeance impulsive, assez court pour que le souvenir soit frais.</p>
+</div>
+
+<table class="decision-table">
+  <tr><th>Outcome</th><th>Qui est impacté</th><th>Impact</th><th>Justification du choix</th></tr>
+  <tr><td>🌟 Super RDV</td><td>Les deux</td><td>+2 pts chacun (si double)</td><td>Récompense maximale pour un accord parfait</td></tr>
+  <tr><td>👍 Bien</td><td>Les deux</td><td>+1 pt chacun</td><td>Récompense le comportement normal, pas seulement l'exceptionnel</td></tr>
+  <tr><td>⏰ En retard</td><td>Le destinataire</td><td>−1 pt destinataire</td><td>Retard &lt;20 min = toléré, &gt;20 min = pénalité légère</td></tr>
+  <tr><td>🚶 Parti après 2 min</td><td>Le destinataire</td><td>−4 pts destinataire</td><td>Acte délibéré plus grave que l'absence totale car il implique un mensonge par action</td></tr>
+  <tr><td>🐰 Absent (lapin)</td><td>Le destinataire</td><td>−5 pts destinataire</td><td>Le comportement le plus dommageable socialement sur Clutch</td></tr>
+  <tr><td>👻 Je n'y suis pas allé·e</td><td>L'émetteur</td><td>−3 pts émetteur</td><td>Punition réduite pour récompenser l'honnêteté vs le ghosting passif</td></tr>
+  <tr><td>🛡️ Insécurité</td><td>Aucun (protection)</td><td>0 pt pour le signalant</td><td>Non-négociable. Voir §11 pour l'analyse éthique complète.</td></tr>
+</table>
+
+<h3>Pourquoi 7 outcomes et pas moins ?</h3>
+<p>Les systèmes à 2 options (venu / pas venu) sont insuffisants car ils ignorent la nuance "venu mais comportement problématique". Les systèmes à plus de 10 options créent une paralysie du choix. 7 couvrent les situations réelles sans surcharge cognitive. Chaque outcome correspond à une situation vécue identifiable immédiatement.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s8"><span class="section-num">8.</span> Le Soft Gate — mécanique des 3 paliers</h2>
+
+<h3>8.1 La question centrale</h3>
+
+<p>Faut-il rendre le feedback obligatoire ? La réponse directe est : <strong>non si on bloque l'app entière, oui si on bloque seulement les nouvelles demandes.</strong></p>
+
+<p>Un mur dur (bloquer toute l'app) crée deux problèmes :</p>
+<ol>
+  <li>Si les deux utilisateurs oublient de donner leur feedback, ils se bloquent mutuellement pour un rendez-vous qui a peut-être eu lieu</li>
+  <li>Une urgence réelle (hospitalisation, accident) peut empêcher de donner un feedback — l'utilisateur de bonne foi est pénalisé comme un ghosteur</li>
+</ol>
+
+<p>La solution est un <strong>Soft Gate</strong> : pression progressive qui n'empêche jamais de lire ses messages ou de voir les présences, mais qui bloque l'envoi de nouveaux Clutchs après 3 feedbacks manquants.</p>
+
+<h3>8.2 Les 3 paliers</h3>
+
+<table class="decision-table">
+  <tr><th>Palier</th><th>Déclencheur</th><th>Action système</th><th>App utilisable ?</th></tr>
+  <tr><td><span class="tag tag-gray">1</span> Doux</td><td>1 RDV sans feedback</td><td>Bannière discrète dans l'onglet Clutchs : "RDV avec X — que s'est-il passé ?"</td><td>Oui, 100%</td></tr>
+  <tr><td><span class="tag tag-amber">2</span> Orange</td><td>2 RDV sans feedback</td><td>Bannière orange + notification push de rappel</td><td>Oui, 100%</td></tr>
+  <tr><td><span class="tag tag-red">3</span> Blocage</td><td>3 RDV sans feedback</td><td>Envoi de nouveaux Clutchs bloqué · Présences, messages, événements : accessibles</td><td>Lecture seule</td></tr>
+</table>
+
+<div class="formula-block">
+pending_feedbacks = [rdv confirmés avec heure passée de +30 min]
+                    MOINS
+                    [feedbacks soumis OU auto-closés après 24h]
+
+Le compteur est recalculé à chaque ouverture de l'onglet Clutchs.
+</div>
+
+<h3>8.3 Justification du seuil à 3</h3>
+<p>1 feedback manquant : trop strict, un oubli unique est normal. 5 : trop laxiste, un ghosteur systématique peut continuer longtemps. 3 est le point d'inflexion où le comportement de non-feedback devient un pattern et non une exception.</p>
+
+<p><strong>Ce seuil est modifiable</strong> dans <code>TRUST_CONFIG.GATE_BLOCK</code> sans toucher à l'interface.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s9"><span class="section-num">9.</span> GPS check-in optionnel</h2>
+
+<h3>9.1 Le problème résolu</h3>
+<p>Tous les feedbacks sont déclaratifs (l'utilisateur dit ce qui s'est passé). Il est impossible de les vérifier objectivement. Le GPS check-in est le seul mécanisme qui introduit une preuve non-déclarative dans le système.</p>
+
+<h3>9.2 Architecture LPD-compatible</h3>
+
+<div class="card-warn">
+  <div class="card-title">⚖️ Contrainte juridique</div>
+  <p style="margin:0">La Loi fédérale suisse sur la Protection des Données (LPD, en vigueur depuis septembre 2023) classe la localisation comme "donnée sensible" au même titre que la santé ou les convictions religieuses. Stocker des coordonnées GPS, même ponctuellement, nécessite un consentement explicite renforcé et une justification de nécessité.</p>
+</div>
+
+<p>Solution : la vérification est entièrement <strong>locale au téléphone</strong>.</p>
+
+<div class="formula-block">
+Flux technique :
+
+  1. Notification push à l'heure du RDV : "Tu es arrivé·e ?"
+  2. L'utilisateur appuie "Je suis là"
+  3. Le téléphone calcule localement :
+       distance = haversine(pos_actuelle, pos_rdv)
+  4. Si distance ≤ 300m :
+       → On envoie à Supabase : { rdv_id, user_id, arrived: true }
+       → On n'envoie PAS lat/lng
+  5. Si distance > 300m :
+       → Rien n'est envoyé
+
+Ce qui est stocké dans rdv_checkins : { rdv_id, user_id, arrived_at }
+Ce qui n'est JAMAIS stocké : latitude, longitude, distance exacte
+</div>
+
+<p>Cette architecture est conforme LPD car aucune donnée de localisation ne quitte l'appareil. Ce qui est transmis est un booléen (présent/pas présent dans un rayon) qui ne permet pas de reconstituer une position.</p>
+
+<h3>9.3 Optionnalité et non-pénalisation</h3>
+<p>Refuser le GPS ne pénalise pas. L'utilisateur reste à "Très fiable" maximum. Seul le niveau "Exemplaire" requiert des check-ins GPS. Cela signifie que le niveau "Exemplaire" est une <em>distinction</em> pour les utilisateurs qui choisissent activement de certifier leur présence.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s10"><span class="section-num">10.</span> Scénarios edge cases</h2>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario A</div>
+  <h4>L'urgence légitime — Marie</h4>
+  <p>Marie a un Verrou avec Thomas à 19h. À 18h45, sa mère fait une chute grave. Elle ne peut pas prévenir. Thomas attend 30 min, part, donne "absent".</p>
+  <p><strong>Résultat dans le système actuel :</strong> Marie reçoit −5 pts comme pénalité. Injuste si l'urgence est réelle.</p>
+  <p><strong>Mitigation :</strong> Le calcul bayésien protège partiellement Marie si elle a un long historique positif. Un seul incident sur 30 RDV est absorbé sans changer de niveau. Le système punit les patterns, pas les incidents isolés.</p>
+  <p><strong>Évolution prévue (Phase 2) :</strong> Bouton "Urgence" avec plafond de 2 utilisations par an sans impact sur le score. Au-delà de 2 : pénalité normale. Ce mécanisme nécessite une modération minimale et est reporté.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario B</div>
+  <h4>Le fantôme systématique — Kevin</h4>
+  <p>Kevin confirme 10 Verrous en 2 semaines. Il ne vient à aucun. Il ne donne aucun feedback.</p>
+  <p><strong>Résultat :</strong> Auto-close après 24h = −1 pt × 10 = −10 pts immédiats. L'autre personne peut signaler "absent" à chaque fois = −5 pts × 10 = −50 pts supplémentaires. Kevin descend rapidement de "Nouveau" vers un score fortement négatif, l'empêchant d'envoyer de nouveaux Clutchs (Soft Gate palier 3 : 3 feedbacks manquants).</p>
+  <p><strong>Conclusion :</strong> Kevin est détecté et bloqué même sans jamais ouvrir l'app.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario C</div>
+  <h4>Le conflit symétrique — Léa et Raphaël</h4>
+  <p>Léa arrive à 19h05, attend 20 min, part. Raphaël arrive à 19h30, attend, part. Les deux donnent "absent".</p>
+  <p><strong>Résultat :</strong> Poids bayésien selon historique. Si les deux ont peu d'historique : −1 pt chacun (pénalité douce). Si Léa a 50 RDV et Raphaël 3 : Raphaël reçoit −5 pts, Léa reçoit 0. Les timestamps des soumissions aident à évaluer le contexte sans GPS.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario D</div>
+  <h4>La vengeance — Sam et Julie</h4>
+  <p>Le RDV s'est bien passé. Julie ne souhaite pas de suite. Sam, blessé, soumet "absent" par vengeance.</p>
+  <p><strong>Résultat :</strong> Les feedbacks sont cachés 3h. Si Julie soumet "Super RDV" et Sam soumet "absent", les feedbacks sont contradictoires. Résolution : poids bayésien. Impact réduit des deux côtés sur conflit non-concordant. La pénalité de −5 pts pour Julie est divisée par un facteur de pondération. Sam reçoit un flag interne pour feedback abusif potentiel si le pattern se répète.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario E — Critique</div>
+  <h4>La sécurité femme — Inès</h4>
+  <p>Inès rencontre un homme qui la met mal à l'aise dès les premières minutes. Elle part sans explication. Il soumet "absent" par vengeance.</p>
+  <p><strong>Résultat :</strong> Inès utilise 🛡️ Insécurité. Effets immédiats : (1) Le feedback de l'homme est neutralisé sur cette session. (2) Score d'Inès = 0 impact. (3) Flag interne sur le compte de l'homme. Si ≥ 2 signalements de sécurité contre le même compte → alerte modération automatique.</p>
+  <p><strong>Justification éthique :</strong> La sécurité physique prend toujours le dessus sur l'intégrité du système de notation. Une femme qui fuit une situation inconfortable ne doit jamais être pénalisée pour cela. C'est non-négociable.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario F</div>
+  <h4>Le nouvel inscrit — Premier RDV</h4>
+  <p>Quelqu'un vient de s'inscrire et a son premier Verrou. Comment afficher son niveau ?</p>
+  <p><strong>Résultat :</strong> Niveau "◦ Nouveau" affiché. Pas de score calculé. Le label est neutre et honnête : "Pas encore assez de données." Il n'y a pas de biais d'entrée.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario G</div>
+  <h4>Le reset de compte</h4>
+  <p>Un utilisateur avec score négatif supprime son compte et en crée un nouveau.</p>
+  <p><strong>MVP actuel :</strong> Le nouveau compte repart à "Nouveau". Toléré en phase beta (peu d'utilisateurs).</p>
+  <p><strong>Phase 2 :</strong> Hash cryptographique du numéro de téléphone comme identifiant persistant de fiabilité. À auditer LPD avant implémentation (le hash d'un numéro de téléphone est-il une donnée personnelle ? Oui selon le RGPD, probablement oui sous LPD).</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-tag">Scénario H</div>
+  <h4>Le feedback tardif</h4>
+  <p>Un utilisateur veut soumettre son feedback 5 jours après le RDV. Son souvenir est biaisé.</p>
+  <p><strong>Résultat :</strong> La fenêtre de feedback expire après 24h. Après quoi : auto-close avec pénalité légère de −1 pt pour les deux. Justification : au-delà de 24h, la fidélité du souvenir est trop faible pour que le feedback soit fiable.</p>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s11"><span class="section-num">11.</span> Analyse éthique</h2>
+
+<h3>11.1 Dignité et score social</h3>
+<p>La critique principale des systèmes de notation de personnes est le risque de réduire un individu à un chiffre. Notre système y répond par :</p>
+<ul>
+  <li>L'absence de chiffre visible (niveaux qualitatifs, pas de %)</li>
+  <li>L'impossibilité de filtrer par niveau (contrairement à Uber qui filtre les chauffeurs)</li>
+  <li>La possibilité de reconstruire son niveau par le comportement futur</li>
+</ul>
+
+<h3>11.2 Consentement</h3>
+<p>Tout utilisateur accepte les CGU qui mentionnent explicitement le système de fiabilité. Le GPS est toujours optionnel. L'utilisateur peut voir son propre niveau à tout moment. Ces trois éléments constituent un consentement informé au sens de la LPD.</p>
+
+<h3>11.3 Sécurité genrée</h3>
+<p>Le bouton 🛡️ Insécurité est le mécanisme le plus important du système d'un point de vue éthique. Il reconnaît que :</p>
+<ol>
+  <li>Les femmes ont des raisons légitimes de fuir des situations que les hommes ne rencontrent pas</li>
+  <li>Un système de notation aveugle au genre pénaliserait systématiquement les femmes qui exercent leur droit à la sécurité</li>
+  <li>La réputation du signaleur potentiellement malveillant (l'homme qui noterait négativement) ne doit pas primer sur la sécurité de la femme</li>
+</ol>
+
+<h3>11.4 Risque de discrimination algorithmique</h3>
+<p>Risque identifié : si un groupe démographique (ex: personnes avec des contraintes professionnelles atypiques) a statistiquement plus de no-shows légitimes, le système pourrait créer une discrimination indirecte. Mitigation : le calcul bayésien atténue les incidents isolés. Les urgences répétées sont traitées humainement (support) plutôt qu'algorithmiquement.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s12"><span class="section-num">12.</span> Analyse juridique — LPD suisse</h2>
+
+<table class="decision-table">
+  <tr><th>Aspect</th><th>Exigence LPD</th><th>Notre réponse</th><th>Statut</th></tr>
+  <tr><td>Données de localisation</td><td>Données sensibles — consentement explicite</td><td>GPS 100% local, rien stocké. Seulement un booléen.</td><td><span class="tag tag-green">Conforme</span></td></tr>
+  <tr><td>Profilage comportemental</td><td>Information préalable de l'utilisateur</td><td>Mentionné dans les CGU + section "Comment améliorer ma fiabilité"</td><td><span class="tag tag-green">Conforme</span></td></tr>
+  <tr><td>Droit de rectification</td><td>L'utilisateur peut contester des données incorrectes</td><td>À implémenter : formulaire de contestation feedback via support</td><td><span class="tag tag-amber">À faire</span></td></tr>
+  <tr><td>Droit à l'effacement</td><td>Suppression du profil et de toutes les données</td><td>Bouton "Supprimer mon compte" déjà implémenté (LPD anonymisation)</td><td><span class="tag tag-green">Conforme</span></td></tr>
+  <tr><td>Transparence algorithmique</td><td>Informer des critères de décision automatisée</td><td>Section "Comment améliorer ta fiabilité" sur le profil</td><td><span class="tag tag-green">Conforme</span></td></tr>
+  <tr><td>Transfert hors Suisse</td><td>Supabase hébergé en UE (Frankfurt)</td><td>UE = niveau de protection adéquat selon LPD</td><td><span class="tag tag-green">Conforme</span></td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s13"><span class="section-num">13.</span> Analyse psychologique</h2>
+
+<h3>13.1 Théorie de la norme sociale</h3>
+<p>Les systèmes de notation créent des <em>normes sociales</em>. Un utilisateur qui voit que la moyenne est "Très fiable" cherchera naturellement à atteindre ce niveau. Notre système exploite ce mécanisme en rendant "Fiable" la norme perçue (la majorité des utilisateurs actifs devrait être à ce niveau), créant une aspiration vers "Très fiable" et "Exemplaire".</p>
+
+<h3>13.2 Risque d'anxiété de performance</h3>
+<p>Les notes numériques créent de l'anxiété mesurée (études sur les ratings Uber chauffeurs, les notes Airbnb hôtes). Les niveaux qualitatifs la réduisent car :</p>
+<ul>
+  <li>Il n'y a pas de différence visible entre "Fiable 12 rencontres" et "Fiable 14 rencontres"</li>
+  <li>Le niveau ne change pas à chaque RDV (inertie du calcul bayésien)</li>
+  <li>La progression est linéaire et prévisible ("si je viens à mes RDV, je monte")</li>
+</ul>
+
+<h3>13.3 Biais de récence</h3>
+<p>Un incident récent est psychologiquement plus marquant qu'un historique long. Notre système intègre <code>recent_noshows</code> comme variable séparée pour éviter qu'un utilisateur exemplaire soit définitivement "puni" par un incident isolé récent, tout en empêchant quelqu'un de "coaster" sur un vieux bon historique.</p>
+
+<h3>13.4 Dopamine éthique</h3>
+<p>Chaque GPS check-in réussi déclenchera une micro-récompense visuelle (+3 pts fiabilité). Ce mécanisme de <em>reward shaping</em> transforme un comportement souhaitable (se présenter) en une expérience positive, sans manipulation dark-pattern (le check-in est facultatif et le bénéfice est expliqué à l'avance).</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s14"><span class="section-num">14.</span> Implémentation technique</h2>
+
+<h3>14.1 Architecture</h3>
+<p>Clutch est une application Next.js 15 en mode <code>output: 'export'</code> — zéro serveur. Tout passe par Supabase (base de données PostgreSQL, auth, realtime). Le scoring est calculé côté client au moment du chargement du profil.</p>
+
+<h3>14.2 Tables Supabase créées</h3>
+
+<div class="formula-block">
+-- Feedbacks post-RDV avec révélation différée
+rdv_feedbacks (
+  id uuid PRIMARY KEY,
+  rdv_id uuid → clutches.id,
+  from_id uuid → profiles.id,
+  to_id uuid → profiles.id,
+  outcome text (super|ok|late|left_early|absent|ghost|unsafe),
+  submitted_at timestamptz,
+  revealed_at timestamptz,  -- = submitted_at + 3h
+  is_revealed boolean
+)
+
+-- Check-ins GPS (zéro coordonnées)
+rdv_checkins (
+  id uuid PRIMARY KEY,
+  rdv_id uuid → clutches.id,
+  user_id uuid → profiles.id,
+  arrived_at timestamptz
+)
+
+-- Colonnes ajoutées sur profiles
+trust_level text DEFAULT 'new'
+trust_score integer DEFAULT 0
+rdv_count integer DEFAULT 0
+gps_checkin_count integer DEFAULT 0
+pending_feedbacks integer DEFAULT 0
+recent_noshows integer DEFAULT 0
+</div>
+
+<h3>14.3 Constante TRUST_CONFIG</h3>
+<p>Toutes les pondérations sont centralisées dans une seule constante. Modifier un comportement ne nécessite de toucher qu'à cette constante, sans chercher dans le code.</p>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s15"><span class="section-num">15.</span> Ce qui est modifiable vs figé</h2>
+
+<table class="decision-table">
+  <tr><th>Élément</th><th>Modifiable sans refactoring ?</th><th>Impact si modifié</th></tr>
+  <tr><td>Valeurs des points (+3, −5, etc.)</td><td class="outcome-pos">✓ Oui — TRUST_CONFIG</td><td>Comportement utilisateur, pas l'affichage</td></tr>
+  <tr><td>Seuils des niveaux</td><td class="outcome-pos">✓ Oui — TRUST_CONFIG</td><td>Redistribution entre niveaux</td></tr>
+  <tr><td>Délai de révélation (3h)</td><td class="outcome-pos">✓ Oui — TRUST_CONFIG</td><td>Expérience anti-vengeance</td></tr>
+  <tr><td>Rayon GPS (300m)</td><td class="outcome-pos">✓ Oui — TRUST_CONFIG</td><td>Précision de la preuve</td></tr>
+  <tr><td>Seuil soft gate (3)</td><td class="outcome-pos">✓ Oui — TRUST_CONFIG</td><td>Pression sur les utilisateurs négligents</td></tr>
+  <tr><td>Labels des 4 niveaux (Fiable, etc.)</td><td class="outcome-neg">⚠ Refactoring UI</td><td>Changement d'identité produit</td></tr>
+  <tr><td>Schéma des tables Supabase</td><td class="outcome-neg">⚠ Migration SQL</td><td>Données existantes à migrer</td></tr>
+  <tr><td>🛡️ Insécurité neutralise toujours</td><td class="outcome-neg">✗ Non négociable</td><td>Éthique fondamentale du produit</td></tr>
+  <tr><td>GPS = zéro coordonnées stockées</td><td class="outcome-neg">✗ Non négociable</td><td>Conformité LPD</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="s16"><span class="section-num">16.</span> Glossaire</h2>
+
+<div class="def"><span class="def-term">Algorithme bayésien</span> <span class="def-text">— Méthode statistique qui pondère les nouvelles informations selon la quantité d'informations déjà disponibles. Ici : les premiers rendez-vous comptent moins dans le calcul du score que les RDV ultérieurs.</span></div>
+<div class="def"><span class="def-term">Clutch</span> <span class="def-text">— Dans l'application : demande de rendez-vous spontané envoyée d'un utilisateur à un autre pendant leur fenêtre de disponibilité commune. Durée de validité : 2h maximum.</span></div>
+<div class="def"><span class="def-term">Dark pattern</span> <span class="def-text">— Technique de conception d'interface qui pousse l'utilisateur à effectuer une action non souhaitée (ex: continuer à scroller, acheter sans le vouloir). Clutch refuse par principe tous les dark patterns.</span></div>
+<div class="def"><span class="def-term">Dopamine éthique</span> <span class="def-text">— Récompense psychologique positif liée à un comportement bénéfique pour l'utilisateur lui-même (vs dopamine manipulatrice liée à des comportements addictifs). Sur Clutch : l'excitation de voir sa fiabilité monter après un vrai RDV.</span></div>
+<div class="def"><span class="def-term">Edge case</span> <span class="def-text">— Situation limite, rare ou atypique qui peut révéler des failles dans un système (ex: urgence médicale pendant un RDV, conflit de timeline, vengeance).</span></div>
+<div class="def"><span class="def-term">ELO</span> <span class="def-text">— Système de classement inventé par Arpad Elo pour les échecs. La valeur d'une victoire dépend du classement de l'adversaire vaincu. Adapté ici : la valeur d'un feedback dépend de la fiabilité de son émetteur.</span></div>
+<div class="def"><span class="def-term">Ghosting</span> <span class="def-text">— Disparition silencieuse sans prévenir. Sur Clutch : ne pas se présenter à un rendez-vous confirmé sans annuler préalablement.</span></div>
+<div class="def"><span class="def-term">Haversine</span> <span class="def-text">— Formule mathématique calculant la distance entre deux points géographiques sur une sphère (la Terre). Utilisée pour le GPS check-in sans stocker les coordonnées.</span></div>
+<div class="def"><span class="def-term">LPD</span> <span class="def-text">— Loi fédérale sur la Protection des Données (Suisse), en vigueur depuis le 1er septembre 2023. Équivalent suisse du RGPD européen, avec des spécificités locales. La localisation est classée "donnée sensible".</span></div>
+<div class="def"><span class="def-term">No-show</span> <span class="def-text">— Terme anglais pour "ne pas se présenter". Sur Clutch : un utilisateur qui a confirmé un Verrou et ne vient pas au rendez-vous sans prévenir.</span></div>
+<div class="def"><span class="def-term">Outcome</span> <span class="def-text">— Issue, résultat. Ici : l'une des 7 options disponibles dans le formulaire de feedback post-rendez-vous.</span></div>
+<div class="def"><span class="def-term">Reward shaping</span> <span class="def-text">— Technique de conception comportementale qui définit des récompenses intermédiaires pour guider un comportement vers un objectif. Ici : la récompense +3 pts pour le GPS check-in encourage la présence physique.</span></div>
+<div class="def"><span class="def-term">RLS (Row Level Security)</span> <span class="def-text">— Mécanisme de sécurité Supabase/PostgreSQL qui garantit que chaque utilisateur ne peut lire et modifier que ses propres données. Obligatoire sur toutes les tables Clutch.</span></div>
+<div class="def"><span class="def-term">Soft Gate</span> <span class="def-text">— Barrière progressive (par opposition à un "hard gate" ou mur dur). L'application reste partiellement utilisable pendant que la pression pour résoudre le problème (donner un feedback) augmente.</span></div>
+<div class="def"><span class="def-term">Verrou</span> <span class="def-text">— Dans l'application : état d'un Clutch accepté des deux côtés. Le Verrou représente un rendez-vous confirmé. L'image du verrou fermant/se refermant progressivement est une métaphore visuelle centrale de Clutch.</span></div>
+
+<hr class="divider">
+
+<div class="footnote">
+  <p><strong>Clutch</strong> · Lausanne, Suisse · Beta juin 2026 · <a href="mailto:david.saugy@gmail.com">david.saugy@gmail.com</a></p>
+  <p>Ce document est confidentiel. Il décrit l'architecture produit au 15 juin 2026 (version 1.0). Toutes les pondérations sont modifiables via la constante <code>TRUST_CONFIG</code> dans <code>app/app2/page.tsx</code>. Les valeurs figées (🛡️ insécurité neutre, GPS zéro-coordonnées) sont non-négociables par décision éthique et juridique.</p>
+</div>
+
+</body>
+</html>

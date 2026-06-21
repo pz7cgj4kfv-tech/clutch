@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="fr" class="geist_a71539c9-module__T19VSG__variable geist_mono_8d43a2aa-module__8Li5zG__variable h-full antialiased"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/><link rel="preload" href="/_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/caa3a2e1cccd8315-s.p.0wgildi0cnwt9.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/chunks/1tu0jll_2xo0l.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/1jq4o6yq14o4c.js"/><script src="/_next/static/chunks/07-hzktxqjvzd.js" async=""></script><script src="/_next/static/chunks/29hu594r0iqqs.js" async=""></script><script src="/_next/static/chunks/3n7dm2ojtyzwn.js" async=""></script><script src="/_next/static/chunks/turbopack-1ev8dzobiasvv.js" async=""></script><script src="/_next/static/chunks/158myu8e_yme3.js" async=""></script><script src="/_next/static/chunks/38fo_bviye57g.js" async=""></script><script src="/_next/static/chunks/3ycbr7oqaie4l.js" async=""></script><meta name="next-size-adjust" content=""/><link rel="manifest" href="/manifest.json"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/><meta name="apple-mobile-web-app-title" content="Clutch"/><meta name="theme-color" content="#5D1048"/><title>Clutch</title><meta name="description" content="L&#x27;app de rencontres spontanées à Lausanne"/><link rel="manifest" href="/manifest.json"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-title" content="Clutch"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/><link rel="icon" href="/favicon.ico?favicon.2vob68tjqpejf.ico" sizes="256x256" type="image/x-icon"/><script defer="" data-domain="pz7cgj4kfv-tech.github.io" src="https://plausible.io/js/script.js"></script><script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer=""></script><script>
+          window.OneSignalDeferred = window.OneSignalDeferred || [];
+          OneSignalDeferred.push(async function(OneSignal) {
+            await OneSignal.init({
+              appId: "72f8da44-de01-4ad1-b1d8-6d2fbf33daf4",
+              safari_web_id: "",
+              notifyButton: { enable: false },
+              allowLocalhostAsSecureOrigin: true,
+            });
+          });
+        </script><script src="/_next/static/chunks/0cz1d0mv5g_q7.js" noModule=""></script></head><body class="min-h-full flex flex-col"><div hidden=""><!--$--><!--/$--></div><style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+          background: #2a1020;
+          font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+          color: #f5e8de;
+          overflow-x: hidden;
+          -webkit-font-smoothing: antialiased;
+        }
+        input { font-family: inherit; }
+        ::-webkit-scrollbar { width: 0; }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: .3; }
+          50%       { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50%       { transform: scale(1.06); }
+        }
+        @keyframes ticker {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+
+        .anim { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) both; }
+        .d1 { animation-delay: .05s; }
+        .d2 { animation-delay: .18s; }
+        .d3 { animation-delay: .32s; }
+        .d4 { animation-delay: .46s; }
+        .d5 { animation-delay: .60s; }
+
+        .btn-red {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 16px 28px;
+          background: #C8860A; color: #1a0a14;
+          border: none; border-radius: 12px;
+          font-size: 16px; font-weight: 800;
+          cursor: pointer; text-decoration: none;
+          transition: background .15s, transform .15s;
+          letter-spacing: -.02em; line-height: 1;
+          white-space: nowrap;
+        }
+        .btn-red:hover { background: #a06d08; transform: translateY(-1px); }
+        .btn-red:active { transform: scale(.98); }
+
+        .btn-outline {
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 16px 28px;
+          background: transparent; color: #FFBF9E;
+          border: 1px solid rgba(245,232,222,0.25); border-radius: 12px;
+          font-size: 16px; font-weight: 700;
+          cursor: pointer; text-decoration: none;
+          transition: border-color .15s, transform .15s;
+          letter-spacing: -.02em; line-height: 1;
+          white-space: nowrap;
+        }
+        .btn-outline:hover { border-color: rgba(245,232,222,0.6); transform: translateY(-1px); }
+
+        .stat-card {
+          text-align: center;
+          padding: 28px 20px;
+          border: 1px solid rgba(255,191,158,0.08);
+          border-radius: 16px;
+          background: rgba(255,191,158,0.05);
+        }
+
+        .step-dot {
+          width: 40px; height: 40px;
+          border-radius: 50%;
+          background: #C8860A;
+          color: #1a0a14;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .feat-card {
+          padding: 20px;
+          border: 1px solid rgba(255,191,158,0.08);
+          border-radius: 14px;
+          background: rgba(255,191,158,0.05);
+          transition: border-color .2s;
+        }
+        .feat-card:hover { border-color: rgba(200,134,10,0.3); }
+
+        .ticker-wrap {
+          overflow: hidden;
+          padding: 16px 0;
+          background: rgba(255,191,158,0.05);
+          border-top: 1px solid rgba(255,191,158,0.08);
+          border-bottom: 1px solid rgba(255,191,158,0.08);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ticker-inner {
+          display: inline-block;
+          animation: ticker 24s linear infinite;
+        }
+        .ticker-item {
+          display: inline-block;
+          padding: 0 32px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .1em;
+          text-transform: uppercase;
+          color: rgba(245,232,222,0.35);
+        }
+        .ticker-item span { color: #C8860A; margin-right: 32px; }
+
+        .waitlist-input {
+          width: 100%;
+          padding: 15px 18px;
+          background: rgba(255,191,158,0.07);
+          border: 1px solid rgba(255,191,158,0.12);
+          border-radius: 12px;
+          font-size: 16px;
+          color: #f5e8de;
+          outline: none;
+          caret-color: #C8860A;
+          transition: border-color .15s;
+        }
+        .waitlist-input:focus { border-color: rgba(200,134,10,0.5); }
+        .waitlist-input.error { border-color: #C8860A; }
+        .waitlist-input::placeholder { color: rgba(245,232,222,0.3); }
+
+        .pill-nav {
+          display: inline-flex; align-items: center;
+          padding: 7px 14px;
+          border: 1px solid rgba(255,191,158,0.12);
+          border-radius: 999px;
+          font-size: 12px; font-weight: 600;
+          color: rgba(245,232,222,0.5);
+          text-decoration: none;
+          transition: border-color .15s, color .15s;
+        }
+        .pill-nav:hover { border-color: rgba(200,134,10,0.4); color: #C8860A; }
+
+        @media (min-width: 600px) {
+          .hero-title { font-size: 72px !important; }
+          .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .feat-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+      </style><nav style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid rgba(255,191,158,0.08);position:sticky;top:0;z-index:100;background:rgba(42,16,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)"><div style="font-size:20px;font-weight:900;letter-spacing:-.06em;color:#f5e8de">CLUTCH<span style="color:#C8860A;margin-left:2px">.</span></div><div style="display:flex;gap:8px;align-items:center"><a href="/app2" class="btn-red" style="padding:9px 16px;font-size:13px">Tester →</a><a href="/hq" class="pill-nav">QG 🔒</a></div></nav><section style="min-height:calc(100svh - 61px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px 48px;text-align:center;max-width:700px;margin:0 auto"><div class="anim d1" style="display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(200,134,10,0.3);border-radius:999px;font-size:12px;font-weight:700;color:#C8860A;margin-bottom:32px;letter-spacing:.04em"><span style="animation:pulse 2s ease-in-out infinite;display:inline-block">🇨🇭</span>Lausanne · Beta juin 2026</div><h1 class="anim d2 hero-title" style="font-size:52px;font-weight:900;letter-spacing:-.05em;line-height:1.05;margin-bottom:24px">Finis de swiper<br/><span style="color:#C8860A">dans le vide.</span></h1><p class="anim d3" style="font-size:18px;color:rgba(245,232,222,0.6);line-height:1.65;margin-bottom:40px;max-width:480px">Clutch = un match → un RDV réel → <strong style="color:#f5e8de;font-weight:700">dans les 18h</strong>.<br/>Ou ça expire.</p><div class="anim d4" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:20px"><a href="/app2" class="btn-red" style="font-size:17px;padding:17px 32px">Tester l&#x27;app →</a><a href="/app2?preview=onboarding" class="btn-outline" style="font-size:17px;padding:17px 32px;text-decoration:none;display:inline-flex;align-items:center">Voir le flow d&#x27;inscription</a></div><div class="anim d5" style="font-size:12px;color:rgba(245,232,222,0.3);letter-spacing:.03em">Gratuit pour les femmes · Toujours</div></section><div class="ticker-wrap"><div class="ticker-inner"><span><span class="ticker-item">MATCH RÉEL<span>✦</span></span><span class="ticker-item">PAS DE GHOSTING<span>✦</span></span><span class="ticker-item">RDV EN 18H<span>✦</span></span><span class="ticker-item">LAUSANNE FIRST<span>✦</span></span><span class="ticker-item">ZÉRO BULLSHIT<span>✦</span></span><span class="ticker-item">100% GRATUIT ♀<span>✦</span></span><span class="ticker-item">SCORE FIABILITÉ<span>✦</span></span><span class="ticker-item">BOUTON SOS<span>✦</span></span><span class="ticker-item">PROFILS VÉRIFIÉS<span>✦</span></span><span class="ticker-item">MATCH RÉEL<span>✦</span></span></span><span><span class="ticker-item">MATCH RÉEL<span>✦</span></span><span class="ticker-item">PAS DE GHOSTING<span>✦</span></span><span class="ticker-item">RDV EN 18H<span>✦</span></span><span class="ticker-item">LAUSANNE FIRST<span>✦</span></span><span class="ticker-item">ZÉRO BULLSHIT<span>✦</span></span><span class="ticker-item">100% GRATUIT ♀<span>✦</span></span><span class="ticker-item">SCORE FIABILITÉ<span>✦</span></span><span class="ticker-item">BOUTON SOS<span>✦</span></span><span class="ticker-item">PROFILS VÉRIFIÉS<span>✦</span></span><span class="ticker-item">MATCH RÉEL<span>✦</span></span></span></div></div><section style="padding:80px 24px;max-width:900px;margin:0 auto"><div class="stats-grid" style="display:grid;grid-template-columns:1fr;gap:16px"><div class="stat-card"><div style="font-size:56px;font-weight:900;letter-spacing:-.04em;color:#C8860A;line-height:1;margin-bottom:10px">0</div><div style="font-size:14px;color:rgba(245,232,222,0.5);line-height:1.5">apps de rencontres qui forcent un vrai RDV</div></div><div class="stat-card"><div style="font-size:56px;font-weight:900;letter-spacing:-.04em;color:#C8860A;line-height:1;margin-bottom:10px">18h</div><div style="font-size:14px;color:rgba(245,232,222,0.5);line-height:1.5">max entre le match et le rendez-vous</div></div><div class="stat-card"><div style="font-size:56px;font-weight:900;letter-spacing:-.04em;color:#C8860A;line-height:1;margin-bottom:10px">CHF 0</div><div style="font-size:14px;color:rgba(245,232,222,0.5);line-height:1.5">pour les femmes — toujours</div></div></div></section><section style="padding:0 24px 80px;max-width:640px;margin:0 auto"><div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,232,222,0.3);margin-bottom:40px;text-align:center">Comment ça marche</div><div style="display:flex;flex-direction:column;gap:32px"><div style="display:flex;gap:20px;align-items:flex-start"><div style="position:relative"><div class="step-dot">01</div><div style="position:absolute;top:100%;left:50%;transform:translateX(-50%);width:1px;height:32px;background:linear-gradient(to bottom, rgba(200,134,10,0.4), transparent);margin-top:0"></div></div><div style="padding-top:8px"><div style="font-size:15px;font-weight:800;margin-bottom:6px;letter-spacing:-.02em;line-height:1.3">Tu matches avec quelqu&#x27;un de disponible MAINTENANT</div><div style="font-size:13px;color:rgba(245,232,222,0.5);line-height:1.65">Tu indiques que tu es dispo ce soir à Lausanne. Seules les personnes disponibles maintenant apparaissent — pas de profils dormants.</div></div></div><div style="display:flex;gap:20px;align-items:flex-start"><div style="position:relative"><div class="step-dot">02</div><div style="position:absolute;top:100%;left:50%;transform:translateX(-50%);width:1px;height:32px;background:linear-gradient(to bottom, rgba(200,134,10,0.4), transparent);margin-top:0"></div></div><div style="padding-top:8px"><div style="font-size:15px;font-weight:800;margin-bottom:6px;letter-spacing:-.02em;line-height:1.3">Tu proposes : lieu + heure + message (dans les 2h)</div><div style="font-size:13px;color:rgba(245,232,222,0.5);line-height:1.65">Tu choisis un endroit réel. Tu envoies une proposition concrète. Pas de &quot;on verra&quot;. Dans les 2h, c&#x27;est confirmé ou expiré.</div></div></div><div style="display:flex;gap:20px;align-items:flex-start"><div style="position:relative"><div class="step-dot">03</div></div><div style="padding-top:8px"><div style="font-size:15px;font-weight:800;margin-bottom:6px;letter-spacing:-.02em;line-height:1.3">Tu y vas — score de fiabilité si tu ne viens pas</div><div style="font-size:13px;color:rgba(245,232,222,0.5);line-height:1.65">Le Verrou se referme. RDV réel dans les 18h. Si tu ghostes, ton score de fiabilité chute. Le respect, c&#x27;est un feature.</div></div></div></div></section><section style="padding:0 24px 80px;max-width:900px;margin:0 auto"><div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,232,222,0.3);margin-bottom:32px;text-align:center">Ce qui rend Clutch différent</div><div class="feat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">🔒</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Profils certifiés</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Score de fiabilité public. Ghosting = pénalité réelle.</div></div><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">⚡</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Disponible maintenant</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Seules les personnes dispo ce soir apparaissent.</div></div><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">🎯</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Score de compatibilité</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Pas de scroll infini. Des suggestions pertinentes.</div></div><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">🚨</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Bouton SOS</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Un contact reçoit ta position en un tap.</div></div><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">📅</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Événements Lausanne</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Concerts, bars, expos — RDV avec contexte.</div></div><div class="feat-card"><div style="font-size:22px;margin-bottom:10px">♀</div><div style="font-size:13px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em">Gratuit pour les femmes</div><div style="font-size:12px;color:rgba(245,232,222,0.45);line-height:1.55">Toujours. Par choix éthique, pas marketing.</div></div></div></section><section style="padding:80px 24px;background:rgba(20,8,16,0.7);border-top:1px solid rgba(255,191,158,0.08);border-bottom:1px solid rgba(255,191,158,0.08)"><div style="max-width:480px;margin:0 auto;text-align:center"><div style="font-size:32px;font-weight:900;letter-spacing:-.04em;margin-bottom:10px;line-height:1.1">Sois parmi les premiers<br/>à <span style="color:#C8860A">Lausanne</span></div><p style="font-size:14px;color:rgba(245,232,222,0.5);margin-bottom:32px;line-height:1.6">On ouvre la beta bientôt. Laisse ton email,<br/>on te contacte dès que c&#x27;est live.</p><div><div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap"><input type="email" placeholder="ton@email.com" class="waitlist-input" style="flex:1;min-width:220px" value=""/><button class="btn-red" style="opacity:1;cursor:pointer;width:auto;padding:15px 24px">Je veux accès</button></div></div></div></section><footer style="padding:28px 24px;border-top:1px solid rgba(255,191,158,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:900;letter-spacing:-.04em;color:rgba(245,232,222,0.4)">CLUTCH<span style="color:#C8860A">.</span></div><div style="display:flex;gap:20px;flex-wrap:wrap"><a href="/app2" style="font-size:12px;color:rgba(245,232,222,0.3);text-decoration:none">App</a><a href="/privacy" style="font-size:12px;color:rgba(245,232,222,0.3);text-decoration:none">Confidentialité</a><a href="/terms" style="font-size:12px;color:rgba(245,232,222,0.3);text-decoration:none">CGU</a><a href="mailto:david.saugy@gmail.com" style="font-size:12px;color:rgba(245,232,222,0.3);text-decoration:none">Contact</a><a href="/hq" style="font-size:12px;color:rgba(245,232,222,0.3);text-decoration:none">QG 🔒</a></div><div style="font-size:11px;color:rgba(245,232,222,0.2)">Construit à Lausanne 🇨🇭 · 2026 · <!-- -->v11.06-V</div></footer><!--$--><!--/$--><script src="/_next/static/chunks/1jq4o6yq14o4c.js" id="_R_" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0])</script><script>self.__next_f.push([1,"1:\"$Sreact.fragment\"\n2:I[39756,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"default\"]\n3:I[37457,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"default\"]\n4:I[47257,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"ClientPageRoot\"]\n5:I[31713,[\"/_next/static/chunks/158myu8e_yme3.js\",\"/_next/static/chunks/38fo_bviye57g.js\",\"/_next/static/chunks/3ycbr7oqaie4l.js\"],\"default\"]\n8:I[97367,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"OutletBoundary\"]\n9:\"$Sreact.suspense\"\nb:I[97367,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"ViewportBoundary\"]\nd:I[97367,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"MetadataBoundary\"]\nf:I[68027,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"default\",1]\n:HL[\"/_next/static/chunks/1tu0jll_2xo0l.css\",\"style\"]\n:HL[\"/_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2\",\"font\",{\"crossOrigin\":\"\",\"type\":\"font/woff2\"}]\n:HL[\"/_next/static/media/caa3a2e1cccd8315-s.p.0wgildi0cnwt9.woff2\",\"font\",{\"crossOrigin\":\"\",\"type\":\"font/woff2\"}]\n"])</script><script>self.__next_f.push([1,"0:{\"P\":null,\"c\":[\"\",\"\"],\"q\":\"\",\"i\":false,\"f\":[[[\"\",{\"children\":[\"__PAGE__\",{}]},\"$undefined\",\"$undefined\",16],[[\"$\",\"$1\",\"c\",{\"children\":[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/_next/static/chunks/1tu0jll_2xo0l.css\",\"precedence\":\"next\",\"crossOrigin\":\"$undefined\",\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/158myu8e_yme3.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"html\",null,{\"lang\":\"fr\",\"className\":\"geist_a71539c9-module__T19VSG__variable geist_mono_8d43a2aa-module__8Li5zG__variable h-full antialiased\",\"children\":[[\"$\",\"head\",null,{\"children\":[[\"$\",\"link\",null,{\"rel\":\"manifest\",\"href\":\"/manifest.json\"}],[\"$\",\"meta\",null,{\"name\":\"apple-mobile-web-app-capable\",\"content\":\"yes\"}],[\"$\",\"meta\",null,{\"name\":\"apple-mobile-web-app-status-bar-style\",\"content\":\"black-translucent\"}],[\"$\",\"meta\",null,{\"name\":\"apple-mobile-web-app-title\",\"content\":\"Clutch\"}],[\"$\",\"meta\",null,{\"name\":\"theme-color\",\"content\":\"#5D1048\"}],[\"$\",\"script\",null,{\"defer\":true,\"data-domain\":\"pz7cgj4kfv-tech.github.io\",\"src\":\"https://plausible.io/js/script.js\"}],[\"$\",\"script\",null,{\"src\":\"https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js\",\"defer\":true}],[\"$\",\"script\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"\\n          window.OneSignalDeferred = window.OneSignalDeferred || [];\\n          OneSignalDeferred.push(async function(OneSignal) {\\n            await OneSignal.init({\\n              appId: \\\"72f8da44-de01-4ad1-b1d8-6d2fbf33daf4\\\",\\n              safari_web_id: \\\"\\\",\\n              notifyButton: { enable: false },\\n              allowLocalhostAsSecureOrigin: true,\\n            });\\n          });\\n        \"}}]]}],[\"$\",\"body\",null,{\"className\":\"min-h-full flex flex-col\",\"children\":[\"$\",\"$L2\",null,{\"parallelRouterKey\":\"children\",\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"$L3\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":[[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":404}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],[]],\"forbidden\":\"$undefined\",\"unauthorized\":\"$undefined\"}]}]]}]]}],{\"children\":[[\"$\",\"$1\",\"c\",{\"children\":[[\"$\",\"$L4\",null,{\"Component\":\"$5\",\"serverProvidedParams\":{\"searchParams\":{},\"params\":{},\"promises\":[\"$@6\",\"$@7\"]}}],[[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/38fo_bviye57g.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-1\",{\"src\":\"/_next/static/chunks/3ycbr7oqaie4l.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"$L8\",null,{\"children\":[\"$\",\"$9\",null,{\"name\":\"Next.MetadataOutlet\",\"children\":\"$@a\"}]}]]}],{},null,false,null]},null,false,null],[\"$\",\"$1\",\"h\",{\"children\":[null,[\"$\",\"$Lb\",null,{\"children\":\"$Lc\"}],[\"$\",\"div\",null,{\"hidden\":true,\"children\":[\"$\",\"$Ld\",null,{\"children\":[\"$\",\"$9\",null,{\"name\":\"Next.Metadata\",\"children\":\"$Le\"}]}]}],[\"$\",\"meta\",null,{\"name\":\"next-size-adjust\",\"content\":\"\"}]]}],false]],\"m\":\"$undefined\",\"G\":[\"$f\",[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/_next/static/chunks/1tu0jll_2xo0l.css\",\"precedence\":\"next\",\"crossOrigin\":\"$undefined\",\"nonce\":\"$undefined\"}]]],\"S\":true,\"h\":null,\"s\":\"$undefined\",\"l\":\"$undefined\",\"p\":\"$undefined\",\"d\":\"$undefined\",\"b\":\"build-1782041829557\"}\n"])</script><script>self.__next_f.push([1,"6:{}\n7:\"$0:f:0:1:1:children:0:props:children:0:props:serverProvidedParams:params\"\n"])</script><script>self.__next_f.push([1,"c:[[\"$\",\"meta\",\"0\",{\"charSet\":\"utf-8\"}],[\"$\",\"meta\",\"1\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1, viewport-fit=cover\"}]]\n"])</script><script>self.__next_f.push([1,"10:I[27201,[\"/_next/static/chunks/158myu8e_yme3.js\"],\"IconMark\"]\na:null\ne:[[\"$\",\"title\",\"0\",{\"children\":\"Clutch\"}],[\"$\",\"meta\",\"1\",{\"name\":\"description\",\"content\":\"L'app de rencontres spontanées à Lausanne\"}],[\"$\",\"link\",\"2\",{\"rel\":\"manifest\",\"href\":\"/manifest.json\",\"crossOrigin\":\"$undefined\"}],[\"$\",\"meta\",\"3\",{\"name\":\"mobile-web-app-capable\",\"content\":\"yes\"}],[\"$\",\"meta\",\"4\",{\"name\":\"apple-mobile-web-app-title\",\"content\":\"Clutch\"}],[\"$\",\"meta\",\"5\",{\"name\":\"apple-mobile-web-app-status-bar-style\",\"content\":\"black-translucent\"}],[\"$\",\"link\",\"6\",{\"rel\":\"icon\",\"href\":\"/favicon.ico?favicon.2vob68tjqpejf.ico\",\"sizes\":\"256x256\",\"type\":\"image/x-icon\"}],[\"$\",\"$L10\",\"7\",{}]]\n"])</script></body></html>

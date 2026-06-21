@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clutch — Arbre complet de l'application</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #2a1020;
+    color: #f5e8de;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(42, 16, 32, 0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(200, 134, 10, 0.3);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  #header h1 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #C8860A;
+    letter-spacing: 0.02em;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .btn {
+    background: rgba(200, 134, 10, 0.15);
+    border: 1px solid rgba(200, 134, 10, 0.4);
+    color: #FFBF9E;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgba(200, 134, 10, 0.3); }
+
+  #legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #f5e8de;
+    opacity: 0.85;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  #canvas-wrap {
+    position: fixed;
+    top: 52px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #canvas-wrap.dragging { cursor: grabbing; }
+
+  #tree-root {
+    position: absolute;
+    top: 0; left: 0;
+    transform-origin: 0 0;
+    padding: 30px 40px 80px 40px;
+  }
+
+  /* SVG overlay for lines */
+  #svg-lines {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* NODE styles */
+  .tree-node {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    position: relative;
+  }
+
+  .node-self {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+  }
+
+  .node-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    border: 1.5px solid transparent;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    position: relative;
+    z-index: 2;
+  }
+  .node-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  .node-pill.root-pill {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 7px 16px;
+  }
+
+  .status-ok     { background: rgba(45,189,126,0.18); border-color: #2DBD7E; color: #a8f0d1; }
+  .status-warn   { background: rgba(200,134,10,0.18); border-color: #C8860A; color: #ffd98a; }
+  .status-bug    { background: rgba(239,68,68,0.18);  border-color: #ef4444; color: #fca5a5; }
+  .status-idea   { background: rgba(139,92,246,0.18); border-color: #8b5cf6; color: #c4b5fd; }
+  .status-group  { background: rgba(255,191,158,0.12); border-color: rgba(255,191,158,0.5); color: #FFBF9E; }
+
+  .toggle-icon {
+    font-size: 9px;
+    opacity: 0.6;
+    transition: transform 0.25s;
+    display: inline-block;
+  }
+  .collapsed .toggle-icon { transform: rotate(-90deg); }
+
+  /* Children container */
+  .node-children {
+    display: flex;
+    flex-direction: column;
+    margin-left: 28px;
+    padding-left: 0;
+    gap: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.3s ease;
+    max-height: 5000px;
+    opacity: 1;
+  }
+  .node-children.hidden {
+    max-height: 0 !important;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Child wrapper with vertical spacing */
+  .child-wrap {
+    padding: 4px 0;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    position: relative;
+  }
+
+  /* Vertical connector line before pill */
+  .connector-v {
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255,191,158,0.2);
+  }
+  .connector-h {
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    width: 20px;
+    height: 1px;
+    background: rgba(255,191,158,0.35);
+    transform: translateY(-50%);
+  }
+  /* Hide vertical below last child */
+  .child-wrap:last-child .connector-v {
+    bottom: 50%;
+  }
+
+  /* root level groups gap */
+  .root-group-wrap {
+    padding: 6px 0;
+  }
+
+  /* Zoom hint */
+  #zoom-hint {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    font-size: 11px;
+    color: rgba(245,232,222,0.35);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔒 Clutch — Arbre complet de l'application</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <button class="btn" onclick="expandAll()">Tout développer</button>
+    <button class="btn" onclick="collapseAll()">Tout réduire</button>
+  </div>
+  <div id="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#2DBD7E"></div>Implémenté ✅</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#C8860A"></div>Partiel ⚠️</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Bug / Non impl. 🔴</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Idée Phase 2 💡</div>
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <div id="tree-root"></div>
+</div>
+
+<div id="zoom-hint">Scroll pour zoomer · Glisser pour déplacer</div>
+
+<script>
+// ─────────────────────────────────────────
+// TREE DATA
+// ─────────────────────────────────────────
+const STATUS = { ok: 'ok', warn: 'warn', bug: 'bug', idea: 'idea', group: 'group' };
+
+const treeData = [
+  { id: 'auth', label: '🔑 AUTH', status: 'group', children: [
+    { id: 'auth-new', label: 'Pas de compte', status: 'ok', children: [
+      { id: 'auth-reg', label: 'Register email + password', status: 'ok' },
+      { id: 'auth-onboard', label: 'Onboarding 5 étapes', status: 'ok', children: [
+        { id: 'ob-prenom', label: 'Prénom', status: 'ok' },
+        { id: 'ob-genre', label: 'Genre', status: 'ok' },
+        { id: 'ob-age', label: 'Âge', status: 'ok' },
+        { id: 'ob-photo', label: 'Photo', status: 'ok' },
+        { id: 'ob-interests', label: 'Intérêts', status: 'ok' },
+      ]},
+    ]},
+    { id: 'auth-existing', label: 'Compte existant', status: 'ok', children: [
+      { id: 'auth-login', label: 'Login', status: 'ok' },
+      { id: 'auth-session', label: 'Session persistée', status: 'ok' },
+    ]},
+  ]},
+
+  { id: 'account', label: '👤 TYPE DE COMPTE', status: 'group', children: [
+    { id: 'acc-std', label: 'Standard', status: 'ok', children: [
+      { id: 'acc-f', label: 'Gratuit femmes', status: 'ok' },
+      { id: 'acc-m', label: 'CHF 9.90/mois hommes', status: 'warn' },
+    ]},
+    { id: 'acc-premium', label: 'Premium CHF 19.90', status: 'warn', children: [
+      { id: 'acc-fav-ill', label: 'Favoris illimités', status: 'warn' },
+      { id: 'acc-who-fav', label: 'Voir qui vous a favori', status: 'idea' },
+      { id: 'acc-alerts', label: 'Alertes présence', status: 'idea' },
+    ]},
+    { id: 'acc-driver', label: 'Clutch Driver', status: 'warn', children: [
+      { id: 'acc-event-create', label: 'Créer événements', status: 'warn' },
+    ]},
+  ]},
+
+  { id: 'avail', label: '📍 DISPONIBILITÉ', status: 'group', children: [
+    { id: 'avail-off', label: 'Hors ligne', status: 'ok', children: [
+      { id: 'avail-off-nobody', label: 'Ne voit personne', status: 'ok' },
+    ]},
+    { id: 'avail-on', label: 'En ligne', status: 'ok', children: [
+      { id: 'avail-open', label: 'Ouvrir fenêtre', status: 'ok', children: [
+        { id: 'avail-gps', label: 'Zone GPS (rayon km)', status: 'ok' },
+        { id: 'avail-slot', label: 'Créneau horaire (18h max)', status: 'ok' },
+        { id: 'avail-intent', label: 'Intention (optionnel)', status: 'ok' },
+      ]},
+      { id: 'avail-close', label: 'Fermer fenêtre', status: 'ok' },
+    ]},
+  ]},
+
+  { id: 'presences', label: '👥 PRÉSENCES', status: 'group', children: [
+    { id: 'pres-genre', label: 'Filtre genre', status: 'ok' },
+    { id: 'pres-zone', label: 'Filtre zone + créneau', status: 'ok' },
+    { id: 'pres-list', label: 'Liste profils disponibles', status: 'ok', children: [
+      { id: 'pres-cd', label: 'Score CD (dots orange)', status: 'ok' },
+      { id: 'pres-star', label: 'Score fiabilité (étoiles)', status: 'ok' },
+      { id: 'pres-badge', label: 'Badge certifié', status: 'warn' },
+    ]},
+    { id: 'pres-fiche', label: 'Fiche profil', status: 'ok', children: [
+      { id: 'pres-photos', label: 'Photos', status: 'ok' },
+      { id: 'pres-common', label: 'Intérêts communs', status: 'ok' },
+      { id: 'pres-send', label: 'Envoyer Clutch', status: 'ok' },
+      { id: 'pres-fav', label: 'Favori', status: 'warn' },
+      { id: 'pres-report', label: 'Signaler', status: 'ok' },
+    ]},
+  ]},
+
+  { id: 'clutch', label: '🔒 CLUTCH', status: 'group', children: [
+    { id: 'cl-send', label: 'Envoi Clutch', status: 'ok', children: [
+      { id: 'cl-antidup1', label: 'Anti-doublon même personne', status: 'ok' },
+      { id: 'cl-antidup2', label: 'Anti-doublon verrou actif', status: 'ok' },
+      { id: 'cl-nominatim', label: 'Recherche lieu Nominatim', status: 'ok' },
+      { id: 'cl-heure', label: 'Choix heure (intersection)', status: 'ok' },
+      { id: 'cl-msg', label: 'Message libre', status: 'ok' },
+    ]},
+    { id: 'cl-receive', label: 'Destinataire reçoit', status: 'ok', children: [
+      { id: 'cl-autodecline', label: 'Auto-décliné si verrou actif', status: 'ok' },
+      { id: 'cl-accept', label: 'Accepte → Verrou', status: 'ok' },
+      { id: 'cl-refuse', label: 'Refuse', status: 'ok', children: [
+        { id: 'cl-toast', label: 'Toast chez envoyeur', status: 'ok' },
+      ]},
+      { id: 'cl-ignore', label: 'Ignore → Expire 2h', status: 'ok' },
+    ]},
+    { id: 'cl-verrou', label: 'Verrou confirmé', status: 'ok', children: [
+      { id: 'cl-anim', label: 'Animation Verrou simultanée', status: 'ok' },
+      { id: 'cl-chat', label: 'Chat messages', status: 'ok' },
+      { id: 'cl-radar', label: 'ProximityRadar (<30min)', status: 'ok', children: [
+        { id: 'cl-countdown', label: 'Countdown', status: 'ok' },
+        { id: 'cl-checkin', label: 'Check-in GPS', status: 'ok' },
+      ]},
+      { id: 'cl-postrdv', label: 'Post-RDV', status: 'ok', children: [
+        { id: 'cl-feedback', label: 'Feedback 5 options', status: 'ok', children: [
+          { id: 'cl-fb-super', label: '🌟 Super (+5pts)', status: 'ok' },
+          { id: 'cl-fb-bien', label: '👍 Bien (+3pts)', status: 'ok' },
+          { id: 'cl-fb-parti', label: '🚶 Parti tôt (-15pts)', status: 'ok' },
+          { id: 'cl-fb-lapin', label: '🐰 Lapin (-20pts)', status: 'ok' },
+          { id: 'cl-fb-ghost', label: '👻 J\'ai ghosté (-15pts)', status: 'ok' },
+        ]},
+        { id: 'cl-score-upd', label: 'Score fiabilité mis à jour', status: 'warn' },
+      ]},
+    ]},
+  ]},
+
+  { id: 'events', label: '🎟️ ÉVÉNEMENTS', status: 'group', children: [
+    { id: 'ev-list', label: 'Liste événements', status: 'ok' },
+    { id: 'ev-register', label: 'S\'inscrire', status: 'ok' },
+    { id: 'ev-create', label: 'Clutch Driver crée événement', status: 'warn' },
+  ]},
+
+  { id: 'favoris', label: '⭐ FAVORIS', status: 'group', children: [
+    { id: 'fav-add', label: 'Ajouter favori', status: 'warn' },
+    { id: 'fav-see', label: 'Voir si tu as été favori', status: 'idea' },
+  ]},
+
+  { id: 'sos', label: '🚨 SOS SÉCURITÉ', status: 'group', children: [
+    { id: 'sos-btn', label: 'Bouton SOS', status: 'ok' },
+    { id: 'sos-alert', label: 'Alerte contact urgence', status: 'idea' },
+  ]},
+
+  { id: 'score', label: '⭐ SCORE FIABILITÉ', status: 'group', children: [
+    { id: 'sc-init', label: 'Score initial 80/100', status: 'ok' },
+    { id: 'sc-plus', label: '+5 super RDV', status: 'ok' },
+    { id: 'sc-minus', label: '-20 lapin', status: 'ok' },
+    { id: 'sc-visible', label: 'Visible sur profil', status: 'ok' },
+    { id: 'sc-suspend', label: 'Score < 50 → compte suspendu', status: 'idea' },
+  ]},
+
+  { id: 'profil', label: '⚙️ PROFIL', status: 'group', children: [
+    { id: 'pr-edit', label: 'Modifier infos', status: 'ok' },
+    { id: 'pr-certif', label: 'Certification selfie', status: 'warn' },
+    { id: 'pr-delete', label: 'Supprimer compte', status: 'ok' },
+    { id: 'pr-report', label: 'Signalement reçu', status: 'warn' },
+  ]},
+];
+
+// ─────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────
+const statusClass = { ok: 'status-ok', warn: 'status-warn', bug: 'status-bug', idea: 'status-idea', group: 'status-group' };
+
+let allNodes = []; // track for expand/collapse all
+
+function buildNode(node, depth) {
+  const hasChildren = node.children && node.children.length > 0;
+  const isGroup = node.status === 'group';
+  const defaultCollapsed = depth >= 2;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tree-node';
+  wrapper.dataset.id = node.id;
+
+  const selfDiv = document.createElement('div');
+  selfDiv.className = 'node-self';
+
+  // Pill
+  const pill = document.createElement('div');
+  pill.className = `node-pill ${statusClass[node.status] || 'status-group'}${depth === 0 ? ' root-pill' : ''}`;
+  pill.dataset.nodeId = node.id;
+
+  const labelSpan = document.createElement('span');
+  labelSpan.textContent = node.label;
+  pill.appendChild(labelSpan);
+
+  if (hasChildren) {
+    const toggle = document.createElement('span');
+    toggle.className = 'toggle-icon';
+    toggle.textContent = '▾';
+    pill.appendChild(toggle);
+  }
+
+  selfDiv.appendChild(pill);
+  wrapper.appendChild(selfDiv);
+
+  // Children
+  let childrenDiv = null;
+  if (hasChildren) {
+    childrenDiv = document.createElement('div');
+    childrenDiv.className = 'node-children' + (defaultCollapsed ? ' hidden' : '');
+    childrenDiv.dataset.nodeId = node.id;
+
+    node.children.forEach((child, i) => {
+      const childWrap = document.createElement('div');
+      childWrap.className = 'child-wrap';
+
+      // Connectors
+      const connV = document.createElement('div');
+      connV.className = 'connector-v';
+      const connH = document.createElement('div');
+      connH.className = 'connector-h';
+      childWrap.appendChild(connV);
+      childWrap.appendChild(connH);
+
+      const childNode = buildNode(child, depth + 1);
+      childWrap.appendChild(childNode);
+      childrenDiv.appendChild(childWrap);
+    });
+
+    wrapper.appendChild(childrenDiv);
+
+    // Toggle click
+    pill.addEventListener('click', () => {
+      const collapsed = childrenDiv.classList.contains('hidden');
+      if (collapsed) {
+        childrenDiv.classList.remove('hidden');
+        pill.classList.remove('collapsed');
+      } else {
+        childrenDiv.classList.add('hidden');
+        pill.classList.add('collapsed');
+      }
+    });
+
+    if (defaultCollapsed) pill.classList.add('collapsed');
+
+    allNodes.push({ pill, childrenDiv });
+  }
+
+  return wrapper;
+}
+
+function renderTree() {
+  const root = document.getElementById('tree-root');
+  root.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.gap = '8px';
+  container.style.alignItems = 'flex-start';
+
+  treeData.forEach(group => {
+    const wrap = document.createElement('div');
+    wrap.className = 'root-group-wrap';
+    const node = buildNode(group, 0);
+    wrap.appendChild(node);
+    container.appendChild(wrap);
+  });
+
+  root.appendChild(container);
+}
+
+function expandAll() {
+  allNodes.forEach(({ pill, childrenDiv }) => {
+    childrenDiv.classList.remove('hidden');
+    pill.classList.remove('collapsed');
+  });
+}
+
+function collapseAll() {
+  allNodes.forEach(({ pill, childrenDiv }) => {
+    childrenDiv.classList.add('hidden');
+    pill.classList.add('collapsed');
+  });
+}
+
+// ─────────────────────────────────────────
+// PAN + ZOOM
+// ─────────────────────────────────────────
+const canvasWrap = document.getElementById('canvas-wrap');
+const treeRoot = document.getElementById('tree-root');
+
+let scale = 1;
+let tx = 30, ty = 20;
+let isDragging = false;
+let dragStartX, dragStartY, dragTx, dragTy;
+
+function applyTransform() {
+  treeRoot.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+
+// Wheel zoom
+canvasWrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const rect = canvasWrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Zoom towards mouse
+  tx = mx + (tx - mx) * delta;
+  ty = my + (ty - my) * delta;
+  scale = Math.max(0.2, Math.min(3, scale * delta));
+  applyTransform();
+}, { passive: false });
+
+// Mouse drag
+canvasWrap.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragTx = tx;
+  dragTy = ty;
+  canvasWrap.classList.add('dragging');
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  tx = dragTx + (e.clientX - dragStartX);
+  ty = dragTy + (e.clientY - dragStartY);
+  applyTransform();
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  canvasWrap.classList.remove('dragging');
+});
+
+// Touch support
+let lastTouchDist = null;
+let touchStart = null;
+
+canvasWrap.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx, ty };
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+  }
+}, { passive: true });
+
+canvasWrap.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 1 && touchStart) {
+    tx = touchStart.tx + (e.touches[0].clientX - touchStart.x);
+    ty = touchStart.ty + (e.touches[0].clientY - touchStart.y);
+    applyTransform();
+  } else if (e.touches.length === 2 && lastTouchDist) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const delta = dist / lastTouchDist;
+    lastTouchDist = dist;
+    scale = Math.max(0.2, Math.min(3, scale * delta));
+    applyTransform();
+  }
+}, { passive: false });
+
+canvasWrap.addEventListener('touchend', () => {
+  touchStart = null;
+  lastTouchDist = null;
+});
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+renderTree();
+applyTransform();
+</script>
+</body>
+</html>

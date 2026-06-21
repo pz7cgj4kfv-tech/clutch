@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x110'  // Versionnage HEXADÉCIMAL. ~272e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x111'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3082,48 +3082,36 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{fontSize:13,fontWeight:700,color:C.white}}>No events in this category</div>
           </div>
         )}
+        {/* 2 événements par ligne (demande Mel) — grandes photos qui donnent envie, infos dessus ; clic → détail riche */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11}}>
         {filteredEvs.map(ev=>{
           const photo = (ev as any).eventPhotos?.[0]
           const isImg = photo && String(photo).startsWith('http')
           const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:18,marginBottom:14,cursor:'pointer',overflow:'hidden',boxShadow:'0 3px 14px rgba(83,41,67,.07)'}}>
-            {/* Photo bannière (Mel — events photo-forward) */}
-            <div style={{position:'relative',height:152,background:isImg?'#e9e4e7':(photo||`linear-gradient(135deg,${C.plum},${C.bgSheet})`),display:'flex',alignItems:'center',justifyContent:'center'}}>
-              {isImg && <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/>}
-              {!isImg && <span style={{fontSize:54}}>{ev.emoji}</span>}
-              <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.5) 0%,rgba(0,0,0,.12) 35%,transparent 60%)'}}/>
-              <div style={{position:'absolute',top:10,left:10,display:'flex',gap:6}}>
-                {ev.certified&&<span style={{fontSize:9,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:6,padding:'2px 7px',fontWeight:800}}>✓ CERTIFIED</span>}
-                {(ev as any).isGroupe&&<span style={{fontSize:9,background:'rgba(255,255,255,.95)',color:C.plum,borderRadius:6,padding:'2px 7px',fontWeight:800}}>👥 GROUPE</span>}
-              </div>
-              {registered.has(ev.id)&&<span style={{position:'absolute',top:10,right:10,fontSize:9,background:C.green,color:'#fff',borderRadius:6,padding:'2px 7px',fontWeight:800}}>✓ INSCRIT·E</span>}
-              <div style={{position:'absolute',bottom:9,left:13,right:13}}>
-                <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap'}}>
-                  <span style={{fontSize:10,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.45)',backdropFilter:'blur(4px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time}{ev.date&&ev.date!=='Ce soir'?'':' · ce soir'}</span>
-                  {ev.lieu&&<span style={{fontSize:10,fontWeight:700,color:'#fff',background:'rgba(0,0,0,.45)',backdropFilter:'blur(4px)',borderRadius:20,padding:'3px 9px',maxWidth:'70%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'').split(',')[0]}</span>}
-                </div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
-                  <span style={{fontSize:30,flexShrink:0,filter:'drop-shadow(0 1px 3px rgba(0,0,0,.5))'}}>{ev.emoji}</span>
-                  <div style={{fontSize:17,fontWeight:900,color:'#fff',textShadow:'0 1px 5px rgba(0,0,0,.6)',lineHeight:1.15}}>{ev.title}</div>
-                </div>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
+            {/* Photo qui donne envie */}
+            <div style={{position:'relative',height:120,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
+              <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,.1) 45%,transparent 72%)'}}/>
+              {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}
+              {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
+              <div style={{position:'absolute',bottom:7,left:9,right:9}}>
+                <span style={{fontSize:9,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.5)',backdropFilter:'blur(3px)',borderRadius:20,padding:'2px 8px'}}>🕐 {ev.time}</span>
+                <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,marginTop:4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
               </div>
             </div>
-            {/* Infos sous la photo */}
-            <div style={{padding:'10px 14px 12px'}}>
-              <div style={{fontSize:11,color:C.whiteMid,display:'flex',alignItems:'center',gap:5,marginBottom:8,flexWrap:'wrap'}}>
-                {(ev as any).creatorPhoto && <img src={(ev as any).creatorPhoto} alt="" style={{width:18,height:18,borderRadius:'50%',objectFit:'cover'}}/>}
-                <span>{t('ev.by')} <strong style={{color:C.plum}}>{ev.creator}</strong> · {ev.time} · {(ev.lieu||'').split(',')[0]}</span>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <div style={{fontSize:11,fontWeight:700,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots} {lang==='en'?'registered':'inscrit·es'}</div>
-                <div style={{flex:1,height:4,borderRadius:2,background:C.border,overflow:'hidden'}}>
-                  <div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green,borderRadius:2}}/>
-                </div>
+            {/* Footer compact */}
+            <div style={{padding:'8px 10px 9px'}}>
+              <div style={{fontSize:9.5,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:6}}>📍 {(ev.lieu||'').split(',')[0]}</div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:10,fontWeight:800,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
+                <div style={{flex:1,height:3.5,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green}}/></div>
               </div>
             </div>
           </div>
         )})}
+        </div>
         </>)}
       </div>
 

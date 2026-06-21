@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x111'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x112'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6642,6 +6642,50 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 🌙 CLUTCH NIGHT (prototype) — mode nuit : soirées/clubs/afters + rayon élargi (« on accepte de se
+// déplacer plus loin pour une vraie sortie »). Idée David. Données mock, à brancher V2.
+// ════════════════════════════════════════════════════════════════════
+function ClutchNightOverlay({ onClose, onActivate }:{ onClose:()=>void; onActivate:()=>void }) {
+  const NIGHT = [
+    {e:'🎶', n:'D Club Lausanne',     d:'Techno night · dès 23h',  far:'Flon · 4 km'},
+    {e:'🍸', n:'Le Bourg',           d:'Concert + DJ set · 22h',   far:'Vieille Ville · 3 km'},
+    {e:'🎷', n:'After Jazz',         d:'Jam jusqu\'à l\'aube',     far:'Ouchy · 6 km'},
+    {e:'🌃', n:'Rooftop sunset',     d:'Apéro & vue · 21h',        far:'Prilly · 9 km'},
+  ]
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(120% 90% at 50% 25%,#532943 0%,#2C1020 55%,#160a12 100%)',display:'flex',flexDirection:'column',overflowY:'auto'}}>
+      <div style={{padding:'calc(var(--sat) + 40px) 22px calc(var(--sab) + 28px)',flex:1,display:'flex',flexDirection:'column'}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:60,filter:'drop-shadow(0 0 18px rgba(235,107,175,.6))'}}>🌙</div>
+          <div style={{fontSize:30,fontWeight:900,color:'#fff',marginTop:6,letterSpacing:'-.02em'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></div>
+          <div style={{fontSize:13.5,color:'#e8d8e4',marginTop:10,lineHeight:1.55,maxWidth:300,marginLeft:'auto',marginRight:'auto'}}>Ce soir, on sort. Les soirées, clubs et afters près de toi — et un peu <b style={{color:'#77BC1F'}}>plus loin que d'habitude</b> 🚆</div>
+        </div>
+        <div style={{display:'inline-flex',alignSelf:'center',alignItems:'center',gap:7,marginTop:16,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.16)',borderRadius:20,padding:'6px 13px'}}>
+          <span style={{fontSize:13}}>📍</span><span style={{fontSize:11.5,color:'#fff',fontWeight:700}}>Rayon élargi · jusqu'à 25 km</span>
+        </div>
+        <div style={{marginTop:22,display:'flex',flexDirection:'column',gap:10}}>
+          {NIGHT.map((c,i)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:13,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.12)',borderRadius:16,padding:'12px 14px'}}>
+              <div style={{width:44,height:44,borderRadius:13,background:'rgba(235,107,175,.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{c.e}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14.5,fontWeight:800,color:'#fff'}}>{c.n}</div>
+                <div style={{fontSize:11.5,color:'#cbb8c6',marginTop:1}}>{c.d}</div>
+              </div>
+              <div style={{fontSize:10.5,color:'#9a8d96',fontWeight:600,flexShrink:0}}>{c.far}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:'auto',paddingTop:22}}>
+          <button onClick={onActivate} style={{width:'100%',padding:'16px',borderRadius:18,border:'none',background:'linear-gradient(135deg,#EB6BAF,#532943)',color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>🌙 Activer Clutch Night ce soir</button>
+          <button onClick={onClose} style={{width:'100%',padding:'13px',marginTop:8,borderRadius:16,border:'none',background:'transparent',color:'#cbb8c6',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Plus tard</button>
+          <div style={{fontSize:10,color:'#7a6d76',textAlign:'center',marginTop:8}}>Prototype · les soirées réelles arriveront avec les partenaires</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
 // 🥚 ÉPHÉMÈRE — Coucou à Mel (À RETIRER AU PROCHAIN BUILD). Visible UNIQUEMENT pour Mel, 1 fois.
 // Blague : déployé dimanche 21 juin à 5h37 du matin. Pour la faire rigoler.
 // ════════════════════════════════════════════════════════════════════
@@ -7516,6 +7560,7 @@ export default function App2() {
   useEffect(()=>{ if(user?.id && HELLO_IDS.includes(user.id)){ try{ if(!localStorage.getItem('mel_hello_v2')) setShowMelHello(true) }catch{ setShowMelHello(true) } } }, [user?.id])
 
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
+  const [showClutchNight,setShowClutchNight] = useState(false) // 🌙 prototype Clutch Night
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
   const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number}|null>(null)
   const fabRaf = useRef<number>(0)
@@ -9050,6 +9095,16 @@ export default function App2() {
                   {/* ── LISTE ── */}
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
 
+                    {/* ══ 🌙 BANNER CLUTCH NIGHT (prototype) ══ */}
+                    <button onClick={()=>setShowClutchNight(true)} style={{width:'100%',display:'flex',alignItems:'center',gap:12,background:'linear-gradient(120deg,#532943,#2C1020)',border:'none',borderRadius:18,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                      <span style={{fontSize:26,filter:'drop-shadow(0 0 10px rgba(235,107,175,.55))'}}>🌙</span>
+                      <span style={{flex:1,minWidth:0}}>
+                        <span style={{display:'block',fontSize:14.5,fontWeight:900,color:'#fff'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></span>
+                        <span style={{display:'block',fontSize:11.5,color:'#e8d8e4',marginTop:1}}>Ce soir on sort · soirées & afters, un peu plus loin 🚆</span>
+                      </span>
+                      <span style={{fontSize:18,color:'#EB6BAF'}}>›</span>
+                    </button>
+
                     {/* ══ MODE PRO — MANOSKI ══ */}
                     {proMode && !proJobFilter && (() => {
                       // Comptage par catégorie parmi les profils dispo
@@ -10390,6 +10445,8 @@ export default function App2() {
             background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
           }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
+          {/* 🌙 Clutch Night (prototype) */}
+          {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ setShowClutchNight(false); showToast('🌙 Clutch Night arrive bientôt — on prépare les soirées',C.orange) }}/>}
           {/* 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build) */}
           {showMelHello && <MelHello onClose={()=>{ setShowMelHello(false); try{localStorage.setItem('mel_hello_v2','1')}catch{} }}/>}
           {/* ── Contre-Clutch modal ── */}

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2732,6 +2732,9 @@ const eventDurH = (ev:any):number => {
   return 2
 }
 const eventDurLabel = (ev:any):string => { const d=eventDurH(ev); return d>=5?'4h+':`~${d}h` }
+// Filtre basique anti-contenu déplacé (V1 — liste de mots ; une vraie modération IA viendra côté serveur).
+const BANNED_WORDS = ['pute','putain','salope','connard','enculé','encule','nique','niquer','bite','couille','pédé','pede','negro','nègre','negre','youpin','bougnoule','viol','pédophile','pedophile','fdp','ntm','sexe gratuit','plan cul','escort','drogue à vendre','coke à vendre']
+const hasBannedWords = (s?:string):boolean => { const t=(s||'').toLowerCase(); return BANNED_WORDS.some(w=>t.includes(w)) }
 // Corrige le jour de la semaine d'une date absolue (« Sam 21 juin » → « Dim 21 juin »). Laisse « Ce soir »/« Demain » tels quels.
 const FR_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 const FR_WD = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
@@ -2854,6 +2857,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   const createGroupEvent = async () => {
     if (!newEvValid) return
+    // Anti-contenu déplacé (David : « vérifier que les gens mettent pas n'importe quoi »)
+    if (hasBannedWords(newEvTitle) || hasBannedWords(newEvDesc) || hasBannedWords(newEvLieu)) {
+      showToast?.(lang==='en'?'Inappropriate wording — please rephrase':'Texte non autorisé — reformule sans mots déplacés', C.red); return
+    }
+    // Créneau valide : entre MAINTENANT et +18h (fenêtre structurelle Clutch) — David
+    const [hh,mm] = newEvTime.split(':').map(Number)
+    const target = new Date(); if(newEvDate==='Demain') target.setDate(target.getDate()+1); target.setHours(hh||0,mm||0,0,0)
+    const now = new Date()
+    if (target.getTime() < now.getTime()-60000) { showToast?.(lang==='en'?'That time is already past':'Cette heure est déjà passée', C.orange); return }
+    if (target.getTime() > now.getTime()+18*3600*1000) { showToast?.(lang==='en'?'Pick a slot within the next 18h':'Choisis un créneau dans les 18h', C.orange); return }
     setCreating(true)
     let realId = `g-user-${Date.now()}`
     // Persistance Supabase (additif). Si la migration events_mvp n'est pas encore
@@ -2936,10 +2949,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const CP_ZONES=['Lausanne centre','Vieille Ville','Flon','Ouchy','Région Lausanne','Lavaux','Renens / Ouest','Autre']
   const [registering, setRegistering] = useState(false)
   const [regBlock, setRegBlock] = useState('') // alerte inline quand l'inscription est bloquée (plafond/chevauchement)
-  useEffect(()=>{ setRegBlock('') }, [selEv?.id]) // reset l'alerte à l'ouverture d'un autre event
+  useEffect(()=>{ setRegBlock(''); setCancelArmed(false) }, [selEv?.id]) // reset alertes à l'ouverture d'un autre event
   // Bannières partenaires : défilement auto (David). Avance d'une carte toutes les 3.5s, repart au début, pause au toucher.
   const bannerRef = useRef<HTMLDivElement>(null)
   const bannerPause = useRef(0)
+  const createDragY = useRef(0) // swipe-down pour fermer la création d'event
   useEffect(()=>{
     if (evFilter!=='all') return
     const id = setInterval(()=>{
@@ -2983,43 +2997,48 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   const isRealEvent = (id:any) => typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
   const [cancelling, setCancelling] = useState(false)
+  const [cancelArmed, setCancelArmed] = useState(false) // confirmation inline 2-temps pour annuler son event
   // Le CRÉATEUR annule son événement (= flake). Règle produit : les inscrits sont LIBÉRÉS
   // sans pénalité ; c'est le créateur qui perd des points de fiabilité (il a planté le groupe).
+  // NOTE : pas de window.confirm (BLOQUÉ dans la WebView iOS → l'annulation ne se faisait jamais). Confirmation inline 2-temps.
   const cancelMyEvent = async (ev: any) => {
-    if (!confirm("Annuler cet événement ?\n\nLes inscrits seront libérés (AUCUNE pénalité pour eux). Toi, organisateur·ice, tu perds des points de fiabilité pour avoir annulé.")) return
     setCancelling(true)
     try {
       if (isRealEvent(ev.id)) {
-        // On NE supprime PAS les inscrits ici : on marque l'event 'cancelled'. Chaque inscrit
-        // le détecte à l'ouverture des Événements → notice « tu es libéré » + auto-désinscription.
         await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
         if (userId) {
-          await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', userId)  // nettoie ma propre inscription d'hôte
-          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()  // pénalité créateur (-10)
+          await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', userId)
+          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()
           const cur = (p as any)?.reliability_score ?? 100
           await supabase.from('profiles').update({ reliability_score: Math.max(0, cur-10) }).eq('id', userId)
         }
       }
     } catch {}
+    // Nettoyage local COMPLET (sinon l'event annulé reste "coincé" et compte dans le plafond — bug David)
     setDbEvents(prev => prev.filter(e => e.id !== ev.id))
     setUserGroupEvents(prev => prev.filter(e => e.id !== ev.id))
-    setCancelling(false); setSelEv(null)
+    setRegistered((prev:Set<string>)=>{ const n=new Set(prev); n.delete(ev.id); return n })
+    setGroupJoined(prev=>{ const n=new Set(prev); n.delete(ev.id); return n })
+    setCancelling(false); setCancelArmed(false); setSelEv(null)
+    showToast?.(lang==='en'?'Event cancelled':'Événement annulé', C.green)
   }
   const doRegister = async (ev: any) => {
     if (registered.has(ev.id)) return
     const EN = lang==='en'
-    // (a) Plafond : max 2 inscriptions actives simultanées
-    const myActive = events.filter((e:any)=>registered.has(e.id))
-    if (myActive.length >= MAX_ACTIVE_EVENTS) {
+    const isMine = (e:any)=> (userId && e.created_by===userId) || e.creator==='Toi'
+    // « occupé » = inscrit, NON annulé. (a) plafond ne compte PAS mes propres events (organiser ≠ consommer une place)
+    const myBusy = events.filter((e:any)=> registered.has(e.id) && e.status!=='cancelled')
+    const myJoined = myBusy.filter((e:any)=> !isMine(e))
+    if (myJoined.length >= MAX_ACTIVE_EVENTS) {
       const msg = EN?`You're already in ${MAX_ACTIVE_EVENTS} events — leave one to join another.`:`Tu es déjà inscrit·e à ${MAX_ACTIVE_EVENTS} événements — désinscris-toi d'un pour en rejoindre un autre.`
       setRegBlock(msg); showToast?.(msg, C.orange); setTimeout(()=>setRegBlock(''),5000)
       return
     }
-    // (b) Anti-chevauchement : même jour + créneaux [début, début+durée] qui se recouvrent
+    // (b) Anti-chevauchement : même jour + créneaux qui se recouvrent (inclut mes propres events)
     const aStart = parseEventMinutes(ev.time)
     if (aStart != null) {
       const aEnd = aStart + eventDurH(ev)*60
-      const clash = myActive.find((e:any)=>{
+      const clash = myBusy.find((e:any)=>{
         if ((e.date||'') !== (ev.date||'')) return false
         const bStart = parseEventMinutes(e.time); if (bStart == null) return false
         const bEnd = bStart + eventDurH(e)*60
@@ -3477,9 +3496,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               {(selEv.created_by ? (!!userId && selEv.created_by===userId) : selEv.creator==='Toi') ? (
                 <div>
                   <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
-                  <button onClick={()=>cancelMyEvent(selEv)} disabled={cancelling}
-                    style={{width:'100%',padding:'14px',background:'rgba(220,80,80,.12)',border:`1px solid ${C.red}55`,borderRadius:16,color:C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:cancelling?0.6:1}}>
-                    {cancelling?'…':(lang==='en'?'🚫 Cancel this event':"🚫 Annuler l'événement")}
+                  <button onClick={()=>{ if(cancelArmed) cancelMyEvent(selEv); else setCancelArmed(true) }} disabled={cancelling}
+                    style={{width:'100%',padding:'14px',background:cancelArmed?C.red:'rgba(220,80,80,.12)',border:`1px solid ${C.red}${cancelArmed?'':'55'}`,borderRadius:16,color:cancelArmed?'#fff':C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:cancelling?0.6:1}}>
+                    {cancelling?'…':cancelArmed?(lang==='en'?'⚠️ Tap again to confirm':'⚠️ Touche encore pour confirmer'):(lang==='en'?'🚫 Cancel this event':"🚫 Annuler l'événement")}
                   </button>
                   <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginTop:6,lineHeight:1.4}}>{lang==='en'?'Registered people are freed (no penalty for them). You lose reliability points for cancelling.':'Les inscrits sont libérés (aucune pénalité pour eux). Toi, tu perds des points de fiabilité.'}</div>
                 </div>
@@ -3572,9 +3591,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       {showCreateGroup&&(
         <div style={{position:'fixed',inset:0,zIndex:9100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={tryCloseCreate}/>
-          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 40px',animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'90vh',overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
-            {/* Handle */}
-            <div style={{width:36,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 18px'}}/>
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'calc(var(--sat) + 12px) 20px calc(var(--sab) + 90px)',animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',height:'94vh',boxSizing:'border-box',overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+            {/* Handle — glisser vers le bas pour fermer */}
+            <div onTouchStart={e=>{createDragY.current=e.touches[0].clientY}} onTouchEnd={e=>{ if(e.changedTouches[0].clientY-createDragY.current>55) tryCloseCreate() }}
+              style={{padding:'4px 0 14px',margin:'-4px 0 4px',cursor:'grab'}}>
+              <div style={{width:40,height:5,borderRadius:3,background:`${C.whiteMid}40`,margin:'0 auto'}}/>
+            </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
               <div style={{fontSize:16,fontWeight:900}}>🎟️ Organiser un événement</div>
               <button onClick={tryCloseCreate} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
@@ -3620,6 +3642,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   ))}
                 </div>
                 <input type='time' value={newEvTime} onChange={e=>setNewEvTime(e.target.value)}
+                  min={newEvDate==='Aujourd\'hui' ? new Date().toTimeString().slice(0,5) : undefined}
                   style={{width:108,background:C.whiteFaint,border:`1px solid ${C.salmon}`,borderRadius:12,padding:'11px 12px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
               </div>
             </div>
@@ -3638,17 +3661,22 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </div>
             </div>
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 PLACES : <span style={{color:C.salmon}}>{newEvMax}</span> <span style={{color:C.whiteMid,fontWeight:600}}>· dès 2</span></div>
-              <input type='range' min={2} max={6} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
-                style={{width:'100%',accentColor:C.salmon}}/>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 NOMBRE DE PLACES</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {[2,4,6,8,10,12].map(n=>(
+                  <button key={n} onClick={()=>setNewEvMax(n)}
+                    style={{flex:1,minWidth:44,padding:'9px 0',borderRadius:10,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvMax===n?C.salmon:C.border}`,background:newEvMax===n?C.salmonFaint:'transparent',color:newEvMax===n?C.salmon:C.whiteMid}}>{n}</button>
+                ))}
+              </div>
             </div>
 
-            {/* Champ 5 : Description (OBLIGATOIRE — David) */}
+            {/* Champ 5 : Description (OBLIGATOIRE — David) + aide */}
             <div style={{marginBottom:22}}>
               <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· obligatoire</span></div>
-              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={2}
-                placeholder='Quelques mots pour donner envie...'
-                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box'}}/>
+              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={3}
+                placeholder={'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
+                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box',lineHeight:1.5}}/>
+              <div style={{fontSize:10,color:C.whiteMid,marginTop:5,lineHeight:1.4}}>📎 Pièce jointe (PDF, programme…) : <b style={{color:C.salmon}}>bientôt</b></div>
             </div>
 
             <button onClick={createGroupEvent} disabled={!newEvValid||creating}

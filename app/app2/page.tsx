@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x116'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x117'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2023,30 +2023,32 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
 // ═════════════════════════════════════════════════════════════
 // CLUTCH LANCÉ — animation légère (quand tu envoies)
 // ═════════════════════════════════════════════════════════════
-function ClutchSent({ onDone, name }:{ onDone:()=>void; name:string }) {
-  useEffect(()=>{ const t=setTimeout(onDone,2000); return()=>clearTimeout(t) },[onDone])
+function ClutchSent({ onDone, name, lang='fr' }:{ onDone:()=>void; name:string; lang?:Lang }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2400); return()=>clearTimeout(t) },[onDone])
+  const first = name?.split(' ')[0] || (lang==='en'?'They':'Cette personne')
   return (
-    <div style={{position:'fixed',inset:0,zIndex:5000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(61,26,51,.93)',backdropFilter:'blur(12px)'}} onClick={onDone}>
+    <div style={{position:'fixed',inset:0,zIndex:5000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(42,16,32,.95)',backdropFilter:'blur(12px)'}} onClick={onDone}>
       <style>{`
         @keyframes sentStar{0%{transform:scale(0) rotate(-30deg);opacity:0}20%{opacity:1}50%{transform:scale(1.15) rotate(8deg);opacity:1}85%{transform:scale(1) rotate(0);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
-        @keyframes sentFade{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
+        @keyframes sentFade{0%{opacity:1}88%{opacity:1}100%{opacity:0}}
         @keyframes sentRing{0%{transform:translate(-50%,-50%) scale(0);opacity:.9}70%{opacity:.3}100%{transform:translate(-50%,-50%) scale(6);opacity:0}}
         @keyframes sentRing2{0%{transform:translate(-50%,-50%) scale(0);opacity:.6}70%{opacity:.15}100%{transform:translate(-50%,-50%) scale(8);opacity:0}}
-        @keyframes sentTxtIn{0%{transform:translateY(30px);opacity:0}30%{transform:translateY(-4px);opacity:1}50%{transform:translateY(0);opacity:1}85%{opacity:1}100%{opacity:0}}
-        @keyframes sentSubIn{0%,15%{opacity:0;transform:translateY(16px)}40%{opacity:1;transform:translateY(0)}85%{opacity:1}100%{opacity:0}}
+        @keyframes sentTxtIn{0%{transform:translateY(30px);opacity:0}30%{transform:translateY(-4px);opacity:1}50%{transform:translateY(0);opacity:1}88%{opacity:1}100%{opacity:0}}
         @keyframes sentTap{0%,70%{opacity:0}85%{opacity:.5}100%{opacity:0}}
         .sr{position:absolute;top:50%;left:50%;border-radius:50%;pointer-events:none;}
-        .sr1{width:80px;height:80px;border:2px solid #E27C00;animation:sentRing 1.8s ease-out .05s both;}
-        .sr2{width:80px;height:80px;border:1.5px solid #FFBF9E88;animation:sentRing2 2.2s ease-out .0s both;}
+        .sr1{width:80px;height:80px;border:2px solid #EB6BAF;animation:sentRing 1.8s ease-out .05s both;}
+        .sr2{width:80px;height:80px;border:1.5px solid rgba(235,107,175,.5);animation:sentRing2 2.2s ease-out .0s both;}
       `}</style>
-      <div style={{position:'relative',textAlign:'center',animation:'sentFade 3.6s ease both'}}>
+      <div style={{position:'relative',textAlign:'center',animation:'sentFade 3.8s ease both',padding:'0 30px'}}>
         <div className="sr sr1"/><div className="sr sr2"/>
-        <div style={{fontSize:80,lineHeight:1,animation:'sentStar 3.6s cubic-bezier(.22,1,.36,1) both',filter:'drop-shadow(0 0 20px #E27C00) drop-shadow(0 0 40px #FFBF9E88)'}}>✦</div>
-        <div style={{marginTop:20,animation:'sentTxtIn 3.6s ease both'}}>
-          <div style={{fontSize:26,fontWeight:900,color:'#FFBF9E',letterSpacing:'-.03em'}}>Clutch sent!</div>
-          <div style={{fontSize:14,color:'rgba(255,191,158,.75)',marginTop:6,fontWeight:600}}>{name} has 2h to reply ⏳</div>
+        <div style={{fontSize:80,lineHeight:1,animation:'sentStar 3.8s cubic-bezier(.22,1,.36,1) both',filter:'drop-shadow(0 0 20px #EB6BAF) drop-shadow(0 0 40px rgba(235,107,175,.5))'}}>✦</div>
+        <div style={{marginTop:20,animation:'sentTxtIn 3.8s ease both'}}>
+          <div style={{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:'-.03em'}}>{lang==='en'?'Clutch sent!':'Clutch envoyé !'}</div>
+          <div style={{fontSize:14,color:'rgba(255,255,255,.8)',marginTop:6,fontWeight:600}}>{lang==='en'?`${first} has 2h to reply ⏳`:`${first} a 2h pour répondre ⏳`}</div>
+          {/* Didactique : on rassure sur OÙ le clutch est parti (David : « le clutch disparaît ») */}
+          <div style={{fontSize:12.5,color:'#EB6BAF',marginTop:14,fontWeight:800,background:'rgba(235,107,175,.12)',border:'1px solid rgba(235,107,175,.35)',borderRadius:12,padding:'8px 14px',display:'inline-block'}}>{lang==='en'?'💬 Find it in your Clutchs tab':'💬 Tu le retrouves dans l\'onglet Clutchs'}</div>
         </div>
-        <div style={{marginTop:24,fontSize:11,color:'rgba(255,191,158,.35)',animation:'sentTap 3.6s ease both'}}>Tap to continue</div>
+        <div style={{marginTop:22,fontSize:11,color:'rgba(255,255,255,.4)',animation:'sentTap 3.8s ease both'}}>{lang==='en'?'Tap to continue':'Touche pour continuer'}</div>
       </div>
     </div>
   )
@@ -3286,7 +3288,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{marginBottom:12}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                   <span style={{fontSize:11,color:C.whiteMid}}>Places</span>
-                  <span style={{fontSize:11,color:selEv.taken/selEv.spots>.8?C.orange:C.green,fontWeight:700}}>{selEv.spots-selEv.taken} left</span>
+                  <span style={{fontSize:11,color:selEv.taken/selEv.spots>.8?C.orange:C.green,fontWeight:700}}>{selEv.spots-selEv.taken} {lang==='en'?'left':'restantes'}</span>
                 </div>
                 <div style={{height:5,borderRadius:3,background:C.whiteFaint,overflow:'hidden'}}>
                   <div style={{height:'100%',width:`${selEv.taken/selEv.spots*100}%`,background:`linear-gradient(90deg,${C.green},${C.orange})`,borderRadius:3}}/>
@@ -6942,16 +6944,16 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
 
   const distLabel = (km: number | null) => {
     if (bothArrived) return null
-    if (km === null) return <span style={{color:'#9ca3af',fontSize:11}}>GPS…</span>
-    if (km < 0.015) return <span style={{color:'#16a34a',fontWeight:800,fontSize:12}}>Sur place ✓</span>
-    if (km < 1) return <span style={{color:'#1a0810',fontWeight:700,fontSize:12}}>{Math.round(km*1000)}m du lieu</span>
-    return <span style={{color:'#6b2d4a',fontWeight:700,fontSize:12}}>{km.toFixed(2)}km du lieu</span>
+    if (km === null) return <span style={{color:'#B2B2B2',fontSize:11}}>GPS…</span>
+    if (km < 0.015) return <span style={{color:'#77BC1F',fontWeight:800,fontSize:12}}>Sur place ✓</span>
+    if (km < 1) return <span style={{color:'#4A2A3D',fontWeight:700,fontSize:12}}>{Math.round(km*1000)}m du lieu</span>
+    return <span style={{color:'#532943',fontWeight:700,fontSize:12}}>{km.toFixed(2)}km du lieu</span>
   }
 
   return (
     <>
       <style>{`
-        @keyframes jySuisPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{transform:scale(1.03);box-shadow:0 0 0 8px rgba(74,222,128,0)}}
+        @keyframes jySuisPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(119,188,31,.5)}50%{transform:scale(1.03);box-shadow:0 0 0 8px rgba(119,188,31,0)}}
         @keyframes rdvBlink{0%,100%{opacity:1}50%{opacity:.5}}
         @keyframes sonarOut{0%{opacity:.7;transform:scale(0)}60%{opacity:.25}100%{opacity:0;transform:scale(1)}}
       `}</style>
@@ -6967,8 +6969,8 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
           <div style={{flexShrink:0,minWidth:52}}>
             {bothArrived
-              ? <div style={{fontSize:13,color:'#16a34a',fontWeight:900}}>🎉 Top !</div>
-              : <div style={{fontSize:20,fontWeight:900,color:past?'#d97706':'#1a0810',fontVariantNumeric:'tabular-nums',fontFamily:'monospace',lineHeight:1}}>
+              ? <div style={{fontSize:13,color:'#77BC1F',fontWeight:900}}>🎉 Top !</div>
+              : <div style={{fontSize:20,fontWeight:900,color:past?'#d97706':'#4A2A3D',fontVariantNumeric:'tabular-nums',fontFamily:'monospace',lineHeight:1}}>
                   {past ? '0:00' : `${mins}:${String(secs).padStart(2,'0')}`}
                 </div>}
           </div>
@@ -6978,11 +6980,11 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
             </div>
           )}
           <div style={{flex:1,overflow:'hidden'}}>
-            <div style={{fontSize:11,color:'#6b2d4a',fontWeight:800,letterSpacing:'.03em',textTransform:'uppercase',
+            <div style={{fontSize:11,color:'#532943',fontWeight:800,letterSpacing:'.03em',textTransform:'uppercase',
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
               📍 {venueName}
             </div>
-            <div style={{fontSize:11,color:'#9b5367',fontWeight:700}}>
+            <div style={{fontSize:11,color:'#6F6F6E',fontWeight:700}}>
               RDV {new Date(verrou.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
               {Number(verrou.retard_min) > 0 && <span style={{color:'#d97706'}}> → {new Date(new Date(verrou.proposed_time).getTime()+Number(verrou.retard_min)*60000).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</span>}
               {(verrou as any).is_quick_date && <span style={{color:C.orange,marginLeft:4}}>⚡ Quick Date</span>}
@@ -7008,7 +7010,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
           {(()=>{
             const comp = dopplerDir===0 ? 1 : Math.max(0.35, Math.min(0.95, 1-dopplerSpeed*0.65))
             const xOff = dopplerDir * Math.min(14, dopplerSpeed*18) // décalage vers direction
-            const wc = dopplerDir===1?'#16a34a':dopplerDir===-1?'#d97706':'#94a3b8'
+            const wc = dopplerDir===1?'#77BC1F':dopplerDir===-1?'#d97706':'#B2B2B2'
             const dur = dopplerDir===0 ? 2.4 : Math.max(0.8, 2.4-dopplerSpeed*1.2)
             return (
               <div style={{position:'absolute',left:0,top:4,transform:`translateX(${myOffsetPx}px)`,transition:'transform 1.2s ease'}}>
@@ -7026,12 +7028,12 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                   <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',position:'relative',zIndex:1,
                     backgroundImage:myPhoto?`url(${myPhoto})`:'none',backgroundSize:'cover',backgroundPosition:'center',
                     backgroundColor:'#e8d0c8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,
-                    border:`3px solid ${myArrived?'#16a34a':col}`,
-                    boxShadow:myArrived?`0 0 0 3px #16a34a33`:`0 2px 8px rgba(0,0,0,.2)`}}>
+                    border:`3px solid ${myArrived?'#77BC1F':col}`,
+                    boxShadow:myArrived?`0 0 0 3px #77BC1F33`:`0 2px 8px rgba(0,0,0,.2)`}}>
                     {!myPhoto&&'👤'}
                   </div>
                   {myArrived&&<div style={{position:'absolute',bottom:-2,right:-2,width:17,height:17,borderRadius:'50%',zIndex:2,
-                    background:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
+                    background:'#77BC1F',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
                     border:'2px solid #fff',fontWeight:900,color:'#fff'}}>✓</div>}
                 </div>
               </div>
@@ -7045,7 +7047,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                 <svg style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',overflow:'visible',pointerEvents:'none',width:0,height:0}}>
                   {[0,1,2].map(i=>(
                     <ellipse key={i} cx={0} cy={0} rx={28} ry={28}
-                      fill="none" stroke="#94a3b8" strokeWidth={1.4-i*0.3}
+                      fill="none" stroke="#B2B2B2" strokeWidth={1.4-i*0.3}
                       style={{animation:`sonarOut 2.4s ease-out ${i*0.8}s infinite`}}/>
                   ))}
                 </svg>
@@ -7053,12 +7055,12 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
               <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',position:'relative',zIndex:1,
                 backgroundImage:other?.photo_url?`url(${other.photo_url})`:'none',backgroundSize:'cover',backgroundPosition:'center',
                 backgroundColor:'#e8d0c8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,
-                border:`3px solid ${otherArrived?'#16a34a':col}`,
-                boxShadow:otherArrived?`0 0 0 3px #16a34a33`:`0 2px 8px rgba(0,0,0,.2)`}}>
+                border:`3px solid ${otherArrived?'#77BC1F':col}`,
+                boxShadow:otherArrived?`0 0 0 3px #77BC1F33`:`0 2px 8px rgba(0,0,0,.2)`}}>
                 {!other?.photo_url&&'👤'}
               </div>
               {otherArrived&&<div style={{position:'absolute',bottom:-2,left:-2,width:17,height:17,borderRadius:'50%',zIndex:2,
-                background:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
+                background:'#77BC1F',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,
                 border:'2px solid #fff',fontWeight:900,color:'#fff'}}>✓</div>}
             </div>
           </div>
@@ -7072,8 +7074,8 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
           // Je suis en retard — je vois le statut de ma demande
           if (iAmLate) {
             if (verrou.retard_accepted === true) return (
-              <div style={{background:'rgba(22,163,74,.08)',border:'1px solid rgba(22,163,74,.3)',borderRadius:12,padding:'10px 12px',marginBottom:8,textAlign:'center'}}>
-                <div style={{fontSize:13,fontWeight:900,color:'#16a34a',marginBottom:2}}>✓ Retard accepté</div>
+              <div style={{background:'rgba(119,188,31,.08)',border:'1px solid rgba(119,188,31,.3)',borderRadius:12,padding:'10px 12px',marginBottom:8,textAlign:'center'}}>
+                <div style={{fontSize:13,fontWeight:900,color:'#77BC1F',marginBottom:2}}>✓ Retard accepté</div>
                 <div style={{fontSize:11,color:'#5a8a6a',lineHeight:1.5}}>Ton partenaire t'attend — prends ton temps 🙏</div>
               </div>
             )
@@ -7086,7 +7088,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
               return (
                 <div style={{position:'absolute',inset:0,background:'rgba(42,16,32,.97)',borderRadius:16,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 20px',gap:14,zIndex:99}}>
                   <div style={{fontSize:28}}>😔</div>
-                  <div style={{fontSize:15,fontWeight:900,color:'#ef4444',textAlign:'center'}}>Retard refusé</div>
+                  <div style={{fontSize:15,fontWeight:900,color:'#dc2626',textAlign:'center'}}>Retard refusé</div>
                   <div style={{fontSize:12,color:'#FFBF9E',lineHeight:1.6,textAlign:'center'}}>
                     {other?.name||'Ton partenaire'} n'a pas pu t'attendre.
                     {refuserMsg && <><br/><span style={{fontStyle:'italic',color:'#f5e8de',marginTop:6,display:'block'}}>«&nbsp;{refuserMsg}&nbsp;»</span></>}
@@ -7133,7 +7135,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                     maxLength={60}
                     autoFocus
                     onClick={e=>e.stopPropagation()}
-                    style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid rgba(239,68,68,.4)',background:'rgba(239,68,68,.06)',color:'#f5e8de',fontSize:12,fontFamily:'inherit',boxSizing:'border-box',outline:'none'}}
+                    style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid rgba(220,38,38,.4)',background:'rgba(220,38,38,.06)',color:'#f5e8de',fontSize:12,fontFamily:'inherit',boxSizing:'border-box',outline:'none'}}
                   />
                   <div style={{display:'flex',gap:8}}>
                     <button onClick={e=>{e.stopPropagation();setShowRefuseInput(false);setRefuseMsg('')}}
@@ -7143,7 +7145,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                     <button onClick={async e=>{
                       e.stopPropagation()
                       await sb?.from('clutches').update({retard_accepted:false,status:'cancelled',cancel_message:refuseMsg||null,cancel_by:userId}).eq('id',verrou.id)
-                    }} style={{flex:2,padding:'8px',borderRadius:10,border:'none',background:'#ef4444',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                    }} style={{flex:2,padding:'8px',borderRadius:10,border:'none',background:'#dc2626',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
                       Confirmer le refus
                     </button>
                   </div>
@@ -7153,13 +7155,13 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                   <button onClick={async e=>{
                     e.stopPropagation()
                     await sb?.from('clutches').update({retard_accepted:true}).eq('id',verrou.id)
-                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#77BC1F',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
                     ✓ OK, j'attends
                   </button>
                   <button onClick={e=>{
                     e.stopPropagation()
                     setShowRefuseInput(true)
-                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#ef4444',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+                  }} style={{flex:1,padding:'9px',borderRadius:10,border:'none',background:'#dc2626',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
                     ✗ Refuser
                   </button>
                 </div>
@@ -7172,17 +7174,17 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
 
         {bothArrived ? (
           <div style={{textAlign:'center',padding:'4px 0 2px'}}>
-            <div style={{fontSize:14,fontWeight:900,color:'#16a34a',marginBottom:6}}>🎉 Les deux sur place !</div>
+            <div style={{fontSize:14,fontWeight:900,color:'#77BC1F',marginBottom:6}}>🎉 Les deux sur place !</div>
             {past ? (
               <button onClick={e=>{e.stopPropagation();onTerminer?.()}}
-                style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#16a34a',
+                style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#77BC1F',
                   color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
-                  boxShadow:'0 3px 12px rgba(22,163,74,.4)',letterSpacing:.3}}>
+                  boxShadow:'0 3px 12px rgba(119,188,31,.4)',letterSpacing:.3}}>
                 ✓ Terminer le RDV
               </button>
             ) : (
-              <div style={{width:'100%',padding:'10px',borderRadius:12,background:'rgba(22,163,74,.12)',
-                border:'1px solid rgba(22,163,74,.3)',color:'#15803d',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
+              <div style={{width:'100%',padding:'10px',borderRadius:12,background:'rgba(119,188,31,.12)',
+                border:'1px solid rgba(119,188,31,.3)',color:'#5a9418',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
                 ⏳ Profitez du moment ! Vous pourrez clore le RDV à partir de l'heure prévue.
               </div>
             )}
@@ -7196,21 +7198,21 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                 <button onClick={e=>{e.stopPropagation();if(canCheckin)onCheckin?.()}}
                   style={{padding:'7px 12px',borderRadius:10,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:900,
                     cursor:canCheckin?'pointer':'default',
-                    background:canCheckin?'#16a34a':'#e5e7eb',
-                    color:canCheckin?'#fff':'#9ca3af',
+                    background:canCheckin?'#77BC1F':'#E3E3E3',
+                    color:canCheckin?'#fff':'#B2B2B2',
                     animation:canCheckin?'jySuisPulse 1.5s ease-in-out infinite':undefined}}>
                   ✓ {"J'y suis !"}
                 </button>
               ) : (
-                <div style={{fontSize:13,color:'#16a34a',fontWeight:900}}>✓ Arrivé·e</div>
+                <div style={{fontSize:13,color:'#77BC1F',fontWeight:900}}>✓ Arrivé·e</div>
               )}
             </div>
             {/* L'autre — droite */}
             <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
               {otherDistKm !== null
-                ? <div style={{color:'#1a0810',fontWeight:700,fontSize:12}}>{Math.round(otherDistKm*1000)}m du lieu</div>
-                : <div style={{fontSize:12,color:'#6b2d4a',fontWeight:700}}>{other?.name||''}</div>}
-              <div style={{fontSize:13,color:otherArrived?'#16a34a':'#9ca3af',fontWeight:otherArrived?900:500}}>
+                ? <div style={{color:'#4A2A3D',fontWeight:700,fontSize:12}}>{Math.round(otherDistKm*1000)}m du lieu</div>
+                : <div style={{fontSize:12,color:'#532943',fontWeight:700}}>{other?.name||''}</div>}
+              <div style={{fontSize:13,color:otherArrived?'#77BC1F':'#B2B2B2',fontWeight:otherArrived?900:500}}>
                 {otherArrived?'✓ Arrivé·e':'En route…'}
               </div>
             </div>
@@ -9760,7 +9762,7 @@ export default function App2() {
                             </div>}
                             <div style={{flex:1,minWidth:0}}>
                               {!isAccepted && <div onClick={()=>{if(other){setSelProfile(other);setShowProfileSheet(true)}}} style={{fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                                <span style={{color:isRec?GC.F:C.whiteMid}}>{isRec?'← From':'→ To'}</span>{' '}
+                                <span style={{color:isRec?GC.F:C.whiteMid}}>{isRec?(lang==='en'?'← From':'← De'):(lang==='en'?'→ To':'→ Pour')}</span>{' '}
                                 <GenderSvg gk={genderKey(other?.gender)} size={13}/>{' '}
                                 <span style={{textDecoration:'underline',textDecorationColor:`${C.salmon}55`}}>{other?.name||'?'}</span>
                               </div>}
@@ -9775,9 +9777,9 @@ export default function App2() {
                                   if(!isMock) { await supabase.from('clutches').update({status:'cancelled'}).eq('id',c.id); await insertCancelMsg(c.id, c.receiver_id) }
                                   await applyPenalty('cancel_early')
                                   loadClutches()
-                                }} title="Cancel (-2 pts)"
+                                }} title={lang==='en'?'Cancel (-2 pts)':'Annuler (-2 pts)'}
                                   style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
-                                  ✕ Cancel
+                                  ✕ {lang==='en'?'Cancel':'Annuler'}
                                 </button>
                               )}
                             </div>
@@ -9789,14 +9791,14 @@ export default function App2() {
                               <div style={{marginTop:8,background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.3)',borderRadius:12,padding:'10px 12px'}}>
                                 {(()=>{const reason=penaltyReasonFromTime(c.proposed_time);const p=getPenalty(reason);
                                   const level=Math.abs(p.pts)<=5?0:Math.abs(p.pts)<=10?1:Math.abs(p.pts)<=15?2:3;
-                                  const colors=['#2DBD7E','#E27C00','#FF8C00','#ef4444'];const labels=['Low','Medium','High','Severe'];
+                                  const colors=[C.green,C.orange,C.red,C.red];const labels=lang==='en'?['Low','Medium','High','Severe']:['Légère','Moyenne','Élevée','Sévère'];
                                   return(
                                   <>
-                                    <div style={{fontSize:12,color:C.white,fontWeight:700,marginBottom:8}}>Cancel this Verrou?</div>
+                                    <div style={{fontSize:12,color:C.white,fontWeight:700,marginBottom:8}}>{lang==='en'?'Cancel this Verrou?':'Annuler ce Verrou ?'}</div>
                                     <div style={{marginBottom:10}}>
                                       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
                                         <span style={{fontSize:13}}>{p.emoji}</span>
-                                        <span style={{fontSize:11,color:C.whiteMid}}>Penalty</span>
+                                        <span style={{fontSize:11,color:C.whiteMid}}>{lang==='en'?'Penalty':'Pénalité'}</span>
                                         <span style={{fontSize:11,fontWeight:800,color:colors[level]}}>{labels[level]}</span>
                                       </div>
                                       <div style={{display:'flex',gap:3,height:6}}>
@@ -10449,10 +10451,11 @@ export default function App2() {
               untilHH: new Date(new Date(activeVerrou.proposed_time).getTime() + TRUST_CONFIG.RDV_LOCK_AFTER_H*3600*1000).toTimeString().slice(0,5)
             } : undefined}
             onSent={(_clutchId)=>{
-            setShowSend(false); setShowProfileSheet(false); setTab('presences'); setShowCelebration(true); loadClutches()
+            // David : « le clutch disparaît » → on emmène direct sur l'onglet Clutchs pour qu'il VOIE le clutch envoyé
+            setShowSend(false); setShowProfileSheet(false); setTab('clutchs'); setShowCelebration(true); loadClutches()
           }} showToast={showToast} onTargetUnavailable={()=>{setShowSend(false);setShowProfileSheet(false);setSlotGoneProfile(selProfile)}}/>}
           {slotGoneProfile&&<SlotGoneOverlay name={slotGoneProfile.name||''} avatar={(slotGoneProfile as any).photo_url||undefined} lang={lang} onDone={()=>{setSlotGoneProfile(null);setTab('presences')}}/>}
-          {showCelebration&&<ClutchSent onDone={()=>setShowCelebration(false)} name={selProfile?.name||''}/>}
+          {showCelebration&&<ClutchSent onDone={()=>setShowCelebration(false)} name={selProfile?.name||''} lang={lang}/>}
           {showVerrou&&<VerrouExplosion onDone={onVerrouDone} verrou={verrouData}/>}
           {/* Logo Clutch flottant animé (verre + battement néon + flottement). Tap → Présences.
               (L'ancien bouton 💬 feedback est déplacé tout en bas du Profil.) */}

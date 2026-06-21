@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10C'  // Versionnage HEXADÉCIMAL. ~268e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10D'  // Versionnage HEXADÉCIMAL. ~269e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4857,6 +4857,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     else { el.style.transform='translateX(0)'; el.style.opacity='1' }
   }
   const [showBotLab, setShowBotLab] = useState(false)
+  const [showConvDemo, setShowConvDemo] = useState(false) // aperçu de la Convergence (demande David)
   const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
   const [editField, setEditField] = useState<string|null>(null)
   const [editing, setEditing] = useState(false)
@@ -6032,6 +6033,15 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
         <div style={{fontSize:10,color:C.whiteMid,marginTop:14,opacity:.8}}>{algoTrained>0?`🪄 ${algoTrained} réponse${algoTrained>1?'s':''} — Clutch te comprend mieux`:'Plus tu réponds, mieux Clutch te comprend 🪄'}</div>
       </div>
+      {/* ✦ Aperçu Convergence (demande David : pouvoir voir l'animation du rapprochement) */}
+      <button onClick={()=>setShowConvDemo(true)} style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'14px',borderRadius:16,border:`1px solid ${C.border}`,background:`linear-gradient(135deg,${C.bordeaux}0a,${C.green}08)`,cursor:'pointer',fontFamily:'inherit',marginBottom:14,textAlign:'left'}}>
+        <span style={{fontSize:22}}>✦</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:800,color:C.white}}>Voir la Convergence</div>
+          <div style={{fontSize:11.5,color:C.whiteMid,marginTop:1}}>L'animation quand vous vous rapprochez du lieu du RDV</div>
+        </div>
+        <span style={{color:'#c9c2c7',fontSize:18}}>›</span>
+      </button>
       {/* Avancé — pondérations & tests (Test de personnalité dedans, comme la maquette validée) */}
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
         <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations &amp; tests</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
@@ -6268,6 +6278,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   return (
     <>
     {showBotLab && <BotLab user={user} onClose={()=>setShowBotLab(false)} showToast={showToast}/>}
+    {showConvDemo && <ConvergenceOverlay demo myProgress={0} otherProgress={0} mins={0} secs={0} otherName="Anaïs" venueName="Café du Marché" bothArrived={false} onClose={()=>setShowConvDemo(false)}/>}
     <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'var(--sat) 0 32px'}}>
 
       {/* ─── HERO ─── */}
@@ -6545,12 +6556,20 @@ function penaltyReasonFromTime(proposedTime: string|null, isGhost=false): Penalt
 // ═════════════════════════════════════════════════════════════
 // ═══ CONVERGENCE — animation immersive : deux nuages (toi + l'autre) convergent vers le LIEU (étoile verte),
 //     avec un battement de cœur qui se synchronise. Nom de code interne : "al-jabr" (réunir ce qui était séparé). ═══
-function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, venueName, bothArrived, onClose }:{
-  myProgress:number; otherProgress:number; mins:number; secs:number; otherName:string; venueName:string; bothArrived:boolean; onClose:()=>void;
+function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, venueName, bothArrived, onClose, demo=false }:{
+  myProgress:number; otherProgress:number; mins:number; secs:number; otherName:string; venueName:string; bothArrived:boolean; onClose:()=>void; demo?:boolean;
 }) {
   const cvRef = useRef<HTMLCanvasElement|null>(null)
-  const progRef = useRef({ a: myProgress, b: otherProgress })
-  progRef.current = { a: myProgress, b: otherProgress }
+  // DEMO : la progression s'anime toute seule (loin → on se rejoint) en boucle, pour prévisualiser l'animation.
+  const [demoProg,setDemoProg] = useState(0)
+  useEffect(()=>{ if(!demo) return; let p=0; const iv=setInterval(()=>{ p+=0.011; if(p>1.25)p=0; setDemoProg(Math.min(1,p)) },90); return ()=>clearInterval(iv) },[demo])
+  const effA = demo ? demoProg : myProgress
+  const effB = demo ? Math.max(0, demoProg-0.05) : otherProgress
+  const dMins = demo ? Math.max(0,Math.round((1-demoProg)*12)) : mins
+  const dSecs = demo ? Math.max(0,Math.round((1-demoProg)*45)) : secs
+  const dArrived = demo ? demoProg>0.96 : bothArrived
+  const progRef = useRef({ a: effA, b: effB })
+  progRef.current = { a: effA, b: effB }
   useEffect(()=>{
     const cv = cvRef.current; if(!cv) return
     const ctx = cv.getContext('2d'); if(!ctx) return
@@ -6606,13 +6625,14 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
     <div style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(120% 90% at 50% 40%,#1a0f1e 0%,#0b0610 72%)',display:'flex',flexDirection:'column'}}>
       <canvas ref={cvRef} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>
       <div style={{position:'relative',zIndex:2,textAlign:'center',marginTop:'calc(var(--sat) + 54px)'}}>
-        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#8a7d86'}}>{bothArrived?'Vous y êtes':'Vous vous rapprochez'}</div>
+        {demo&&<div style={{fontSize:10,fontWeight:800,letterSpacing:'.1em',color:'#77BC1F',marginBottom:6}}>✦ APERÇU</div>}
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#8a7d86'}}>{dArrived?'Vous y êtes':'Vous vous rapprochez'}</div>
         <div style={{fontSize:24,fontWeight:800,color:'#fff',marginTop:4}}>{otherName}</div>
       </div>
       <div style={{position:'relative',zIndex:2,marginTop:'auto',textAlign:'center',marginBottom:'calc(var(--sab) + 40px)'}}>
-        <div style={{fontSize:52,fontWeight:800,color:'#fff',lineHeight:1,letterSpacing:'-.02em'}}>{bothArrived?'✦':(mins<1?`${secs}s`:`${mins} min`)}</div>
-        <div style={{fontSize:14,color:'#9a8d96',marginTop:8,fontWeight:600}}>{bothArrived?<>{otherName} est <b style={{color:'#77BC1F'}}>au lieu</b></>:<>Rendez-vous à <b style={{color:'#77BC1F'}}>{venueName}</b></>}</div>
-        <button onClick={onClose} style={{marginTop:22,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',borderRadius:30,padding:'10px 22px',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Revenir à l'app</button>
+        <div style={{fontSize:52,fontWeight:800,color:'#fff',lineHeight:1,letterSpacing:'-.02em'}}>{dArrived?'✦':(dMins<1?`${dSecs}s`:`${dMins} min`)}</div>
+        <div style={{fontSize:14,color:'#9a8d96',marginTop:8,fontWeight:600}}>{dArrived?<>{otherName} est <b style={{color:'#77BC1F'}}>au lieu</b></>:<>Rendez-vous à <b style={{color:'#77BC1F'}}>{venueName}</b></>}</div>
+        <button onClick={onClose} style={{marginTop:22,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',borderRadius:30,padding:'10px 22px',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{demo?'Fermer l\'aperçu':'Revenir à l\'app'}</button>
       </div>
     </div>
   )

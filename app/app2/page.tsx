@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x102'  // Versionnage HEXADÉCIMAL. ~258e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x103'  // Versionnage HEXADÉCIMAL. ~259e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2842,8 +2842,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   }
 
   const [selEv, setSelEv] = useState<any|null>(()=>
-    initialEventId ? MOCK_EVENTS.find(e=>e.id===initialEventId)||null : null
+    initialEventId ? (events.find((e:any)=>e.id===initialEventId) || MOCK_EVENTS.find(e=>e.id===initialEventId) || null) : null
   )
+  // Ouvre l'event demandé (depuis l'onglet Clutchs → « Mes événements ») dès que les vrais events (DB) sont chargés
+  useEffect(() => {
+    if (!initialEventId) return
+    const found = events.find((e:any)=>e.id===initialEventId)
+    if (found) setSelEv((cur:any)=> cur && cur.id===initialEventId ? cur : found)
+  }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
   const [registering, setRegistering] = useState(false)
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
@@ -7377,6 +7383,18 @@ export default function App2() {
     })
     return () => { cancelled = true }
   }, [user?.id])
+  // « Mes événements » à afficher AUSSI dans l'onglet Clutchs (demande David 21.06). Fetch léger (colonnes DB directes).
+  const [myUpcomingEvents,setMyUpcomingEvents] = useState<any[]>([])
+  useEffect(() => {
+    const uuids = [...registeredEvents].filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id))
+    if (!uuids.length) { setMyUpcomingEvents([]); return }
+    let cancelled = false
+    supabase.from('events').select('id,emoji,title,event_time,event_date,lieu,status,active').in('id', uuids).then(({ data }: any) => {
+      if (cancelled) return
+      setMyUpcomingEvents((data||[]).filter((e:any)=>e.active!==false && e.status!=='cancelled'))
+    })
+    return () => { cancelled = true }
+  }, [registeredEvents])
   // Persist waitlist to localStorage
   useEffect(() => {
     try { localStorage.setItem('clutch_waitlist', JSON.stringify([...waitlistEvIds])) } catch {}
@@ -9180,7 +9198,28 @@ export default function App2() {
                     </div>
                   </div>
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId ? 180 : 14}}>
-                    {/* Events rejoints → visibles UNIQUEMENT dans l'onglet Événements (séparation events/clutchs, décision David). On ne mélange plus. */}
+                    {/* Mes événements à venir — AUSSI ici (demande David). Tap → ouvre l'event dans l'onglet Événements. */}
+                    {myUpcomingEvents.length>0 && (
+                      <div style={{marginBottom:14}}>
+                        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,margin:'2px 2px 8px'}}>📅 {lang==='en'?'My events':'Mes événements'}</div>
+                        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                          {myUpcomingEvents.map((ev:any)=>(
+                            <div key={ev.id} onClick={()=>{ setTab('evenements'); setOpenEventId(ev.id) }}
+                              style={{display:'flex',alignItems:'center',gap:12,background:C.bgCard,border:`1px solid ${C.green}55`,borderRadius:14,padding:'12px 14px',cursor:'pointer',boxShadow:'0 2px 10px rgba(83,41,67,.06)'}}>
+                              <span style={{fontSize:24,flexShrink:0}}>{ev.emoji||'🎟️'}</span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:14,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.title}</div>
+                                <div style={{fontSize:11.5,color:C.whiteMid,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                  <span style={{color:C.green,fontWeight:700}}>✓ {lang==='en'?'Joined':'Inscrit·e'}</span>
+                                  {ev.event_time?` · 🕐 ${ev.event_time}`:''}{ev.lieu?` · 📍 ${(ev.lieu||'').split(',')[0]}`:''}
+                                </div>
+                              </div>
+                              <span style={{color:C.whiteMid,fontSize:18,flexShrink:0}}>›</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {/* Clutchs actifs */}
                     {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
                     {actifs.map((c:any)=>{

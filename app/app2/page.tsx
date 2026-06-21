@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2646,6 +2646,11 @@ const PARTNERS_MOCK = [
   {id:'p_jazz',    emoji:'🎷', name:'Apéro Jazz Collectif',  cat:'Musique · Apéro',      zone:'Vieille Ville',      members:212,  desc:'Jam sessions et apéros jazz une fois par mois. Amène ton instrument.', next:'Jam ouverte · ven. 19h', verified:true},
   {id:'p_rando',   emoji:'🥾', name:'Rando du Dimanche',     cat:'Nature · Sport',       zone:'Lavaux / Jura',      members:156,  desc:'Balades et randos accessibles à tous, chaque dimanche matin.', next:'Lavaux sunrise · dim. 7h', verified:false},
   {id:'p_parents', emoji:'👶', name:'Parents & Cie',         cat:'Famille · Entraide',   zone:'Lausanne',           members:89,   desc:'Sorties parc, gardes partagées, cafés entre parents.', next:'Pique-nique parc · sam. 15h', verified:false},
+  // Partenaires officiels supplémentaires (Lausanne & environs) — bannières "à la une"
+  {id:'p_mad',     emoji:'🪩', name:'MAD Lausanne',          cat:'Clubbing · Concerts',  zone:'Genève-Sud, Lausanne', members:2100, desc:'Le club mythique de Lausanne. Concerts, soirées à thème, afters.', next:'House night · ven. 23h', verified:true},
+  {id:'p_montreux',emoji:'🎺', name:'Montreux Jazz Café',    cat:'Musique · Live',       zone:'Montreux',           members:870,  desc:'Concerts live et jam sessions dans l\'esprit du festival.', next:'Soul session · sam. 20h', verified:true},
+  {id:'p_lakeyoga',emoji:'🧘', name:'Lake Yoga Vidy',        cat:'Bien-être · Plein air', zone:'Vidy, Lausanne',     members:430,  desc:'Yoga au bord du lac, tous niveaux, lever et coucher du soleil.', next:'Sunset flow · dim. 19h', verified:true},
+  {id:'p_caves',   emoji:'🍷', name:'Caves Ouvertes Lavaux', cat:'Dégustation · Vin',    zone:'Lavaux',             members:640,  desc:'Dégustations chez les vignerons du vignoble UNESCO.', next:'Balade & dégustation · sam. 10h', verified:true},
 ]
 
 // Barre de filtres VOLONTAIREMENT courte (audit David 21.06 : « beaucoup trop de boutons en haut »).
@@ -2932,6 +2937,21 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [registering, setRegistering] = useState(false)
   const [regBlock, setRegBlock] = useState('') // alerte inline quand l'inscription est bloquée (plafond/chevauchement)
   useEffect(()=>{ setRegBlock('') }, [selEv?.id]) // reset l'alerte à l'ouverture d'un autre event
+  // Bannières partenaires : défilement auto (David). Avance d'une carte toutes les 3.5s, repart au début, pause au toucher.
+  const bannerRef = useRef<HTMLDivElement>(null)
+  const bannerPause = useRef(0)
+  useEffect(()=>{
+    if (evFilter!=='all') return
+    const id = setInterval(()=>{
+      const el = bannerRef.current; if(!el) return
+      if (Date.now() < bannerPause.current) return
+      const card = el.firstElementChild as HTMLElement | null
+      const step = card ? card.offsetWidth + 11 : el.clientWidth*0.8
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 8) el.scrollTo({left:0,behavior:'smooth'})
+      else el.scrollBy({left:step,behavior:'smooth'})
+    }, 3500)
+    return ()=>clearInterval(id)
+  }, [evFilter])
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
   const evTouchStartX = useRef<number|null>(null)
   const [unregConfirmId, setUnregConfirmId] = useState<string|null>(null)
@@ -3073,8 +3093,21 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {evFilter==='partenaires' && (<>
           <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 14px',marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🫂 Groupes à suivre</div>
-            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>Suis un groupe — tournoi de ping-pong, rando du dimanche, collectif… — et reçois une notif à chacun de leurs nouveaux événements. Ton réseau se construit tout seul.</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}><b>« Tout »</b> = les événements ponctuels. <b>Ici</b> = les <b>groupes récurrents</b> (clubs, collectifs) que tu suis pour être <b>notifié·e</b> de leurs nouveaux events. Ton réseau se construit tout seul.</div>
           </div>
+          {/* Groupes suivis — visibles en un coup d'œil (David : « ils apparaissent où ? ») */}
+          {(()=>{ const fol = PARTNERS_MOCK.filter((p:any)=>followedPartners.has(p.id)); if(!fol.length) return null; return (
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.green,marginBottom:7}}>✓ Tu suis {fol.length} groupe{fol.length>1?'s':''}</div>
+              <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+                {fol.map((p:any)=>(
+                  <span key={p.id} style={{display:'inline-flex',alignItems:'center',gap:5,background:`${C.green}10`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'5px 11px',fontSize:12,fontWeight:700,color:C.white}}>
+                    <span style={{fontSize:13}}>{p.emoji}</span>{p.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )})()}
           <button onClick={()=>setShowCreatePartner(true)} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px dashed ${C.plum}`,background:'transparent',color:C.plum,fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:14}}>+ Créer mon groupe</button>
           {/* Mes groupes créés */}
           {myPartners.map((p:any)=>(
@@ -3124,7 +3157,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {/* ✨ BANNIÈRES PARTENAIRES (payants = mis en avant, défilent en haut) — demande David. Visible seulement sur "Tout". */}
         {evFilter==='all' && PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
           <div style={{marginBottom:14}}>
-            <div style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',padding:'2px 2px 4px',margin:'0 -2px'}}>
+            <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',padding:'2px 2px 4px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
                 <div key={p.id} onClick={()=>setEvFilter('partenaires')} style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#532943,#2C1020)',boxShadow:'0 4px 16px rgba(83,41,67,.22)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
                   <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.14,lineHeight:1}}>{p.emoji}</div>
@@ -8813,7 +8846,20 @@ export default function App2() {
     return { lockFrom, lockUntil, rdvMs }
   }, [activeVerrou])
 
-  // Swipe supprimé — conflits avec zoom carte sur mobile
+  // Garde avant d'envoyer un Clutch : pas pendant un RDV verrouillé, ET pas tant qu'un feedback
+  // post-RDV n'est pas rempli (David : « je ne dois pas pouvoir clutcher si j'ai pas fini le feedback »).
+  const clutchGuard = (): boolean => {
+    if (myRdvWindow) {
+      showToast(`🔒 RDV en cours — disponible après ${new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`, C.orange)
+      return false
+    }
+    if (pendingFeedbacks > 0) {
+      showToast(lang==='en'?'💬 Finish your feedback on the last meetup first':'💬 Termine ton retour sur le dernier RDV avant d\'en lancer un nouveau', C.orange)
+      setTab('clutchs')
+      return false
+    }
+    return true
+  }
 
   // ── RENDER ─────────────────────────────────────────────────
   return (
@@ -9572,7 +9618,7 @@ export default function App2() {
                                 <div style={{fontSize:17,fontWeight:900,color:'#fff',letterSpacing:-.3}}>{p.name||'?'}</div>
                                 {p.age&&<div style={{fontSize:12,color:'rgba(255,255,255,.5)',marginTop:1}}>{p.age} ans</div>}
                               </div>
-                              <button onClick={()=>{if(myRdvWindow){showToast(`🔒 RDV en cours — disponible après ${new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`,C.orange);return};setLiveMode(false);setSelProfile(p);setShowSend(true)}}
+                              <button onClick={()=>{if(!clutchGuard())return;setLiveMode(false);setSelProfile(p);setShowSend(true)}}
                                 style={{padding:'10px 16px',borderRadius:12,background:'#FF1493',border:'none',color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit',flexShrink:0,boxShadow:'0 4px 16px rgba(255,20,147,.5)'}}>
                                 ⚡ Clutch
                               </button>
@@ -9587,7 +9633,7 @@ export default function App2() {
 
               {/* ── TAB : ÉVÉNEMENTS — avec Anaïs + détail cliquable ── */}
               {tab==='evenements' && <EventsTab
-                onClutch={(p)=>{if(myRdvWindow){showToast(`🔒 RDV en cours — disponible après ${new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}`,C.orange);return};setSelProfile(p);setShowSend(true)}}
+                onClutch={(p)=>{if(!clutchGuard())return;setSelProfile(p);setShowSend(true)}}
                 registered={registeredEvents}
                 setRegistered={setRegisteredEvents}
                 waitlist={waitlistEvIds}
@@ -10420,18 +10466,8 @@ export default function App2() {
             return <ProfileSheet
               profile={selProfile} userId={user.id}
               onClutch={()=>{
-                if(pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK){
-                  setShowProfileSheet(false)
-                  setTab('clutchs')
-                  showToast(lang==='en'?'Give feedback on your past meetups first':'Donne d\'abord un feedback sur tes RDV passés',C.orange)
-                  return
-                }
-                // Bloquer pendant la fenêtre RDV active (1h avant → 2h après)
-                if(myRdvWindow){
-                  const until = new Date(myRdvWindow.lockUntil).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
-                  showToast(`🔒 RDV en cours — tu peux clutcher après ${until}`,C.orange)
-                  return
-                }
+                // Bloc dur : pas pendant un RDV verrouillé, ET pas tant qu'un feedback post-RDV n'est pas rempli (David)
+                if(!clutchGuard()){ setShowProfileSheet(false); return }
                 setShowProfileSheet(false);setShowSend(true)
               }}
               onClose={()=>setShowProfileSheet(false)} showToast={showToast}

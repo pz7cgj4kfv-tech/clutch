@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x103'  // Versionnage HEXADÉCIMAL. ~259e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x104'  // Versionnage HEXADÉCIMAL. ~260e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6388,6 +6388,30 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 🥚 ÉPHÉMÈRE — Coucou à Mel (À RETIRER AU PROCHAIN BUILD). Visible UNIQUEMENT pour Mel, 1 fois.
+// Blague : déployé dimanche 21 juin à 5h37 du matin. Pour la faire rigoler.
+// ════════════════════════════════════════════════════════════════════
+function MelHello({ onClose }:{ onClose:()=>void }) {
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'rgba(42,16,32,.55)',backdropFilter:'blur(5px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+      <div onClick={e=>e.stopPropagation()} style={{maxWidth:344,background:'#fff',borderRadius:26,padding:'26px 22px 22px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
+        <div style={{fontSize:54,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
+        <div style={{fontSize:21,fontWeight:900,color:C.bordeaux,marginTop:8}}>Coucou Mel 👋</div>
+        <div style={{fontSize:14,color:'#4A2A3D',lineHeight:1.65,marginTop:14,textAlign:'left'}}>
+          On est <b>dimanche, 5h37 du matin</b> 😵‍💫 — le « jour de repos », paraît-il.<br/><br/>
+          Pendant que tu dors (sagement), David et son robot codent comme des tarés sur Clutch… pour <b>toi</b> 🤓💚<br/><br/>
+          Si tu reçois nos trucs à des heures pas humaines : c'est normal, on dort jamais 💤🚫<br/><br/>
+          Ce petit mot <b>s'auto-détruit</b> au prochain build — t'es la <b>seule</b> à le voir 🤫
+        </div>
+        <div style={{fontSize:13,fontStyle:'italic',color:C.bordeauxLight,marginTop:16,lineHeight:1.5}}>Bon dimanche, la cheffe 😘<br/>— L'équipe nocturne (David &amp; Claude 🤖)</div>
+        <button onClick={onClose} style={{marginTop:20,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>Haha 😂 merci les fous</button>
+      </div>
+      <style>{`@keyframes melBounce{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-11px) rotate(7deg)}}`}</style>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
 // QuickSOS — bouclier de sécurité DISCRET, visible UNIQUEMENT pendant un RDV actif.
 // Demande David : la sécurité doit être à 1 geste PENDANT le rendez-vous (pas enfoui dans le profil).
 // Garde-fou anti-faux-positif : le bouclier ouvre une feuille → 1 tap envoie (rapide mais délibéré).
@@ -7238,6 +7262,11 @@ export default function App2() {
     try { localStorage.setItem('clutch_completedIds', JSON.stringify([...completedIds.current])) } catch {}
   }
   const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
+  // 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build). Visible que pour elle, 1 fois.
+  const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'
+  const [showMelHello,setShowMelHello] = useState(false)
+  useEffect(()=>{ if(user?.id===MEL_ID){ try{ if(!localStorage.getItem('mel_hello_v1')) setShowMelHello(true) }catch{ setShowMelHello(true) } } }, [user?.id])
+
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
   const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number}|null>(null)
@@ -10086,6 +10115,8 @@ export default function App2() {
             background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
           }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
+          {/* 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build) */}
+          {showMelHello && <MelHello onClose={()=>{ setShowMelHello(false); try{localStorage.setItem('mel_hello_v1','1')}catch{} }}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (
             <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.6)',backdropFilter:'blur(8px)'}} onClick={()=>setCounterClutchId(null)}>

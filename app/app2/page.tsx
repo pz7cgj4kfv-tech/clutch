@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10D'  // Versionnage HEXADÉCIMAL. ~269e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10E'  // Versionnage HEXADÉCIMAL. ~270e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2717,7 +2717,7 @@ const GROUP_EVENTS_DEMO = [
 
 const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','🎬','🎨','🌿','🎲','🚴','🍺','💻','🌙','🎵','🧆','🏊','⛰️']
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, isCertified }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2727,6 +2727,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   onPenalty?:(r:PenaltyReason)=>void;
   onOpenProfile?:(name:string,bio:string,photo:string|null)=>void;
   userId?:string;
+  isCertified?:boolean;
 }) {
   const t = useT(lang)
   const [dbEvents, setDbEvents] = useState<any[]>([])
@@ -3025,6 +3026,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <button onClick={()=>{ const next=myPartners.filter((x:any)=>x.id!==p.id); setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{} }} style={{width:'100%',marginTop:11,padding:'9px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Supprimer ce groupe</button>
             </div>
           ))}
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,margin:'4px 2px 10px'}}>Partenaires & clubs officiels</div>
           {PARTNERS_MOCK.map(p=>{ const on=followedPartners.has(p.id); return (
             <div key={p.id} style={{background:C.bgCard,border:`1px solid ${on?C.plum:C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:11,boxShadow:'0 2px 10px rgba(83,41,67,.05)'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
@@ -3131,7 +3133,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'88vh',overflowY:'auto',background:C.bg,borderTopLeftRadius:22,borderTopRightRadius:22,padding:`18px 18px calc(var(--sab) + 20px)`}}>
             <div style={{width:38,height:4,borderRadius:2,background:C.border,margin:'0 auto 14px'}}/>
             <div style={{fontSize:18,fontWeight:900,color:C.white,marginBottom:4}}>Créer mon groupe</div>
-            <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:16,lineHeight:1.5}}>Un club, un collectif, une activité récurrente. Les gens te suivent → ils sont notifiés de tes events.</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12,lineHeight:1.5}}>Un club, un collectif, une activité récurrente. Les gens te suivent → ils sont notifiés de tes events.</div>
+            {/* Anti-malveillance : publier = profil vérifié (demande David « que les gens ne mettent pas n'importe quoi ») */}
+            <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',borderRadius:12,marginBottom:16,
+              background:isCertified?`${C.green}12`:`${C.plum}0a`,border:`1px solid ${isCertified?`${C.green}55`:C.border}`}}>
+              <span style={{fontSize:17}}>{isCertified?'✓':'🔒'}</span>
+              <div style={{flex:1,fontSize:11,lineHeight:1.45,color:isCertified?C.green:C.whiteMid}}>
+                {isCertified?<><b>Profil vérifié</b> — tu peux publier en confiance.</>:<>Pour <b>publier publiquement</b>, ton profil devra être <b style={{color:C.plum}}>vérifié</b> (certification selfie). On garde Clutch sain.</>}
+              </div>
+            </div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
               {CP_EMOJIS.map(e=><span key={e} onClick={()=>setCpEmoji(e)} style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'pointer',border:`1.5px solid ${cpEmoji===e?C.plum:C.border}`,background:cpEmoji===e?`${C.plum}0d`:'transparent'}}>{e}</span>)}
             </div>
@@ -9407,6 +9417,7 @@ export default function App2() {
                 onClearInitialEvent={()=>setOpenEventId(null)}
                 onPenalty={applyPenalty}
                 userId={user?.id}
+                isCertified={!!(user as any)?.is_certified}
                 onOpenProfile={(name,bio,photo)=>{
                   // Profil créateur enrichi (Anaïs = isCreator:true, allowClutch:false par défaut)
                   const isAnais = name.toLowerCase().includes('anaïs')||name.toLowerCase().includes('anais')

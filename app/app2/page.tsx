@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x104'  // Versionnage HEXADÉCIMAL. ~260e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x105'  // Versionnage HEXADÉCIMAL. ~261e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6394,17 +6394,11 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
 function MelHello({ onClose }:{ onClose:()=>void }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'rgba(42,16,32,.55)',backdropFilter:'blur(5px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-      <div onClick={e=>e.stopPropagation()} style={{maxWidth:344,background:'#fff',borderRadius:26,padding:'26px 22px 22px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
-        <div style={{fontSize:54,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
-        <div style={{fontSize:21,fontWeight:900,color:C.bordeaux,marginTop:8}}>Coucou Mel 👋</div>
-        <div style={{fontSize:14,color:'#4A2A3D',lineHeight:1.65,marginTop:14,textAlign:'left'}}>
-          On est <b>dimanche, 5h37 du matin</b> 😵‍💫 — le « jour de repos », paraît-il.<br/><br/>
-          Pendant que tu dors (sagement), David et son robot codent comme des tarés sur Clutch… pour <b>toi</b> 🤓💚<br/><br/>
-          Si tu reçois nos trucs à des heures pas humaines : c'est normal, on dort jamais 💤🚫<br/><br/>
-          Ce petit mot <b>s'auto-détruit</b> au prochain build — t'es la <b>seule</b> à le voir 🤫
-        </div>
-        <div style={{fontSize:13,fontStyle:'italic',color:C.bordeauxLight,marginTop:16,lineHeight:1.5}}>Bon dimanche, la cheffe 😘<br/>— L'équipe nocturne (David &amp; Claude 🤖)</div>
-        <button onClick={onClose} style={{marginTop:20,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>Haha 😂 merci les fous</button>
+      <div onClick={e=>e.stopPropagation()} style={{maxWidth:312,background:'#fff',borderRadius:26,padding:'32px 24px 24px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
+        <div style={{fontSize:62,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
+        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Dimanche, jour de repos</div>
+        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Ce petit mot s'autodétruira au prochain build.<br/><br/>Bisous 💋</div>
+        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>😂</button>
       </div>
       <style>{`@keyframes melBounce{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-11px) rotate(7deg)}}`}</style>
     </div>

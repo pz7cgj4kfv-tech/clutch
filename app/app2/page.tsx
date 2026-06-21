@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFC'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~252e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
+const V = '0xFD'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~253e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC, 0xFD...). NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4933,6 +4933,41 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [advOpen, setAdvOpen] = useState<string|null>(null)
   const toggleAdv = (k:string) => setAdvOpen(o=>o===k?null:k)
 
+  // ── NIVEAU 3 « matrice dans la matrice » ────────────────────────────────
+  // Fil rouge : « le profil est l'équation, le rendez-vous la solution » — tout pousse DEHORS.
+  // Tempérament de rencontre (mini-quiz ludique, skippable, vit sous « Mon Clutch · l'algo »)
+  const TEMP_ARCH: Record<string,{e:string,l:string,d:string}> = {
+    explorateur:{e:'🧭',l:'Explorateur·rice',d:'tu cherches la nouveauté, les gens qui sortent du cadre'},
+    pose:       {e:'🌿',l:'Posé·e',        d:'tu vises le calme, la profondeur, le vrai'},
+    spontane:   {e:'⚡',l:'Spontané·e',     d:'l\'instant te parle — décider vite, y aller'},
+    solaire:    {e:'☀️',l:'Solaire',        d:'tu apportes la chaleur, le lien facile'},
+  }
+  const TEMP_Q = [
+    {q:'Un soir libre s\'ouvre devant toi…', a:{k:'spontane',e:'⚡',l:'tu sors là, maintenant'}, b:{k:'pose',e:'🌿',l:'tu choisis un truc tranquille'}},
+    {q:'Tu accroches plus vite avec…',        a:{k:'explorateur',e:'🧭',l:'quelqu\'un qui te surprend'}, b:{k:'solaire',e:'☀️',l:'quelqu\'un de chaleureux'}},
+    {q:'Le lieu idéal d\'un premier Clutch ?', a:{k:'explorateur',e:'🧭',l:'un endroit inconnu'}, b:{k:'pose',e:'🌿',l:'ton café de confiance'}},
+    {q:'On te décrit souvent comme…',          a:{k:'solaire',e:'☀️',l:'le soleil de la soirée'}, b:{k:'spontane',e:'⚡',l:'imprévisible, vivant·e'}},
+    {q:'Ce qui te ferait dire oui en 2 sec ?', a:{k:'spontane',e:'⚡',l:'« on y va maintenant »'}, b:{k:'explorateur',e:'🧭',l:'« j\'ai un truc à te montrer »'}},
+  ]
+  const tempKey = `clutch_temperament_${user.id}`
+  const [temperament, setTemperament] = useState<string|null>(()=>{ try{return JSON.parse(localStorage.getItem(tempKey)||'{}').result||null}catch{return null} })
+  const [tempStep, setTempStep] = useState(0)
+  const [tempScore, setTempScore] = useState<Record<string,number>>({})
+  const answerTemp = (k:string) => {
+    const ns = {...tempScore, [k]:(tempScore[k]||0)+1}
+    if (tempStep+1 >= TEMP_Q.length) {
+      const res = Object.entries(ns).sort((a,b)=>b[1]-a[1])[0][0]
+      setTemperament(res); try{localStorage.setItem(tempKey,JSON.stringify({result:res}))}catch{}
+      setTempStep(0); setTempScore({})
+      showToast('✦ Tempérament : '+TEMP_ARCH[res].l, C.green)
+    } else { setTempScore(ns); setTempStep(s=>s+1) }
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(10)
+  }
+  const retakeTemp = () => { setTemperament(null); setTempStep(0); setTempScore({}); try{localStorage.removeItem(tempKey)}catch{} }
+  // Accueil contextuel selon le moment de journée (chaleur, pas manipulation)
+  const hourNow = (typeof Date!=='undefined') ? new Date().getHours() : 12
+  const momentGreeting = hourNow>=18||hourNow<4 ? 'Ce soir, qu\'est-ce qui te tente ?' : hourNow>=12 ? 'Cet aprèm, tu cherches quoi ?' : 'Ce matin, ouvert·e à quoi ?'
+
   const handleRetirerDispo = async () => {
     const { error } = await supabase.from('profiles').update({
       is_available: false,
@@ -5693,6 +5728,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
         <PickRow label="Distance" badge="↺ souple" val={seekDist} onPick={k=>saveSeek({dist:k},[setSeekDist,k])}
           opts={[{k:'quartier',l:'🚶 Mon quartier'},{k:'ville',l:'🏙 Dans la ville'},{k:'region',l:'🚆 Toute la région'}]}/>
+        <DRow label="🛡️ Comment marchent les zones" value="Sécurité" onTap={()=>setProfilePage('distance_zones')}/>
       </div>
       <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,padding:'2px 2px 8px'}}>📌 PERSISTANT (qui tu es)</div>
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
@@ -5734,6 +5770,11 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
         <div style={{fontSize:10,color:C.whiteMid,marginTop:14,opacity:.8}}>{algoTrained>0?`🪄 ${algoTrained} réponse${algoTrained>1?'s':''} — Clutch te comprend mieux`:'Plus tu réponds, mieux Clutch te comprend 🪄'}</div>
       </div>
+      {/* Niveau 3 : tempérament + transparence */}
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+        <DRow label="Mon tempérament de rencontre" value={temperament?`${TEMP_ARCH[temperament].e} ${TEMP_ARCH[temperament].l}`:'À découvrir'} onTap={()=>setProfilePage('temperament')}/>
+        <DRow label="Pourquoi on me propose des gens" value="Transparence" onTap={()=>setProfilePage('why')}/>
+      </div>
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
         <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
         {advOpen==='algo' && <div style={{borderTop:`1px solid ${C.border}`}}>
@@ -5763,7 +5804,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     return (
     <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
       <DRow label="Abonnement" value="Gratuit · Premium" onTap={()=>setProfilePage('subscription')}/>
-      <DRow label="Ma fiabilité" value={lvl} onTap={()=>showToast(`Ta fiabilité : ${lvl}`,C.green)}/>
+      <DRow label="Ma fiabilité" value={lvl} onTap={()=>setProfilePage('fiabilite')}/>
       <DRow label="Préférences & notifications" value="Langue, réception…" onTap={()=>setProfilePage('preferences')}/>
       <DRow label="Favoris" value={favorites.length?`${favorites.length}`:'0'} onTap={()=>setProfilePage('favorites')}/>
       <DRow label="Langue" value={lang==='fr'?'🇨🇭 Français':'🇬🇧 English'} onTap={()=>setLang(lang==='fr'?'en':'fr')}/>
@@ -5774,6 +5815,111 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )}
 
+  // ════ NIVEAU 3 (poupées russes profondes) ════
+
+  // Mon compte → Ma fiabilité → « Comment elle se construit » (pédagogique, jamais punitif)
+  const PageFiabilite = () => {
+    const rs = user.reliability_score ?? 100
+    const lvl = rs>=90?{e:'🏆',t:'Exemplaire',c:C.green}:rs>=75?{e:'⭐',t:'Très fiable',c:C.green}:rs>=50?{e:'🟢',t:'Fiable',c:C.green}:rs>=30?{e:'🌿',t:'En construction',c:C.orange}:{e:'🌱',t:'Nouveau membre',c:C.orange}
+    const pillars = [
+      {e:'⏱️',t:'Ponctualité',d:'arriver à l\'heure à tes rendez-vous'},
+      {e:'📍',t:'Présence',d:'venir vraiment — ne jamais poser de lapin 🐰'},
+      {e:'💛',t:'Respect',d:'prévenir tôt si tu dois annuler, rester correct·e'},
+    ]
+    return (
+      <div>
+        <div style={{textAlign:'center',padding:'8px 0 16px'}}>
+          <div style={{fontSize:40}}>{lvl.e}</div>
+          <div style={{fontSize:18,fontWeight:900,color:lvl.c,marginTop:4}}>{lvl.t}</div>
+          <div style={{maxWidth:240,margin:'10px auto 0',height:6,background:C.border,borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',width:`${rs}%`,background:lvl.c,borderRadius:3}}/></div>
+        </div>
+        <NoteBox>Ta fiabilité, c'est la <b style={{color:C.white}}>confiance</b> que les autres peuvent te faire. Elle se construit à chaque rendez-vous — <b style={{color:C.white}}>elle n'est jamais une punition</b>, juste le reflet de ta parole tenue.</NoteBox>
+        <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',textTransform:'uppercase',margin:'4px 2px 8px'}}>Elle repose sur 3 choses</div>
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+          {pillars.map((p,i)=>(
+            <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'13px 14px',borderBottom:i<2?`1px solid ${C.border}`:'none'}}>
+              <span style={{fontSize:20}}>{p.e}</span>
+              <div><div style={{fontSize:14,fontWeight:700,color:C.white}}>{p.t}</div><div style={{fontSize:12,color:C.whiteMid,marginTop:1}}>{p.d}</div></div>
+            </div>
+          ))}
+        </div>
+        <NoteBox tone="green">↑ <b>Pour monter :</b> honore tes rendez-vous, arrive à l'heure, et préviens dès que possible si un imprévu arrive. C'est tout. La régularité fait le reste.</NoteBox>
+      </div>
+    )
+  }
+
+  // Mon Clutch → Mon tempérament de rencontre (mini-quiz ludique)
+  const PageTemperament = () => {
+    if (temperament) { const a=TEMP_ARCH[temperament]; return (
+      <div>
+        <div style={{textAlign:'center',padding:'14px 0'}}>
+          <div style={{fontSize:48}}>{a.e}</div>
+          <div style={{fontSize:20,fontWeight:900,color:C.white,marginTop:6}}>{a.l}</div>
+          <div style={{fontSize:13,color:C.whiteMid,maxWidth:260,margin:'8px auto 0',lineHeight:1.5}}>{a.d}</div>
+        </div>
+        <NoteBox>Ton tempérament colore subtilement la façon dont Clutch te présente — et comment il choisit qui te proposer. <b style={{color:C.white}}>Aucune étiquette imposée</b> : c'est une nuance, pas une boîte.</NoteBox>
+        <button onClick={retakeTemp} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px solid ${C.border}`,background:'transparent',color:C.salmon,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>↺ Refaire le test</button>
+      </div>
+    )}
+    const Q = TEMP_Q[tempStep]
+    return (
+      <div>
+        <div style={{display:'flex',gap:5,justifyContent:'center',marginBottom:18}}>
+          {TEMP_Q.map((_,i)=><div key={i} style={{width:i===tempStep?22:8,height:8,borderRadius:4,background:i<=tempStep?C.orange:C.border,transition:'all .2s'}}/>)}
+        </div>
+        <div style={{fontSize:18,fontWeight:800,color:C.white,textAlign:'center',padding:'0 10px 22px',lineHeight:1.35}}>{Q.q}</div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {[Q.a,Q.b].map((opt,i)=>(
+            <button key={i} onClick={()=>answerTemp(opt.k)} style={{display:'flex',alignItems:'center',gap:13,padding:'16px 16px',borderRadius:16,border:`1.5px solid ${C.border}`,background:C.bgCard,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              <span style={{fontSize:24}}>{opt.e}</span><span style={{fontSize:14,fontWeight:600,color:C.white,lineHeight:1.3}}>{opt.l}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{textAlign:'center',marginTop:18}}><span onClick={()=>{setProfilePage(null)}} style={{fontSize:12,color:C.whiteMid,cursor:'pointer',textDecoration:'underline'}}>Passer pour l'instant</span></div>
+      </div>
+    )
+  }
+
+  // Mon Clutch → « Pourquoi on te propose des gens » (transparence anti-boîte-noire)
+  const PageWhy = () => {
+    const reasons = [
+      {e:'📍',t:'Vous êtes proches',d:'dans la même zone de la ville, là, maintenant'},
+      {e:'🕐',t:'Au même moment',d:'vos fenêtres de disponibilité se croisent (la règle des 18h)'},
+      {e:'🧩',t:'Un terrain commun',d:'un intérêt, un mode, une envie qui se répondent'},
+      {e:'🏆',t:'La confiance',d:'une fiabilité qui rend le vrai rendez-vous probable'},
+    ]
+    return (
+      <div>
+        <NoteBox>Clutch ne te montre jamais quelqu'un « au hasard » ni pour te <b style={{color:C.white}}>garder sur l'écran</b>. Voici les seules choses qui comptent :</NoteBox>
+        <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+          {reasons.map((r,i)=>(
+            <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'13px 14px',borderBottom:i<3?`1px solid ${C.border}`:'none'}}>
+              <span style={{fontSize:20}}>{r.e}</span>
+              <div><div style={{fontSize:14,fontWeight:700,color:C.white}}>{r.t}</div><div style={{fontSize:12,color:C.whiteMid,marginTop:1}}>{r.d}</div></div>
+            </div>
+          ))}
+        </div>
+        <NoteBox tone="green">🔒 Ce qu'on ne fait <b>jamais</b> : te rendre accro, te cacher des gens pour te faire payer, ou jouer sur ta solitude. L'algo a un seul but — <b>t'envoyer dehors, vers quelqu'un de vrai.</b></NoteBox>
+      </div>
+    )
+  }
+
+  // Ce que je cherche → « Comment marchent les zones » (rassurance sécurité)
+  const PageDistanceZones = () => (
+    <div>
+      <NoteBox tone="green">🛡️ <b>On ne montre JAMAIS où sont les gens.</b> Jamais une position, jamais une distance à une personne. Seulement des <b style={{color:C.white}}>zones de la ville</b>. Personne ne peut te pister.</NoteBox>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        {[{e:'🚶',t:'Mon quartier',d:'à quelques minutes à pied — pour du vraiment spontané'},{e:'🏙',t:'Dans la ville',d:'tout Lausanne — le bon équilibre'},{e:'🚆',t:'Toute la région',d:'plus large, pour ne rien rater autour'}].map((z,i)=>(
+          <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'13px 14px',borderBottom:i<2?`1px solid ${C.border}`:'none'}}>
+            <span style={{fontSize:20}}>{z.e}</span>
+            <div><div style={{fontSize:14,fontWeight:700,color:C.white}}>{z.t}</div><div style={{fontSize:12,color:C.whiteMid,marginTop:1}}>{z.d}</div></div>
+          </div>
+        ))}
+      </div>
+      <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',marginTop:14,lineHeight:1.5,opacity:.85}}>Le radar d'un rendez-vous montre le <b style={{color:C.salmon}}>temps</b> qui te sépare du lieu — jamais la distance à la personne.</div>
+    </div>
+  )
+
   // ── Sous-page container ─────────────────────────────────────
   const subPageTitles: Record<string,string> = {
     edit_profil:'Moi', seeking:'Ce que je cherche',
@@ -5782,6 +5928,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     security:'Sécurité & SOS', legal:'Légal', contact:'Nous contacter',
     cherche:'Ce que je cherche', algo:'Mon Clutch · l\'algo',
     secu:'Sécurité & confidentialité', compte:'Mon compte', moment:'Mode du moment 🌙',
+    fiabilite:'Ma fiabilité', temperament:'Mon tempérament', why:'Pourquoi ces propositions', distance_zones:'Les zones',
   }
   // ⚠️ On stocke les FONCTIONS (pas <Page/>) et on appelle la sélectionnée au rendu.
   // Sinon chaque frappe recrée le composant → input démonté → le clavier se ferme. (Aucun hook dans ces pages.)
@@ -5800,6 +5947,10 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     secu: PageSecu,
     compte: PageCompte,
     moment: PageMoment,
+    fiabilite: PageFiabilite,
+    temperament: PageTemperament,
+    why: PageWhy,
+    distance_zones: PageDistanceZones,
   }
 
   return (
@@ -5891,6 +6042,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             <div style={{fontSize:11,fontWeight:900,letterSpacing:'.04em',textTransform:'uppercase',color:C.salmon}}>⚡ Ce que je cherche en ce moment</div>
             {modesResetLabel() && <span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:10,padding:'2px 8px',whiteSpace:'nowrap'}}>{modesResetLabel()}</span>}
           </div>
+          <div style={{fontSize:12,color:C.whiteMid,marginTop:-4,marginBottom:9,fontStyle:'italic'}}>{momentGreeting}</div>
           <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
             {MODES.map(m=>{const on=ephModes.includes(m.k);return(
               <span key={m.k} onClick={()=>toggleMode(m.k)} style={{fontSize:12,fontWeight:700,padding:'6px 11px',borderRadius:20,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,color:on?'#fff':C.whiteMid,background:on?C.orange:'transparent',transition:'all .15s'}}>{m.e} {m.l}</span>

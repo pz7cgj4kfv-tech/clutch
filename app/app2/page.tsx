@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x100'  // Versionnage HEXADÉCIMAL. ~256e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x101'  // Versionnage HEXADÉCIMAL. ~257e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7353,6 +7353,26 @@ export default function App2() {
   useEffect(() => {
     try { localStorage.setItem('clutch_registered_events', JSON.stringify([...registeredEvents])) } catch {}
   }, [registeredEvents])
+  // 🔧 HYDRATATION depuis le DB (source de vérité) — corrige « inscrit à un event mais il n'apparaît pas »
+  // Le Set venait UNIQUEMENT du localStorage → il dérivait de event_participants (réinstall, autre device,
+  // flux liste d'attente → place libérée, reset…). On resynchronise les VRAIS events (UUID) sur le DB,
+  // tout en gardant les events locaux/mock (non-UUID). Règle CLAUDE.md : la vérité est en DB, pas en cache JS.
+  useEffect(() => {
+    const uid = user?.id
+    if (!uid) return
+    let cancelled = false
+    supabase.from('event_participants').select('event_id').eq('user_id', uid).then(({ data }: any) => {
+      if (cancelled || !data) return
+      const isUuid = (s:any) => typeof s==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
+      const dbIds = data.map((d:any)=>d.event_id).filter(isUuid)
+      setRegisteredEvents(prev => {
+        const merged = new Set<string>(dbIds)                       // vrais events = vérité DB
+        prev.forEach(id => { if (!isUuid(id)) merged.add(id) })      // garde les events locaux/mock
+        return merged
+      })
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
   // Persist waitlist to localStorage
   useEffect(() => {
     try { localStorage.setItem('clutch_waitlist', JSON.stringify([...waitlistEvIds])) } catch {}

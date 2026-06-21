@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x119'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2716,9 +2716,28 @@ const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','
 // ── Inscriptions aux événements : durée + anti-chevauchement (décision David 21.06) ──
 // (a) plafond 2 events actifs · (b) durée obligatoire à la création (défaut 2h si inconnue)
 const MAX_ACTIVE_EVENTS = 2
-const EVENT_DUR_OPTS = [{h:1,label:'1h'},{h:2,label:'2h'},{h:3,label:'3h'},{h:5,label:'Soirée'}]
-const eventDurH = (ev:any):number => { const d=Number(ev?.durationH); return d>0 ? d : 2 } // défaut 2h
-const eventDurLabel = (ev:any):string => { const d=eventDurH(ev); return d>=5?'Soirée':`~${d}h` }
+const EVENT_DUR_OPTS = [{h:1,label:'1h'},{h:2,label:'2h'},{h:3,label:'3h'},{h:5,label:'4h+'}]
+// Durée : explicite si fournie, sinon INFÉRÉE du type d'event (durées variées & sensées pour les tests de chevauchement)
+const eventDurH = (ev:any):number => {
+  const d=Number(ev?.durationH); if(d>0) return d
+  const s = ((ev?.tags||[]).join(' ')+' '+(ev?.title||'')).toLowerCase()
+  if(/club|soir|nuit|jazz|concert|\bdj\b|techno|fête|danse/.test(s)) return 4
+  if(/brunch|rando|balade|vélo|velo|escalade|atelier|cuisine|marché|marche/.test(s)) return 3
+  if(/café|cafe|verre|apéro|apero|échec|echec|lecture|littér/.test(s)) return 1
+  return 2
+}
+const eventDurLabel = (ev:any):string => { const d=eventDurH(ev); return d>=5?'4h+':`~${d}h` }
+// Corrige le jour de la semaine d'une date absolue (« Sam 21 juin » → « Dim 21 juin »). Laisse « Ce soir »/« Demain » tels quels.
+const FR_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+const FR_WD = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+function fixEventDate(s:string|undefined):string {
+  if(!s) return s||''
+  const m = String(s).match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/i)
+  if(!m) return s
+  const day=Number(m[1]); const mon=FR_MONTHS.indexOf(m[2].toLowerCase()); if(mon<0) return s
+  const d=new Date(new Date().getFullYear(), mon, day); const wd=FR_WD[d.getDay()]
+  return s.replace(/^(lun\.?|mar\.?|mer\.?|jeu\.?|ven\.?|sam\.?|dim\.?|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*/i,'').replace(/^/,`${wd} `)
+}
 // Extrait l'heure de début en minutes depuis minuit depuis une string libre ("19:30", "19h30", "Ce soir 20h")
 function parseEventMinutes(t:string|undefined):number|null {
   if(!t) return null
@@ -2815,15 +2834,21 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvEmoji, setNewEvEmoji] = useState('🍷')
   const [newEvTitle, setNewEvTitle] = useState('')
   const [newEvLieu, setNewEvLieu] = useState('')
-  const [newEvTime, setNewEvTime] = useState('')
+  const [newEvTime, setNewEvTime] = useState('20:00')   // molette native (input type=time)
+  const [newEvDate, setNewEvDate] = useState('Aujourd\'hui') // Aujourd'hui / Demain (contraint)
   const [newEvDur, setNewEvDur] = useState(2) // durée en heures (David : obligatoire)
   const [newEvMax, setNewEvMax] = useState(6)
   const [newEvDesc, setNewEvDesc] = useState('')
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [confirmCloseEv, setConfirmCloseEv] = useState(false)
+  const newEvValid = !!(newEvTitle.trim() && newEvLieu.trim() && newEvTime.trim() && newEvDesc.trim()) // desc obligatoire (David)
+  const newEvDirty = !!(newEvTitle || newEvLieu || newEvDesc) // pour confirmer la fermeture
+  const tryCloseCreate = () => { if (newEvDirty && !creating) setConfirmCloseEv(true); else setShowCreateGroup(false) }
+  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2) }
 
   const createGroupEvent = async () => {
-    if (!newEvTitle.trim() || !newEvLieu.trim() || !newEvTime.trim()) return
+    if (!newEvValid) return
     setCreating(true)
     let realId = `g-user-${Date.now()}`
     // Persistance Supabase (additif). Si la migration events_mvp n'est pas encore
@@ -2832,7 +2857,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       if (userId) {
         const { data: ins } = await supabase.from('events').insert({
           title: newEvTitle.trim(), emoji: newEvEmoji, lieu: newEvLieu.trim(),
-          event_time: newEvTime.trim(), event_date: 'Ce soir', spots: newEvMax,
+          event_time: newEvTime.trim(), event_date: newEvDate, spots: newEvMax,
           description: newEvDesc.trim() || 'Événement créé sur Clutch.',
           tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'pending',
           active: true, created_by: userId, creator: 'Toi',
@@ -2853,7 +2878,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       creatorBio: 'Organisateur·ice de cet événement',
       creatorPhoto: null,
       certified: false,
-      date: 'Ce soir',
+      date: newEvDate,
       time: newEvTime.trim(),
       lieu: newEvLieu.trim(),
       spots: newEvMax,
@@ -2874,7 +2899,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(''); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
@@ -2905,6 +2930,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const CP_EMOJIS=['🎉','🎶','🏓','🎷','🥾','🍷','🎨','⚽','🧘','🎲','🍽️','👶','🎸','🎬','📚','🚲']
   const CP_ZONES=['Lausanne centre','Vieille Ville','Flon','Ouchy','Région Lausanne','Lavaux','Renens / Ouest','Autre']
   const [registering, setRegistering] = useState(false)
+  const [regBlock, setRegBlock] = useState('') // alerte inline quand l'inscription est bloquée (plafond/chevauchement)
+  useEffect(()=>{ setRegBlock('') }, [selEv?.id]) // reset l'alerte à l'ouverture d'un autre event
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
   const evTouchStartX = useRef<number|null>(null)
   const [unregConfirmId, setUnregConfirmId] = useState<string|null>(null)
@@ -2964,7 +2991,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     // (a) Plafond : max 2 inscriptions actives simultanées
     const myActive = events.filter((e:any)=>registered.has(e.id))
     if (myActive.length >= MAX_ACTIVE_EVENTS) {
-      showToast?.(EN?`Max ${MAX_ACTIVE_EVENTS} events at once — leave one first`:`Max ${MAX_ACTIVE_EVENTS} événements à la fois — désinscris-toi d'un d'abord`, C.orange)
+      const msg = EN?`You're already in ${MAX_ACTIVE_EVENTS} events — leave one to join another.`:`Tu es déjà inscrit·e à ${MAX_ACTIVE_EVENTS} événements — désinscris-toi d'un pour en rejoindre un autre.`
+      setRegBlock(msg); showToast?.(msg, C.orange); setTimeout(()=>setRegBlock(''),5000)
       return
     }
     // (b) Anti-chevauchement : même jour + créneaux [début, début+durée] qui se recouvrent
@@ -2978,10 +3006,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         return aStart < bEnd && bStart < aEnd   // recouvrement
       })
       if (clash) {
-        showToast?.(EN?`Overlaps with "${clash.title}" (${clash.time})`:`Chevauche « ${clash.title} » (${clash.time})`, C.orange)
+        const msg = EN?`Overlaps with "${clash.title}" (${clash.time}). Leave it first.`:`Chevauche « ${clash.title} » (${clash.time}). Désinscris-toi d'abord.`
+        setRegBlock(msg); showToast?.(msg, C.orange); setTimeout(()=>setRegBlock(''),5000)
         return
       }
     }
+    setRegBlock('')
     setRegistering(true)
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
     try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
@@ -3141,7 +3171,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {filteredEvs.length===0 && (
           <div style={{textAlign:'center',padding:'50px 20px',color:C.whiteMid}}>
             <div style={{fontSize:28,marginBottom:8}}>📅</div>
-            <div style={{fontSize:13,fontWeight:700,color:C.white}}>No events in this category</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.white}}>{lang==='en'?'No events in this category':'Aucun événement dans cette catégorie'}</div>
           </div>
         )}
         {/* 2 événements par ligne (demande Mel) — grandes photos qui donnent envie, infos dessus ; clic → détail riche */}
@@ -3158,18 +3188,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,.1) 45%,transparent 72%)'}}/>
               {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}
               {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
+              {/* Titre seul sur la photo — on laisse la photo respirer (David : heure+lieu vont SOUS la photo) */}
               <div style={{position:'absolute',bottom:7,left:9,right:9}}>
-                {/* Infos qui claquent sur la photo : heure BIEN visible + lieu (David) */}
-                <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginBottom:4}}>
-                  <span style={{fontSize:11.5,fontWeight:900,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time} · {eventDurLabel(ev)}</span>
-                  {ev.lieu && <span style={{fontSize:10.5,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px',maxWidth:'62%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'').split(',')[0]}</span>}
-                </div>
                 <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
               </div>
             </div>
-            {/* Footer compact : date + jauge de places */}
+            {/* Footer : heure + durée + lieu SOUS la photo (demande David) + jauge */}
             <div style={{padding:'8px 10px 9px'}}>
-              <div style={{fontSize:10,color:C.whiteMid,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:6}}>📅 {ev.date}</div>
+              <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {fixEventDate(ev.date)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
+              <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'—').split(',')[0]}</div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontSize:10,fontWeight:800,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
                 <div style={{flex:1,height:3.5,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green}}/></div>
@@ -3251,14 +3278,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.65)',backdropFilter:'blur(4px)'}} onClick={()=>setSelEv(null)}/>
           {/* Sheet = flex column, hauteur fixe, scroll sur le corps uniquement */}
-          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'88vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
             {/* Header fixe — padding safe-area pour ne pas passer sous l'encoche */}
             <div style={{flexShrink:0,padding:'calc(var(--sat) + 14px) 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:26}}>{selEv.emoji}</span>
                 <div>
                   <div style={{fontSize:15,fontWeight:900}}>{selEv.title}</div>
-                  <div style={{fontSize:11,color:C.whiteMid}}>{selEv.date} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
+                  <div style={{fontSize:11,color:C.whiteMid}}>{fixEventDate(selEv.date)} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
                 </div>
               </div>
               <button onClick={()=>setSelEv(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
@@ -3266,7 +3293,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             {/* Corps scrollable — flex:'1 1 0' + overflowY:'scroll' obligatoires sur iOS */}
             <div style={{flex:'1 1 0',overflowY:'scroll',WebkitOverflowScrolling:'touch',padding:'12px 20px 100px'}}>
               <div style={{fontSize:11,color:C.whiteMid,marginBottom:14}}>{selEv.lieu}</div>
-              {selEv.certified&&<div style={{display:'inline-flex',alignItems:'center',gap:5,background:C.orangeFaint,color:C.orange,border:`1px solid ${C.orange}44`,borderRadius:8,padding:'3px 8px',fontSize:10,fontWeight:800,marginBottom:14}}>✓ CERTIFIED</div>}
+              {selEv.certified&&<div style={{display:'inline-flex',alignItems:'center',gap:5,background:C.orangeFaint,color:C.orange,border:`1px solid ${C.orange}44`,borderRadius:8,padding:'3px 8px',fontSize:10,fontWeight:800,marginBottom:14}}>✓ {lang==='en'?'CERTIFIED':'CERTIFIÉ'}</div>}
 
               {/* Photos de l'événement — galerie si disponible */}
               {/* ── Galerie photos événement — full-width avec navigation ── */}
@@ -3313,7 +3340,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{flex:1}}>
                   <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{selEv.creator}
                     <span style={{fontSize:9,fontWeight:900,padding:'1px 6px',borderRadius:10,background:'#FF5FA222',color:'#FF5FA2',border:'1px solid #FF5FA244'}}>✦ CD</span>
-                    <span style={{fontSize:10,color:C.whiteMid}}>· Organizer</span></div>
+                    <span style={{fontSize:10,color:C.whiteMid}}>· {lang==='en'?'Organizer':'Organisateur·ice'}</span></div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{selEv.creatorBio}</div>
                 </div>
                 <span style={{fontSize:11,color:C.salmon}}>→</span>
@@ -3322,7 +3349,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{fontSize:13,color:C.whiteMid,lineHeight:1.7,marginBottom:12}}>{selEv.description}</div>
 
               <div style={{background:C.bgCard,borderRadius:12,padding:'10px 14px',marginBottom:12}}>
-                {[{icon:'👥',l:'Spots',v:`${selEv.taken}/${selEv.spots} registered`},{icon:'💰',l:'Price',v:selEv.price},{icon:'🎒',l:'Bring',v:selEv.bring}].map(r=>(
+                {[{icon:'👥',l:lang==='en'?'Spots':'Places',v:`${selEv.taken}/${selEv.spots} ${lang==='en'?'registered':'inscrit·es'}`},{icon:'💰',l:lang==='en'?'Price':'Prix',v:selEv.price},{icon:'🎒',l:lang==='en'?'Bring':'À amener',v:selEv.bring}].map(r=>(
                   <div key={r.icon} style={{display:'flex',gap:8,alignItems:'flex-start',padding:'3px 0'}}>
                     <span style={{fontSize:13,width:18}}>{r.icon}</span>
                     <span style={{fontSize:11,color:C.whiteMid,width:56,flexShrink:0}}>{r.l}</span>
@@ -3490,13 +3517,19 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                     </button>
                   )
                 ) : (
+                  <>
+                  {regBlock && <div style={{display:'flex',alignItems:'flex-start',gap:8,background:`${C.orange}14`,border:`1px solid ${C.orange}44`,borderRadius:12,padding:'10px 12px',marginBottom:10}}>
+                    <span style={{fontSize:15}}>⚠️</span>
+                    <div style={{flex:1,fontSize:11.5,lineHeight:1.4,color:C.orange,fontWeight:700}}>{regBlock}</div>
+                  </div>}
                   <button onClick={()=>doRegister(selEv)} disabled={registering}
                     style={{width:'100%',padding:'15px',background:C.plum,border:'none',borderRadius:16,color:C.onAccent,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',opacity:registering?.7:1}}>
-                    {registering?'…':(selEv as any).isGroupe?'👥 Rejoindre le groupe':t('events.register')}
+                    {registering?'…':(selEv as any).isGroupe?(lang==='en'?'👥 Join group':'👥 Rejoindre le groupe'):t('events.register')}
                   </button>
+                  </>
                 )
               )}
-              {selEv.price&&!['Entrée libre','Gratuit','Free',''].includes(selEv.price)&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 Pay on-site · {selEv.price}</div>}
+              {selEv.price&&!['Entrée libre','Gratuit','Free',''].includes(selEv.price)&&<div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>💰 {lang==='en'?'Pay on-site':'Sur place'} · {selEv.price}</div>}
             </div>
           </div>
         </div>
@@ -3505,13 +3538,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       {/* ── Bottom sheet création event de groupe ── */}
       {showCreateGroup&&(
         <div style={{position:'fixed',inset:0,zIndex:9100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={()=>setShowCreateGroup(false)}/>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={tryCloseCreate}/>
           <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:'20px 20px 40px',animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'90vh',overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
             {/* Handle */}
             <div style={{width:36,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 18px'}}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
               <div style={{fontSize:16,fontWeight:900}}>🎟️ Organiser un événement</div>
-              <button onClick={()=>setShowCreateGroup(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
+              <button onClick={tryCloseCreate} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
             </div>
 
             {/* Champ 1 : Emoji + Titre */}
@@ -3543,47 +3576,68 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvLieu?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
             </div>
 
-            {/* Champ 3 : Heure + Max participants */}
-            <div style={{marginBottom:14,display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <div>
-                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>🕐 QUAND</div>
-                <input value={newEvTime} onChange={e=>setNewEvTime(e.target.value)} placeholder='19h30, Ce soir 20h...'
-                  style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvTime?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
-              </div>
-              <div>
-                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 PLACES : <span style={{color:C.salmon}}>{newEvMax}</span> <span style={{color:C.whiteMid,fontWeight:600}}>· dès 2</span></div>
-                <input type='range' min={2} max={6} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
-                  style={{width:'100%',marginTop:14,accentColor:C.salmon}}/>
+            {/* Champ 3 : QUAND (jour contraint + molette native) */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>🕐 QUAND</div>
+              <div style={{display:'flex',gap:8}}>
+                <div style={{display:'flex',gap:6,flex:1}}>
+                  {['Aujourd\'hui','Demain'].map(d=>(
+                    <button key={d} onClick={()=>setNewEvDate(d)}
+                      style={{flex:1,padding:'11px 0',borderRadius:10,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvDate===d?C.salmon:C.border}`,background:newEvDate===d?C.salmonFaint:'transparent',color:newEvDate===d?C.salmon:C.whiteMid}}>{d}</button>
+                  ))}
+                </div>
+                <input type='time' value={newEvTime} onChange={e=>setNewEvTime(e.target.value)}
+                  style={{width:108,background:C.whiteFaint,border:`1px solid ${C.salmon}`,borderRadius:12,padding:'11px 12px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
               </div>
             </div>
 
-            {/* Champ : Durée (obligatoire — sert à éviter les inscriptions qui se chevauchent) */}
+            {/* Champ 4 : Durée (obligatoire) + Places */}
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>⏱ COMBIEN DE TEMPS <span style={{color:C.whiteMid,fontWeight:600}}>· évite les chevauchements</span></div>
-              <div style={{display:'flex',gap:7}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>⏱ DURÉE <span style={{color:C.whiteMid,fontWeight:600}}>· évite les chevauchements</span></div>
+              <div style={{display:'flex',gap:6}}>
                 {EVENT_DUR_OPTS.map(o=>(
                   <button key={o.h} onClick={()=>setNewEvDur(o.h)}
-                    style={{flex:1,padding:'10px 0',borderRadius:11,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+                    style={{flex:1,padding:'8px 0',borderRadius:9,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
                       border:`1.5px solid ${newEvDur===o.h?C.salmon:C.border}`,background:newEvDur===o.h?C.salmonFaint:'transparent',color:newEvDur===o.h?C.salmon:C.whiteMid}}>
                     {o.label}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Champ 4 : Description (optionnel) */}
-            <div style={{marginBottom:22}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💬 DESCRIPTION (optionnel)</div>
-              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={2}
-                placeholder='Quelques mots pour donner envie...'
-                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box'}}/>
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 PLACES : <span style={{color:C.salmon}}>{newEvMax}</span> <span style={{color:C.whiteMid,fontWeight:600}}>· dès 2</span></div>
+              <input type='range' min={2} max={6} value={newEvMax} onChange={e=>setNewEvMax(Number(e.target.value))}
+                style={{width:'100%',accentColor:C.salmon}}/>
             </div>
 
-            <button onClick={createGroupEvent} disabled={!newEvTitle.trim()||!newEvLieu.trim()||!newEvTime.trim()||creating}
-              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvTitle&&newEvLieu&&newEvTime?C.salmon:'rgba(255,191,158,0.2)',border:'none',color:newEvTitle&&newEvLieu&&newEvTime?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:newEvTitle&&newEvLieu&&newEvTime?'pointer':'default',fontFamily:'inherit',transition:'all .2s'}}>
+            {/* Champ 5 : Description (OBLIGATOIRE — David) */}
+            <div style={{marginBottom:22}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· obligatoire</span></div>
+              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={2}
+                placeholder='Quelques mots pour donner envie...'
+                style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box'}}/>
+            </div>
+
+            <button onClick={createGroupEvent} disabled={!newEvValid||creating}
+              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(255,191,158,0.2)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:newEvValid?'pointer':'default',fontFamily:'inherit',transition:'all .2s'}}>
               {creating?'Création...':`✦ Publier l\'événement`}
             </button>
+            {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>Remplis le titre, le lieu, l'heure et la description.</div>}
             <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Lieu public · 18+ · Visible dans Événements · Expire après 18h</div>
+
+            {/* Confirmation avant de quitter si des champs sont remplis (David) */}
+            {confirmCloseEv && (
+              <div style={{position:'absolute',inset:0,background:'rgba(42,16,32,.55)',backdropFilter:'blur(4px)',borderRadius:'20px 20px 0 0',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+                <div style={{background:'#fff',borderRadius:18,padding:'20px 18px',maxWidth:300,textAlign:'center',boxShadow:'0 20px 50px rgba(83,41,67,.4)'}}>
+                  <div style={{fontSize:15,fontWeight:900,color:C.bordeaux,marginBottom:6}}>Quitter sans publier ?</div>
+                  <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.5,marginBottom:16}}>Tu as commencé à remplir l'événement. Tout sera perdu.</div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={()=>setConfirmCloseEv(false)} style={{flex:1,padding:'11px',borderRadius:11,border:`1px solid ${C.border}`,background:'transparent',color:C.bordeaux,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Continuer</button>
+                    <button onClick={resetCreateEv} style={{flex:1,padding:'11px',borderRadius:11,border:'none',background:C.red,color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Quitter</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

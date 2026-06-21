@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10A'  // Versionnage HEXADÉCIMAL. ~266e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10B'  // Versionnage HEXADÉCIMAL. ~267e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -157,6 +157,15 @@ const TRUST_CONFIG = {
 // ─── Couleurs genre — cohérentes carte + liste ─────────────────
 const GC = { F:'#FF6B9D', M:'#4FC3F7', X:'#B39DDB' } as const
 type GenderKey = keyof typeof GC
+
+// ─── Icône SVG monochrome de Mel, recolorée via CSS mask (teinte n'importe quelle couleur de SA palette) ───
+function MelIcon({src,color,size=24}:{src:string;color:string;size?:number}) {
+  return <span aria-hidden style={{display:'inline-block',width:size,height:size,backgroundColor:color,
+    WebkitMaskImage:`url(${src})`,maskImage:`url(${src})`,
+    WebkitMaskSize:'contain',maskSize:'contain' as any,
+    WebkitMaskRepeat:'no-repeat',maskRepeat:'no-repeat' as any,
+    WebkitMaskPosition:'center',maskPosition:'center' as any}}/>
+}
 
 // ─── Badges compte ─────────────────────────────────────────────
 function getAccountBadge(profile: any): {label:string; color:string; emoji:string}|null {
@@ -947,12 +956,13 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
       {showPin && (
         <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-100%)',
           zIndex:800,pointerEvents:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-          <div style={{width:24,height:24,borderRadius:'50% 50% 50% 0',background:C.orange,
-            transform:'rotate(-45deg)',
+          {/* épingle prune (palette Mel). TODO: remplacer par Pin_RDVfixe de Mel une fois le viewBox recadré */}
+          <div style={{width:26,height:26,borderRadius:'50% 50% 50% 0',background:C.bordeaux,
+            transform:'rotate(-45deg)',boxShadow:'0 2px 6px rgba(83,41,67,.4)',
             display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{width:10,height:10,borderRadius:'50%',background:C.bg,transform:'rotate(45deg)'}}/>
+            <div style={{width:10,height:10,borderRadius:'50%',background:'#fff',transform:'rotate(45deg)'}}/>
           </div>
-          <div style={{width:2,height:12,background:C.orange,borderRadius:1,opacity:.7}}/>
+          <div style={{width:2,height:12,background:C.bordeaux,borderRadius:1,opacity:.6}}/>
         </div>
       )}
       {/* hint inside map removed — see carte overlay */}
@@ -8743,10 +8753,10 @@ export default function App2() {
                   </div>
                   <div style={{display:'flex',gap:8}}>
                     {([
-                      {k:'romantic',icon:'💕',l:'Romance',   sub:lang==='en'?'romantic meetup':'rencontre romantique'},
-                      {k:'friend',  icon:'🤝',l:lang==='en'?'Friendship':'Amitié',sub:lang==='en'?'outing, activity':'sortie, activité'},
-                      {k:'pro',     icon:'💼',l:'Pro',       sub:lang==='en'?'network, coworking':'réseau, coworking'},
-                      {k:'parent',  icon:'👶',l:'Parents',   sub:lang==='en'?'with kids':'avec enfants'},
+                      {k:'romantic',icon:'/icons/mel/rencontre_amour.svg',  l:'Romance',   sub:lang==='en'?'romantic meetup':'rencontre romantique'},
+                      {k:'friend',  icon:'/icons/mel/rencontre_amis.svg',   l:lang==='en'?'Friendship':'Amitié',sub:lang==='en'?'outing, activity':'sortie, activité'},
+                      {k:'pro',     icon:'/icons/mel/rencontre_pro.svg',    l:'Pro',       sub:lang==='en'?'network, coworking':'réseau, coworking'},
+                      {k:'parent',  icon:'/icons/mel/rencontre_parents.svg',l:'Parents',   sub:lang==='en'?'with kids':'avec enfants'},
                     ] as const).map(m=>{
                       const on=seekModes.includes(m.k)
                       return <button key={m.k} onClick={()=>{
@@ -8759,14 +8769,14 @@ export default function App2() {
                           setSeekModes(on ? without : [...without, m.k])
                         }
                       }}
-                        style={{flex:1,padding:'8px 3px',borderRadius:14,
-                          border:`1.5px solid ${on?C.salmon:C.border}`,
-                          background:on?C.salmonFaint:'transparent',
+                        style={{flex:1,padding:'9px 3px 8px',borderRadius:14,
+                          border:`1.5px solid ${on?C.bordeaux:C.border}`,
+                          background:on?`${C.bordeaux}0d`:'transparent',
                           cursor:'pointer',fontFamily:'inherit',transition:'all .12s',
-                          position:'relative'}}>
-                        {on&&<div style={{position:'absolute',top:4,right:4,width:8,height:8,borderRadius:'50%',background:C.salmon}}/>}
-                        <div style={{fontSize:17,marginBottom:2}}>{m.icon}</div>
-                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.salmon:C.white}}>{m.l}</div>
+                          position:'relative',display:'flex',flexDirection:'column',alignItems:'center'}}>
+                        {on&&<div style={{position:'absolute',top:4,right:4,width:8,height:8,borderRadius:'50%',background:C.bordeaux}}/>}
+                        <MelIcon src={m.icon} color={on?C.bordeaux:C.borderStrong} size={26}/>
+                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{m.l}</div>
                         <div style={{fontSize:8,color:C.whiteMid,lineHeight:1.2}}>{m.sub}</div>
                       </button>
                     })}
@@ -8779,16 +8789,16 @@ export default function App2() {
                   <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>{lang==='en'?'I want to meet…':'Je cherche…'}</div>
                   <div style={{display:'flex',gap:8}}>
                     {([
-                      {k:'F',   icon:GI.F, l:lang==='en'?'Women':'Femmes',        c:GC.F},
-                      {k:'M',   icon:GI.M, l:lang==='en'?'Men':'Hommes',          c:GC.M},
-                      {k:'X',   icon:GI.X, l:lang==='en'?'Non-binary':'Non-binaire',   c:GC.X},
-                      {k:'all', icon:'◎',  l:lang==='en'?'Doesn\'t matter':'Peu importe', c:C.salmon},
+                      {k:'F',   icon:'/icons/mel/femme.svg',       l:lang==='en'?'Women':'Femmes'},
+                      {k:'M',   icon:'/icons/mel/homme.svg',       l:lang==='en'?'Men':'Hommes'},
+                      {k:'X',   icon:'/icons/mel/non-binaire.svg', l:lang==='en'?'Non-binary':'Non-binaire'},
+                      {k:'all', icon:'/icons/mel/neutre.svg',      l:lang==='en'?'Doesn\'t matter':'Peu importe'},
                     ] as const).map(g=>{
                       const on=seekGender===g.k
                       return <button key={g.k} onClick={()=>setSeekGender(g.k as any)}
-                        style={{flex:1,padding:'9px 3px',borderRadius:14,border:`1.5px solid ${on?g.c:C.border}`,background:on?`${g.c}18`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .12s'}}>
-                        <div style={{fontSize:16,color:on?g.c:C.whiteMid,marginBottom:2}}>{g.icon}</div>
-                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?g.c:C.white}}>{g.l}</div>
+                        style={{flex:1,padding:'10px 3px',borderRadius:14,border:`1.5px solid ${on?C.bordeaux:C.border}`,background:on?`${C.bordeaux}0d`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .12s',display:'flex',flexDirection:'column',alignItems:'center'}}>
+                        <MelIcon src={g.icon} color={on?C.bordeaux:C.borderStrong} size={24}/>
+                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{g.l}</div>
                       </button>
                     })}
                   </div>
@@ -8872,11 +8882,10 @@ export default function App2() {
               <div style={{padding:'12px 16px 40px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
                 <button onClick={handleOuvrirFenetre} style={{
                   width:'100%',padding:'20px',
-                  background:`linear-gradient(135deg,${C.salmon} 0%,${C.orange} 100%)`,
-                  border:'none',borderRadius:20,color:C.bg,
+                  background:C.bordeaux,
+                  border:'none',borderRadius:20,color:'#fff',
                   fontSize:17,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
                   letterSpacing:'-.03em',
-                  boxShadow:`0 8px 32px rgba(226,124,0,.35)`,
                 }}>
                   {t('page2.cta')}
                 </button>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFD'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~253e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC, 0xFD...). NB: le build Apple reste un entier dans pbxproj.
+const V = '0xFE'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~254e version. Incrémenter en hexa à chaque deploy (0xFC, 0xFD, 0xFE...). NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4968,6 +4968,25 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const hourNow = (typeof Date!=='undefined') ? new Date().getHours() : 12
   const momentGreeting = hourNow>=18||hourNow<4 ? 'Ce soir, qu\'est-ce qui te tente ?' : hourNow>=12 ? 'Cet aprèm, tu cherches quoi ?' : 'Ce matin, ouvert·e à quoi ?'
 
+  // ── DIDACTIQUE & CONFIANCE (cf mémoire feedback-didactique-confiance) ──
+  // Guide « Comprendre Clutch » + bannière de bienvenue dismissible pour les nouveaux.
+  const guideKey = `clutch_guide_seen_${user.id}`
+  const [guideSeen, setGuideSeen] = useState<boolean>(()=>{ try{return localStorage.getItem(guideKey)==='1'}catch{return false} })
+  const markGuideSeen = () => { setGuideSeen(true); try{localStorage.setItem(guideKey,'1')}catch{} }
+  // Mode Pause bien-être (anti-addiction, bienveillant — effet RÉEL : retire de la carte)
+  const pauseKey = `clutch_paused_${user.id}`
+  const [paused, setPaused] = useState<boolean>(()=>{ try{return localStorage.getItem(pauseKey)==='1'}catch{return false} })
+  const togglePause = async () => {
+    const next = !paused
+    setPaused(next); try{localStorage.setItem(pauseKey, next?'1':'0')}catch{}
+    if (next) { // effet réel : on n'apparaît plus comme disponible
+      await supabase.from('profiles').update({ is_available:false, available_until:null }).eq('id', user.id)
+      onUserUpdate({ ...user, is_available:false, available_until:null } as any)
+    }
+    showToast(next ? '🌙 Clutch en pause — prends soin de toi' : '☀️ Content de te revoir', C.green)
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(8)
+  }
+
   const handleRetirerDispo = async () => {
     const { error } = await supabase.from('profiles').update({
       is_available: false,
@@ -5544,6 +5563,16 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   const PageSecurity = () => (
     <div>
+      {/* Didactique : expliquer en douceur ce qui se passe, pour rassurer (cf mémoire didactique) */}
+      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:'14px',marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:800,color:C.white,marginBottom:10}}>Comment marche ta sécurité 🛡️</div>
+        {[{n:'1',t:'Tu choisis tes proches',d:'jusqu\'à 3 personnes de confiance, gardées sur ton téléphone'},{n:'2',t:'En un geste, tu alertes',d:'un message part avec ta position en direct — tu n\'as rien à taper'},{n:'3',t:'Tu gardes le contrôle',d:'tu arrêtes l\'alerte quand tu veux. C\'est toi qui décides, toujours'}].map((s,i)=>(
+          <div key={i} style={{display:'flex',gap:11,alignItems:'flex-start',marginBottom:i<2?9:0}}>
+            <span style={{width:22,height:22,borderRadius:'50%',background:`${C.green}22`,color:C.green,fontSize:12,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.n}</span>
+            <div><span style={{fontSize:13,fontWeight:700,color:C.white}}>{s.t}</span> <span style={{fontSize:12,color:C.whiteMid}}>— {s.d}</span></div>
+          </div>
+        ))}
+      </div>
       <div style={{background:'rgba(248,113,113,0.06)',border:'1.5px solid rgba(248,113,113,0.25)',borderRadius:14,padding:'16px',marginBottom:12}}>
         <div style={{fontSize:14,fontWeight:800,color:'#f87171',marginBottom:8}}>🆘 Contacts d'urgence <span style={{fontSize:11,color:C.whiteMid,fontWeight:500}}>({sosContacts.length}/3)</span></div>
         <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.6,marginBottom:14}}>
@@ -5803,6 +5832,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     const lvl = rs>=90?'🏆 Exemplaire':rs>=75?'⭐ Très fiable':rs>=50?'🟢 Fiable':rs>=30?'🌿 En construction':'🌱 Nouveau'
     return (
     <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+      <DRow label="🤍 Comprendre Clutch" value="Guide 1 min" onTap={()=>setProfilePage('guide')}/>
+      <DRow label="Faire une pause" value={paused?'🌙 En pause':'Bien-être'} onTap={()=>setProfilePage('pause')}/>
       <DRow label="Abonnement" value="Gratuit · Premium" onTap={()=>setProfilePage('subscription')}/>
       <DRow label="Ma fiabilité" value={lvl} onTap={()=>setProfilePage('fiabilite')}/>
       <DRow label="Préférences & notifications" value="Langue, réception…" onTap={()=>setProfilePage('preferences')}/>
@@ -5920,6 +5951,47 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
+  // « Comprendre Clutch » — guide didactique doux (mise en confiance, cf mémoire didactique)
+  const PageGuide = () => {
+    const cards = [
+      {e:'✦',t:'C\'est quoi Clutch ?',d:'Pas du swipe, pas un jeu pour rester sur ton téléphone. Tu te rends disponible, et tu rencontres quelqu\'un en vrai, dans les heures qui suivent. C\'est tout.'},
+      {e:'🕐',t:'Ta disponibilité (18h max)',d:'Quand tu veux, tu t\'ouvres un créneau : tu apparais sur la carte, au maximum 18h. Après, ça s\'efface tout seul. Tu n\'es jamais « en ligne » en permanence — tu choisis tes moments.'},
+      {e:'⚡',t:'Le Clutch & le Verrou',d:'Tu envoies un Clutch à quelqu\'un qui te plaît. S\'iel accepte, c\'est un Verrou : votre rendez-vous est posé, à une heure, dans un lieu. Doux et clair.'},
+      {e:'🏆',t:'La fiabilité',d:'Une confiance qui se construit simplement, en tenant ta parole : venir, être à l\'heure, prévenir si besoin. Ce n\'est jamais une punition — juste le reflet de ton respect des autres.'},
+      {e:'🛡️',t:'Ta sécurité, ton contrôle',d:'On ne montre jamais où tu es. Tu as un bouton SOS, le blocage, la certification. À chaque étape, c\'est TOI qui décides. Tu peux faire une pause quand tu veux.'},
+    ]
+    return (
+      <div>
+        <NoteBox>Bienvenue 🤍 Voici Clutch en 1 minute, tout en douceur. Aucune question piège, aucune pression.</NoteBox>
+        {cards.map((c,i)=>(
+          <div key={i} style={{display:'flex',gap:13,alignItems:'flex-start',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,padding:'15px 15px',marginBottom:10}}>
+            <span style={{fontSize:24,flexShrink:0}}>{c.e}</span>
+            <div><div style={{fontSize:15,fontWeight:800,color:C.white,marginBottom:4}}>{c.t}</div><div style={{fontSize:13,color:C.whiteMid,lineHeight:1.55}}>{c.d}</div></div>
+          </div>
+        ))}
+        <div style={{textAlign:'center',padding:'14px 10px 4px'}}>
+          <div style={{fontSize:13,fontStyle:'italic',color:C.salmon,marginBottom:14}}>« Réunir ce qui était séparé. »<br/><span style={{fontSize:11,color:C.whiteMid,fontStyle:'normal'}}>Clutch te ramène vers le vrai, en douceur.</span></div>
+          <button onClick={()=>{ markGuideSeen(); setProfilePage(null) }} style={{padding:'13px 26px',borderRadius:14,border:'none',background:C.orange,color:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(226,124,0,.35)'}}>J'ai compris ✦</button>
+        </div>
+      </div>
+    )
+  }
+
+  // Mode Pause bien-être — bienveillant, anti-addiction, effet réel
+  const PagePause = () => (
+    <div>
+      <div style={{textAlign:'center',padding:'10px 0 18px'}}>
+        <div style={{fontSize:46}}>{paused?'🌙':'☀️'}</div>
+        <div style={{fontSize:19,fontWeight:900,color:C.white,marginTop:8}}>{paused?'Tu es en pause':'Faire une pause'}</div>
+      </div>
+      <NoteBox>Prendre du recul, c'est <b style={{color:C.white}}>sain</b>. Pendant ta pause, tu n'apparais plus comme disponible et personne ne peut t'envoyer de Clutch. <b style={{color:C.white}}>Tout est gardé</b> — tes préférences, tes contacts, ton profil. Tu reviens quand tu veux, sans rien perdre.</NoteBox>
+      <button onClick={togglePause} style={{width:'100%',padding:'15px',borderRadius:16,border:`1.5px solid ${paused?C.orange:C.border}`,background:paused?C.orange:C.bgCard,color:paused?'#fff':C.white,fontSize:14.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+        {paused?'☀️ Revenir sur Clutch':'🌙 Mettre Clutch en pause'}
+      </button>
+      <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',marginTop:14,lineHeight:1.5,opacity:.85}}>Aucune culpabilité, aucune notification pour te faire revenir. C'est ton rythme.</div>
+    </div>
+  )
+
   // ── Sous-page container ─────────────────────────────────────
   const subPageTitles: Record<string,string> = {
     edit_profil:'Moi', seeking:'Ce que je cherche',
@@ -5929,6 +6001,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     cherche:'Ce que je cherche', algo:'Mon Clutch · l\'algo',
     secu:'Sécurité & confidentialité', compte:'Mon compte', moment:'Mode du moment 🌙',
     fiabilite:'Ma fiabilité', temperament:'Mon tempérament', why:'Pourquoi ces propositions', distance_zones:'Les zones',
+    guide:'Comprendre Clutch', pause:'Faire une pause',
   }
   // ⚠️ On stocke les FONCTIONS (pas <Page/>) et on appelle la sélectionnée au rendu.
   // Sinon chaque frappe recrée le composant → input démonté → le clavier se ferme. (Aucun hook dans ces pages.)
@@ -5951,6 +6024,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     temperament: PageTemperament,
     why: PageWhy,
     distance_zones: PageDistanceZones,
+    guide: PageGuide,
+    pause: PagePause,
   }
 
   return (
@@ -6034,6 +6109,20 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           </span>
         </button>
       </div>
+
+      {/* ─── BANNIÈRE BIENVENUE (didactique, dismissible, nouveaux users) ─── */}
+      {!guideSeen && (
+        <div style={{padding:'10px 16px 0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:11,background:`linear-gradient(135deg,${C.orange}14,${C.green}10)`,border:`1px solid ${C.orange}44`,borderRadius:16,padding:'12px 14px'}}>
+            <span style={{fontSize:22}}>🤍</span>
+            <div onClick={()=>setProfilePage('guide')} style={{flex:1,cursor:'pointer'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.white}}>Bienvenue sur Clutch</div>
+              <div style={{fontSize:11.5,color:C.whiteMid,marginTop:1}}>Comprendre comment ça marche, en 1 min ›</div>
+            </div>
+            <span onClick={markGuideSeen} style={{fontSize:16,color:C.whiteMid,cursor:'pointer',padding:'4px 6px'}}>✕</span>
+          </div>
+        </div>
+      )}
 
       {/* ─── BLOC VEDETTE : Ce que je cherche EN CE MOMENT (filtres éphémères) ─── */}
       <div style={{padding:'10px 16px 4px'}}>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFA'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~250e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
+const V = 'Z89'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1067,7 +1067,7 @@ function Splash({ onDone }:{onDone:()=>void}) {
         .htag{opacity:${ph>=3?1:0};transition:opacity .8s ease .1s;}
       `}</style>
       <svg width="245" viewBox="30 140 230 210" xmlns="http://www.w3.org/2000/svg">
-        <defs><filter id="splashSh" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="5" dy="8" stdDeviation="3.5" flood-color="#160a12" flood-opacity="0.85"/></filter></defs>
+        <defs><filter id="splashSh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="4" dy="6" stdDeviation="4" flood-color="#1d0f18" flood-opacity="0.6"/></filter></defs>
         <g className="hb" filter="url(#splashSh)"><path fill="#EB6BB0" d="M185.38,206.473l10.697-10.695l-36.604-36.604l-10.696,10.697l-0.806,32.382l-8.621,0.29l0.862-34.607c0.027-1.104,0.478-2.156,1.26-2.938l14.957-14.957c1.682-1.682,4.408-1.682,6.089,0l42.692,42.691c1.681,1.682,1.681,4.408,0,6.089l-14.959,14.958c-0.781,0.781-1.831,1.231-2.937,1.259l-85.845,2.14l-10.696,10.696l36.604,36.603l10.696-10.697l0.802-32.189l8.617-0.141l-0.854,34.266c-0.028,1.104-0.478,2.156-1.261,2.938l-14.957,14.957c-1.681,1.682-4.407,1.682-6.089,0l-42.69-42.691c-1.683-1.682-1.683-4.408,0-6.089l14.957-14.958c0.781-0.781,1.832-1.232,2.938-1.259L185.38,206.473z"/></g>
         <g className="ht"><polygon fill="#77BC1F" points="153.217,202.325 183.263,201.578 188.846,195.994 182.948,190.122 153.521,190.121"/></g>
         <g className="hb2"><polygon fill="#77BC1F" points="127.452,257.386 133.035,251.803 133.422,236.09 106.192,236.09"/></g>

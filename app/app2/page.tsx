@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10E'  // Versionnage HEXADÉCIMAL. ~270e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10F'  // Versionnage HEXADÉCIMAL. ~271e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -552,7 +552,7 @@ function JogWheel({ slots, value, onChange, accent = false }: {
     }, 80)
   }
 
-  const active = C.bordeaux  // sélection en PRUNE (palette Mel, plus de dégradé métallique)
+  const active = C.orange  // heure sélectionnée ALLUMÉE en rose (couleur logo Mel) — demande David
 
   return (
     <div style={{ position:'relative', height:ITEM_H * 3, flex:1, minWidth:0 }}>
@@ -8868,7 +8868,7 @@ export default function App2() {
                           cursor:'pointer',fontFamily:'inherit',transition:'all .12s',
                           position:'relative',display:'flex',flexDirection:'column',alignItems:'center'}}>
                         {on&&<div style={{position:'absolute',top:4,right:4,width:8,height:8,borderRadius:'50%',background:C.bordeaux}}/>}
-                        <MelIcon src={m.icon} color={on?C.bordeaux:C.borderStrong} size={26}/>
+                        {on ? <img src={m.icon.replace('.svg','_color.svg')} width={28} height={28} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={26}/>}
                         <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{m.l}</div>
                         <div style={{fontSize:8,color:C.whiteMid,lineHeight:1.2}}>{m.sub}</div>
                       </button>
@@ -8890,7 +8890,7 @@ export default function App2() {
                       const on=seekGender===g.k
                       return <button key={g.k} onClick={()=>setSeekGender(g.k as any)}
                         style={{flex:1,padding:'10px 3px',borderRadius:14,border:`1.5px solid ${on?C.bordeaux:C.border}`,background:on?`${C.bordeaux}0d`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .12s',display:'flex',flexDirection:'column',alignItems:'center'}}>
-                        <MelIcon src={g.icon} color={on?C.bordeaux:C.borderStrong} size={24}/>
+                        {on ? <img src={g.icon.replace('.svg','_color.svg')} width={26} height={26} alt="" style={{display:'block'}}/> : <MelIcon src={g.icon} color={C.borderStrong} size={24}/>}
                         <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{g.l}</div>
                       </button>
                     })}

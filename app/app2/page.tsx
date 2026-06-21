@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2847,16 +2847,43 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvDur, setNewEvDur] = useState(2) // durée en heures (David : obligatoire)
   const [newEvMax, setNewEvMax] = useState(6)
   const [newEvDesc, setNewEvDesc] = useState('')
+  const [newEvFile, setNewEvFile] = useState<string|null>(null) // nom du fichier joint (prototype)
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmCloseEv, setConfirmCloseEv] = useState(false)
   const newEvValid = !!(newEvTitle.trim() && newEvLieu.trim() && newEvTime.trim() && newEvDesc.trim()) // desc obligatoire (David)
   const newEvDirty = !!(newEvTitle || newEvLieu || newEvDesc) // pour confirmer la fermeture
   const tryCloseCreate = () => { if (newEvDirty && !creating) setConfirmCloseEv(true); else setShowCreateGroup(false) }
-  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2) }
+  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvFile(null); setEvAddrResults([]); setEvShowSugg(false) }
+  // Recherche d'adresse (réutilise Nominatim, comme la mise en ligne — David)
+  const [evAddrResults,setEvAddrResults]=useState<any[]>([])
+  const [evShowSugg,setEvShowSugg]=useState(false)
+  const [evAddrLoading,setEvAddrLoading]=useState(false)
+  const evAddrTimer=useRef<ReturnType<typeof setTimeout>|null>(null)
+  const fmtEvAddr=(r:any):string=>{ const a=r.address||{}; const p=[a.road,a.house_number,a.postcode,a.city||a.town||a.village].filter(Boolean); return p.join(' ')||(r.display_name||'').split(',').slice(0,2).join(',').trim() }
+  const searchEvAddr=async(q:string)=>{
+    if(q.trim().length<3){ setEvAddrResults([]); setEvAddrLoading(false); return }
+    setEvAddrLoading(true)
+    try{
+      const resp=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1&viewbox=6.0,47.0,7.2,46.0&bounded=0`,{headers:{'Accept-Language':lang==='fr'?'fr':'en'}})
+      setEvAddrResults(await resp.json()||[])
+    }catch{ setEvAddrResults([]) }
+    setEvAddrLoading(false)
+  }
+  const handleEvLieuChange=(v:string)=>{ setNewEvLieu(v); setEvShowSugg(true); if(evAddrTimer.current)clearTimeout(evAddrTimer.current); evAddrTimer.current=setTimeout(()=>searchEvAddr(v),600) }
+  const pickEvAddr=(name:string,addr?:string)=>{ setNewEvLieu(addr&&addr!==name?`${name}, ${addr}`:name); setEvShowSugg(false); setEvAddrResults([]) }
 
   const createGroupEvent = async () => {
-    if (!newEvValid) return
+    // David : si on ne peut pas publier, DIRE ce qui manque (au lieu d'un bouton mort)
+    if (!newEvValid) {
+      const miss:string[] = []
+      if(!newEvTitle.trim()) miss.push(lang==='en'?'a title':'le titre')
+      if(!newEvLieu.trim()) miss.push(lang==='en'?'a place':'le lieu')
+      if(!newEvTime.trim()) miss.push(lang==='en'?'a time':'l\'heure')
+      if(!newEvDesc.trim()) miss.push(lang==='en'?'a description':'la description')
+      showToast?.((lang==='en'?'Missing: ':'Il manque : ')+miss.join(', '), C.orange)
+      return
+    }
     // Anti-contenu déplacé (David : « vérifier que les gens mettent pas n'importe quoi »)
     if (hasBannedWords(newEvTitle) || hasBannedWords(newEvDesc) || hasBannedWords(newEvLieu)) {
       showToast?.(lang==='en'?'Inappropriate wording — please rephrase':'Texte non autorisé — reformule sans mots déplacés', C.red); return
@@ -2917,13 +2944,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvFile(null); setEvShowSugg(false)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
   const [selEv, setSelEv] = useState<any|null>(()=>
     initialEventId ? (events.find((e:any)=>e.id===initialEventId) || MOCK_EVENTS.find(e=>e.id===initialEventId) || null) : null
   )
+  const [selPartner, setSelPartner] = useState<any|null>(null) // fiche partenaire (clic sur une bannière)
   // Ouvre l'event demandé (depuis l'onglet Clutchs → « Mes événements ») dès que les vrais events (DB) sont chargés.
   // ONE-SHOT : on efface initialEventId juste après ouverture, sinon le refresh loadEvents (10s) rouvrait l'event en boucle.
   useEffect(() => {
@@ -3176,16 +3204,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {/* ✨ BANNIÈRES PARTENAIRES (payants = mis en avant, défilent en haut) — demande David. Visible seulement sur "Tout". */}
         {evFilter==='all' && PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
           <div style={{marginBottom:14}}>
-            <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',padding:'2px 2px 4px',margin:'0 -2px'}}>
+            <style>{`@keyframes ptnShine{0%{background-position:-180% 0}100%{background-position:180% 0}} .ptnShine::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);background-size:200% 100%;animation:ptnShine 3.2s linear infinite;pointer-events:none}`}</style>
+            <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'2px 2px 4px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
-                <div key={p.id} onClick={()=>setEvFilter('partenaires')} style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#532943,#2C1020)',boxShadow:'0 4px 16px rgba(83,41,67,.22)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-                  <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.14,lineHeight:1}}>{p.emoji}</div>
+                <div key={p.id} onClick={()=>setSelPartner(p)} className="ptnShine" style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#6E2E72,#532943 55%,#2C1020)',border:'1.5px solid rgba(235,107,175,.55)',boxShadow:'0 6px 22px rgba(235,107,175,.28)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                  <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.18,lineHeight:1}}>{p.emoji}</div>
                   <div style={{position:'relative'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
                       <span style={{fontSize:16,fontWeight:900,color:'#fff'}}>{p.name}</span>
-                      <span style={{fontSize:8.5,fontWeight:800,color:'#fff',background:'rgba(119,188,31,.9)',borderRadius:7,padding:'1px 5px'}}>✓</span>
+                      <span style={{fontSize:8,fontWeight:900,color:'#2C1020',background:'#EB6BAF',borderRadius:7,padding:'1px 6px',letterSpacing:'.04em'}}>★ PARTENAIRE</span>
                     </div>
-                    <div style={{fontSize:11,color:'#e8d8e4',opacity:.9}}>{p.cat} · 📍 {p.zone}</div>
+                    <div style={{fontSize:11,color:'#f0dce9',opacity:.95}}>{p.cat} · 📍 {p.zone}</div>
                   </div>
                   <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:10}}>
                     <span style={{fontSize:11,fontWeight:800,color:'#fff',background:'rgba(235,107,175,.22)',border:'1px solid rgba(235,107,175,.5)',borderRadius:9,padding:'4px 9px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🗓 {p.next}</span>
@@ -3588,6 +3617,35 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       )}
 
       {/* ── Bottom sheet création event de groupe ── */}
+      {/* Fiche PARTENAIRE (clic sur une bannière) — David : le clic doit montrer le partenaire, pas aller dans Communauté */}
+      {selPartner && (()=>{ const p=selPartner; const on=followedPartners.has(p.id); return (
+        <div style={{position:'fixed',inset:0,zIndex:9200,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}} onClick={()=>setSelPartner(null)}/>
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:`18px 20px calc(var(--sab) + 28px)`,animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'82vh',overflowY:'auto'}}>
+            <div style={{width:38,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 16px'}}/>
+            <div style={{display:'flex',alignItems:'flex-start',gap:13,marginBottom:14}}>
+              <div style={{width:60,height:60,borderRadius:18,background:'linear-gradient(125deg,#6E2E72,#2C1020)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,flexShrink:0}}>{p.emoji}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:18,fontWeight:900,color:C.white}}>{p.name}</span>
+                  <span style={{fontSize:8,fontWeight:900,color:'#fff',background:C.green,borderRadius:7,padding:'1px 6px'}}>✓ {lang==='en'?'CERTIFIED':'CERTIFIÉ'}</span>
+                </div>
+                <div style={{fontSize:12,color:C.whiteMid,marginTop:2}}>{p.cat} · 📍 {p.zone}</div>
+                <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>👥 {p.members} {lang==='en'?'members':'membres'}</div>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:C.white,lineHeight:1.5,marginBottom:14}}>{p.desc}</div>
+            <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px',marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:800,letterSpacing:'.05em',color:C.whiteMid,marginBottom:3}}>{lang==='en'?'NEXT EVENT':'PROCHAIN ÉVÉNEMENT'}</div>
+              <div style={{fontSize:14,fontWeight:800,color:C.plum}}>🗓 {p.next}</div>
+            </div>
+            <button onClick={()=>togglePartner(p.id)} style={{width:'100%',padding:'14px',borderRadius:14,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+              {on?(lang==='en'?'✓ Following · notifications on':'✓ Suivi · notifs activées'):(lang==='en'?'+ Follow this partner':'+ Suivre ce partenaire')}
+            </button>
+            <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginTop:8}}>{lang==='en'?'You\'ll be notified of their new events':'Tu seras notifié·e de leurs nouveaux événements'}</div>
+          </div>
+        </div>
+      )})()}
       {showCreateGroup&&(
         <div style={{position:'fixed',inset:0,zIndex:9100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)'}} onClick={tryCloseCreate}/>
@@ -3624,11 +3682,22 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               )}
             </div>
 
-            {/* Champ 2 : Lieu */}
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>📍 OÙ</div>
-              <input value={newEvLieu} onChange={e=>setNewEvLieu(e.target.value)} placeholder='Bar du Marché, Parc de Milan, Café Romand...'
+            {/* Champ 2 : Lieu — recherche d'adresse (Nominatim), comme la mise en ligne */}
+            <div style={{marginBottom:14,position:'relative'}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>📍 OÙ <span style={{color:C.whiteMid,fontWeight:600}}>· cherche une adresse</span></div>
+              <input value={newEvLieu} onChange={e=>handleEvLieuChange(e.target.value)} onFocus={()=>{if(newEvLieu.length>=3)setEvShowSugg(true)}} placeholder='Bar du Marché, Place de la Palud, Morges...'
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvLieu?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
+              {evShowSugg && (evAddrResults.length>0 || evAddrLoading) && (
+                <div style={{marginTop:6,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`,overflow:'hidden',boxShadow:'0 6px 20px rgba(83,41,67,.12)'}}>
+                  {evAddrLoading && evAddrResults.length===0 && <div style={{padding:'10px 14px',fontSize:12,color:C.whiteMid}}>Recherche…</div>}
+                  {evAddrResults.map((r:any,i:number)=>{ const name=r.name||(r.display_name||'').split(',')[0]; const addr=fmtEvAddr(r); return (
+                    <div key={i} onClick={()=>pickEvAddr(name,addr)} style={{padding:'10px 14px',borderBottom:i<evAddrResults.length-1?`1px solid ${C.border}`:'none',cursor:'pointer'}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.white}}>{name}</div>
+                      {addr&&<div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>📍 {addr}</div>}
+                    </div>
+                  )})}
+                </div>
+              )}
             </div>
 
             {/* Champ 3 : QUAND (jour contraint + molette native) */}
@@ -3676,14 +3745,27 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={3}
                 placeholder={'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box',lineHeight:1.5}}/>
-              <div style={{fontSize:10,color:C.whiteMid,marginTop:5,lineHeight:1.4}}>📎 Pièce jointe (PDF, programme…) : <b style={{color:C.salmon}}>bientôt</b></div>
+              {/* Pièce jointe réelle (PDF/programme/image) — prototype : on capte le nom, upload V2 */}
+              {newEvFile ? (
+                <div style={{display:'flex',alignItems:'center',gap:9,marginTop:8,padding:'9px 12px',borderRadius:11,border:`1px solid ${C.green}55`,background:`${C.green}10`}}>
+                  <span style={{fontSize:16}}>📄</span>
+                  <div style={{flex:1,minWidth:0,fontSize:12,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{newEvFile}</div>
+                  <span onClick={()=>setNewEvFile(null)} style={{fontSize:15,color:C.whiteMid,cursor:'pointer',padding:2}}>✕</span>
+                </div>
+              ) : (
+                <label style={{display:'flex',alignItems:'center',gap:9,marginTop:8,padding:'9px 12px',borderRadius:11,border:`1px dashed ${C.salmon}`,cursor:'pointer'}}>
+                  <input type='file' accept='.pdf,.png,.jpg,.jpeg,.doc,.docx' style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0]; if(f)setNewEvFile(f.name)}}/>
+                  <span style={{fontSize:16}}>📎</span>
+                  <div style={{flex:1,fontSize:12,fontWeight:700,color:C.salmon}}>Joindre un fichier <span style={{color:C.whiteMid,fontWeight:500}}>(PDF, programme…)</span></div>
+                </label>
+              )}
             </div>
 
-            <button onClick={createGroupEvent} disabled={!newEvValid||creating}
-              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(255,191,158,0.2)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:newEvValid?'pointer':'default',fontFamily:'inherit',transition:'all .2s'}}>
+            <button onClick={createGroupEvent} disabled={creating}
+              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(255,191,158,0.35)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
               {creating?'Création...':`✦ Publier l\'événement`}
             </button>
-            {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>Remplis le titre, le lieu, l'heure et la description.</div>}
+            {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>Touche « Publier » pour voir ce qui manque.</div>}
             <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Lieu public · 18+ · Visible dans Événements · Expire après 18h</div>
 
             {/* Confirmation avant de quitter si des champs sont remplis (David) */}

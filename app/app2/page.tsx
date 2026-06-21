@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFA'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~250e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
+const V = '0xFB'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~250e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5781,7 +5781,83 @@ function penaltyReasonFromTime(proposedTime: string|null, isGhost=false): Penalt
 // Raison : un homme malveillant pourrait se déplacer dans la ville pour triangulariser
 // où habite la femme en observant les variations de distance. → INTERDIT.
 // ═════════════════════════════════════════════════════════════
+// ═══ CONVERGENCE — animation immersive : deux nuages (toi + l'autre) convergent vers le LIEU (étoile verte),
+//     avec un battement de cœur qui se synchronise. Nom de code interne : "al-jabr" (réunir ce qui était séparé). ═══
+function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, venueName, bothArrived, onClose }:{
+  myProgress:number; otherProgress:number; mins:number; secs:number; otherName:string; venueName:string; bothArrived:boolean; onClose:()=>void;
+}) {
+  const cvRef = useRef<HTMLCanvasElement|null>(null)
+  const progRef = useRef({ a: myProgress, b: otherProgress })
+  progRef.current = { a: myProgress, b: otherProgress }
+  useEffect(()=>{
+    const cv = cvRef.current; if(!cv) return
+    const ctx = cv.getContext('2d'); if(!ctx) return
+    const DPR = Math.min(2, (typeof window!=='undefined'?window.devicePixelRatio:1)||1)
+    const resize=()=>{ cv.width=cv.offsetWidth*DPR; cv.height=cv.offsetHeight*DPR; ctx.setTransform(DPR,0,0,DPR,0,0) }
+    resize(); window.addEventListener('resize',resize)
+    const N=80
+    const mk=()=>Array.from({length:N},()=>({a:Math.random()*Math.PI*2,r:0.5+Math.random()*0.55,sz:0.6+Math.random()*2.2,tw:Math.random()*Math.PI*2,sp:0.2+Math.random()*0.8}))
+    const A=mk(), B=mk()
+    const ROSE='235,107,176', PLUM='130,70,108', GREEN='119,188,31'
+    // battement de cœur : double pic (lub-dub) sur ~1.1s
+    const hb=(p:number)=>{ p=p%1; const b=(x:number,c:number,w:number)=>Math.exp(-((x-c)**2)/(2*w*w)); return b(p,0.0,0.045)+0.6*b(p,0.16,0.05) }
+    let raf=0
+    const draw=(t:number)=>{
+      const W=cv.offsetWidth, H=cv.offsetHeight, cx=W/2, cy=H*0.46, base=Math.min(W,H)*0.34
+      ctx.clearRect(0,0,W,H)
+      const ea=progRef.current.a*progRef.current.a*(3-2*progRef.current.a)
+      const eb=progRef.current.b*progRef.current.b*(3-2*progRef.current.b)
+      // étoile verte = LE LIEU
+      const both=(ea+eb)/2
+      const pulse=0.5+0.5*Math.sin(t*0.003)
+      const gR=8+both*16+pulse*4
+      const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,gR*4)
+      grd.addColorStop(0,`rgba(${GREEN},${0.45+both*0.5})`); grd.addColorStop(0.3,`rgba(${GREEN},${0.2+both*0.3})`); grd.addColorStop(1,'rgba(119,188,31,0)')
+      ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(cx,cy,gR*4,0,7); ctx.fill()
+      ctx.fillStyle=`rgba(${GREEN},0.9)`; ctx.beginPath(); ctx.arc(cx,cy,gR*0.6,0,7); ctx.fill()
+      const cloud=(p:any[], e:number, ang:number, color:string, hbPhase:number)=>{
+        const beat=1+0.13*hb(t*0.00085+hbPhase)*(0.4+e*0.6) // cœur qui bat, plus fort en s'approchant
+        const orbit=base*(1-e*0.84)
+        const ccx=cx+Math.cos(ang)*orbit, ccy=cy+Math.sin(ang)*orbit
+        const spread=(base*0.34)*(1-e*0.65)*beat
+        for(const s of p){
+          const px=ccx+Math.cos(s.a+t*0.0004*s.sp)*s.r*spread
+          const py=ccy+Math.sin(s.a+t*0.0004*s.sp)*s.r*spread
+          const tw=0.45+0.55*Math.sin(t*0.004*s.sp+s.tw)
+          const d2c=Math.hypot(px-cx,py-cy)/base
+          const g=Math.max(0,1-d2c)*e
+          const col=g>0.45?GREEN:color
+          ctx.fillStyle=`rgba(${col},${tw*(0.3+e*0.7)})`
+          ctx.beginPath(); ctx.arc(px,py,s.sz*(0.8+e*0.6),0,7); ctx.fill()
+        }
+      }
+      // déphasage des cœurs qui se RÉSORBE quand on se rapproche (synchronisation)
+      const sync=1-Math.min(ea,eb)
+      cloud(A, ea, -Math.PI*0.78, PLUM, 0)            // toi (prune), haut-gauche
+      cloud(B, eb, Math.PI*0.22, ROSE, 0.5*sync)      // l'autre (rose), bas-droite
+      raf=requestAnimationFrame(draw)
+    }
+    raf=requestAnimationFrame(draw)
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
+  },[])
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(120% 90% at 50% 40%,#1a0f1e 0%,#0b0610 72%)',display:'flex',flexDirection:'column'}}>
+      <canvas ref={cvRef} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>
+      <div style={{position:'relative',zIndex:2,textAlign:'center',marginTop:'calc(env(safe-area-inset-top,0px) + 54px)'}}>
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#8a7d86'}}>{bothArrived?'Vous y êtes':'Vous vous rapprochez'}</div>
+        <div style={{fontSize:24,fontWeight:800,color:'#fff',marginTop:4}}>{otherName}</div>
+      </div>
+      <div style={{position:'relative',zIndex:2,marginTop:'auto',textAlign:'center',marginBottom:'calc(env(safe-area-inset-bottom,0px) + 40px)'}}>
+        <div style={{fontSize:52,fontWeight:800,color:'#fff',lineHeight:1,letterSpacing:'-.02em'}}>{bothArrived?'✦':(mins<1?`${secs}s`:`${mins} min`)}</div>
+        <div style={{fontSize:14,color:'#9a8d96',marginTop:8,fontWeight:600}}>{bothArrived?<>{otherName} est <b style={{color:'#77BC1F'}}>au lieu</b></>:<>Rendez-vous à <b style={{color:'#77BC1F'}}>{venueName}</b></>}</div>
+        <button onClick={onClose} style={{marginTop:22,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',borderRadius:30,padding:'10px 22px',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Revenir à l'app</button>
+      </div>
+    </div>
+  )
+}
+
 function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, onRetardAck, supabase: sb }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void; onCheckin?:()=>void; onTerminer?:()=>void; onRetardAck?:()=>void; supabase?:any }) {
+  const [showConv, setShowConv] = useState(false)
   const [now,setNow] = useState(new Date())
   const [myPos,setMyPos] = useState<{lat:number,lng:number,ts:number}|null>(null)
   const [otherPos,setOtherPos] = useState<{lat:number,lng:number}|null>(null)
@@ -5922,7 +5998,8 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
         @keyframes rdvBlink{0%,100%{opacity:1}50%{opacity:.5}}
         @keyframes sonarOut{0%{opacity:.7;transform:scale(0)}60%{opacity:.25}100%{opacity:0;transform:scale(1)}}
       `}</style>
-      <div onClick={onClick} style={{
+      {showConv && <ConvergenceOverlay myProgress={Math.min(1,myOffsetPx/90)} otherProgress={Math.min(1,otherOffsetPx/90)} mins={mins} secs={secs} otherName={other?.name?.split(' ')[0]||'...'} venueName={venueName} bothArrived={bothArrived} onClose={()=>setShowConv(false)}/>}
+      <div onClick={()=>setShowConv(true)} style={{
         position:'fixed',bottom:84,left:10,right:10,zIndex:1400,
         background:'#ffffff',
         border:`2px solid ${col}`,borderRadius:20,padding:'10px 12px 10px',cursor:'pointer',

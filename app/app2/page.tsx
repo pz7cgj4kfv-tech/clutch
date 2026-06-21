@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x114'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x115'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -319,7 +319,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g dans toute la croûte terrestre',
     'sub.at.f1': 'Tout Rh +', 'sub.at.f2': 'Mode incognito', 'sub.at.f3': 'Rayon élargi 50km', 'sub.at.f4': 'Stats avancées', 'sub.at.f5': 'Badge Élite sur le profil', 'sub.at.f6': 'Support prioritaire',
     'sub.women': 'Femmes — toujours gratuites, toujours prioritaires ♀',
-    'ev.filter.all': 'Tout', 'ev.filter.partenaires':'Partenaires', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
+    'ev.filter.all': 'Tout', 'ev.filter.partenaires':'Communauté', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Bien-être', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Gastronomie', 'ev.filter.musique': 'Musique', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte', 'ev.filter.groupe': 'Groupe',
@@ -423,7 +423,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g in the entire Earth\'s crust',
     'sub.at.f1': 'Everything in Rh +', 'sub.at.f2': 'Incognito mode', 'sub.at.f3': 'Extended radius 50km', 'sub.at.f4': 'Advanced stats', 'sub.at.f5': 'Elite badge on profile', 'sub.at.f6': 'Priority support',
     'sub.women': 'Women — always free, always prioritized ♀',
-    'ev.filter.all': 'All', 'ev.filter.partenaires':'Partners', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
+    'ev.filter.all': 'All', 'ev.filter.partenaires':'Community', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Wellness', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Food & Drink', 'ev.filter.musique': 'Music', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed', 'ev.filter.groupe': 'Group',
@@ -2647,7 +2647,7 @@ const PARTNERS_MOCK = [
 
 const EV_FILTERS = [
   {id:'all',      trKey:'ev.filter.all',      icon:'✦'},
-  {id:'partenaires', trKey:'ev.filter.partenaires', icon:'🤝'},
+  {id:'partenaires', trKey:'ev.filter.partenaires', icon:'🫂'},
   {id:'mine',     trKey:'ev.filter.mine',     icon:'📌'},
   {id:'groupe',   trKey:'ev.filter.groupe',   icon:'👥'},
   {id:'soir',     trKey:'ev.filter.soir',     icon:'🌙'},
@@ -3001,11 +3001,45 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
-        {/* 🤝 VUE PARTENAIRES (prototype) — suivre des groupes/organisateurs récurrents → notifs ciblées */}
+        {/* 🫂 VUE COMMUNAUTÉ (prototype) — 2 niveaux distincts : Partenaires officiels (clubs, payants, mis en avant) VS Groupes privés à suivre (Bibi, Rando…). Demande David. */}
         {evFilter==='partenaires' && (<>
-          <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
-            <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🤝 Groupes & partenaires</div>
-            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>Suis un club, un collectif, un organisateur — et reçois une notif à chacun de leurs nouveaux événements. Ton réseau se construit tout seul.</div>
+          <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 14px',marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🫂 Ta communauté</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>Suis des clubs et des groupes — reçois une notif à chacun de leurs nouveaux événements. Ton réseau se construit tout seul.</div>
+          </div>
+
+          {/* ─── PARTENAIRES OFFICIELS (clubs vérifiés, mis en avant en bannière en haut des events) ─── */}
+          <div style={{display:'flex',alignItems:'center',gap:6,margin:'2px 2px 10px'}}>
+            <span style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.plum}}>🏛 Partenaires officiels</span>
+            <span style={{fontSize:9.5,color:C.whiteMid,background:`${C.green}14`,border:`1px solid ${C.green}33`,borderRadius:8,padding:'1px 6px'}}>✓ vérifiés</span>
+          </div>
+          {PARTNERS_MOCK.filter((p:any)=>p.verified).map(p=>{ const on=followedPartners.has(p.id); return (
+            <div key={p.id} style={{background:C.bgCard,border:`1px solid ${on?C.plum:C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:11,boxShadow:'0 2px 10px rgba(83,41,67,.05)'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+                <div style={{width:46,height:46,borderRadius:14,background:`${C.plum}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{p.emoji}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
+                    <span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 5px'}}>✓ Certifié</span>
+                  </div>
+                  <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
+                  <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,fontWeight:700,color:C.plum,background:`${C.plum}0d`,borderRadius:8,padding:'3px 8px'}}>🗓 {p.next}</span>
+                    <span style={{fontSize:10.5,color:C.whiteMid}}>👥 {p.members} membres</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={()=>togglePartner(p.id)} style={{width:'100%',marginTop:11,padding:'10px',borderRadius:12,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                {on?'✓ Suivi · notifs activées':'+ Suivre ce partenaire'}
+              </button>
+            </div>
+          )})}
+
+          {/* ─── GROUPES À SUIVRE (privés / lambda : Bibi, Rando… + les miens) ─── */}
+          <div style={{display:'flex',alignItems:'center',gap:6,margin:'16px 2px 10px'}}>
+            <span style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid}}>🫂 Groupes à suivre</span>
+            <span style={{fontSize:9.5,color:C.whiteMid,opacity:.8}}>créés par des gens comme toi</span>
           </div>
           <button onClick={()=>setShowCreatePartner(true)} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px dashed ${C.plum}`,background:'transparent',color:C.plum,fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:14}}>+ Créer mon groupe</button>
           {/* Mes groupes créés */}
@@ -3028,15 +3062,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <button onClick={()=>{ const next=myPartners.filter((x:any)=>x.id!==p.id); setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{} }} style={{width:'100%',marginTop:11,padding:'9px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Supprimer ce groupe</button>
             </div>
           ))}
-          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,margin:'4px 2px 10px'}}>Partenaires & clubs officiels</div>
-          {PARTNERS_MOCK.map(p=>{ const on=followedPartners.has(p.id); return (
+          {PARTNERS_MOCK.filter((p:any)=>!p.verified).map(p=>{ const on=followedPartners.has(p.id); return (
             <div key={p.id} style={{background:C.bgCard,border:`1px solid ${on?C.plum:C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:11,boxShadow:'0 2px 10px rgba(83,41,67,.05)'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
                 <div style={{width:46,height:46,borderRadius:14,background:`${C.plum}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{p.emoji}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:5}}>
                     <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
-                    {p.verified&&<span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 5px'}}>✓ Certifié</span>}
+                    <span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>Groupe privé</span>
                   </div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
                   <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
@@ -3054,6 +3087,33 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — tu peux créer ton groupe (public ou privé par lien), choisir une <b>région</b> (adresse révélée avant le RDV) et y joindre un <b>fichier</b>. La diffusion réelle des notifs arrive en V2.</div>
         </>)}
         {evFilter!=='partenaires' && (<>
+        {/* ✨ BANNIÈRES PARTENAIRES (payants = mis en avant, défilent en haut) — demande David. Visible seulement sur "Tout". */}
+        {evFilter==='all' && PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
+          <div style={{marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,margin:'0 2px 8px'}}>
+              <span style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.plum}}>✨ À la une</span>
+              <span style={{fontSize:9.5,color:C.whiteMid,opacity:.85}}>nos partenaires</span>
+            </div>
+            <div style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',padding:'2px 2px 4px',margin:'0 -2px'}}>
+              {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
+                <div key={p.id} onClick={()=>setEvFilter('partenaires')} style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#532943,#2C1020)',boxShadow:'0 4px 16px rgba(83,41,67,.22)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                  <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.14,lineHeight:1}}>{p.emoji}</div>
+                  <div style={{position:'relative'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                      <span style={{fontSize:16,fontWeight:900,color:'#fff'}}>{p.name}</span>
+                      <span style={{fontSize:8.5,fontWeight:800,color:'#fff',background:'rgba(119,188,31,.9)',borderRadius:7,padding:'1px 5px'}}>✓</span>
+                    </div>
+                    <div style={{fontSize:11,color:'#e8d8e4',opacity:.9}}>{p.cat} · 📍 {p.zone}</div>
+                  </div>
+                  <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:10}}>
+                    <span style={{fontSize:11,fontWeight:800,color:'#fff',background:'rgba(235,107,175,.22)',border:'1px solid rgba(235,107,175,.5)',borderRadius:9,padding:'4px 9px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🗓 {p.next}</span>
+                    <button onClick={(e)=>{e.stopPropagation();togglePartner(p.id)}} style={{flexShrink:0,fontSize:11,fontWeight:800,color:on?'#EB6BAF':'#532943',background:on?'transparent':'#fff',border:on?'1px solid #EB6BAF':'none',borderRadius:9,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>{on?'✓ Suivi':'+ Suivre'}</button>
+                  </div>
+                </div>
+              )})}
+            </div>
+          </div>
+        )}
         {cancelledNotice && (
           <div style={{background:'rgba(220,80,80,.1)',border:`1px solid ${C.red}44`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'flex-start',gap:8}}>
             <span style={{fontSize:16}}>🚫</span>
@@ -9117,15 +9177,13 @@ export default function App2() {
                   {/* ── LISTE ── */}
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
 
-                    {/* ══ 🌙 BANNER CLUTCH NIGHT (prototype) ══ */}
-                    <button onClick={()=>setShowClutchNight(true)} style={{width:'100%',display:'flex',alignItems:'center',gap:12,background:'linear-gradient(120deg,#532943,#2C1020)',border:'none',borderRadius:18,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                      <span style={{fontSize:26,filter:'drop-shadow(0 0 10px rgba(235,107,175,.55))'}}>🌙</span>
-                      <span style={{flex:1,minWidth:0}}>
-                        <span style={{display:'block',fontSize:14.5,fontWeight:900,color:'#fff'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></span>
-                        <span style={{display:'block',fontSize:11.5,color:'#e8d8e4',marginTop:1}}>Ce soir on sort · soirées & afters, un peu plus loin 🚆</span>
-                      </span>
-                      <span style={{fontSize:18,color:'#EB6BAF'}}>›</span>
-                    </button>
+                    {/* ══ 🌙 PASTILLE CLUTCH NIGHT (petite, comme Clutch Live — David) ══ */}
+                    <div style={{display:'flex',justifyContent:'center',marginBottom:12}}>
+                      <button onClick={()=>setShowClutchNight(true)} style={{display:'inline-flex',alignItems:'center',gap:7,background:'linear-gradient(120deg,#532943,#2C1020)',border:'none',borderRadius:20,padding:'7px 14px 7px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:'0 2px 10px rgba(83,41,67,.25)'}}>
+                        <span style={{fontSize:15,filter:'drop-shadow(0 0 6px rgba(235,107,175,.55))'}}>🌙</span>
+                        <span style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></span>
+                      </button>
+                    </div>
 
                     {/* ══ MODE PRO — MANOSKI ══ */}
                     {proMode && !proJobFilter && (() => {

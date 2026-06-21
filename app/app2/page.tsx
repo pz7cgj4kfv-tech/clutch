@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x117'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x118'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1472,7 +1472,8 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
 }
 
 // Modal suppression compte
-function DeleteModal({userId,onDeleted,onClose,showToast}:{userId:string;onDeleted:()=>void;onClose:()=>void;showToast:(m:string,c?:string)=>void}) {
+function DeleteModal({userId,onDeleted,onClose,showToast,lang='fr'}:{userId:string;onDeleted:()=>void;onClose:()=>void;showToast:(m:string,c?:string)=>void;lang?:Lang}) {
+  const EN = lang==='en'
   const [step,setStep]=useState<'warn'|'type'|'doing'>('warn'); const [typed,setTyped]=useState('')
   const doDelete=async()=>{
     setStep('doing')
@@ -1491,10 +1492,10 @@ function DeleteModal({userId,onDeleted,onClose,showToast}:{userId:string;onDelet
         await supabase.from('profiles').update({name:'Compte supprimé',bio:null,photo_url:null,interests:[],is_available:false,available_until:null,deleted_at:new Date().toISOString()}).eq('id',userId)
         await supabase.auth.signOut()
       }
-      showToast('✓ Account deleted. See you!', C.green)
+      showToast(EN?'✓ Account deleted. See you!':'✓ Compte supprimé. À bientôt !', C.green)
       onDeleted()
     } catch {
-      showToast('Error — try again', C.red)
+      showToast(EN?'Error — try again':'Erreur — réessaie', C.red)
       setStep('warn')
     }
   }
@@ -1502,9 +1503,9 @@ function DeleteModal({userId,onDeleted,onClose,showToast}:{userId:string;onDelet
     <div style={{position:'fixed',inset:0,zIndex:3000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.75)',backdropFilter:'blur(6px)'}} onClick={step==='doing'?undefined:onClose}/>
       <div style={{position:'relative',background:C.bg,borderRadius:'20px 20px 0 0',padding:'24px 20px 48px',animation:'modalIn .4s cubic-bezier(.22,1,.36,1)'}}>
-        {step==='doing'?<div style={{textAlign:'center',padding:'30px 0'}}><div style={{fontSize:32,marginBottom:12}}>⏳</div><div style={{fontSize:14,color:C.whiteMid}}>Deleting…</div></div>
-        :step==='warn'?<><div style={{fontSize:18,fontWeight:900,color:C.red,marginBottom:8}}>🗑 Delete my account</div><div style={{fontSize:13,color:C.whiteMid,lineHeight:1.6,marginBottom:20}}>This action is <strong style={{color:C.white}}>irreversible</strong>. All your data will be erased (Swiss LPD).</div><button onClick={()=>setStep('type')} style={{width:'100%',padding:'13px',background:'rgba(239,68,68,.12)',border:'1.5px solid rgba(239,68,68,.4)',borderRadius:12,color:C.red,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>Continue →</button><button onClick={onClose} style={{width:'100%',padding:'13px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button></>
-        :<><div style={{fontSize:16,fontWeight:900,color:C.red,marginBottom:8}}>Final confirmation</div><div style={{fontSize:13,color:C.whiteMid,marginBottom:16}}>Type <strong style={{color:C.white}}>DELETE</strong> :</div><input value={typed} onChange={e=>setTyped(e.target.value.toUpperCase())} placeholder="DELETE" style={{width:'100%',background:'rgba(239,68,68,.08)',border:`1.5px solid ${typed==='DELETE'?C.red:'rgba(255,255,255,.1)'}`,borderRadius:12,padding:'13px 14px',fontSize:16,fontWeight:800,letterSpacing:'.1em',color:C.red,outline:'none',fontFamily:'inherit',caretColor:C.red,marginBottom:16}}/><button onClick={doDelete} disabled={typed!=='DELETE'} style={{width:'100%',padding:'14px',background:typed==='DELETE'?C.red:'rgba(239,68,68,.12)',border:'none',borderRadius:12,color:typed==='DELETE'?'#fff':'rgba(239,68,68,.4)',fontSize:14,fontWeight:900,cursor:typed==='DELETE'?'pointer':'default',fontFamily:'inherit',marginBottom:10}}>🗑 Delete permanently</button><button onClick={onClose} style={{width:'100%',padding:'13px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button></>}
+        {step==='doing'?<div style={{textAlign:'center',padding:'30px 0'}}><div style={{fontSize:32,marginBottom:12}}>⏳</div><div style={{fontSize:14,color:C.whiteMid}}>{EN?'Deleting…':'Suppression…'}</div></div>
+        :step==='warn'?<><div style={{fontSize:18,fontWeight:900,color:C.red,marginBottom:8}}>🗑 {EN?'Delete my account':'Supprimer mon compte'}</div><div style={{fontSize:13,color:C.whiteMid,lineHeight:1.6,marginBottom:20}}>{EN?<>This action is <strong style={{color:C.white}}>irreversible</strong>. All your data will be erased (Swiss LPD).</>:<>Cette action est <strong style={{color:C.white}}>irréversible</strong>. Toutes tes données seront effacées (LPD suisse).</>}</div><button onClick={()=>setStep('type')} style={{width:'100%',padding:'13px',background:'rgba(239,68,68,.12)',border:'1.5px solid rgba(239,68,68,.4)',borderRadius:12,color:C.red,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>{EN?'Continue →':'Continuer →'}</button><button onClick={onClose} style={{width:'100%',padding:'13px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Cancel':'Annuler'}</button></>
+        :<><div style={{fontSize:16,fontWeight:900,color:C.red,marginBottom:8}}>{EN?'Final confirmation':'Confirmation finale'}</div><div style={{fontSize:13,color:C.whiteMid,marginBottom:16}}>{EN?<>Type <strong style={{color:C.white}}>DELETE</strong> :</>:<>Tape <strong style={{color:C.white}}>SUPPRIMER</strong> :</>}</div><input value={typed} onChange={e=>setTyped(e.target.value.toUpperCase())} placeholder={EN?'DELETE':'SUPPRIMER'} style={{width:'100%',background:'rgba(239,68,68,.08)',border:`1.5px solid ${typed===(EN?'DELETE':'SUPPRIMER')?C.red:'rgba(255,255,255,.1)'}`,borderRadius:12,padding:'13px 14px',fontSize:16,fontWeight:800,letterSpacing:'.1em',color:C.red,outline:'none',fontFamily:'inherit',caretColor:C.red,marginBottom:16}}/><button onClick={doDelete} disabled={typed!==(EN?'DELETE':'SUPPRIMER')} style={{width:'100%',padding:'14px',background:typed===(EN?'DELETE':'SUPPRIMER')?C.red:'rgba(239,68,68,.12)',border:'none',borderRadius:12,color:typed===(EN?'DELETE':'SUPPRIMER')?'#fff':'rgba(239,68,68,.4)',fontSize:14,fontWeight:900,cursor:typed===(EN?'DELETE':'SUPPRIMER')?'pointer':'default',fontFamily:'inherit',marginBottom:10}}>🗑 {EN?'Delete permanently':'Supprimer définitivement'}</button><button onClick={onClose} style={{width:'100%',padding:'13px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,color:C.whiteMid,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Cancel':'Annuler'}</button></>}
       </div>
     </div>
   )
@@ -3117,13 +3118,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}
               {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
               <div style={{position:'absolute',bottom:7,left:9,right:9}}>
-                <span style={{fontSize:9,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.5)',backdropFilter:'blur(3px)',borderRadius:20,padding:'2px 8px'}}>🕐 {ev.time}</span>
-                <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,marginTop:4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
+                {/* Infos qui claquent sur la photo : heure BIEN visible + lieu (David) */}
+                <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginBottom:4}}>
+                  <span style={{fontSize:11.5,fontWeight:900,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px'}}>🕐 {ev.time}</span>
+                  {ev.lieu && <span style={{fontSize:10.5,fontWeight:800,color:'#fff',background:'rgba(0,0,0,.58)',backdropFilter:'blur(3px)',borderRadius:20,padding:'3px 9px',maxWidth:'62%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'').split(',')[0]}</span>}
+                </div>
+                <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
               </div>
             </div>
-            {/* Footer compact */}
+            {/* Footer compact : date + jauge de places */}
             <div style={{padding:'8px 10px 9px'}}>
-              <div style={{fontSize:9.5,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:6}}>📍 {(ev.lieu||'').split(',')[0]}</div>
+              <div style={{fontSize:10,color:C.whiteMid,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:6}}>📅 {ev.date}</div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontSize:10,fontWeight:800,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
                 <div style={{flex:1,height:3.5,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green}}/></div>
@@ -6727,22 +6732,6 @@ function ClutchNightOverlay({ onClose, onActivate }:{ onClose:()=>void; onActiva
 
 // ════════════════════════════════════════════════════════════════════
 // 🥚 ÉPHÉMÈRE — Coucou à Mel (À RETIRER AU PROCHAIN BUILD). Visible UNIQUEMENT pour Mel, 1 fois.
-// Blague : déployé dimanche 21 juin à 5h37 du matin. Pour la faire rigoler.
-// ════════════════════════════════════════════════════════════════════
-function MelHello({ onClose }:{ onClose:()=>void }) {
-  return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'rgba(42,16,32,.55)',backdropFilter:'blur(5px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-      <div onClick={e=>e.stopPropagation()} style={{maxWidth:312,background:'#fff',borderRadius:26,padding:'32px 24px 24px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
-        <div style={{fontSize:64,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
-        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Dimanche, jour de repos</div>
-        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Ce petit mot s'autodétruira au prochain build.</div>
-        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>😊</button>
-      </div>
-      <style>{`@keyframes melBounce{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-11px) rotate(7deg)}}`}</style>
-    </div>
-  )
-}
-
 // ════════════════════════════════════════════════════════════════════
 // QuickSOS — bouclier de sécurité DISCRET, visible UNIQUEMENT pendant un RDV actif.
 // Demande David : la sécurité doit être à 1 geste PENDANT le rendez-vous (pas enfoui dans le profil).
@@ -6970,12 +6959,12 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
           <div style={{flexShrink:0,minWidth:52}}>
             {bothArrived
               ? <div style={{fontSize:13,color:'#77BC1F',fontWeight:900}}>🎉 Top !</div>
-              : <div style={{fontSize:20,fontWeight:900,color:past?'#d97706':'#4A2A3D',fontVariantNumeric:'tabular-nums',fontFamily:'monospace',lineHeight:1}}>
+              : <div style={{fontSize:20,fontWeight:900,color:past?'#EB6BAF':'#4A2A3D',fontVariantNumeric:'tabular-nums',fontFamily:'monospace',lineHeight:1}}>
                   {past ? '0:00' : `${mins}:${String(secs).padStart(2,'0')}`}
                 </div>}
           </div>
           {Number(verrou.retard_min) > 0 && (
-            <div style={{flexShrink:0,padding:'2px 7px',borderRadius:8,background:'rgba(226,124,0,.12)',border:'1px solid rgba(226,124,0,.4)',color:'#d97706',fontSize:11,fontWeight:900}}>
+            <div style={{flexShrink:0,padding:'2px 7px',borderRadius:8,background:'rgba(235,107,175,.12)',border:'1px solid rgba(235,107,175,.4)',color:'#EB6BAF',fontSize:11,fontWeight:900}}>
               +{verrou.retard_min}min
             </div>
           )}
@@ -6986,7 +6975,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
             </div>
             <div style={{fontSize:11,color:'#6F6F6E',fontWeight:700}}>
               RDV {new Date(verrou.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
-              {Number(verrou.retard_min) > 0 && <span style={{color:'#d97706'}}> → {new Date(new Date(verrou.proposed_time).getTime()+Number(verrou.retard_min)*60000).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</span>}
+              {Number(verrou.retard_min) > 0 && <span style={{color:'#EB6BAF'}}> → {new Date(new Date(verrou.proposed_time).getTime()+Number(verrou.retard_min)*60000).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</span>}
               {(verrou as any).is_quick_date && <span style={{color:C.orange,marginLeft:4}}>⚡ Quick Date</span>}
             </div>
             {(verrou as any).is_quick_date && (() => {
@@ -7010,7 +6999,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
           {(()=>{
             const comp = dopplerDir===0 ? 1 : Math.max(0.35, Math.min(0.95, 1-dopplerSpeed*0.65))
             const xOff = dopplerDir * Math.min(14, dopplerSpeed*18) // décalage vers direction
-            const wc = dopplerDir===1?'#77BC1F':dopplerDir===-1?'#d97706':'#B2B2B2'
+            const wc = dopplerDir===1?'#77BC1F':dopplerDir===-1?'#EB6BAF':'#B2B2B2'
             const dur = dopplerDir===0 ? 2.4 : Math.max(0.8, 2.4-dopplerSpeed*1.2)
             return (
               <div style={{position:'absolute',left:0,top:4,transform:`translateX(${myOffsetPx}px)`,transition:'transform 1.2s ease'}}>
@@ -7114,16 +7103,16 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
             }
             // En attente de réponse
             return (
-              <div style={{background:'rgba(226,124,0,.06)',border:'1px solid rgba(226,124,0,.2)',borderRadius:12,padding:'8px 12px',marginBottom:8,textAlign:'center'}}>
-                <div style={{fontSize:11,fontWeight:700,color:'#d97706'}}>⏳ En attente de réponse de {other?.name||'ton partenaire'}…</div>
+              <div style={{background:'rgba(235,107,175,.06)',border:'1px solid rgba(235,107,175,.2)',borderRadius:12,padding:'8px 12px',marginBottom:8,textAlign:'center'}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#EB6BAF'}}>⏳ En attente de réponse de {other?.name||'ton partenaire'}…</div>
               </div>
             )
           }
 
           // C'est l'autre qui est en retard — je dois décider
           if (iNeedToDecide) return (
-            <div style={{background:'rgba(226,124,0,.08)',border:'1px solid rgba(226,124,0,.35)',borderRadius:12,padding:'10px 12px',marginBottom:8}}>
-              <div style={{fontSize:12,fontWeight:800,color:'#d97706',marginBottom:8,textAlign:'center'}}>
+            <div style={{background:'rgba(235,107,175,.08)',border:'1px solid rgba(235,107,175,.35)',borderRadius:12,padding:'10px 12px',marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:800,color:'#EB6BAF',marginBottom:8,textAlign:'center'}}>
                 ⏰ {other?.name||'Partenaire'} sera 30 min en retard
               </div>
               {showRefuseInput ? (
@@ -7595,10 +7584,6 @@ export default function App2() {
   }
   const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
   // 🥚 ÉPHÉMÈRE — coucou à Mel + David (À RETIRER au prochain build). Visible qu'eux deux, 1 fois.
-  const HELLO_IDS = ['9626a0ba-037f-49dd-9957-ebd37e58a864','bad38f3e-87df-40e0-a2d2-75c03b58d72b'] // Mel · David
-  const [showMelHello,setShowMelHello] = useState(false)
-  useEffect(()=>{ if(user?.id && HELLO_IDS.includes(user.id)){ try{ if(!localStorage.getItem('mel_hello_v2')) setShowMelHello(true) }catch{ setShowMelHello(true) } } }, [user?.id])
-
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
   const [showClutchNight,setShowClutchNight] = useState(false) // 🌙 prototype Clutch Night
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
@@ -9135,13 +9120,13 @@ export default function App2() {
                   {/* ── LISTE ── */}
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
 
-                    {/* ══ 🌙 PASTILLE CLUTCH NIGHT (petite, comme Clutch Live — David) ══ */}
-                    <div style={{display:'flex',justifyContent:'center',marginBottom:12}}>
+                    {/* ══ 🌙 PASTILLE CLUTCH NIGHT (petite ; masquée pendant un Verrou actif — David) ══ */}
+                    {!activeVerrou && <div style={{display:'flex',justifyContent:'center',marginBottom:12}}>
                       <button onClick={()=>setShowClutchNight(true)} style={{display:'inline-flex',alignItems:'center',gap:7,background:'linear-gradient(120deg,#532943,#2C1020)',border:'none',borderRadius:20,padding:'7px 14px 7px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:'0 2px 10px rgba(83,41,67,.25)'}}>
                         <span style={{fontSize:15,filter:'drop-shadow(0 0 6px rgba(235,107,175,.55))'}}>🌙</span>
                         <span style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></span>
                       </button>
-                    </div>
+                    </div>}
 
                     {/* ══ MODE PRO — MANOSKI ══ */}
                     {proMode && !proJobFilter && (() => {
@@ -10345,7 +10330,7 @@ export default function App2() {
               onOpenChat={existingLock?()=>{setChatClutch(existingLock);setShowChat(true)}:undefined}
               userInterests={(user as any).interests||[]} lang={lang}/>
           })()}
-          {showDelete&&user&&<DeleteModal userId={user.id} onDeleted={()=>{setShowDelete(false);setUser(null);setProfiles([]);setClutches([]);setScreen('login')}} onClose={()=>setShowDelete(false)} showToast={showToast}/>}
+          {showDelete&&user&&<DeleteModal userId={user.id} onDeleted={()=>{setShowDelete(false);setUser(null);setProfiles([]);setClutches([]);setScreen('login')}} onClose={()=>setShowDelete(false)} showToast={showToast} lang={lang}/>}
           {/* Overlay bloquant feedback — aucune interaction possible tant que feedback non donné */}
           {showFeedback&&feedbackClutch&&<div style={{position:'fixed',inset:0,zIndex:3999,background:'rgba(10,4,8,.92)',backdropFilter:'blur(4px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={e=>e.stopPropagation()}>
             <div style={{padding:'20px 20px 0',textAlign:'center',maxWidth:380}}>
@@ -10466,7 +10451,8 @@ export default function App2() {
             .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
             @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
           `}</style>
-          <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — lance-moi où tu veux"
+          {/* Clutch Live masqué pendant un Verrou actif (David : ne doit pas être cliquable en plein RDV) */}
+          {!activeVerrou && <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — lance-moi où tu veux"
             onPointerDown={(e)=>{ cancelAnimationFrame(fabRaf.current); const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0} }}
             onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp; setFabPos(clampFab(d.ox+dx, d.oy+dy)); } }}
             onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(!d)return; if(!d.moved){ setFlow('app');setTab('presences');activateLive(); return }
@@ -10482,12 +10468,10 @@ export default function App2() {
             position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(var(--sab) + 84px)', right:14}),
             zIndex:1200, width:46, height:46, borderRadius:'50%', touchAction:'none',
             background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-          }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>
+          }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>}
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🌙 Clutch Night (prototype) */}
           {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ setShowClutchNight(false); showToast('🌙 Clutch Night arrive bientôt — on prépare les soirées',C.orange) }}/>}
-          {/* 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build) */}
-          {showMelHello && <MelHello onClose={()=>{ setShowMelHello(false); try{localStorage.setItem('mel_hello_v2','1')}catch{} }}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (
             <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.6)',backdropFilter:'blur(8px)'}} onClick={()=>setCounterClutchId(null)}>

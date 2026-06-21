@@ -263,8 +263,9 @@ export default function LabPage() {
       if (!error) inserted++
     }
     const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
+    if ((count??0) > 0) await supabase.from('events').update({ spots: count }).eq('id', ev.id)  // cale spots = inscrits -> COMPLET
     setBusy(null)
-    if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
+    if ((count??0) > 0) showToast(`✓ "${ev.title}" COMPLET : ${count}/${count}`, C.green)
     else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
   }
   const freeEventSpot = async () => {

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = 'Z87'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
+const V = 'Z88'  // Version visible (dev). Code lettre+numéro, SANS date. Bump à chaque deploy.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -310,7 +310,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g dans toute la croûte terrestre',
     'sub.at.f1': 'Tout Rh +', 'sub.at.f2': 'Mode incognito', 'sub.at.f3': 'Rayon élargi 50km', 'sub.at.f4': 'Stats avancées', 'sub.at.f5': 'Badge Élite sur le profil', 'sub.at.f6': 'Support prioritaire',
     'sub.women': 'Femmes — toujours gratuites, toujours prioritaires ♀',
-    'ev.filter.all': 'Tout', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
+    'ev.filter.all': 'Tout', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Bien-être', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Gastronomie', 'ev.filter.musique': 'Musique', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte', 'ev.filter.groupe': 'Groupe',
@@ -414,7 +414,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g in the entire Earth\'s crust',
     'sub.at.f1': 'Everything in Rh +', 'sub.at.f2': 'Incognito mode', 'sub.at.f3': 'Extended radius 50km', 'sub.at.f4': 'Advanced stats', 'sub.at.f5': 'Elite badge on profile', 'sub.at.f6': 'Priority support',
     'sub.women': 'Women — always free, always prioritized ♀',
-    'ev.filter.all': 'All', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
+    'ev.filter.all': 'All', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Wellness', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Food & Drink', 'ev.filter.musique': 'Music', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed', 'ev.filter.groupe': 'Group',
@@ -1451,7 +1451,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
                   return null
                 })()}
               </div>
-              <div style={{fontSize:10,fontWeight:isActive?800:500,color:isActive?'#EB6BAF':'rgba(0,0,0,0.4)',letterSpacing:'.04em'}}>{label}</div>
+              <div style={{fontSize:9,fontWeight:isActive?800:600,color:isActive?'#EB6BAF':'rgba(0,0,0,0.42)',letterSpacing:0,maxWidth:'100%',whiteSpace:'nowrap',overflow:'visible',textAlign:'center'}}>{label}</div>
             </button>
           )
         })}
@@ -2626,6 +2626,7 @@ const MOCK_EVENTS = [
 // mais à documenter dans CGU. Pas de filtrage automatique = utilisateur choisit.
 const EV_FILTERS = [
   {id:'all',      trKey:'ev.filter.all',      icon:'✦'},
+  {id:'mine',     trKey:'ev.filter.mine',     icon:'📌'},
   {id:'groupe',   trKey:'ev.filter.groupe',   icon:'👥'},
   {id:'soir',     trKey:'ev.filter.soir',     icon:'🌙'},
   {id:'demain',   trKey:'ev.filter.demain',   icon:'☀️'},
@@ -2858,6 +2859,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   const filteredEvs = events.filter(ev => {
     if (evFilter==='all') return true
+    if (evFilter==='mine') return registered.has(ev.id)
     if (evFilter==='groupe') return !!(ev as any).isGroupe
     if (evFilter==='soir') return ev.date === 'Ce soir'
     if (evFilter==='demain') return ev.date.toLowerCase().includes('demain')
@@ -2926,6 +2928,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           {EV_FILTERS.map(f=>{
             const countForFilter = (fid:string) => {
               if (fid==='all') return events.length
+              if (fid==='mine') return events.filter(ev=>registered.has(ev.id)).length
               if (fid==='groupe') return events.filter(ev=>(ev as any).isGroupe).length
               if (fid==='soir') return events.filter(ev=>ev.date==='Ce soir').length
               if (fid==='demain') return events.filter(ev=>ev.date.toLowerCase().includes('demain')).length
@@ -4479,10 +4482,12 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid })
       if (!error) inserted++   // les doublons (déjà inscrits) échouent silencieusement, normal
     }
-    // taken est recalculé par le trigger DB ; on lit juste le total pour le message
+    // taken est recalculé par le trigger DB ; on lit le total
     const { count } = await supabase.from('event_participants').select('*',{count:'exact',head:true}).eq('event_id',ev.id)
+    // On n'a que ~10 bots → pour saturer un gros event, on cale spots sur le nb d'inscrits (COMPLET garanti)
+    if ((count??0) > 0) await supabase.from('events').update({ spots: count }).eq('id', ev.id)
     setBusy(null)
-    if ((count??0) > 0) showToast(`✓ "${ev.title}" : ${count} inscrit·es (${inserted} ajouté·es)`, C.green)
+    if ((count??0) > 0) showToast(`✓ "${ev.title}" COMPLET : ${count}/${count}`, C.green)
     else showToast("❌ Échec — applique la SQL event_participants_bot_admin", C.red)
   }
   // Libère UNE place sur le dernier event (retire 1 bot inscrit) → tester la notice "place libérée"
@@ -6546,6 +6551,9 @@ export default function App2() {
     try { localStorage.setItem('clutch_completedIds', JSON.stringify([...completedIds.current])) } catch {}
   }
   const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
+  // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
+  const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
+  const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean}|null>(null)
   const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
   const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
   const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
@@ -9302,11 +9310,15 @@ export default function App2() {
             .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
             @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
           `}</style>
-          <button className="cl-fab" onClick={()=>{setFlow('app');setTab('presences');activateLive()}} aria-label="Clutch Live — les gens autour de toi" style={{
-            position:'fixed', bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:14,
-            zIndex:1200, width:56, height:56, borderRadius:'50%',
-            background:'transparent', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-          }}><img src="/icons/mel/QuickClutch.svg" width={56} height={56} alt="" style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))'}}/></button>
+          <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — déplace-moi où tu veux"
+            onPointerDown={(e)=>{ const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false} }}
+            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const sz=46; const nx=Math.min(window.innerWidth-sz-6,Math.max(6,d.ox+dx)); const ny=Math.min(window.innerHeight-sz-6,Math.max(6,d.oy+dy)); setFabPos({x:nx,y:ny}); } }}
+            onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(d&&!d.moved){ setFlow('app');setTab('presences');activateLive() } else if(d&&d.moved){ setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
+            style={{
+            position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:14}),
+            zIndex:1200, width:46, height:46, borderRadius:'50%', touchAction:'none',
+            background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+          }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (

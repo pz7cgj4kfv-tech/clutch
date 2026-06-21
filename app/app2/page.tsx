@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x107'  // Versionnage HEXADÉCIMAL. ~263e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x108'  // Versionnage HEXADÉCIMAL. ~264e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -103,8 +103,8 @@ const Sounds = {
 // orange=rose (accent) · green=vert Mel · border=gris clair.
 const C = {
   bg:'#FFFFFF',          // fond principal (blanc pur)
-  bgCard:'#F6F2F6',      // cartes : léger fond prune-tinté → SÉPARE du blanc (demande David : ne pas tout poser sur du blanc)
-  bgSheet:'#FBF9FB',     // bottom sheets : à peine teinté
+  bgCard:'#F4F4F4',      // cartes : gris NEUTRE très léger (famille palette Mel #E3E3E3/#B2B2B2) → sépare du blanc sans inventer de couleur (validé David)
+  bgSheet:'#FFFFFF',     // bottom sheets : blanc pur (Mel)
   bordeaux:'#532943',    // prune — accent fort, CTA, onglet actif, ombres
   bordeauxLight:'#6E3A5C',
   salmon:'#6F6F6E', salmonFaint:'rgba(83,41,67,0.06)', salmonMid:'#B2B2B2',
@@ -2924,7 +2924,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   return (
     <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
         <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:6}}>{t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
           <button onClick={()=>setShowCreateGroup(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',borderRadius:20,background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
@@ -4717,6 +4717,25 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const profilePage = pageStack[pageStack.length-1] || null
   const setProfilePage = (p:string|null) => setPageStack(s => p===null ? [] : [...s, p])
   const popPage = () => setPageStack(s => s.slice(0,-1))
+  // 🧭 SWIPE-BACK (ergonomie David) : glisser vers la droite ferme la sous-page (feel iOS), sans casser le scroll vertical.
+  const swipeOverlayRef = useRef<HTMLDivElement|null>(null)
+  const swipeRef = useRef<{x:number;y:number;active:boolean;decided:boolean;horiz:boolean}>({x:0,y:0,active:false,decided:false,horiz:false})
+  const onSwipeStart = (e:React.TouchEvent) => { const t=e.touches[0]; swipeRef.current={x:t.clientX,y:t.clientY,active:true,decided:false,horiz:false} }
+  const onSwipeMove = (e:React.TouchEvent) => {
+    const s=swipeRef.current; if(!s.active) return
+    const t=e.touches[0]; const dx=t.clientX-s.x, dy=t.clientY-s.y
+    if(!s.decided){ if(Math.abs(dx)<6 && Math.abs(dy)<6) return; s.decided=true; s.horiz = Math.abs(dx) > Math.abs(dy) }
+    if(!s.horiz) return // scroll vertical → on laisse passer
+    const el=swipeOverlayRef.current; if(el){ const off=Math.max(0,dx); el.style.transition='none'; el.style.transform=`translateX(${off}px)`; el.style.opacity=String(Math.max(.5,1-off/600)) }
+  }
+  const onSwipeEnd = (e:React.TouchEvent) => {
+    const s=swipeRef.current; if(!s.active) return; s.active=false
+    const el=swipeOverlayRef.current; if(!el || !s.horiz) return
+    const dx=(e.changedTouches[0]?.clientX||s.x)-s.x
+    el.style.transition='transform .2s ease, opacity .2s ease'
+    if(dx>90){ el.style.transform='translateX(100%)'; el.style.opacity='0'; setTimeout(()=>{ popPage(); setEditField(null); if(el){ el.style.transform=''; el.style.opacity=''; } },170) }
+    else { el.style.transform='translateX(0)'; el.style.opacity='1' }
+  }
   const [showBotLab, setShowBotLab] = useState(false)
   const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
   const [editField, setEditField] = useState<string|null>(null)
@@ -4840,6 +4859,14 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     showToast(m==='open'?'🟢 Mode Ouverte':m==='selective'?'🟡 Mode Sélective':'🔴 Mode Pause', C.whiteMid)
   }
 
+  // ── NOTIFICATIONS — préférences (demande David). Volume + catégories importantes.
+  // ⚠️ La livraison push (app fermée) dépend de OneSignal natif + déclencheurs serveur — ces prefs pilotent
+  // ce qu'on ENVOIE quand c'est branché. Les « sécurité » sont forcées ON (RDV/arrivée = vital).
+  const notifKey = `clutch_notif_${user.id}`
+  const NOTIF_DEFAULT = { level:'important', clutch:true, verrou:true, lapin:true, rdv:true, arrived:true, events:true, messages:true }
+  const [notifPrefs, setNotifPrefs] = useState<any>(()=>{ try{ return {...NOTIF_DEFAULT, ...JSON.parse(localStorage.getItem(notifKey)||'{}')} }catch{ return NOTIF_DEFAULT } })
+  const saveNotif = (patch:any) => { setNotifPrefs((p:any)=>{ const n={...p,...patch}; try{localStorage.setItem(notifKey,JSON.stringify(n))}catch{}; return n }); if(typeof navigator!=='undefined'&&(navigator as any).vibrate)(navigator as any).vibrate(6) }
+
   // ── FILTRES ÉPHÉMÈRES « Ce que je cherche en ce moment » ────────────────
   // Principe produit (mémoire project_ux_rules) : ces envies s'EFFACENT toutes seules.
   // On ne reste jamais coincé dans un filtre. Modes = reset 18h ; mode du moment = reset à minuit.
@@ -4850,12 +4877,45 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     {k:'parents', e:'👶', l:'Parents'},
     {k:'entraide',e:'🤲', l:'Entraide'},
   ]
+  // Moods — liste riche, chacun rattaché à un moment de journée (p). Le « feu vert » = ça colle à l'instant
+  // présent (honnête : basé sur l'heure, pas une fausse dispo). Le wiring vers les vraies dispos = V2 (algo).
+  const PERIODS = [
+    {k:'matin', e:'🌅', l:'Ce matin'},
+    {k:'aprem', e:'☀️', l:'Cet après-midi'},
+    {k:'soir',  e:'🌆', l:'Ce soir'},
+    {k:'nuit',  e:'🌙', l:'Cette nuit'},
+  ]
+  const periodFromHour = (h:number) => h<6?'nuit':h<12?'matin':h<18?'aprem':h<23?'soir':'nuit'
   const MOMENTS = [
-    {k:'balade', e:'🥾', l:'Juste une balade'},
-    {k:'cafe',   e:'☕', l:'Un café tranquille'},
-    {k:'soir',   e:'🎉', l:'Sortir ce soir'},
-    {k:'chien',  e:'🐕', l:'Avec mon chien'},
-    {k:'calme',  e:'🧘', l:'Quelque chose de calme'},
+    // Matin
+    {k:'cafe',     e:'☕', l:'Un café tranquille',       p:'matin'},
+    {k:'petitdej', e:'🥐', l:'Un petit-déj',             p:'matin'},
+    {k:'sport',    e:'🏃', l:'Sport / footing',          p:'matin'},
+    {k:'yoga',     e:'🧘', l:'Yoga · méditation',        p:'matin'},
+    {k:'chien',    e:'🐕', l:'Balade avec mon chien',    p:'matin'},
+    {k:'lecture',  e:'📚', l:'Un coin lecture',          p:'matin'},
+    // Après-midi
+    {k:'balade',   e:'🥾', l:'Une balade · rando',       p:'aprem'},
+    {k:'terrasse', e:'🍹', l:'Une terrasse au soleil',   p:'aprem'},
+    {k:'expo',     e:'🎨', l:'Expo · musée',             p:'aprem'},
+    {k:'velo',     e:'🚲', l:'Un tour à vélo',           p:'aprem'},
+    {k:'jeux',     e:'🎲', l:'Jeux · café-jeux',         p:'aprem'},
+    {k:'shopping', e:'🛍️', l:'Shopping tranquille',      p:'aprem'},
+    // Soir
+    {k:'apero',    e:'🍷', l:'Un apéro',                 p:'soir'},
+    {k:'diner',    e:'🍽️', l:'Un dîner',                 p:'soir'},
+    {k:'cine',     e:'🎬', l:'Ciné',                     p:'soir'},
+    {k:'concert',  e:'🎵', l:'Un concert · live',        p:'soir'},
+    {k:'sortir',   e:'🎉', l:'Sortir ce soir',           p:'soir'},
+    // Nuit
+    {k:'club',     e:'🌃', l:'Boîte · danser',           p:'nuit'},
+    {k:'bar',      e:'🍸', l:'Un bar de nuit',           p:'nuit'},
+    {k:'after',    e:'🎧', l:'Un after · DJ set',        p:'nuit'},
+    {k:'nightwalk',e:'🌙', l:'Marcher dans la nuit',     p:'nuit'},
+    // À tout moment
+    {k:'discuter', e:'💬', l:'Juste discuter',           p:'any'},
+    {k:'calme',    e:'🍃', l:'Quelque chose de calme',   p:'any'},
+    {k:'surprise', e:'🎲', l:'Surprends-moi',            p:'any'},
   ]
   const momentKey = `clutch_moment_${user.id}`
   const nextMidnight = () => { const d=new Date(); d.setHours(24,0,0,0); return d.getTime() }
@@ -4869,6 +4929,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [moment, setMoment] = useState<string|null>(()=>{
     const r = readMoment(); if (r.moment_until && r.moment_until > Date.now()) return r.moment||null; return null
   })
+  const [momentPeriod, setMomentPeriod] = useState<string>(()=>periodFromHour(new Date().getHours()))
   const persistMoment = (next:{modes?:string[], modes_until?:number, moment?:string|null, moment_until?:number}) => {
     const cur = readMoment()
     const merged = { ...cur, ...next }
@@ -5518,6 +5579,32 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   const PagePreferences = () => (
     <div>
+      {SH('🔔 Notifications')}
+      <div style={{background:C.bgCard,borderRadius:14,padding:'14px',border:`1px solid ${C.border}`,marginBottom:8}}>
+        <div style={{fontSize:11,color:C.whiteMid,marginBottom:10,lineHeight:1.5}}>Choisis ce qui te dérange… et ce qui ne doit JAMAIS t'échapper.</div>
+        <div style={{display:'flex',gap:7,marginBottom:14}}>
+          {[{k:'low',e:'🔕',l:'Faible'},{k:'important',e:'🔔',l:'Important'},{k:'all',e:'📣',l:'Tout'}].map(o=>{const on=notifPrefs.level===o.k;return(
+            <div key={o.k} onClick={()=>saveNotif({level:o.k})} style={{flex:1,textAlign:'center',padding:'10px 4px',borderRadius:12,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,background:on?`${C.orange}12`:'transparent'}}>
+              <div style={{fontSize:18}}>{o.e}</div><div style={{fontSize:10.5,fontWeight:800,color:on?C.orange:C.whiteMid,marginTop:3}}>{o.l}</div>
+            </div>
+          )})}
+        </div>
+        <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:6}}>Ne jamais manquer (sécurité)</div>
+        {[{k:'clutch',e:'⚡',l:'Un Clutch reçu'},{k:'verrou',e:'🔒',l:'Un Verrou (RDV confirmé)'},{k:'rdv',e:'🕐',l:'L\'heure du RDV approche'},{k:'arrived',e:'📍',l:'« Il/elle est arrivé·e »'},{k:'lapin',e:'🐰',l:'Un lapin / une annulation'}].map((row,i)=>{
+          const locked = row.k==='rdv'||row.k==='arrived' // vital sécurité → forcé ON
+          const val = locked ? true : !!notifPrefs[row.k]
+          return (
+            <div key={row.k} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+              <span style={{fontSize:17}}>{row.e}</span>
+              <span style={{flex:1,fontSize:13,fontWeight:600,color:C.white}}>{row.l}{locked&&<span style={{fontSize:9,color:C.green,marginLeft:6,fontWeight:800}}>essentiel</span>}</span>
+              {locked
+                ? <div style={{width:44,height:26,borderRadius:13,background:C.green,opacity:.55,position:'relative',flexShrink:0}}><div style={{position:'absolute',top:2,left:20,width:22,height:22,borderRadius:'50%',background:'#fff'}}/></div>
+                : <Tog on={val} onTap={()=>saveNotif({[row.k]:!val})}/>}
+            </div>
+          )
+        })}
+        <div style={{fontSize:10,color:C.whiteMid,marginTop:10,lineHeight:1.5,opacity:.85}}>🔒 Les notifs de sécurité (heure du RDV, arrivée) restent toujours actives — c'est vital.</div>
+      </div>
       {SH('Langue')}
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:8}}>
         <div style={{display:'flex',gap:8,padding:'12px 14px'}}>
@@ -5530,7 +5617,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
       </div>
 
-      {SH('Mode de réception')}
+      {SH('Qui peut m\'envoyer un Clutch')}
       <div style={{background:C.bgCard,borderRadius:14,padding:'14px',border:`1px solid ${C.border}`,marginBottom:8}}>
         <div style={{fontSize:11,color:C.whiteMid,marginBottom:10,lineHeight:1.5}}>Contrôle qui peut t'envoyer un Clutch quand tu es disponible.</div>
         {([['open','🟢 Ouverte','Tout le monde peut t\'envoyer un Clutch'],['selective','🟡 Sélective','Seulement les profils compatibles'],['pause','🔴 Pause','Personne ne peut t\'envoyer de Clutch']] as [typeof recepMode,string,string][]).map(([m,label,desc])=>(
@@ -5735,18 +5822,37 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
-  // ÉCRAN : Mode du moment 🌙 (éphémère, reset minuit)
-  const PageMoment = () => (
+  // ÉCRAN : Mode du moment 🌙 (éphémère, reset minuit) — riche, par moment de journée, avec « feu vert » de pertinence
+  const PageMoment = () => {
+    const nowP = periodFromHour(new Date().getHours())
+    const list = MOMENTS.filter(m => m.p===momentPeriod || m.p==='any')
+    return (
     <div>
-      <NoteBox>Une envie <b style={{color:C.white}}>ponctuelle</b>, juste pour aujourd'hui. Ça <b style={{color:C.white}}>disparaît à minuit</b> — aucune pression.</NoteBox>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 2px'}}>
-        {MOMENTS.map(m=>(
-          <span key={m.k} onClick={()=>pickMoment(m.k)} style={{fontSize:13,fontWeight:700,padding:'9px 14px',borderRadius:22,cursor:'pointer',border:`1.5px solid ${moment===m.k?C.orange:C.border}`,color:moment===m.k?'#fff':C.whiteMid,background:moment===m.k?C.orange:'transparent'}}>{m.e} {m.l}</span>
-        ))}
+      <NoteBox>Une envie <b style={{color:C.white}}>ponctuelle</b>, juste pour aujourd'hui. Ça <b style={{color:C.white}}>disparaît à minuit</b> — aucune pression. Le point <span style={{color:C.green,fontWeight:800}}>vert</span> = ce qui colle le mieux à l'instant.</NoteBox>
+      {/* Sélecteur moment de journée */}
+      <div style={{display:'flex',gap:7,marginBottom:14}}>
+        {PERIODS.map(p=>{const on=momentPeriod===p.k; const isNow=nowP===p.k; return(
+          <div key={p.k} onClick={()=>setMomentPeriod(p.k)} style={{flex:1,textAlign:'center',padding:'9px 4px',borderRadius:13,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,background:on?`${C.orange}12`:'transparent',position:'relative'}}>
+            <div style={{fontSize:17}}>{p.e}</div>
+            <div style={{fontSize:9.5,fontWeight:800,color:on?C.orange:C.whiteMid,marginTop:2,lineHeight:1.1}}>{p.l.replace('Cet ','').replace('Ce ','').replace('Cette ','')}</div>
+            {isNow&&<div style={{position:'absolute',top:5,right:5,width:6,height:6,borderRadius:'50%',background:C.green}} title="maintenant"/>}
+          </div>
+        )})}
       </div>
-      <NoteBox>À minuit, ton mode du moment s'efface. Demain, tu en choisis un autre — ou pas. ↺</NoteBox>
+      {/* Moods du moment sélectionné */}
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {list.map(m=>{const on=moment===m.k; const fits=m.p===nowP||m.p==='any'; return(
+          <div key={m.k} onClick={()=>pickMoment(m.k)} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:14,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,background:on?`${C.orange}12`:C.bgCard}}>
+            <span style={{fontSize:22}}>{m.e}</span>
+            <span style={{flex:1,fontSize:14,fontWeight:on?800:600,color:on?C.orange:C.white}}>{m.l}</span>
+            <span style={{width:9,height:9,borderRadius:'50%',background:fits?C.green:C.borderStrong,flexShrink:0}} title={fits?'ça bouge à cette heure':'plutôt à un autre moment'}/>
+            {on&&<span style={{fontSize:15,color:C.orange}}>✓</span>}
+          </div>
+        )})}
+      </div>
+      <NoteBox>À minuit, ton mode du moment s'efface. Demain, tu en choisis un autre — ou pas. ↺<br/><span style={{fontSize:10.5,opacity:.8}}>Bientôt : le vert te montrera où il y a le plus de monde dispo, en vrai.</span></NoteBox>
     </div>
-  )
+  )}
 
   // ÉCRAN : Ce que je cherche (éphémère vs persistant)
   const PageCherche = () => (
@@ -5829,7 +5935,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   // ÉCRAN : Sécurité & confidentialité (groupe → SOS / bloqués / certif)
   const PageSecu = () => (
     <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
-      <DRow label="Mode de réception" value={recepMode==='open'?'🟢 Ouverte':recepMode==='selective'?'🟡 Sélective':'🔴 Pause'} onTap={()=>setProfilePage('preferences')}/>
+      <DRow label="Qui peut m'envoyer un Clutch" value={recepMode==='open'?'🟢 Ouverte':recepMode==='selective'?'🟡 Sélective':'🔴 Pause'} onTap={()=>setProfilePage('preferences')}/>
       <DRow label="Mode invisible" right={<Tog on={recepMode==='pause'} onTap={()=>saveRecepMode(recepMode==='pause'?'open':'pause')}/>}/>
       <DRow label="Contacts SOS" value={`${sosContacts.filter(c=>c.name.trim()||c.phone.trim()).length} configuré${sosContacts.filter(c=>c.name.trim()||c.phone.trim()).length>1?'s':''}`} onTap={()=>setProfilePage('security')}/>
       <DRow label="Personnes ghostées" value={blocked.length?`${blocked.length}`:'0'} onTap={()=>setProfilePage('ghosted')}/>
@@ -6096,29 +6202,34 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         )
       })()}
 
-      {/* ─── CTA DISPONIBILITÉ ─── */}
+      {/* ─── CTA DISPONIBILITÉ ─── (feu vert/neutre, 100% palette Mel) */}
       <div style={{padding:'10px 16px 4px'}}>
         <button onClick={rdvBlocked&&!isAvailable?()=>showToast('RDV en cours — tu redeviendras visible 2h après ton RDV',C.orange):isAvailable?handleRetirerDispo:()=>setFlow('carte')}
-          style={{width:'100%',padding:'13px 20px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
-            background:isAvailable?`linear-gradient(135deg,#0a4a1a,#166534)`:`linear-gradient(135deg,${C.bordeauxLight},${C.bordeaux})`,
-            border:`1.5px solid ${isAvailable?'#22c55e66':C.border}`,
+          style={{width:'100%',padding:'14px 18px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
+            background:isAvailable?`${C.green}12`:C.bgCard,
+            border:`1.5px solid ${isAvailable?C.green:C.border}`,
             display:'flex',alignItems:'center',justifyContent:'space-between',
-            boxShadow:isAvailable?'0 0 20px rgba(34,197,94,.25)':'none',transition:'all .3s'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:20}}>{isAvailable?'🟢':'⚪'}</span>
+            boxShadow:isAvailable?`0 0 16px ${C.green}33`:'none',transition:'all .3s'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            {/* feu de statut */}
+            <span style={{position:'relative',width:13,height:13,flexShrink:0,display:'inline-block'}}>
+              <span style={{position:'absolute',inset:0,borderRadius:'50%',background:isAvailable?C.green:C.borderStrong}}/>
+              {isAvailable&&<span style={{position:'absolute',inset:-3,borderRadius:'50%',border:`2px solid ${C.green}`,animation:'availPulse 1.8s ease-out infinite'}}/>}
+            </span>
             <div style={{textAlign:'left'}}>
-              <div style={{fontSize:13,fontWeight:900,color:isAvailable?'#4ade80':C.white}}>
+              <div style={{fontSize:13.5,fontWeight:900,color:C.white}}>
                 {isAvailable?t('profile.avail.on'):t('profile.avail.off')}
               </div>
-              <div style={{fontSize:10,color:isAvailable?'#86efac':C.whiteMid}}>
+              <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>
                 {isAvailable?(t('profile.avail.sub.on').replace('{time}',(user as any).available_until?new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'...')):t('profile.avail.sub.off')}
               </div>
             </div>
           </div>
-          <span style={{fontSize:13,fontWeight:700,color:isAvailable?'#4ade80':C.salmon,background:isAvailable?'rgba(34,197,94,.15)':'rgba(255,191,158,.1)',borderRadius:10,padding:'5px 10px',border:`1px solid ${isAvailable?'rgba(34,197,94,.3)':'rgba(255,191,158,.2)'}`}}>
+          <span style={{fontSize:12.5,fontWeight:800,color:isAvailable?C.green:C.salmon,background:isAvailable?`${C.green}1c`:C.bgCard,borderRadius:10,padding:'5px 11px',border:`1px solid ${isAvailable?`${C.green}66`:C.border}`,whiteSpace:'nowrap',flexShrink:0}}>
             {isAvailable?t('settings.remove'):t('settings.enable')}
           </span>
         </button>
+        <style>{`@keyframes availPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.9);opacity:0}}`}</style>
       </div>
 
       {/* ─── BANNIÈRE BIENVENUE (didactique, dismissible, nouveaux users) ─── */}
@@ -6236,7 +6347,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
       {/* ─── SOUS-PAGE (slide depuis la droite) ─── */}
       {profilePage && (
-        <div style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+        <div ref={swipeOverlayRef} onTouchStart={onSwipeStart} onTouchMove={onSwipeMove} onTouchEnd={onSwipeEnd}
+          style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch',willChange:'transform'}}>
           {/* Header */}
           <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'calc(var(--sat) + 16px) 16px 12px',display:'flex',alignItems:'center',gap:12,zIndex:2}}>
             <button onClick={()=>{popPage();setEditField(null)}}
@@ -7377,6 +7489,33 @@ export default function App2() {
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
     import('@/lib/onesignal').then(({ initOneSignal }) => initOneSignal()).catch(() => {})
+  }, [])
+
+  // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0
+  // (bug connu iOS : l'encoche n'est pas rapportée malgré viewport-fit=cover), on applique un fallback
+  // notch UNIQUEMENT sur iPhone « tall ». Sinon le header montait sous la caméra (bug signalé David).
+  useEffect(() => {
+    const apply = () => {
+      try {
+        const probe = document.createElement('div')
+        probe.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;height:env(safe-area-inset-top)'
+        document.body.appendChild(probe)
+        let top = probe.getBoundingClientRect().height
+        probe.style.height = 'env(safe-area-inset-bottom)'
+        let bot = probe.getBoundingClientRect().height
+        probe.remove()
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (navigator.platform==='MacIntel' && (navigator as any).maxTouchPoints>1)
+        const longSide = Math.max(window.screen?.height||0, window.screen?.width||0)
+        const tall = longSide >= 800 // iPhone X et +
+        if (isIOS && tall) { if (top < 20) top = 50; if (bot < 10) bot = 34 }
+        document.documentElement.style.setProperty('--sat', top + 'px')
+        document.documentElement.style.setProperty('--sab', bot + 'px')
+      } catch {}
+    }
+    apply()
+    window.addEventListener('orientationchange', apply)
+    window.addEventListener('resize', apply)
+    return () => { window.removeEventListener('orientationchange', apply); window.removeEventListener('resize', apply) }
   }, [])
 
   // Persist hiddenHistIds to localStorage
@@ -8526,7 +8665,7 @@ export default function App2() {
           {flow==='options' && (
             <div className="fi" style={{position:'fixed',inset:0,background:C.bg,display:'flex',flexDirection:'column'}}>
               {/* Header */}
-              <div style={{padding:'12px 16px 14px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{padding:'12px 16px 14px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
                   <button onClick={()=>setFlow('carte')} style={{background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:10,width:34,height:34,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:C.salmon,fontSize:16,flexShrink:0}}>←</button>
                   <div style={{flex:1,minWidth:0}}>
@@ -8713,7 +8852,7 @@ export default function App2() {
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
 
                   {/* ── HEADER ── */}
-                  <div style={{padding:'12px 16px 0',paddingTop:'calc(env(safe-area-inset-top,8px) + 10px)',flexShrink:0}}>
+                  <div style={{padding:'12px 16px 0',paddingTop:'calc(var(--sat) + 10px)',flexShrink:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:20,fontWeight:900,letterSpacing:-0.3,display:'flex',alignItems:'baseline',gap:6}}>{lang==='en'?'Nearby':'Présences'}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
@@ -9032,7 +9171,7 @@ export default function App2() {
                     `}</style>
 
                     {/* Header */}
-                    <div style={{paddingTop:'calc(env(safe-area-inset-top,8px) + 14px)',padding:'calc(env(safe-area-inset-top,8px) + 14px) 20px 16px',flexShrink:0}}>
+                    <div style={{paddingTop:'calc(var(--sat) + 14px)',padding:'calc(var(--sat) + 14px) 20px 16px',flexShrink:0}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div style={{display:'flex',alignItems:'center',gap:10}}>
                           <div style={{position:'relative',width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -9171,7 +9310,7 @@ export default function App2() {
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
-                  <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                  <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
                     {/* ── Soft gate bannière feedback ── */}
                     {pendingFeedbacks >= TRUST_CONFIG.GATE_WARN && (
                       <div onClick={()=>{ const p=(clutches as any[]).find(c=>(c.status==='confirmed'||c.status==='accepted')&&c.proposed_time&&new Date(c.proposed_time).getTime()+30*60*1000<Date.now()&&!localStorage.getItem(`feedback_done_${c.id}`));if(p){setFeedbackClutch(p);setShowFeedback(true)}}}
@@ -9733,7 +9872,7 @@ export default function App2() {
                 return (
                   <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
                     {/* Header */}
-                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(env(safe-area-inset-top,8px) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
+                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(var(--sat) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
                       <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
                       <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
                     </div>

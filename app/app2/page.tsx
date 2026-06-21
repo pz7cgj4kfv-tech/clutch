@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x108'  // Versionnage HEXADÉCIMAL. ~264e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x109'  // Versionnage HEXADÉCIMAL. ~265e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -103,7 +103,7 @@ const Sounds = {
 // orange=rose (accent) · green=vert Mel · border=gris clair.
 const C = {
   bg:'#FFFFFF',          // fond principal (blanc pur)
-  bgCard:'#F4F4F4',      // cartes : gris NEUTRE très léger (famille palette Mel #E3E3E3/#B2B2B2) → sépare du blanc sans inventer de couleur (validé David)
+  bgCard:'#FFFFFF',      // cartes : BLANC (design Mel — séparation par lignes #E3E3E3, pas par fond teinté). Vérifié sur ses PDF 20 juin.
   bgSheet:'#FFFFFF',     // bottom sheets : blanc pur (Mel)
   bordeaux:'#532943',    // prune — accent fort, CTA, onglet actif, ombres
   bordeauxLight:'#6E3A5C',
@@ -543,15 +543,15 @@ function JogWheel({ slots, value, onChange, accent = false }: {
     }, 80)
   }
 
-  const active = accent ? C.orange : C.salmon
+  const active = C.bordeaux  // sélection en PRUNE (palette Mel, plus de dégradé métallique)
 
   return (
     <div style={{ position:'relative', height:ITEM_H * 3, flex:1, minWidth:0 }}>
-      {/* selection ring */}
+      {/* selection ring — FLAT, prune (demande David : pas d'effet/dégradé moche) */}
       <div style={{
         position:'absolute', top:ITEM_H, left:4, right:4, height:ITEM_H,
-        background:`linear-gradient(90deg,${C.bordeaux}80,${accent?C.orange:C.salmon}28,${C.bordeaux}80)`,
-        border:`1px solid ${accent?C.orange+'66':C.borderStrong}`,
+        background:`${C.bordeaux}0d`,
+        border:`1.5px solid ${C.bordeaux}`,
         borderRadius:12, pointerEvents:'none', zIndex:2,
       }}/>
       {/* fade top */}
@@ -6202,30 +6202,28 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         )
       })()}
 
-      {/* ─── CTA DISPONIBILITÉ ─── (feu vert/neutre, 100% palette Mel) */}
+      {/* ─── CTA DISPONIBILITÉ ─── (Version A « comme Mel » : pastille PRUNE quand dispo. NB: option verte #77BC1F en réserve si David change d'avis) */}
       <div style={{padding:'10px 16px 4px'}}>
         <button onClick={rdvBlocked&&!isAvailable?()=>showToast('RDV en cours — tu redeviendras visible 2h après ton RDV',C.orange):isAvailable?handleRetirerDispo:()=>setFlow('carte')}
           style={{width:'100%',padding:'14px 18px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
-            background:isAvailable?`${C.green}12`:C.bgCard,
-            border:`1.5px solid ${isAvailable?C.green:C.border}`,
-            display:'flex',alignItems:'center',justifyContent:'space-between',
-            boxShadow:isAvailable?`0 0 16px ${C.green}33`:'none',transition:'all .3s'}}>
+            background:isAvailable?C.bordeaux:C.bg,
+            border:`1.5px solid ${isAvailable?C.bordeaux:C.border}`,
+            display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all .25s'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            {/* feu de statut */}
             <span style={{position:'relative',width:13,height:13,flexShrink:0,display:'inline-block'}}>
               <span style={{position:'absolute',inset:0,borderRadius:'50%',background:isAvailable?C.green:C.borderStrong}}/>
               {isAvailable&&<span style={{position:'absolute',inset:-3,borderRadius:'50%',border:`2px solid ${C.green}`,animation:'availPulse 1.8s ease-out infinite'}}/>}
             </span>
             <div style={{textAlign:'left'}}>
-              <div style={{fontSize:13.5,fontWeight:900,color:C.white}}>
+              <div style={{fontSize:13.5,fontWeight:900,color:isAvailable?'#fff':C.white}}>
                 {isAvailable?t('profile.avail.on'):t('profile.avail.off')}
               </div>
-              <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>
+              <div style={{fontSize:10.5,color:isAvailable?'#ffffffcc':C.whiteMid,marginTop:1}}>
                 {isAvailable?(t('profile.avail.sub.on').replace('{time}',(user as any).available_until?new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'...')):t('profile.avail.sub.off')}
               </div>
             </div>
           </div>
-          <span style={{fontSize:12.5,fontWeight:800,color:isAvailable?C.green:C.salmon,background:isAvailable?`${C.green}1c`:C.bgCard,borderRadius:10,padding:'5px 11px',border:`1px solid ${isAvailable?`${C.green}66`:C.border}`,whiteSpace:'nowrap',flexShrink:0}}>
+          <span style={{fontSize:12.5,fontWeight:800,color:isAvailable?'#fff':C.bordeaux,background:isAvailable?'#ffffff26':C.bg,borderRadius:10,padding:'5px 11px',border:`1px solid ${isAvailable?'#ffffff55':C.border}`,whiteSpace:'nowrap',flexShrink:0}}>
             {isAvailable?t('settings.remove'):t('settings.enable')}
           </span>
         </button>
@@ -8553,10 +8551,10 @@ export default function App2() {
               {/* Header flottant — absolu, sans dégradé */}
               <div style={{position:'absolute',top:0,left:0,right:0,zIndex:900,padding:'48px 16px 10px'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-                  <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:900,letterSpacing:'.2em',textTransform:'uppercase',color:C.salmon,background:'rgba(61,26,51,.82)',backdropFilter:'blur(8px)',padding:'5px 12px',borderRadius:20,border:`1px solid ${C.border}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:900,letterSpacing:'.2em',textTransform:'uppercase',color:'#fff',background:C.bordeaux,padding:'6px 13px',borderRadius:20}}>
                     ✦ Clutch
                   </div>
-                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{fontSize:12,fontWeight:700,color:C.whiteMid,background:'rgba(61,26,51,.82)',backdropFilter:'blur(8px)',padding:'5px 14px',borderRadius:20,border:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit'}}>
+                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{fontSize:12,fontWeight:800,color:'#fff',background:C.bordeaux,padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontFamily:'inherit'}}>
                     {lang==='en'?'← Cancel':'← Annuler'}
                   </button>
                 </div>
@@ -8572,16 +8570,16 @@ export default function App2() {
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
                   title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}
                   style={{position:'absolute',top:8,right:8,zIndex:1200,
-                    padding:'5px 10px',borderRadius:20,
-                    background:'rgba(42,16,32,.8)',border:`1px solid ${C.border}`,
-                    color:C.whiteMid,fontSize:11,cursor:'pointer',fontFamily:'inherit',
-                    backdropFilter:'blur(8px)',pointerEvents:'all'}}>
+                    padding:'6px 12px',borderRadius:20,
+                    background:C.bordeaux,border:'none',
+                    color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+                    pointerEvents:'all'}}>
                   {lang==='en'?'⊕ My position':'⊕ Ma position'}
                 </button>
                 {/* Hint sobre — bas gauche */}
                 <div style={{position:'absolute',bottom:8,left:8,zIndex:1100,pointerEvents:'none'}}>
-                  <div style={{background:'rgba(42,16,32,.75)',backdropFilter:'blur(4px)',borderRadius:8,padding:'4px 9px',fontSize:9,color:C.whiteMid,whiteSpace:'nowrap'}}>
-                    {lang==='en'?'Move the map · long press to pin':'Déplace la carte · appui long pour épingler'}
+                  <div style={{background:C.bordeaux,borderRadius:8,padding:'5px 11px',fontSize:10,fontWeight:600,color:'#fff',whiteSpace:'nowrap'}}>
+                    {lang==='en'?'Move map · long-press to pin':'Déplace la carte · appui long = épingler'}
                   </div>
                 </div>
               </div>
@@ -8646,8 +8644,8 @@ export default function App2() {
                     setFlow('options')
                   }} style={{
                     padding:'13px 32px',
-                    background:C.orange,border:'none',
-                    borderRadius:14,color:C.bordeaux,
+                    background:C.bordeaux,border:'none',
+                    borderRadius:14,color:'#fff',
                     fontSize:15,fontWeight:900,
                     cursor:'pointer',fontFamily:'inherit',
                     letterSpacing:'-.02em',

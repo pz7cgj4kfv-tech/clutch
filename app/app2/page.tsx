@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2830,11 +2830,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   // Events de groupe : démo bots + events créés par l'user dans cette session
   const [userGroupEvents, setUserGroupEvents] = useState<any[]>(GROUP_EVENTS_DEMO)
   const [groupJoined, setGroupJoined] = useState<Set<string>>(new Set())
+  // Events annulés/masqués localement — filtre DUR (survit au refresh DB & aux blocages RLS). David : « il part et revient ».
+  const [cancelledLocal, setCancelledLocal] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_cancelled_events');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
+  const hideEvent = (id:string) => setCancelledLocal(prev=>{ const n=new Set(prev); n.add(id); try{localStorage.setItem('clutch_cancelled_events',JSON.stringify([...n]))}catch{}; return n })
 
-  // Fusion : partenaires/DB + groupe local — dédoublonné par id (la version DB prime sur la locale)
+  // Fusion : partenaires/DB + groupe local — dédoublonné par id (la version DB prime sur la locale), moins les annulés
   const events = (() => {
     const seen = new Set(partnerEvents.map((e:any)=>e.id))
-    return [...partnerEvents, ...userGroupEvents.filter((e:any)=>!seen.has(e.id))]
+    return [...partnerEvents, ...userGroupEvents.filter((e:any)=>!seen.has(e.id))].filter((e:any)=>!cancelledLocal.has(e.id) && e.status!=='cancelled')
   })()
 
   // Création event groupe
@@ -3042,7 +3045,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         }
       }
     } catch {}
-    // Nettoyage local COMPLET (sinon l'event annulé reste "coincé" et compte dans le plafond — bug David)
+    // Nettoyage local COMPLET + filtre DUR (sinon l'event « part et revient » au refresh DB / RLS — bug David)
+    hideEvent(ev.id)
     setDbEvents(prev => prev.filter(e => e.id !== ev.id))
     setUserGroupEvents(prev => prev.filter(e => e.id !== ev.id))
     setRegistered((prev:Set<string>)=>{ const n=new Set(prev); n.delete(ev.id); return n })

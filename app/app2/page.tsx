@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10F'  // Versionnage HEXADÉCIMAL. ~271e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x110'  // Versionnage HEXADÉCIMAL. ~272e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3154,6 +3154,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{marginBottom:11}}>
               <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Description</div>
               <textarea value={cpDesc} onChange={e=>setCpDesc(e.target.value)} placeholder="En 1-2 phrases…" rows={2} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none'}}/>
+            </div>
+            {/* Jalon visible : pièce jointe (idée oncle = PDF partition) — pas encore branché */}
+            <div style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px dashed ${C.border}`,background:'transparent',marginBottom:11,opacity:.85}}>
+              <span style={{fontSize:18}}>📎</span>
+              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.white}}>Joindre un fichier</div><div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>PDF, partition, programme… <b style={{color:C.plum}}>bientôt</b></div></div>
             </div>
             <div onClick={()=>setCpPrivate(v=>!v)} style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,marginBottom:16,cursor:'pointer'}}>
               <div style={{flex:1}}>

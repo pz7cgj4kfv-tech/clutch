@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x105'  // Versionnage HEXADÉCIMAL. ~261e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x106'  // Versionnage HEXADÉCIMAL. ~262e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2844,11 +2844,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [selEv, setSelEv] = useState<any|null>(()=>
     initialEventId ? (events.find((e:any)=>e.id===initialEventId) || MOCK_EVENTS.find(e=>e.id===initialEventId) || null) : null
   )
-  // Ouvre l'event demandé (depuis l'onglet Clutchs → « Mes événements ») dès que les vrais events (DB) sont chargés
+  // Ouvre l'event demandé (depuis l'onglet Clutchs → « Mes événements ») dès que les vrais events (DB) sont chargés.
+  // ONE-SHOT : on efface initialEventId juste après ouverture, sinon le refresh loadEvents (10s) rouvrait l'event en boucle.
   useEffect(() => {
     if (!initialEventId) return
     const found = events.find((e:any)=>e.id===initialEventId)
-    if (found) setSelEv((cur:any)=> cur && cur.id===initialEventId ? cur : found)
+    if (found) { setSelEv(found); onClearInitialEvent?.() }
   }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
   const [registering, setRegistering] = useState(false)
@@ -6395,10 +6396,10 @@ function MelHello({ onClose }:{ onClose:()=>void }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'rgba(42,16,32,.55)',backdropFilter:'blur(5px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
       <div onClick={e=>e.stopPropagation()} style={{maxWidth:312,background:'#fff',borderRadius:26,padding:'32px 24px 24px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
-        <div style={{fontSize:62,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
-        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Dimanche, jour de repos</div>
-        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Ce petit mot s'autodétruira au prochain build.<br/><br/>Bisous 💋</div>
-        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>😂</button>
+        <div style={{fontSize:62,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>🤡</div>
+        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Coucou, les deux fous 😂</div>
+        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Si vous lisez ça, c'est que Clutch est <b>vivant</b> 🎉<br/>(et que personne n'a dormi 🫠)<br/><br/>Ce petit mot s'autodétruira au prochain build.<br/><br/>Bisous 💋</div>
+        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>🤝 Allez, on continue</button>
       </div>
       <style>{`@keyframes melBounce{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-11px) rotate(7deg)}}`}</style>
     </div>
@@ -7256,10 +7257,10 @@ export default function App2() {
     try { localStorage.setItem('clutch_completedIds', JSON.stringify([...completedIds.current])) } catch {}
   }
   const [keepContactClutch,setKeepContactClutch] = useState<any>(null) // Clutch pour modal "Garder le contact"
-  // 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build). Visible que pour elle, 1 fois.
-  const MEL_ID = '9626a0ba-037f-49dd-9957-ebd37e58a864'
+  // 🥚 ÉPHÉMÈRE — coucou à Mel + David (À RETIRER au prochain build). Visible qu'eux deux, 1 fois.
+  const HELLO_IDS = ['9626a0ba-037f-49dd-9957-ebd37e58a864','bad38f3e-87df-40e0-a2d2-75c03b58d72b'] // Mel · David
   const [showMelHello,setShowMelHello] = useState(false)
-  useEffect(()=>{ if(user?.id===MEL_ID){ try{ if(!localStorage.getItem('mel_hello_v1')) setShowMelHello(true) }catch{ setShowMelHello(true) } } }, [user?.id])
+  useEffect(()=>{ if(user?.id && HELLO_IDS.includes(user.id)){ try{ if(!localStorage.getItem('mel_hello_v2')) setShowMelHello(true) }catch{ setShowMelHello(true) } } }, [user?.id])
 
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
@@ -10110,7 +10111,7 @@ export default function App2() {
           }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🥚 ÉPHÉMÈRE — coucou à Mel (À RETIRER au prochain build) */}
-          {showMelHello && <MelHello onClose={()=>{ setShowMelHello(false); try{localStorage.setItem('mel_hello_v1','1')}catch{} }}/>}
+          {showMelHello && <MelHello onClose={()=>{ setShowMelHello(false); try{localStorage.setItem('mel_hello_v2','1')}catch{} }}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (
             <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.6)',backdropFilter:'blur(8px)'}} onClick={()=>setCounterClutchId(null)}>

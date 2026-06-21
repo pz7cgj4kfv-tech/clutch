@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Zones de sécurité iOS (encoche / barre home) — lisibles aussi en JS via getComputedStyle */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
 }
 
 @theme inline {

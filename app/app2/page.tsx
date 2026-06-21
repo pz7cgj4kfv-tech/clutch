@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFE'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~254e version. Incrémenter en hexa à chaque deploy (0xFC, 0xFD, 0xFE...). NB: le build Apple reste un entier dans pbxproj.
+const V = '0xFF'  // Versionnage HEXADÉCIMAL. ~255e version. Après 0xFF → 0x100. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -102,9 +102,9 @@ const Sounds = {
 // bg=blanc · white=texte foncé · whiteMid/salmon=gris · bordeaux=prune (CTA/actif)
 // orange=rose (accent) · green=vert Mel · border=gris clair.
 const C = {
-  bg:'#FFFFFF',          // fond principal (blanc)
-  bgCard:'#FFFFFF',      // cartes (blanc + bordure/ombre pour séparer)
-  bgSheet:'#FFFFFF',     // bottom sheets
+  bg:'#FFFFFF',          // fond principal (blanc pur)
+  bgCard:'#F6F2F6',      // cartes : léger fond prune-tinté → SÉPARE du blanc (demande David : ne pas tout poser sur du blanc)
+  bgSheet:'#FBF9FB',     // bottom sheets : à peine teinté
   bordeaux:'#532943',    // prune — accent fort, CTA, onglet actif, ombres
   bordeauxLight:'#6E3A5C',
   salmon:'#6F6F6E', salmonFaint:'rgba(83,41,67,0.06)', salmonMid:'#B2B2B2',
@@ -1295,7 +1295,7 @@ function Toast({msg,color,onDone}:{msg:string;color:string;onDone:()=>void}) {
     }
   }
   return (
-    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,padding:'env(safe-area-inset-top,0px) 12px 0',pointerEvents:'none'}}>
+    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,padding:'var(--sat) 12px 0',pointerEvents:'none'}}>
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -1427,7 +1427,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
       )}
       {/* Barre d'onglets — design clair (fond blanc cassé + cercles + pastille active violette).
           Transitoire : le reste de l'app passera au clair avec les couleurs de Mel. */}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,height:72,background:'rgba(255,255,255,0.97)',borderTop:'1px solid #E3E3E3',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
+      <div style={{position:'fixed',bottom:0,left:0,right:0,height:'calc(72px + var(--sab))',paddingBottom:'var(--sab)',boxSizing:'border-box',background:'rgba(255,255,255,0.97)',borderTop:'1px solid #E3E3E3',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
@@ -2300,7 +2300,7 @@ function ActiveVerrouBar({ verrou, onClick, lang }:{ verrou:any; onClick:()=>voi
       {/* Pill compacte — discret mais visible */}
       <div onClick={onClick} className="lock-pill" style={{
         position:'fixed',
-        top:'calc(env(safe-area-inset-top,0px) + 6px)',
+        top:'calc(var(--sat) + 6px)',
         left:'50%',transform:'translateX(-50%)',
         zIndex:1500,cursor:'pointer',
         background:urgency?'rgba(180,0,0,.92)':'rgba(140,60,0,.9)',
@@ -2916,7 +2916,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   }
 
   return (
-    <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
+    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
       <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
         <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:6}}>{t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
@@ -3037,7 +3037,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           {/* Sheet = flex column, hauteur fixe, scroll sur le corps uniquement */}
           <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
             {/* Header fixe — padding safe-area pour ne pas passer sous l'encoche */}
-            <div style={{flexShrink:0,padding:'calc(env(safe-area-inset-top,0px) + 14px) 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{flexShrink:0,padding:'calc(var(--sat) + 14px) 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:26}}>{selEv.emoji}</span>
                 <div>
@@ -3197,7 +3197,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               )}
             </div>
             {/* CTA fixe en bas — padding-bottom = tab bar (72) + safe area + marge */}
-            <div style={{flexShrink:0,padding:'8px 20px calc(max(env(safe-area-inset-bottom,0px),0px) + 88px)',borderTop:`1px solid ${C.border}`,background:C.bgSheet}}>
+            <div style={{flexShrink:0,padding:'8px 20px calc(max(var(--sab),0px) + 88px)',borderTop:`1px solid ${C.border}`,background:C.bgSheet}}>
               {(selEv.created_by ? (!!userId && selEv.created_by===userId) : selEv.creator==='Toi') ? (
                 <div>
                   <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
@@ -3648,7 +3648,7 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead, maxMessages
           <div ref={bottomRef}/>
         </div>
         {/* Input */}
-        <div style={{flexShrink:0,padding:'8px 12px calc(env(safe-area-inset-bottom,0px) + 12px)',borderTop:`1px solid ${C.border}`,display:'flex',gap:8,alignItems:'flex-end'}}>
+        <div style={{flexShrink:0,padding:'8px 12px calc(var(--sab) + 12px)',borderTop:`1px solid ${C.border}`,display:'flex',gap:8,alignItems:'flex-end'}}>
           {isClosed
             ? <div style={{flex:1,padding:'12px',textAlign:'center',fontSize:12,color:C.whiteMid,fontStyle:'italic'}}>
                 {clutch.status==='cancelled'?'↩ Ce Clutch a été annulé — le chat est fermé':clutch.status==='declined'?'✕ Clutch refusé — le chat est fermé':'⏱ Clutch expiré — le chat est fermé'}
@@ -4141,7 +4141,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
         </div>
 
         {/* Actions — toujours visibles en bas */}
-        <div style={{flexShrink:0,padding:'10px 16px calc(env(safe-area-inset-bottom,0px) + 16px)',borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{flexShrink:0,padding:'10px 16px calc(var(--sab) + 16px)',borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:8}}>
           {activeClutch ? (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <div style={{textAlign:'center',padding:'12px',background:`${C.green}14`,border:`1px solid ${C.green}44`,borderRadius:14,color:C.green,fontSize:13,fontWeight:800}}>
@@ -4575,11 +4575,11 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:9999,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
-      <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',zIndex:2}}>
+      <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'calc(var(--sat) + 14px) 16px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',zIndex:2}}>
         <div style={{fontSize:16,fontWeight:900,color:C.white}}>🤖 Générateur de bots</div>
         <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer',padding:'4px 4px 4px 12px'}}>✕</button>
       </div>
-      <div style={{padding:'12px 16px calc(env(safe-area-inset-bottom, 0px) + 60px)'}}>
+      <div style={{padding:'12px 16px calc(var(--sab) + 60px)'}}>
         <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
         </div>
@@ -6031,7 +6031,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   return (
     <>
     {showBotLab && <BotLab user={user} onClose={()=>setShowBotLab(false)} showToast={showToast}/>}
-    <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'0 0 32px'}}>
+    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'var(--sat) 0 32px'}}>
 
       {/* ─── HERO ─── */}
       <div style={{position:'relative',height:260,background:user.photo_url?'transparent':`linear-gradient(160deg,${C.bordeauxLight},${C.bordeaux})`,overflow:'hidden',flexShrink:0}}>
@@ -6193,14 +6193,16 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             cf mémoire project_test_features_to_remove. N'agit QUE sur le compte connecté. */}
         {SH('🧪 Test (dev)')}
         <MCard>
-          <MRow icon="🔄" label="Reset test" sub="Annule mes clutchs + débloque mon Verrou" onTap={async()=>{
+          <MRow icon="🔄" label="Reset test" sub="Annule mes clutchs + mes inscriptions events + débloque mon Verrou" onTap={async()=>{
             if(!user?.id) return
-            if(!confirm('Reset test : annuler tes clutchs actifs et débloquer ton Verrou ?')) return
+            if(!confirm('Reset test : annuler tes clutchs actifs, te désinscrire de tous les événements et débloquer ton Verrou ?')) return
             await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
               .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
               .in('status',['pending','accepted','confirmed','checked_in'])
+            // Désinscription de TOUS mes événements (le reset oubliait ça → on restait inscrit partout)
+            await supabase.from('event_participants').delete().eq('user_id', user.id)
             await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
-            showToast('✅ Reset effectué — recharge l\'app',C.orange)
+            showToast('✅ Reset complet (clutchs + events) — recharge l\'app',C.orange)
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
         </MCard>
@@ -6223,9 +6225,9 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
       {/* ─── SOUS-PAGE (slide depuis la droite) ─── */}
       {profilePage && (
-        <div style={{position:'fixed',inset:0,bottom:72,background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+        <div style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
           {/* Header */}
-          <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'48px 16px 12px',display:'flex',alignItems:'center',gap:12,zIndex:2}}>
+          <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'calc(var(--sat) + 16px) 16px 12px',display:'flex',alignItems:'center',gap:12,zIndex:2}}>
             <button onClick={()=>{popPage();setEditField(null)}}
               style={{background:'none',border:'none',color:C.salmon,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4,padding:'4px 0',flexShrink:0}}>
               ‹ Retour
@@ -6362,11 +6364,11 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
   return (
     <div style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(120% 90% at 50% 40%,#1a0f1e 0%,#0b0610 72%)',display:'flex',flexDirection:'column'}}>
       <canvas ref={cvRef} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>
-      <div style={{position:'relative',zIndex:2,textAlign:'center',marginTop:'calc(env(safe-area-inset-top,0px) + 54px)'}}>
+      <div style={{position:'relative',zIndex:2,textAlign:'center',marginTop:'calc(var(--sat) + 54px)'}}>
         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#8a7d86'}}>{bothArrived?'Vous y êtes':'Vous vous rapprochez'}</div>
         <div style={{fontSize:24,fontWeight:800,color:'#fff',marginTop:4}}>{otherName}</div>
       </div>
-      <div style={{position:'relative',zIndex:2,marginTop:'auto',textAlign:'center',marginBottom:'calc(env(safe-area-inset-bottom,0px) + 40px)'}}>
+      <div style={{position:'relative',zIndex:2,marginTop:'auto',textAlign:'center',marginBottom:'calc(var(--sab) + 40px)'}}>
         <div style={{fontSize:52,fontWeight:800,color:'#fff',lineHeight:1,letterSpacing:'-.02em'}}>{bothArrived?'✦':(mins<1?`${secs}s`:`${mins} min`)}</div>
         <div style={{fontSize:14,color:'#9a8d96',marginTop:8,fontWeight:600}}>{bothArrived?<>{otherName} est <b style={{color:'#77BC1F'}}>au lieu</b></>:<>Rendez-vous à <b style={{color:'#77BC1F'}}>{venueName}</b></>}</div>
         <button onClick={onClose} style={{marginTop:22,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',borderRadius:30,padding:'10px 22px',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Revenir à l'app</button>
@@ -7158,6 +7160,19 @@ export default function App2() {
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
   const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number}|null>(null)
   const fabRaf = useRef<number>(0)
+  // Bornes du Clutch Live : ne JAMAIS passer sous l'encoche/la caméra (haut) ni sur la barre d'onglets (bas).
+  // Il rebondit sur ces limites. sz=46. Nav bar = 72 + safe-area bottom.
+  const fabBounds = () => {
+    const sz=46
+    let sat=0, sab=0
+    try { const cs=getComputedStyle(document.documentElement); sat=parseInt(cs.getPropertyValue('--sat'))||0; sab=parseInt(cs.getPropertyValue('--sab'))||0 } catch {}
+    const w = typeof window!=='undefined'?window.innerWidth:390
+    const h = typeof window!=='undefined'?window.innerHeight:780
+    return { minX:8, maxX:w-sz-8, minY:sat+50, maxY:h-72-sab-sz-10 }
+  }
+  const clampFab = (x:number,y:number) => { const b=fabBounds(); return { x:Math.min(b.maxX,Math.max(b.minX,x)), y:Math.min(b.maxY,Math.max(b.minY,y)) } }
+  // Au montage : re-borner une position sauvegardée qui serait hors zone (ancien bug : coincé sous l'encoche)
+  useEffect(()=>{ setFabPos(p=> p ? clampFab(p.x,p.y) : p) }, [])
   const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
   const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
   const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
@@ -8557,7 +8572,7 @@ export default function App2() {
             <>
               {/* ── TAB : PRÉSENCES — cards compactes, tap = détail + Clutcher ── */}
               {tab==='presences' && (<>
-                <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
+                <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
 
                   {/* ── HEADER ── */}
                   <div style={{padding:'12px 16px 0',paddingTop:'calc(env(safe-area-inset-top,8px) + 10px)',flexShrink:0}}>
@@ -9017,7 +9032,7 @@ export default function App2() {
                 const displayHist = (isMock && mockCleared) ? [] : hist.filter((c:any)=>!hiddenHistIds.has(c.id))
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
                 return (
-                <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column'}}>
+                <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(env(safe-area-inset-top,8px) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
                     {/* ── Soft gate bannière feedback ── */}
                     {pendingFeedbacks >= TRUST_CONFIG.GATE_WARN && (
@@ -9557,7 +9572,7 @@ export default function App2() {
                 const contactClutches = [..._byPerson.values()]
 
                 return (
-                  <div className="fi" style={{position:'fixed',inset:0,bottom:72,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+                  <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
                     {/* Header */}
                     <div style={{padding:'16px 16px 12px',paddingTop:'calc(env(safe-area-inset-top,8px) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
                       <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
@@ -9916,18 +9931,18 @@ export default function App2() {
           `}</style>
           <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — lance-moi où tu veux"
             onPointerDown={(e)=>{ cancelAnimationFrame(fabRaf.current); const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0} }}
-            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp; const sz=46; const nx=Math.min(window.innerWidth-sz-6,Math.max(6,d.ox+dx)); const ny=Math.min(window.innerHeight-sz-6,Math.max(6,d.oy+dy)); setFabPos({x:nx,y:ny}); } }}
+            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp; setFabPos(clampFab(d.ox+dx, d.oy+dy)); } }}
             onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(!d)return; if(!d.moved){ setFlow('app');setTab('presences');activateLive(); return }
               // 🏓 Lancer : glisse avec friction + rebond sur les bords, puis se cale
-              const sz=46, friction=0.94, bounce=0.62; let vx=d.vx, vy=d.vy;
-              const step=()=>{ setFabPos(p=>{ if(!p)return p; let x=p.x+vx, y=p.y+vy; const maxX=window.innerWidth-sz-6, maxY=window.innerHeight-sz-6;
-                if(x<6){x=6;vx=-vx*bounce} else if(x>maxX){x=maxX;vx=-vx*bounce}
-                if(y<6){y=6;vy=-vy*bounce} else if(y>maxY){y=maxY;vy=-vy*bounce}
+              const friction=0.94, bounce=0.62; let vx=d.vx, vy=d.vy;
+              const step=()=>{ setFabPos(p=>{ if(!p)return p; let x=p.x+vx, y=p.y+vy; const b=fabBounds();
+                if(x<b.minX){x=b.minX;vx=-vx*bounce} else if(x>b.maxX){x=b.maxX;vx=-vx*bounce}
+                if(y<b.minY){y=b.minY;vy=-vy*bounce} else if(y>b.maxY){y=b.maxY;vy=-vy*bounce}
                 return {x,y} }); vx*=friction; vy*=friction;
                 if(Math.hypot(vx,vy)>0.4){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } };
               if(Math.hypot(vx,vy)>0.6){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
             style={{
-            position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(env(safe-area-inset-bottom,0px) + 84px)', right:14}),
+            position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(var(--sab) + 84px)', right:14}),
             zIndex:1200, width:46, height:46, borderRadius:'50%', touchAction:'none',
             background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
           }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>

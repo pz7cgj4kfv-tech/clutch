@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x112'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x113'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2880,14 +2880,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   // 🤝 Mes groupes créés (prototype) — persisté localStorage
   const [myPartners, setMyPartners] = useState<any[]>(()=>{ try{const s=localStorage.getItem('clutch_my_partners');return s?JSON.parse(s):[]}catch{return []} })
   const [showCreatePartner, setShowCreatePartner] = useState(false)
-  const [cpName,setCpName]=useState(''); const [cpCat,setCpCat]=useState(''); const [cpZone,setCpZone]=useState(''); const [cpDesc,setCpDesc]=useState(''); const [cpPrivate,setCpPrivate]=useState(false); const [cpEmoji,setCpEmoji]=useState('🎉')
+  const [cpName,setCpName]=useState(''); const [cpCat,setCpCat]=useState(''); const [cpZone,setCpZone]=useState(''); const [cpDesc,setCpDesc]=useState(''); const [cpPrivate,setCpPrivate]=useState(false); const [cpEmoji,setCpEmoji]=useState('🎉'); const [cpFile,setCpFile]=useState<string|null>(null)
   const createPartner = () => {
     if(!cpName.trim()) return
-    const g = { id:'my_'+Date.now(), emoji:cpEmoji, name:cpName.trim(), cat:cpCat.trim()||'Mon groupe', zone:cpZone.trim()||'Région Lausanne', members:1, desc:cpDesc.trim()||'Nouveau groupe Clutch.', next:'Aucun event pour l\'instant', verified:false, mine:true, isPrivate:cpPrivate, link:cpPrivate?`clutch.app/g/${Math.random().toString(36).slice(2,9)}`:null }
+    const g = { id:'my_'+Date.now(), emoji:cpEmoji, name:cpName.trim(), cat:cpCat.trim()||'Mon groupe', zone:cpZone.trim()||'Région Lausanne', members:1, desc:cpDesc.trim()||'Nouveau groupe Clutch.', next:'Aucun event pour l\'instant', verified:false, mine:true, isPrivate:cpPrivate, link:cpPrivate?`clutch.app/g/${Math.random().toString(36).slice(2,9)}`:null, file:cpFile||null }
     const next=[g,...myPartners]; setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{}
-    setShowCreatePartner(false); setCpName('');setCpCat('');setCpZone('');setCpDesc('');setCpPrivate(false);setCpEmoji('🎉')
+    setShowCreatePartner(false); setCpName('');setCpCat('');setCpZone('');setCpDesc('');setCpPrivate(false);setCpEmoji('🎉');setCpFile(null)
   }
   const CP_EMOJIS=['🎉','🎶','🏓','🎷','🥾','🍷','🎨','⚽','🧘','🎲','🍽️','👶','🎸','🎬','📚','🚲']
+  const CP_ZONES=['Lausanne centre','Vieille Ville','Flon','Ouchy','Région Lausanne','Lavaux','Renens / Ouest','Autre']
   const [registering, setRegistering] = useState(false)
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
   const evTouchStartX = useRef<number|null>(null)
@@ -3020,6 +3021,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   </div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
                   <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
+                  {p.file&&<div style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:10.5,color:C.green,marginTop:7,background:`${C.green}10`,border:`1px solid ${C.green}33`,borderRadius:8,padding:'4px 8px'}}>📄 {p.file}</div>}
                   {p.isPrivate&&p.link&&<div style={{fontSize:10.5,color:C.plum,marginTop:7,background:`${C.plum}0a`,borderRadius:8,padding:'5px 8px',wordBreak:'break-all'}}>🔗 Lien privé : {p.link}</div>}
                 </div>
               </div>
@@ -3049,7 +3051,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </button>
             </div>
           )})}
-          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — bientôt : créer ton propre groupe (public ou privé par lien), event en région (sans adresse exacte), fichiers joints.</div>
+          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — tu peux créer ton groupe (public ou privé par lien), choisir une <b>région</b> (adresse révélée avant le RDV) et y joindre un <b>fichier</b>. La diffusion réelle des notifs arrive en V2.</div>
         </>)}
         {evFilter!=='partenaires' && (<>
         {cancelledNotice && (
@@ -3133,21 +3135,41 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
               {CP_EMOJIS.map(e=><span key={e} onClick={()=>setCpEmoji(e)} style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'pointer',border:`1.5px solid ${cpEmoji===e?C.plum:C.border}`,background:cpEmoji===e?`${C.plum}0d`:'transparent'}}>{e}</span>)}
             </div>
-            {[['Nom du groupe',cpName,setCpName,'Ex. Apéro Jazz Collectif'],['Catégorie',cpCat,setCpCat,'Ex. Musique · Apéro'],['Zone',cpZone,setCpZone,'Ex. Vieille Ville (pas l\'adresse exacte)']].map(([lab,val,set,ph]:any)=>(
+            {[['Nom du groupe',cpName,setCpName,'Ex. Apéro Jazz Collectif'],['Catégorie',cpCat,setCpCat,'Ex. Musique · Apéro']].map(([lab,val,set,ph]:any)=>(
               <div key={lab} style={{marginBottom:11}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>{lab}</div>
                 <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
               </div>
             ))}
+            {/* Lieu = RÉGION (pas l'adresse exacte). GPS caché, révélé avant le RDV — vision David (oncle/Bibi) */}
+            <div style={{marginBottom:11}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Zone <span style={{color:C.whiteMid,fontWeight:600}}>· région, pas l'adresse</span></div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {CP_ZONES.map(z=><span key={z} onClick={()=>setCpZone(z)} style={{padding:'7px 12px',borderRadius:11,fontSize:12,fontWeight:700,cursor:'pointer',border:`1.5px solid ${cpZone===z?C.plum:C.border}`,background:cpZone===z?`${C.plum}0d`:'transparent',color:cpZone===z?C.plum:C.whiteMid}}>{z}</span>)}
+              </div>
+              <div style={{display:'flex',alignItems:'flex-start',gap:7,marginTop:9,padding:'9px 11px',borderRadius:11,background:`${C.green}0d`,border:`1px solid ${C.green}33`}}>
+                <span style={{fontSize:14}}>🛡️</span>
+                <div style={{fontSize:10.5,lineHeight:1.45,color:C.whiteMid}}>L'<b style={{color:C.white}}>adresse exacte reste cachée</b> — elle n'est révélée aux participants qu'<b style={{color:C.green}}>un peu avant le RDV</b>. Comme pour les Clutchs.</div>
+              </div>
+            </div>
             <div style={{marginBottom:11}}>
               <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Description</div>
               <textarea value={cpDesc} onChange={e=>setCpDesc(e.target.value)} placeholder="En 1-2 phrases…" rows={2} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none'}}/>
             </div>
-            {/* Jalon visible : pièce jointe (idée oncle = PDF partition) — pas encore branché */}
-            <div style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px dashed ${C.border}`,background:'transparent',marginBottom:11,opacity:.85}}>
-              <span style={{fontSize:18}}>📎</span>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.white}}>Joindre un fichier</div><div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>PDF, partition, programme… <b style={{color:C.plum}}>bientôt</b></div></div>
-            </div>
+            {/* Pièce jointe (idée oncle = PDF partition) — prototype : on capte le nom du fichier, upload réel en V2 */}
+            {cpFile ? (
+              <div style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.green}55`,background:`${C.green}10`,marginBottom:11}}>
+                <span style={{fontSize:18}}>📄</span>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{cpFile}</div><div style={{fontSize:10.5,color:C.green,marginTop:1}}>Joint au groupe ✓</div></div>
+                <span onClick={()=>setCpFile(null)} style={{fontSize:16,color:C.whiteMid,cursor:'pointer',padding:4}}>✕</span>
+              </div>
+            ) : (
+              <label style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px dashed ${C.plum}`,background:'transparent',marginBottom:11,cursor:'pointer'}}>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0]; if(f)setCpFile(f.name)}}/>
+                <span style={{fontSize:18}}>📎</span>
+                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.white}}>Joindre un fichier</div><div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>PDF, partition, programme… <b style={{color:C.plum}}>choisir</b></div></div>
+              </label>
+            )}
             <div onClick={()=>setCpPrivate(v=>!v)} style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,marginBottom:16,cursor:'pointer'}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:700,color:C.white}}>🔒 Groupe privé (par lien)</div>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFB'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~250e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
+const V = '0xFC'  // Versionnage HEXADÉCIMAL (0-9 a-f). ~252e version. Incrémenter en hexa à chaque deploy (0xFB, 0xFC...). NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4705,7 +4705,11 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   onSetAvailable?:()=>void; isAvailable?:boolean; rdvBlocked?:boolean; onFeedback?:()=>void;
 }) {
   const [profileSubTab, setProfileSubTab] = useState<'profil'|'settings'>('profil')
-  const [profilePage, setProfilePage] = useState<string|null>(null)
+  // Navigation « poupées russes » : pile d'écrans. push = on entre plus profond, pop = ‹ Retour remonte d'un niveau.
+  const [pageStack, setPageStack] = useState<string[]>([])
+  const profilePage = pageStack[pageStack.length-1] || null
+  const setProfilePage = (p:string|null) => setPageStack(s => p===null ? [] : [...s, p])
+  const popPage = () => setPageStack(s => s.slice(0,-1))
   const [showBotLab, setShowBotLab] = useState(false)
   const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
   const [editField, setEditField] = useState<string|null>(null)
@@ -4828,6 +4832,106 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     try{localStorage.setItem(recepKey, m)}catch{}
     showToast(m==='open'?'🟢 Mode Ouverte':m==='selective'?'🟡 Mode Sélective':'🔴 Mode Pause', C.whiteMid)
   }
+
+  // ── FILTRES ÉPHÉMÈRES « Ce que je cherche en ce moment » ────────────────
+  // Principe produit (mémoire project_ux_rules) : ces envies s'EFFACENT toutes seules.
+  // On ne reste jamais coincé dans un filtre. Modes = reset 18h ; mode du moment = reset à minuit.
+  const MODES = [
+    {k:'romance', e:'💕', l:'Romance'},
+    {k:'amitie',  e:'🤝', l:'Amitié'},
+    {k:'pro',     e:'💼', l:'Pro'},
+    {k:'parents', e:'👶', l:'Parents'},
+    {k:'entraide',e:'🤲', l:'Entraide'},
+  ]
+  const MOMENTS = [
+    {k:'balade', e:'🥾', l:'Juste une balade'},
+    {k:'cafe',   e:'☕', l:'Un café tranquille'},
+    {k:'soir',   e:'🎉', l:'Sortir ce soir'},
+    {k:'chien',  e:'🐕', l:'Avec mon chien'},
+    {k:'calme',  e:'🧘', l:'Quelque chose de calme'},
+  ]
+  const momentKey = `clutch_moment_${user.id}`
+  const nextMidnight = () => { const d=new Date(); d.setHours(24,0,0,0); return d.getTime() }
+  const readMoment = () => { try { return JSON.parse(localStorage.getItem(momentKey)||'{}') } catch { return {} as any } }
+  // Modes éphémères (reset 18h)
+  const [ephModes, setEphModes] = useState<string[]>(()=>{
+    const r = readMoment(); if (r.modes_until && r.modes_until > Date.now()) return r.modes||[]; return []
+  })
+  const [modesUntil, setModesUntil] = useState<number>(()=>{ const r=readMoment(); return (r.modes_until && r.modes_until>Date.now())?r.modes_until:0 })
+  // Mode du moment (reset minuit)
+  const [moment, setMoment] = useState<string|null>(()=>{
+    const r = readMoment(); if (r.moment_until && r.moment_until > Date.now()) return r.moment||null; return null
+  })
+  const persistMoment = (next:{modes?:string[], modes_until?:number, moment?:string|null, moment_until?:number}) => {
+    const cur = readMoment()
+    const merged = { ...cur, ...next }
+    try { localStorage.setItem(momentKey, JSON.stringify(merged)) } catch {}
+  }
+  const toggleMode = (k:string) => {
+    setEphModes(prev => {
+      const has = prev.includes(k)
+      const nextArr = has ? prev.filter(x=>x!==k) : [...prev, k]
+      const until = nextArr.length ? Date.now()+18*3600*1000 : 0
+      setModesUntil(until)
+      persistMoment({ modes: nextArr, modes_until: until })
+      return nextArr
+    })
+  }
+  const pickMoment = (k:string) => {
+    setMoment(prev => {
+      const next = prev===k ? null : k
+      persistMoment({ moment: next, moment_until: next ? nextMidnight() : 0 })
+      return next
+    })
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(8)
+  }
+  const modesResetLabel = () => {
+    if (!modesUntil) return null
+    const h = Math.max(0, Math.round((modesUntil-Date.now())/3600000))
+    return h>=1 ? `↺ reset dans ${h}h` : '↺ reset bientôt'
+  }
+
+  // ── MON CLUTCH · l'algo (préférence locale, ludique — wiring DB en V2) ──
+  const algoKey = `clutch_algo_${user.id}`
+  const readAlgo = () => { try { return JSON.parse(localStorage.getItem(algoKey)||'{}') } catch { return {} as any } }
+  const [algoStyle, setAlgoStyle] = useState<string>(()=> readAlgo().style || 'proximite')
+  const [algoTrained, setAlgoTrained] = useState<number>(()=> readAlgo().trained || 0)
+  const setAlgo = (style:string) => {
+    setAlgoStyle(style)
+    try { localStorage.setItem(algoKey, JSON.stringify({ ...readAlgo(), style })) } catch {}
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(8)
+  }
+  // Questions binaires « Entraîne ton Clutch »
+  const TRAIN_Q = [
+    {q:'Tu préférerais voir…', a:{e:'📍',l:'quelqu\'un tout près'}, b:{e:'🧩',l:'très compatible'}},
+    {q:'Ce soir, plutôt…', a:{e:'🎲',l:'une surprise'}, b:{e:'🧩',l:'sur mesure'}},
+    {q:'Un bon Clutch, c\'est…', a:{e:'⚡',l:'spontané, vite'}, b:{e:'🌱',l:'qui prend son temps'}},
+    {q:'Tu accordes plus d\'importance à…', a:{e:'📍',l:'la distance'}, b:{e:'🏆',l:'la fiabilité'}},
+  ]
+  const [trainIdx, setTrainIdx] = useState(0)
+  const answerTrain = () => {
+    const n = algoTrained+1
+    setAlgoTrained(n)
+    try { localStorage.setItem(algoKey, JSON.stringify({ ...readAlgo(), trained:n })) } catch {}
+    setTrainIdx(i => (i+1) % TRAIN_Q.length)
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(10)
+  }
+  // Easter egg al-jabr (chasse au trésor) — révélation au tap de la tagline
+  const [secretOpen, setSecretOpen] = useState(false)
+
+  // ── « Ce que je cherche » — préférences persistantes (qui tu es) ──
+  const seekKey = `clutch_seek_${user.id}`
+  const readSeek = () => { try { return JSON.parse(localStorage.getItem(seekKey)||'{}') } catch { return {} as any } }
+  const [seekDist, setSeekDist] = useState<string>(()=> readSeek().dist || 'ville')
+  const [seekGender, setSeekGender] = useState<string>(()=> readSeek().gender || 'all')
+  const [seekAge, setSeekAge] = useState<string>(()=> readSeek().age || 'all')
+  const saveSeek = (patch:any, ...setters:[(v:any)=>void, any][]) => {
+    setters.forEach(([fn,v])=>fn(v))
+    try { localStorage.setItem(seekKey, JSON.stringify({ ...readSeek(), ...patch })) } catch {}
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
+  }
+  const [advOpen, setAdvOpen] = useState<string|null>(null)
+  const toggleAdv = (k:string) => setAdvOpen(o=>o===k?null:k)
 
   const handleRetirerDispo = async () => {
     const { error } = await supabase.from('profiles').update({
@@ -5533,12 +5637,151 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
+  // ── Helpers visuels des nouvelles sous-pages (poupées russes) ───────────
+  // ⚠️ Pas de hooks ici — ce sont de simples fonctions appelées au rendu.
+  const NoteBox = ({children,tone='soft'}:{children:React.ReactNode,tone?:'soft'|'green'}) => (
+    <div style={{background:tone==='green'?`${C.green}14`:C.bgCard,border:`1px solid ${tone==='green'?`${C.green}44`:C.border}`,borderRadius:14,padding:'12px 14px',margin:'4px 0 14px',fontSize:12,color:tone==='green'?C.green:C.whiteMid,lineHeight:1.55}}>{children}</div>
+  )
+  const Tog = ({on,onTap}:{on:boolean,onTap:()=>void}) => (
+    <div onClick={onTap} style={{width:44,height:26,borderRadius:13,background:on?C.green:C.border,position:'relative',cursor:'pointer',transition:'.2s',flexShrink:0}}>
+      <div style={{position:'absolute',top:2,left:on?20:2,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'.2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+    </div>
+  )
+  const DRow = ({label,value,badge,onTap,danger,right}:{label:string,value?:string,badge?:string,onTap?:()=>void,danger?:boolean,right?:React.ReactNode}) => (
+    <div onClick={onTap} style={{display:'flex',alignItems:'center',gap:10,padding:'14px 14px',borderBottom:`1px solid ${C.border}`,cursor:onTap?'pointer':'default'}}>
+      <span style={{flex:1,fontSize:14,fontWeight:600,color:danger?'#f87171':C.white}}>{label}{badge&&<span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 6px',marginLeft:6}}>{badge}</span>}</span>
+      {right || <span style={{fontSize:13,color:C.whiteMid,display:'flex',alignItems:'center',gap:4}}>{value}{onTap&&<span style={{fontSize:17,color:'#c9c2c7'}}>›</span>}</span>}
+    </div>
+  )
+  const PickRow = ({label,opts,val,onPick,badge}:{label:string,opts:{k:string,l:string}[],val:string,onPick:(k:string)=>void,badge?:string}) => (
+    <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.white,marginBottom:9}}>{label}{badge&&<span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 6px',marginLeft:6}}>{badge}</span>}</div>
+      <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+        {opts.map(o=>(
+          <span key={o.k} onClick={()=>onPick(o.k)} style={{fontSize:12,fontWeight:700,padding:'6px 12px',borderRadius:20,cursor:'pointer',border:`1.5px solid ${val===o.k?C.orange:C.border}`,color:val===o.k?'#fff':C.whiteMid,background:val===o.k?C.orange:'transparent'}}>{o.l}</span>
+        ))}
+      </div>
+    </div>
+  )
+
+  // ÉCRAN : Mode du moment 🌙 (éphémère, reset minuit)
+  const PageMoment = () => (
+    <div>
+      <NoteBox>Une envie <b style={{color:C.white}}>ponctuelle</b>, juste pour aujourd'hui. Ça <b style={{color:C.white}}>disparaît à minuit</b> — aucune pression.</NoteBox>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 2px'}}>
+        {MOMENTS.map(m=>(
+          <span key={m.k} onClick={()=>pickMoment(m.k)} style={{fontSize:13,fontWeight:700,padding:'9px 14px',borderRadius:22,cursor:'pointer',border:`1.5px solid ${moment===m.k?C.orange:C.border}`,color:moment===m.k?'#fff':C.whiteMid,background:moment===m.k?C.orange:'transparent'}}>{m.e} {m.l}</span>
+        ))}
+      </div>
+      <NoteBox>À minuit, ton mode du moment s'efface. Demain, tu en choisis un autre — ou pas. ↺</NoteBox>
+    </div>
+  )
+
+  // ÉCRAN : Ce que je cherche (éphémère vs persistant)
+  const PageCherche = () => (
+    <div>
+      <NoteBox tone="green">↺ <b>Tes filtres « du moment » s'effacent après 18h.</b> Tu repars ouvert·e à chaque fois — jamais coincé·e.</NoteBox>
+      <div style={{fontSize:11,fontWeight:800,color:C.green,padding:'2px 2px 8px'}}>⚡ ÉPHÉMÈRE (se réinitialise)</div>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+        <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.white,marginBottom:9}}>Modes <span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 6px'}}>↺ 18h</span></div>
+          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+            {MODES.map(m=>{const on=ephModes.includes(m.k);return(
+              <span key={m.k} onClick={()=>toggleMode(m.k)} style={{fontSize:12,fontWeight:700,padding:'6px 11px',borderRadius:20,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,color:on?'#fff':C.whiteMid,background:on?C.orange:'transparent'}}>{m.e} {m.l}</span>
+            )})}
+          </div>
+        </div>
+        <PickRow label="Distance" badge="↺ souple" val={seekDist} onPick={k=>saveSeek({dist:k},[setSeekDist,k])}
+          opts={[{k:'quartier',l:'🚶 Mon quartier'},{k:'ville',l:'🏙 Dans la ville'},{k:'region',l:'🚆 Toute la région'}]}/>
+      </div>
+      <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,padding:'2px 2px 8px'}}>📌 PERSISTANT (qui tu es)</div>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+        <PickRow label="Genre recherché" val={seekGender} onPick={k=>saveSeek({gender:k},[setSeekGender,k])}
+          opts={[{k:'women',l:'♀ Femmes'},{k:'men',l:'♂ Hommes'},{k:'all',l:'✨ Tout le monde'}]}/>
+        <PickRow label="Âge" val={seekAge} onPick={k=>saveSeek({age:k},[setSeekAge,k])}
+          opts={[{k:'18-25',l:'18–25'},{k:'25-35',l:'25–35'},{k:'35-50',l:'35–50'},{k:'all',l:'Tout'}]}/>
+      </div>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        <div onClick={()=>toggleAdv('cherche')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — filtres fins</span><span>{advOpen==='cherche'?'⌃':'⌄'}</span></div>
+        {advOpen==='cherche' && <div style={{borderTop:`1px solid ${C.border}`}}>
+          <DRow label="Que des profils certifiés" right={<Tog on={!!readSeek().certOnly} onTap={()=>saveSeek({certOnly:!readSeek().certOnly})}/>}/>
+          <DRow label="Que des profils avec photo" right={<Tog on={readSeek().photoOnly!==false} onTap={()=>saveSeek({photoOnly:readSeek().photoOnly===false})}/>}/>
+        </div>}
+      </div>
+    </div>
+  )
+
+  // ÉCRAN : Mon Clutch · l'algo (la pièce fun + éthique)
+  const PageAlgo = () => { const Q=TRAIN_Q[trainIdx]; return (
+    <div>
+      <NoteBox>Tu choisis <b style={{color:C.white}}>comment Clutch te propose des gens</b>. Par défaut on optimise pour toi — mais tu peux régler.</NoteBox>
+      <div style={{display:'flex',gap:8,marginBottom:16}}>
+        {[{k:'proximite',e:'📍',t:'Proximité'},{k:'compatibilite',e:'🧩',t:'Compatibilité'},{k:'decouverte',e:'🎲',t:'Découverte'}].map(o=>{const on=algoStyle===o.k;return(
+          <div key={o.k} onClick={()=>setAlgo(o.k)} style={{flex:1,border:`1.5px solid ${on?C.orange:C.border}`,borderRadius:14,padding:'14px 6px',textAlign:'center',cursor:'pointer',background:on?`${C.orange}14`:'transparent'}}>
+            <div style={{fontSize:24}}>{o.e}</div><div style={{fontSize:11,fontWeight:800,color:on?C.orange:C.white,marginTop:5}}>{o.t}</div>
+          </div>
+        )})}
+      </div>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>Entraîne ton Clutch</div>
+      <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,padding:'18px 16px',textAlign:'center',marginBottom:16}}>
+        <div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:14}}>« {Q.q} »</div>
+        <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+          {[Q.a,Q.b].map((opt,i)=>(
+            <button key={i} onClick={answerTrain} style={{flex:1,maxWidth:130,padding:'14px 8px',borderRadius:16,border:`1.5px solid ${C.border}`,background:'transparent',cursor:'pointer',fontFamily:'inherit'}}>
+              <div style={{fontSize:24}}>{opt.e}</div><div style={{fontSize:11,color:C.whiteMid,marginTop:6,lineHeight:1.3}}>{opt.l}</div>
+            </button>
+          ))}
+        </div>
+        <div style={{fontSize:10,color:C.whiteMid,marginTop:14,opacity:.8}}>{algoTrained>0?`🪄 ${algoTrained} réponse${algoTrained>1?'s':''} — Clutch te comprend mieux`:'Plus tu réponds, mieux Clutch te comprend 🪄'}</div>
+      </div>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
+        <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
+        {advOpen==='algo' && <div style={{borderTop:`1px solid ${C.border}`}}>
+          <DRow label="Poids de la fiabilité" value="Élevé"/>
+          <DRow label="Réinitialiser mon algo" danger onTap={()=>{ setAlgo('proximite'); setAlgoTrained(0); try{localStorage.setItem(algoKey,JSON.stringify({style:'proximite',trained:0}))}catch{}; showToast('↺ Algo réinitialisé',C.orange) }} right={<span style={{color:C.salmon,fontSize:15}}>↺</span>}/>
+        </div>}
+      </div>
+      <NoteBox>🔒 Éthique : ton algo ne sert jamais à te rendre accro pour rien — il sert à te faire <b style={{color:C.white}}>sortir voir des gens</b>.</NoteBox>
+    </div>
+  )}
+
+  // ÉCRAN : Sécurité & confidentialité (groupe → SOS / bloqués / certif)
+  const PageSecu = () => (
+    <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+      <DRow label="Mode de réception" value={recepMode==='open'?'🟢 Ouverte':recepMode==='selective'?'🟡 Sélective':'🔴 Pause'} onTap={()=>setProfilePage('preferences')}/>
+      <DRow label="Mode invisible" right={<Tog on={recepMode==='pause'} onTap={()=>saveRecepMode(recepMode==='pause'?'open':'pause')}/>}/>
+      <DRow label="Contacts SOS" value={`${sosContacts.filter(c=>c.name.trim()||c.phone.trim()).length} configuré${sosContacts.filter(c=>c.name.trim()||c.phone.trim()).length>1?'s':''}`} onTap={()=>setProfilePage('security')}/>
+      <DRow label="Personnes ghostées" value={blocked.length?`${blocked.length}`:'0'} onTap={()=>setProfilePage('ghosted')}/>
+      <DRow label="Certification selfie" right={(user as any).is_certified?<span style={{color:C.green,fontWeight:800,fontSize:13}}>✓ Fait</span>:<span style={{color:C.whiteMid,fontSize:13}}>À faire ›</span>} onTap={()=>showToast('Certification selfie — bientôt',C.whiteMid)}/>
+    </div>
+  )
+
+  // ÉCRAN : Mon compte (groupe → abonnement / fiabilité / favoris / légal…)
+  const PageCompte = () => {
+    const rs = user.reliability_score ?? 100
+    const lvl = rs>=90?'🏆 Exemplaire':rs>=75?'⭐ Très fiable':rs>=50?'🟢 Fiable':rs>=30?'🌿 En construction':'🌱 Nouveau'
+    return (
+    <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+      <DRow label="Abonnement" value="Gratuit · Premium" onTap={()=>setProfilePage('subscription')}/>
+      <DRow label="Ma fiabilité" value={lvl} onTap={()=>showToast(`Ta fiabilité : ${lvl}`,C.green)}/>
+      <DRow label="Préférences & notifications" value="Langue, réception…" onTap={()=>setProfilePage('preferences')}/>
+      <DRow label="Favoris" value={favorites.length?`${favorites.length}`:'0'} onTap={()=>setProfilePage('favorites')}/>
+      <DRow label="Langue" value={lang==='fr'?'🇨🇭 Français':'🇬🇧 English'} onTap={()=>setLang(lang==='fr'?'en':'fr')}/>
+      <DRow label="Légal & données" value="CGU · LPD" onTap={()=>setProfilePage('legal')}/>
+      <DRow label="Nous contacter" onTap={()=>setProfilePage('contact')}/>
+      <DRow label="Se déconnecter" danger onTap={()=>{ if(confirm('Se déconnecter ?')) signOut() }}/>
+      <DRow label="Supprimer mon compte" danger onTap={()=>setShowDelete(true)}/>
+    </div>
+  )}
+
   // ── Sous-page container ─────────────────────────────────────
   const subPageTitles: Record<string,string> = {
-    edit_profil:'Mon profil', seeking:'Ce que je cherche',
+    edit_profil:'Moi', seeking:'Ce que je cherche',
     favorites:'Favoris', ghosted:'Ghostés',
     subscription:'Mon abonnement', preferences:'Préférences',
     security:'Sécurité & SOS', legal:'Légal', contact:'Nous contacter',
+    cherche:'Ce que je cherche', algo:'Mon Clutch · l\'algo',
+    secu:'Sécurité & confidentialité', compte:'Mon compte', moment:'Mode du moment 🌙',
   }
   // ⚠️ On stocke les FONCTIONS (pas <Page/>) et on appelle la sélectionnée au rendu.
   // Sinon chaque frappe recrée le composant → input démonté → le clavier se ferme. (Aucun hook dans ces pages.)
@@ -5552,6 +5795,11 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     security: PageSecurity,
     legal: PageLegal,
     contact: PageContact,
+    cherche: PageCherche,
+    algo: PageAlgo,
+    secu: PageSecu,
+    compte: PageCompte,
+    moment: PageMoment,
   }
 
   return (
@@ -5636,39 +5884,69 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </button>
       </div>
 
-      {/* ─── MENU PRINCIPAL ─── */}
+      {/* ─── BLOC VEDETTE : Ce que je cherche EN CE MOMENT (filtres éphémères) ─── */}
+      <div style={{padding:'10px 16px 4px'}}>
+        <div style={{background:`linear-gradient(135deg,${C.bgCard},${C.bgCard})`,border:`1px solid ${C.border}`,borderRadius:18,padding:14}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:11}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:'.04em',textTransform:'uppercase',color:C.salmon}}>⚡ Ce que je cherche en ce moment</div>
+            {modesResetLabel() && <span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:10,padding:'2px 8px',whiteSpace:'nowrap'}}>{modesResetLabel()}</span>}
+          </div>
+          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+            {MODES.map(m=>{const on=ephModes.includes(m.k);return(
+              <span key={m.k} onClick={()=>toggleMode(m.k)} style={{fontSize:12,fontWeight:700,padding:'6px 11px',borderRadius:20,cursor:'pointer',border:`1.5px solid ${on?C.orange:C.border}`,color:on?'#fff':C.whiteMid,background:on?C.orange:'transparent',transition:'all .15s'}}>{m.e} {m.l}</span>
+            )})}
+          </div>
+          <div onClick={()=>setProfilePage('moment')} style={{marginTop:11,display:'flex',alignItems:'center',gap:9,background:C.bg,border:`1.5px dashed ${C.salmon}`,borderRadius:14,padding:'9px 12px',cursor:'pointer'}}>
+            <span style={{fontSize:18}}>{moment?MOMENTS.find(m=>m.k===moment)?.e:'🌙'}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.white}}>{moment?MOMENTS.find(m=>m.k===moment)?.l:'Mode du moment'}</div>
+              <div style={{fontSize:11,color:C.whiteMid}}>{moment?'Actif aujourd\'hui':'Une préférence éphémère pour aujourd\'hui'}</div>
+            </div>
+            <span style={{fontSize:9,fontWeight:800,color:C.salmon,background:`${C.salmon}22`,borderRadius:10,padding:'2px 7px',whiteSpace:'nowrap'}}>{moment?'expire à minuit':'expire demain'}</span>
+          </div>
+          <div style={{fontSize:10,color:`${C.whiteMid}cc`,marginTop:9,textAlign:'center',lineHeight:1.4}}>↺ Ces envies <b style={{color:C.green}}>s'effacent toutes seules</b> — tu ne restes jamais coincé·e dans un filtre.</div>
+        </div>
+      </div>
+
+      {/* ─── PORTES (poupées russes) ─── */}
       <div style={{padding:'0 16px'}}>
+        {([
+          {sec:'Mon profil'},
+          {ic:'🧬',bg:`${C.salmon}26`,ti:'Moi',su:'Photos, bio, intérêts, langues…',pg:'edit_profil'},
+          {ic:'🎯',bg:`${C.orange}22`,ti:'Ce que je cherche',su:'Genre, modes, âge, distance',pg:'cherche'},
+          {ic:'✨',bg:`${C.green}22`,ti:'Mon Clutch',tag:'l\'algo',su:'Comment on me propose des gens',pg:'algo'},
+          {sec:'Sécurité & compte'},
+          {ic:'🔒',bg:`${C.bordeauxLight}`,ti:'Sécurité & confidentialité',su:'Visibilité, SOS, bloqués, certif',pg:'secu'},
+          {ic:'⚙️',bg:C.border,ti:'Mon compte',su:'Abonnement, fiabilité, favoris, légal',pg:'compte'},
+        ] as any[]).map((d,i)=> d.sec
+          ? <div key={i} style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,margin:'18px 2px 6px'}}>{d.sec}</div>
+          : <div key={i} onClick={()=>setProfilePage(d.pg)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 4px',cursor:'pointer',borderBottom:`1px solid ${C.border}`}}>
+              <div style={{width:38,height:38,borderRadius:12,background:d.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}>{d.ic}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:800,color:C.white}}>{d.ti}{d.tag&&<span style={{fontSize:9,color:C.salmon,background:`${C.salmon}22`,padding:'1px 6px',borderRadius:8,marginLeft:6}}>{d.tag}</span>}</div>
+                <div style={{fontSize:12,color:C.whiteMid,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.su}</div>
+              </div>
+              <span style={{color:'#c9c2c7',fontSize:19}}>›</span>
+            </div>
+        )}
 
-        {SH('Mon compte')}
-        <MCard>
-          <MRow icon="👤" label="Mon profil" sub="Photos, bio, passions, style de vie…" onTap={()=>setProfilePage('edit_profil')}/>
-          <MRow icon="🎯" label="Ce que je cherche" sub={editLookingFor?({romance:'❤️ Romantique',friendship:'🤝 Amical',pro:'💼 Pro',all:'✨ Tout'}[editLookingFor]||''):'Mode de rencontre…'} onTap={()=>setProfilePage('seeking')}/>
-          <MRow icon="💎" label="Mon abonnement" sub="Gratuit · Passer Premium CHF 19.90/mois" onTap={()=>setProfilePage('subscription')}/>
-        </MCard>
+        {/* ─── Tagline al-jabr (chasse au trésor — révélation au tap) ─── */}
+        <div style={{textAlign:'center',padding:'26px 12px 8px',borderTop:`1px solid ${C.border}`,marginTop:18}}>
+          <div onClick={()=>setSecretOpen(o=>!o)} style={{fontSize:13,fontStyle:'italic',color:C.salmon,letterSpacing:'.02em',cursor:'pointer'}}>« Réunir ce qui était séparé. »</div>
+          {secretOpen && (
+            <div style={{fontSize:11,color:C.whiteMid,marginTop:11,lineHeight:1.55,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',textAlign:'left'}}>
+              🗝️ <b style={{color:C.white}}>Tu as trouvé.</b><br/>Le mot « algèbre » vient de <b style={{color:C.salmon}}>al-jabr</b> — au IXᵉ siècle, ça voulait dire « réunir ce qui était séparé ». Retrouver l'inconnu, le <i>x</i> qu'on cherche.<br/>C'est exactement ce que fait Clutch. 🟣
+            </div>
+          )}
+        </div>
 
-        {SH('Social')}
-        <MCard>
-          <MRow icon="❤️" label="Favoris" sub={favorites.length>0?`${favorites.length} personne${favorites.length>1?'s':''}`:'Aucun favori'} onTap={()=>setProfilePage('favorites')}/>
-          <MRow icon="👻" label="Ghostés" sub={blocked.length>0?`${blocked.length} personne${blocked.length>1?'s':''}`:'Personne de ghosté'} onTap={()=>setProfilePage('ghosted')}/>
-        </MCard>
-
-        {SH('Application')}
-        <MCard>
-          <MRow icon="🔔" label="Préférences" sub="Langue, réception, activité…" onTap={()=>setProfilePage('preferences')}/>
-          <MRow icon="🆘" label="Sécurité & SOS" sub={sosName?`Contact : ${sosName}`:'Configurer un contact d\'urgence'} onTap={()=>setProfilePage('security')}/>
-        </MCard>
-
-        {SH('Informations')}
-        <MCard>
-          <MRow icon="⚖️" label="Légal & Confidentialité" sub="CGU, données, LPD suisse" onTap={()=>setProfilePage('legal')}/>
-          <MRow icon="📩" label="Nous contacter" sub="Bug, idée, feedback" onTap={()=>setProfilePage('contact')}/>
-        </MCard>
-
-        {SH('Danger')}
-        <MCard>
-          <MRow icon="🚪" label="Se déconnecter" danger onTap={()=>{ if(confirm('Se déconnecter ?')) signOut() }}/>
-          <MRow icon="🗑" label="Supprimer mon compte" danger onTap={()=>setShowDelete(true)}/>
-        </MCard>
+        {/* 👁 NOTE ÉQUIPE — visible David + Mel uniquement (isAdmin) */}
+        {isAdmin && (
+          <div style={{margin:'10px 0',border:'1px dashed #dc2626',background:'rgba(220,38,38,.06)',borderRadius:12,padding:'10px 12px'}}>
+            <div style={{fontSize:9,fontWeight:800,color:'#f87171',letterSpacing:'.06em'}}>👁 NOTE ÉQUIPE (toi + Mel — invisible des users)</div>
+            <div style={{fontSize:11,color:'#fca5a5',marginTop:4,lineHeight:1.45}}>Noms de code internes : <b>al-jabr</b> (réunir ce qui était séparé → la Convergence) · 🪆 <b>Matryoshka</b> (ce profil en couches = poupées russes). Âme érudite côté équipe, jamais imposée aux users. La tagline FR + la structure imbriquée le font RESSENTIR. Filtres « du moment » = éphémères (reset 18h / minuit) : on ne reste jamais coincé.</div>
+          </div>
+        )}
 
         {/* 🧪 DEV — Reset test rapide. À RETIRER avant la sortie publique App Store.
             cf mémoire project_test_features_to_remove. N'agit QUE sur le compte connecté. */}
@@ -5707,7 +5985,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         <div style={{position:'fixed',inset:0,bottom:72,background:C.bg,zIndex:300,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
           {/* Header */}
           <div style={{position:'sticky',top:0,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:'48px 16px 12px',display:'flex',alignItems:'center',gap:12,zIndex:2}}>
-            <button onClick={()=>{setProfilePage(null);setEditField(null)}}
+            <button onClick={()=>{popPage();setEditField(null)}}
               style={{background:'none',border:'none',color:C.salmon,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4,padding:'4px 0',flexShrink:0}}>
               ‹ Retour
             </button>

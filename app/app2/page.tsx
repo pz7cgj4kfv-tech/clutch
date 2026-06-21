@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x106'  // Versionnage HEXADÉCIMAL. ~262e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x107'  // Versionnage HEXADÉCIMAL. ~263e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6396,10 +6396,10 @@ function MelHello({ onClose }:{ onClose:()=>void }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'rgba(42,16,32,.55)',backdropFilter:'blur(5px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
       <div onClick={e=>e.stopPropagation()} style={{maxWidth:312,background:'#fff',borderRadius:26,padding:'32px 24px 24px',textAlign:'center',boxShadow:'0 25px 70px rgba(83,41,67,.45)',border:`2px solid ${C.orange}`}}>
-        <div style={{fontSize:62,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>🤡</div>
-        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Coucou, les deux fous 😂</div>
-        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Si vous lisez ça, c'est que Clutch est <b>vivant</b> 🎉<br/>(et que personne n'a dormi 🫠)<br/><br/>Ce petit mot s'autodétruira au prochain build.<br/><br/>Bisous 💋</div>
-        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>🤝 Allez, on continue</button>
+        <div style={{fontSize:64,display:'inline-block',animation:'melBounce 1.4s ease-in-out infinite'}}>😂</div>
+        <div style={{fontSize:22,fontWeight:900,color:C.bordeaux,marginTop:16,lineHeight:1.3}}>Dimanche, jour de repos</div>
+        <div style={{fontSize:13.5,color:C.bordeauxLight,marginTop:14,lineHeight:1.6}}>Ce petit mot s'autodétruira au prochain build.</div>
+        <button onClick={onClose} style={{marginTop:22,width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${C.orange},${C.bordeaux})`,color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 18px rgba(226,124,0,.35)'}}>😊</button>
       </div>
       <style>{`@keyframes melBounce{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-11px) rotate(7deg)}}`}</style>
     </div>

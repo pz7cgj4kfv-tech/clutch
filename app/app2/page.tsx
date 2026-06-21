@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0xFF'  // Versionnage HEXADÉCIMAL. ~255e version. Après 0xFF → 0x100. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x100'  // Versionnage HEXADÉCIMAL. ~256e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6377,6 +6377,78 @@ function ConvergenceOverlay({ myProgress, otherProgress, mins, secs, otherName, 
   )
 }
 
+// ════════════════════════════════════════════════════════════════════
+// QuickSOS — bouclier de sécurité DISCRET, visible UNIQUEMENT pendant un RDV actif.
+// Demande David : la sécurité doit être à 1 geste PENDANT le rendez-vous (pas enfoui dans le profil).
+// Garde-fou anti-faux-positif : le bouclier ouvre une feuille → 1 tap envoie (rapide mais délibéré).
+// Réutilise la logique sos_sessions + /sos?t=token (partage position EN DIRECT aux contacts choisis).
+// ════════════════════════════════════════════════════════════════════
+function QuickSOS({ user, supabase: sb, lang, showToast }:{ user:any; supabase:any; lang:Lang; showToast:(m:string,c?:string)=>void }) {
+  const [open,setOpen] = useState(false)
+  const [liveToken,setLiveToken] = useState<string|null>(null)
+  const watchRef = useRef<number|null>(null)
+  const isFr = lang==='fr'
+  const readContacts = () => { try { const r=JSON.parse(localStorage.getItem(`clutch_sos_${user.id}`)||'{}'); return Array.isArray(r.contacts)?r.contacts:((r.name||r.phone)?[{name:r.name||'',phone:r.phone||''}]:[]) } catch { return [] } }
+  const sendLive = async () => {
+    const pseudo = user?.name || (isFr?'Quelqu\'un':'Someone')
+    const contacts = readContacts().filter((c:any)=>c.phone?.trim())
+    let token:string|null = null
+    try { const { data } = await sb.from('sos_sessions').insert({ user_id:user.id, user_name:pseudo, active:true }).select('token').single(); token=(data as any)?.token||null } catch {}
+    if (token && navigator.geolocation) {
+      if (watchRef.current!=null) navigator.geolocation.clearWatch(watchRef.current)
+      watchRef.current = navigator.geolocation.watchPosition(
+        pos => { sb.from('sos_sessions').update({ lat:pos.coords.latitude, lng:pos.coords.longitude, updated_at:new Date().toISOString() }).eq('token', token as string).then(()=>{}) },
+        ()=>{}, { enableHighAccuracy:true, maximumAge:5000 })
+      setLiveToken(token)
+    }
+    const link = token ? `${window.location.origin}/sos?t=${token}` : ''
+    const share = (locTxt:string) => {
+      const text = token
+        ? `🆘 ${pseudo} ${isFr?'a besoin d\'aide. Suis ma position EN DIRECT':'needs help. Follow my LIVE location'} : ${link}`
+        : `🆘 ${pseudo} ${isFr?'a besoin d\'aide.':'needs help.'}${locTxt}`
+      if ((navigator as any).share) (navigator as any).share({ title:'Clutch SOS', text }).catch(()=>{})
+      else if (contacts.length) window.location.href = `sms:/open?addresses=${encodeURIComponent(contacts.map((c:any)=>c.phone.trim()).join(','))}&body=${encodeURIComponent(text)}`
+      else showToast(isFr?'Ajoute un contact SOS dans Profil → Sécurité':'Add an SOS contact in Profile → Security', C.orange)
+    }
+    if (token) share('')
+    else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos=>share(` https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`), ()=>share(''), { timeout:6000, enableHighAccuracy:true })
+    else share('')
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate([20,40,20])
+  }
+  const stopLive = async () => {
+    if (watchRef.current!=null && navigator.geolocation) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current=null }
+    if (liveToken) { try { await sb.from('sos_sessions').update({ active:false }).eq('token', liveToken) } catch {}; setLiveToken(null) }
+    showToast(isFr?'Partage de position arrêté':'Location sharing stopped', C.orange)
+  }
+  return (<>
+    <button onClick={()=>setOpen(true)} aria-label={isFr?'Sécurité':'Safety'}
+      style={{position:'fixed', left:14, bottom:'calc(72px + var(--sab) + 14px)', zIndex:1150, width:44, height:44, borderRadius:'50%',
+        border:`1.5px solid ${liveToken?'#dc2626':C.border}`, background: liveToken?'#dc2626':'rgba(255,255,255,0.94)', backdropFilter:'blur(8px)',
+        display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 3px 12px rgba(83,41,67,.22)',
+        animation: liveToken?'sosPulse 1.2s ease-in-out infinite':'none'}}>
+      <span style={{fontSize:20,lineHeight:1}}>{liveToken?'📡':'🛡️'}</span>
+    </button>
+    {open && (
+      <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(20,10,18,.45)',display:'flex',alignItems:'flex-end'}}>
+        <div onClick={e=>e.stopPropagation()} style={{width:'100%',background:C.bg,borderTopLeftRadius:22,borderTopRightRadius:22,padding:'20px 18px calc(var(--sab) + 22px)',boxShadow:'0 -8px 30px rgba(0,0,0,.2)'}}>
+          <div style={{width:38,height:4,borderRadius:2,background:C.border,margin:'0 auto 16px'}}/>
+          <div style={{fontSize:17,fontWeight:900,color:C.white,marginBottom:6}}>🛡️ {isFr?'Ta sécurité':'Your safety'}</div>
+          <div style={{fontSize:12.5,color:C.whiteMid,lineHeight:1.5,marginBottom:16}}>{isFr?'Tu es pendant un rendez-vous. En un geste, tes proches reçoivent ta position en direct.':'You\'re on a meetup. In one tap, your contacts get your live location.'}</div>
+          {!liveToken ? (
+            <button onClick={()=>{ sendLive(); setOpen(false) }} style={{width:'100%',padding:'16px',borderRadius:16,border:'none',background:'#dc2626',color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>📍 {isFr?'Envoyer ma position à mes proches':'Send my live location'}</button>
+          ) : (
+            <button onClick={()=>{ stopLive(); setOpen(false) }} style={{width:'100%',padding:'16px',borderRadius:16,border:`1.5px solid ${C.border}`,background:'transparent',color:C.white,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>⏹ {isFr?'Arrêter le partage en direct':'Stop live sharing'}</button>
+          )}
+          <a href="tel:117" style={{display:'block',textAlign:'center',width:'100%',boxSizing:'border-box',padding:'14px',borderRadius:16,border:`1.5px solid ${C.border}`,background:C.bgCard,color:'#dc2626',fontSize:14,fontWeight:800,textDecoration:'none',marginBottom:12}}>📞 {isFr?'Appeler la police (117)':'Call police (117)'}</a>
+          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5}}>{isFr?'Discret — la personne en face ne voit rien. Tes contacts se règlent dans Profil → Sécurité.':'Discreet — the other person sees nothing. Set contacts in Profile → Security.'}</div>
+          <button onClick={()=>setOpen(false)} style={{width:'100%',padding:'12px',marginTop:8,borderRadius:14,border:'none',background:'transparent',color:C.whiteMid,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{isFr?'Fermer':'Close'}</button>
+        </div>
+      </div>
+    )}
+    <style>{`@keyframes sosPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}50%{box-shadow:0 0 0 9px rgba(220,38,38,0)}}`}</style>
+  </>)
+}
+
 function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, onRetardAck, supabase: sb }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void; onCheckin?:()=>void; onTerminer?:()=>void; onRetardAck?:()=>void; supabase?:any }) {
   const [showConv, setShowConv] = useState(false)
   const [now,setNow] = useState(new Date())
@@ -9726,6 +9798,10 @@ export default function App2() {
               />
             ) : null
           })()}
+          {/* 🛡️ SOS discret — visible UNIQUEMENT pendant un RDV actif (demande David : sécurité à 1 geste pendant le rendez-vous) */}
+          {flow==='app' && activeVerrou && !showVerrou && (
+            <QuickSOS user={user} supabase={supabase} lang={lang} showToast={showToast}/>
+          )}
           {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV. Masqué si feedback inline actif */}
           {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && (
             <ProximityRadar

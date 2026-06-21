@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x10B'  // Versionnage HEXADÉCIMAL. ~267e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10C'  // Versionnage HEXADÉCIMAL. ~268e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2876,6 +2876,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   // 🤝 Partenaires suivis (prototype, persisté localStorage)
   const [followedPartners, setFollowedPartners] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_partners');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
   const togglePartner = (id:string) => setFollowedPartners(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); try{localStorage.setItem('clutch_partners',JSON.stringify([...n]))}catch{}; return n })
+  // 🤝 Mes groupes créés (prototype) — persisté localStorage
+  const [myPartners, setMyPartners] = useState<any[]>(()=>{ try{const s=localStorage.getItem('clutch_my_partners');return s?JSON.parse(s):[]}catch{return []} })
+  const [showCreatePartner, setShowCreatePartner] = useState(false)
+  const [cpName,setCpName]=useState(''); const [cpCat,setCpCat]=useState(''); const [cpZone,setCpZone]=useState(''); const [cpDesc,setCpDesc]=useState(''); const [cpPrivate,setCpPrivate]=useState(false); const [cpEmoji,setCpEmoji]=useState('🎉')
+  const createPartner = () => {
+    if(!cpName.trim()) return
+    const g = { id:'my_'+Date.now(), emoji:cpEmoji, name:cpName.trim(), cat:cpCat.trim()||'Mon groupe', zone:cpZone.trim()||'Région Lausanne', members:1, desc:cpDesc.trim()||'Nouveau groupe Clutch.', next:'Aucun event pour l\'instant', verified:false, mine:true, isPrivate:cpPrivate, link:cpPrivate?`clutch.app/g/${Math.random().toString(36).slice(2,9)}`:null }
+    const next=[g,...myPartners]; setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{}
+    setShowCreatePartner(false); setCpName('');setCpCat('');setCpZone('');setCpDesc('');setCpPrivate(false);setCpEmoji('🎉')
+  }
+  const CP_EMOJIS=['🎉','🎶','🏓','🎷','🥾','🍷','🎨','⚽','🧘','🎲','🍽️','👶','🎸','🎬','📚','🚲']
   const [registering, setRegistering] = useState(false)
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
   const evTouchStartX = useRef<number|null>(null)
@@ -2994,6 +3005,26 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🤝 Groupes & partenaires</div>
             <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>Suis un club, un collectif, un organisateur — et reçois une notif à chacun de leurs nouveaux événements. Ton réseau se construit tout seul.</div>
           </div>
+          <button onClick={()=>setShowCreatePartner(true)} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px dashed ${C.plum}`,background:'transparent',color:C.plum,fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:14}}>+ Créer mon groupe</button>
+          {/* Mes groupes créés */}
+          {myPartners.map((p:any)=>(
+            <div key={p.id} style={{background:C.bgCard,border:`1.5px solid ${C.plum}`,borderRadius:16,padding:'13px 14px',marginBottom:11}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+                <div style={{width:46,height:46,borderRadius:14,background:`${C.plum}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{p.emoji}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                    <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
+                    <span style={{fontSize:9,fontWeight:800,color:C.plum,background:`${C.plum}14`,borderRadius:8,padding:'1px 6px'}}>Mon groupe</span>
+                    {p.isPrivate&&<span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>🔒 Privé</span>}
+                  </div>
+                  <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
+                  <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
+                  {p.isPrivate&&p.link&&<div style={{fontSize:10.5,color:C.plum,marginTop:7,background:`${C.plum}0a`,borderRadius:8,padding:'5px 8px',wordBreak:'break-all'}}>🔗 Lien privé : {p.link}</div>}
+                </div>
+              </div>
+              <button onClick={()=>{ const next=myPartners.filter((x:any)=>x.id!==p.id); setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{} }} style={{width:'100%',marginTop:11,padding:'9px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Supprimer ce groupe</button>
+            </div>
+          ))}
           {PARTNERS_MOCK.map(p=>{ const on=followedPartners.has(p.id); return (
             <div key={p.id} style={{background:C.bgCard,border:`1px solid ${on?C.plum:C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:11,boxShadow:'0 2px 10px rgba(83,41,67,.05)'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
@@ -3093,6 +3124,38 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         )})}
         </>)}
       </div>
+
+      {/* 🤝 Créer un groupe — bottom sheet (prototype) */}
+      {showCreatePartner && (
+        <div onClick={()=>setShowCreatePartner(false)} style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(42,16,32,.5)',display:'flex',alignItems:'flex-end'}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'88vh',overflowY:'auto',background:C.bg,borderTopLeftRadius:22,borderTopRightRadius:22,padding:`18px 18px calc(var(--sab) + 20px)`}}>
+            <div style={{width:38,height:4,borderRadius:2,background:C.border,margin:'0 auto 14px'}}/>
+            <div style={{fontSize:18,fontWeight:900,color:C.white,marginBottom:4}}>Créer mon groupe</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:16,lineHeight:1.5}}>Un club, un collectif, une activité récurrente. Les gens te suivent → ils sont notifiés de tes events.</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+              {CP_EMOJIS.map(e=><span key={e} onClick={()=>setCpEmoji(e)} style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'pointer',border:`1.5px solid ${cpEmoji===e?C.plum:C.border}`,background:cpEmoji===e?`${C.plum}0d`:'transparent'}}>{e}</span>)}
+            </div>
+            {[['Nom du groupe',cpName,setCpName,'Ex. Apéro Jazz Collectif'],['Catégorie',cpCat,setCpCat,'Ex. Musique · Apéro'],['Zone',cpZone,setCpZone,'Ex. Vieille Ville (pas l\'adresse exacte)']].map(([lab,val,set,ph]:any)=>(
+              <div key={lab} style={{marginBottom:11}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>{lab}</div>
+                <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+              </div>
+            ))}
+            <div style={{marginBottom:11}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Description</div>
+              <textarea value={cpDesc} onChange={e=>setCpDesc(e.target.value)} placeholder="En 1-2 phrases…" rows={2} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none'}}/>
+            </div>
+            <div onClick={()=>setCpPrivate(v=>!v)} style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,marginBottom:16,cursor:'pointer'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.white}}>🔒 Groupe privé (par lien)</div>
+                <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>N'apparaît pas dans la liste publique. Tu partages un lien.</div>
+              </div>
+              <div style={{width:44,height:26,borderRadius:13,background:cpPrivate?C.green:C.border,position:'relative',flexShrink:0,transition:'.2s'}}><div style={{position:'absolute',top:2,left:cpPrivate?20:2,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'.2s'}}/></div>
+            </div>
+            <button onClick={createPartner} disabled={!cpName.trim()} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:cpName.trim()?C.bordeaux:C.border,color:'#fff',fontSize:15,fontWeight:800,cursor:cpName.trim()?'pointer':'default',fontFamily:'inherit'}}>Créer le groupe</button>
+          </div>
+        </div>
+      )}
 
       {/* Détail événement — bottom sheet scrollable */}
       {selEv&&(

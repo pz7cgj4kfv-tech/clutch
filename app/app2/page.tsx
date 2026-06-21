@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x109'  // Versionnage HEXADÉCIMAL. ~265e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x10A'  // Versionnage HEXADÉCIMAL. ~266e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -310,7 +310,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g dans toute la croûte terrestre',
     'sub.at.f1': 'Tout Rh +', 'sub.at.f2': 'Mode incognito', 'sub.at.f3': 'Rayon élargi 50km', 'sub.at.f4': 'Stats avancées', 'sub.at.f5': 'Badge Élite sur le profil', 'sub.at.f6': 'Support prioritaire',
     'sub.women': 'Femmes — toujours gratuites, toujours prioritaires ♀',
-    'ev.filter.all': 'Tout', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
+    'ev.filter.all': 'Tout', 'ev.filter.partenaires':'Partenaires', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Bien-être', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Gastronomie', 'ev.filter.musique': 'Musique', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte', 'ev.filter.groupe': 'Groupe',
@@ -414,7 +414,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.note': '28g in the entire Earth\'s crust',
     'sub.at.f1': 'Everything in Rh +', 'sub.at.f2': 'Incognito mode', 'sub.at.f3': 'Extended radius 50km', 'sub.at.f4': 'Advanced stats', 'sub.at.f5': 'Elite badge on profile', 'sub.at.f6': 'Priority support',
     'sub.women': 'Women — always free, always prioritized ♀',
-    'ev.filter.all': 'All', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
+    'ev.filter.all': 'All', 'ev.filter.partenaires':'Partners', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Wellness', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Food & Drink', 'ev.filter.musique': 'Music', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed', 'ev.filter.groupe': 'Group',
@@ -2625,8 +2625,19 @@ const MOCK_EVENTS = [
 // evGender : 'F'=entre femmes · 'X'=mixte · 'M'=entre hommes
 // NOTE LÉGALE CH : discrimination tolérée pour événements sociaux privés (art. 8 Cst) ;
 // mais à documenter dans CGU. Pas de filtrage automatique = utilisateur choisit.
+// 🤝 PROTOTYPE — Groupes / Partenaires (vision David : suivre un organisateur récurrent → notifs ciblées = réseau)
+// Données mock pour visualiser le concept. À brancher DB en V2.
+const PARTNERS_MOCK = [
+  {id:'p_dclub',   emoji:'🎶', name:'D Club Lausanne',      cat:'Clubbing · Soirées',   zone:'Flon, Lausanne',     members:1240, desc:'Les meilleures nuits de Lausanne. Soirées chaque week-end.', next:'Techno night · sam. 23h', verified:true},
+  {id:'p_pingpong',emoji:'🏓', name:'Ping-Pong chez Bibi',  cat:'Sport · Convivial',    zone:'Région Lausanne',    members:38,   desc:'Tournois ping-pong détendus chez un passionné. Lieu donné avant.', next:'Tournoi débutants · dim. 14h', verified:false},
+  {id:'p_jazz',    emoji:'🎷', name:'Apéro Jazz Collectif',  cat:'Musique · Apéro',      zone:'Vieille Ville',      members:212,  desc:'Jam sessions et apéros jazz une fois par mois. Amène ton instrument.', next:'Jam ouverte · ven. 19h', verified:true},
+  {id:'p_rando',   emoji:'🥾', name:'Rando du Dimanche',     cat:'Nature · Sport',       zone:'Lavaux / Jura',      members:156,  desc:'Balades et randos accessibles à tous, chaque dimanche matin.', next:'Lavaux sunrise · dim. 7h', verified:false},
+  {id:'p_parents', emoji:'👶', name:'Parents & Cie',         cat:'Famille · Entraide',   zone:'Lausanne',           members:89,   desc:'Sorties parc, gardes partagées, cafés entre parents.', next:'Pique-nique parc · sam. 15h', verified:false},
+]
+
 const EV_FILTERS = [
   {id:'all',      trKey:'ev.filter.all',      icon:'✦'},
+  {id:'partenaires', trKey:'ev.filter.partenaires', icon:'🤝'},
   {id:'mine',     trKey:'ev.filter.mine',     icon:'📌'},
   {id:'groupe',   trKey:'ev.filter.groupe',   icon:'👥'},
   {id:'soir',     trKey:'ev.filter.soir',     icon:'🌙'},
@@ -2852,6 +2863,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (found) { setSelEv(found); onClearInitialEvent?.() }
   }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
+  // 🤝 Partenaires suivis (prototype, persisté localStorage)
+  const [followedPartners, setFollowedPartners] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_partners');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
+  const togglePartner = (id:string) => setFollowedPartners(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); try{localStorage.setItem('clutch_partners',JSON.stringify([...n]))}catch{}; return n })
   const [registering, setRegistering] = useState(false)
   const [evPhotoIdx, setEvPhotoIdx] = useState(0)
   const evTouchStartX = useRef<number|null>(null)
@@ -2936,6 +2950,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           {EV_FILTERS.map(f=>{
             const countForFilter = (fid:string) => {
               if (fid==='all') return events.length
+              if (fid==='partenaires') return PARTNERS_MOCK.length
               if (fid==='mine') return events.filter(ev=>registered.has(ev.id)).length
               if (fid==='groupe') return events.filter(ev=>(ev as any).isGroupe).length
               if (fid==='soir') return events.filter(ev=>ev.date==='Ce soir').length
@@ -2963,6 +2978,37 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
+        {/* 🤝 VUE PARTENAIRES (prototype) — suivre des groupes/organisateurs récurrents → notifs ciblées */}
+        {evFilter==='partenaires' && (<>
+          <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🤝 Groupes & partenaires</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>Suis un club, un collectif, un organisateur — et reçois une notif à chacun de leurs nouveaux événements. Ton réseau se construit tout seul.</div>
+          </div>
+          {PARTNERS_MOCK.map(p=>{ const on=followedPartners.has(p.id); return (
+            <div key={p.id} style={{background:C.bgCard,border:`1px solid ${on?C.plum:C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:11,boxShadow:'0 2px 10px rgba(83,41,67,.05)'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+                <div style={{width:46,height:46,borderRadius:14,background:`${C.plum}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{p.emoji}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
+                    {p.verified&&<span style={{fontSize:9,fontWeight:800,color:C.green,background:`${C.green}1c`,borderRadius:8,padding:'1px 5px'}}>✓ Certifié</span>}
+                  </div>
+                  <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
+                  <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,fontWeight:700,color:C.plum,background:`${C.plum}0d`,borderRadius:8,padding:'3px 8px'}}>🗓 {p.next}</span>
+                    <span style={{fontSize:10.5,color:C.whiteMid}}>👥 {p.members} membres</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={()=>togglePartner(p.id)} style={{width:'100%',marginTop:11,padding:'10px',borderRadius:12,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                {on?'✓ Suivi · notifs activées':'+ Suivre ce groupe'}
+              </button>
+            </div>
+          )})}
+          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — bientôt : créer ton propre groupe (public ou privé par lien), event en région (sans adresse exacte), fichiers joints.</div>
+        </>)}
+        {evFilter!=='partenaires' && (<>
         {cancelledNotice && (
           <div style={{background:'rgba(220,80,80,.1)',border:`1px solid ${C.red}44`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'flex-start',gap:8}}>
             <span style={{fontSize:16}}>🚫</span>
@@ -3035,6 +3081,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
           </div>
         )})}
+        </>)}
       </div>
 
       {/* Détail événement — bottom sheet scrollable */}

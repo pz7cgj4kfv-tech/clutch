@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x101'  // Versionnage HEXADÉCIMAL. ~257e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x102'  // Versionnage HEXADÉCIMAL. ~258e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5799,19 +5799,23 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
         <div style={{fontSize:10,color:C.whiteMid,marginTop:14,opacity:.8}}>{algoTrained>0?`🪄 ${algoTrained} réponse${algoTrained>1?'s':''} — Clutch te comprend mieux`:'Plus tu réponds, mieux Clutch te comprend 🪄'}</div>
       </div>
-      {/* Niveau 3 : tempérament + transparence */}
+      {/* Avancé — pondérations & tests (Test de personnalité dedans, comme la maquette validée) */}
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
-        <DRow label="Mon tempérament de rencontre" value={temperament?`${TEMP_ARCH[temperament].e} ${TEMP_ARCH[temperament].l}`:'À découvrir'} onTap={()=>setProfilePage('temperament')}/>
-        <DRow label="Pourquoi on me propose des gens" value="Transparence" onTap={()=>setProfilePage('why')}/>
-      </div>
-      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
-        <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
+        <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations &amp; tests</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
         {advOpen==='algo' && <div style={{borderTop:`1px solid ${C.border}`}}>
+          <DRow label="Test de personnalité" value={temperament?`${TEMP_ARCH[temperament].e} Fait`:'Non fait'} onTap={()=>setProfilePage('temperament')}/>
           <DRow label="Poids de la fiabilité" value="Élevé"/>
           <DRow label="Réinitialiser mon algo" danger onTap={()=>{ setAlgo('proximite'); setAlgoTrained(0); try{localStorage.setItem(algoKey,JSON.stringify({style:'proximite',trained:0}))}catch{}; showToast('↺ Algo réinitialisé',C.orange) }} right={<span style={{color:C.salmon,fontSize:15}}>↺</span>}/>
         </div>}
       </div>
       <NoteBox>🔒 Éthique : ton algo ne sert jamais à te rendre accro pour rien — il sert à te faire <b style={{color:C.white}}>sortir voir des gens</b>.</NoteBox>
+      {/* 👁 NOTE ÉQUIPE — visible David + Mel uniquement */}
+      {isAdmin && (
+        <div style={{margin:'2px 0 8px',border:'1px dashed #dc2626',background:'rgba(220,38,38,.06)',borderRadius:12,padding:'10px 12px'}}>
+          <div style={{fontSize:9,fontWeight:800,color:'#f87171',letterSpacing:'.06em'}}>👁 POURQUOI CE CHOIX (toi + Mel)</div>
+          <div style={{fontSize:11,color:'#fca5a5',marginTop:4,lineHeight:1.45}}>« Entraîne ton Clutch » en <b>questions binaires</b> (ça ou ça) plutôt qu'en curseurs/réglages techniques : <b>ludique</b>, sans jargon, <b>dopamine éthique</b> (le user joue à affiner), et l'algo apprend sans qu'il comprenne la mécanique. Alternative écartée : des curseurs % = froid, intimidant, personne ne touche. → À valider : on garde 3 styles (Proximité/Compatibilité/Découverte) ou on en ajoute (« Nouveauté », « Mes affinités ») ?</div>
+        </div>
+      )}
     </div>
   )}
 

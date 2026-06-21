@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x113'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x114'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9621,9 +9621,9 @@ export default function App2() {
                         : isNewRec ? `2px solid ${C.salmon}88`
                         : isSent ? `1px solid ${C.orange}55`
                         : `1px solid ${C.border}`
-                      const cardBg = isAccepted ? `linear-gradient(135deg,${C.bgCard},${C.bordeaux}88)`
-                        : isNewRec ? `linear-gradient(135deg,${C.bgCard},rgba(255,107,107,.06))`
-                        : C.bgCard
+                      // Cartes BLANCHES (design Mel). L'identité Verrou vient du bandeau photo prune + bordure verte,
+                      // PAS d'un dégradé sur toute la carte (illisible = « effet verre » que David rejette).
+                      const cardBg = C.bgCard
                       const sc = isAccepted ? C.green : isNewRec ? C.salmon : C.orange
                       const sl = isAccepted ? 'Verrou' : isNewRec ? (countdown?`← ${countdown}`:'← Received') : (countdown?`→ ${countdown}`:'→ Sent')
                       // ── INLINE FEEDBACK : remplace toute la carte ──
@@ -9833,7 +9833,7 @@ export default function App2() {
                                 {/* Ligne 1 : Chat + Retard */}
                                 <div style={{display:'flex',gap:8}}>
                                   <button onClick={()=>{setChatClutch(c);setShowChat(true);setUnreadChats(prev=>{const n={...prev};delete n[c.id];return n})}}
-                                    style={{flex:2,padding:'8px',background:`${C.green}14`,border:`1px solid ${C.green}44`,borderRadius:10,color:C.green,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                                    style={{flex:2,padding:'11px 8px',background:'#fff',border:`1.5px solid ${C.green}`,borderRadius:12,color:C.green,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
                                     {lang==='en'?`💬 Chat with ${other?.name}`:`💬 Chat avec ${other?.name}`}
                                     {unreadChats[c.id]>0 && (
                                       <span style={{background:'#4A90D9',color:'#fff',fontSize:9,fontWeight:900,borderRadius:10,padding:'1px 5px',marginLeft:4}}>
@@ -9947,13 +9947,13 @@ export default function App2() {
                                         if (!isMock) supabase.from('clutches').update({status:'completed'}).eq('id',c.id).then(()=>{})
                                         setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'completed'}:cl))
                                       }} style={{flex:1,padding:'12px 8px',
-                                        background:canTerminer?C.green:'rgba(45,189,126,.2)',
-                                        border:canTerminer?'none':'1px solid rgba(45,189,126,.3)',
-                                        borderRadius:10,color:canTerminer?'#fff':'rgba(45,189,126,.5)',
+                                        background:canTerminer?C.green:C.border,
+                                        border:canTerminer?'none':`1px solid ${C.borderStrong}`,
+                                        borderRadius:12,color:canTerminer?'#fff':C.salmon,
                                         fontSize:12,fontWeight:900,
                                         cursor:canTerminer?'pointer':'default',
                                         fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative',zIndex:1}}>
-                                        ✓ {lang==='en'?'Done':'Terminer'}
+                                        {canTerminer ? `✓ ${lang==='en'?'Done':'Terminer'}` : `⏳ ${lang==='en'?'Waiting':'En attente'}`}
                                       </button>
                                     )
                                   })()}

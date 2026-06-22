@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x141'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x142'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1510,8 +1510,8 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           )
         })}
       </div>
-      {/* Version — pastille LISIBLE en bas à gauche, flottante au-dessus de la nav (David : « que je puisse la voir facilement ») */}
-      <div style={{position:'fixed',left:8,bottom:'calc(72px + var(--sab) + 5px)',zIndex:1001,fontSize:9,fontWeight:800,color:'rgba(83,41,67,.55)',background:'rgba(255,255,255,.72)',borderRadius:8,padding:'1px 6px',pointerEvents:'none',letterSpacing:'.04em',backdropFilter:'blur(4px)'}}>{V}</div>
+      {/* Version — pastille LISIBLE en bas à gauche (hex + décimal), flottante au-dessus de la nav, sur toutes les pages */}
+      <div style={{position:'fixed',left:9,bottom:'calc(72px + var(--sab) + 6px)',zIndex:1001,fontSize:10.5,fontWeight:800,color:'rgba(83,41,67,.72)',background:'rgba(255,255,255,.85)',border:'1px solid rgba(83,41,67,.12)',borderRadius:9,padding:'2px 8px',pointerEvents:'none',letterSpacing:'.03em',backdropFilter:'blur(6px)',boxShadow:'0 1px 5px rgba(83,41,67,.12)'}}>{V} · {Number(V)}</div>
     </>
   )
 }
@@ -3044,7 +3044,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const CP_EMOJIS=['🎉','🎶','🏓','🎷','🥾','🍷','🎨','⚽','🧘','🎲','🍽️','👶','🎸','🎬','📚','🚲']
   const CP_ZONES=['Lausanne centre','Vieille Ville','Flon','Ouchy','Région Lausanne','Lavaux','Renens / Ouest','Autre']
   const [registering, setRegistering] = useState(false)
-  const [nightMode, setNightMode] = useState(false) // 🌙 Clutch Night (mode nuit dans Événements)
+  const [nightMode, setNightMode] = useState(()=>{ try{return localStorage.getItem('clutch_night_active')==='1'}catch{return false} }) // 🌙 Clutch Night (mode nuit immersif)
+  useEffect(()=>{ const h=()=>{ try{setNightMode(localStorage.getItem('clutch_night_active')==='1')}catch{} }; window.addEventListener('clutch-night-sync',h); return ()=>window.removeEventListener('clutch-night-sync',h) },[])
   const [regBlock, setRegBlock] = useState('') // alerte inline quand l'inscription est bloquée (plafond/chevauchement)
   useEffect(()=>{ setRegBlock(''); setCancelArmed(false) }, [selEv?.id]) // reset alertes à l'ouverture d'un autre event
   // Bannières partenaires : défilement auto (David). Avance d'une carte toutes les 3.5s, repart au début, pause au toucher.
@@ -3181,7 +3182,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         <style>{`@keyframes cnMoonGlow{0%,100%{filter:drop-shadow(0 0 2px rgba(235,107,175,.45))}50%{filter:drop-shadow(0 0 8px rgba(235,107,175,.95))}}@keyframes cnMoonSway{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}.cn-moon{display:inline-block;animation:cnMoonGlow 2.6s ease-in-out infinite,cnMoonSway 4s ease-in-out infinite}`}</style>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           {/* 🌙 Clutch Night — LUNE ANIMÉE, bouton rond (David : une lune, pas un sablier, et animée) */}
-          <button onClick={()=>setNightMode(v=>!v)} title={EN?'Clutch Night — nightlife & afters':'Clutch Night — soirées & afters'} style={{flexShrink:0,width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
+          <button onClick={()=>setNightMode(v=>{ const nv=!v; try{localStorage.setItem('clutch_night_active',nv?'1':'0')}catch{}; return nv })} title={EN?'Clutch Night — nightlife & afters':'Clutch Night — soirées & afters'} style={{flexShrink:0,width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
             border:nightMode?'1px solid rgba(235,107,175,.6)':`1px solid ${C.border}`,
             background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
             <span className="cn-moon" style={{fontSize:18,lineHeight:1}}>🌙</span>
@@ -11027,7 +11028,7 @@ export default function App2() {
             onTapNight={()=>setShowClutchNight(true)} />
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🌙 Clutch Night (prototype) */}
-          {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ setShowClutchNight(false); showToast('🌙 Clutch Night arrive bientôt — on prépare les soirées',C.orange) }}/>}
+          {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ try{localStorage.setItem('clutch_night_active','1')}catch{}; setShowClutchNight(false); setFlow('app'); setTab('evenements'); try{window.dispatchEvent(new Event('clutch-night-sync'))}catch{}; showToast('🌙 Clutch Night activé',C.green) }}/>}
           {/* ── Contre-Clutch modal ── */}
           {counterClutchId && (
             <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.6)',backdropFilter:'blur(8px)'}} onClick={()=>setCounterClutchId(null)}>

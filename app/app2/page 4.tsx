@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x144'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 72   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x142'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 70   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3242,7 +3242,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           </div>
         )}
       </div>
-      <div style={{flex:1,overflowY:'auto',overflowX:'hidden',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px',boxSizing:'border-box'}}>
+      <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
         {/* 🫂 VUE COMMUNAUTÉ (prototype) — UNIQUEMENT les groupes à suivre (les partenaires payants sont déjà
             mis en avant en bannières dans « Tout »). Demande David : ne pas remettre les partenaires ici. */}
         {evFilter==='partenaires' && (<>
@@ -3316,22 +3316,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <style>{`@keyframes ptnShine{0%{background-position:-180% 0}100%{background-position:180% 0}} .ptnShine::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);background-size:200% 100%;animation:ptnShine 3.2s linear infinite;pointer-events:none}`}</style>
             <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:9,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'1px 2px 2px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
-                <div key={p.id} onClick={()=>setSelPartner(p)} style={{flexShrink:0,width:'82%',maxWidth:310,scrollSnapAlign:'start',cursor:'pointer',borderRadius:14,overflow:'hidden',position:'relative',background:'#fff',border:`1.5px solid ${C.border}`,boxShadow:'0 4px 14px rgba(83,41,67,.16)',minHeight:84,display:'flex',alignItems:'stretch'}}>
-                  {/* Photo qui POP à gauche (vraie image, plus de voile prune) — design David : fond clair + photo qui tape */}
-                  <div style={{width:98,flexShrink:0,position:'relative',background:'#eee'}}>
-                    {p.photo ? <img src={p.photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/> : <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:34,background:`linear-gradient(135deg,${C.plum},#2C1020)`}}>{p.emoji}</div>}
-                    <span style={{position:'absolute',top:6,left:6,fontSize:7.5,fontWeight:900,color:'#fff',background:'#EB6BAF',borderRadius:6,padding:'1px 6px',letterSpacing:'.04em',boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}>★ PARTENAIRE</span>
+                <div key={p.id} onClick={()=>setSelPartner(p)} className="ptnShine" style={{flexShrink:0,width:'72%',maxWidth:270,scrollSnapAlign:'start',cursor:'pointer',borderRadius:14,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#6E2E72,#532943 55%,#2C1020)',border:'1.5px solid rgba(235,107,175,.55)',boxShadow:'0 4px 14px rgba(235,107,175,.24)',padding:'9px 12px',minHeight:72,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                  {/* Photo de fond (partenaire) + voile prune pour la lisibilité du texte */}
+                  {p.photo && <><img src={p.photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:.55}}/><div style={{position:'absolute',inset:0,background:'linear-gradient(115deg,rgba(44,16,32,.92),rgba(83,41,67,.55) 60%,rgba(44,16,32,.85))'}}/></>}
+                  <div style={{position:'absolute',top:-14,right:-14,fontSize:62,opacity:.18,lineHeight:1}}>{p.emoji}</div>
+                  <div style={{position:'relative'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:1,flexWrap:'wrap'}}>
+                      <span style={{fontSize:14,fontWeight:900,color:'#fff'}}>{p.name}</span>
+                      <span style={{fontSize:7.5,fontWeight:900,color:'#2C1020',background:'#EB6BAF',borderRadius:6,padding:'1px 5px',letterSpacing:'.04em'}}>★ PARTENAIRE</span>
+                    </div>
+                    <div style={{fontSize:10,color:'#f0dce9',opacity:.95}}>{p.cat} · 📍 {p.zone}</div>
                   </div>
-                  {/* Infos sur fond clair, contraste fort */}
-                  <div style={{flex:1,minWidth:0,padding:'9px 11px',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontSize:14.5,fontWeight:900,color:C.plum,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</div>
-                      <div style={{fontSize:10,color:C.whiteMid,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.cat} · 📍 {p.zone}</div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:7}}>
-                      <span style={{fontSize:9.5,fontWeight:800,color:C.plum,background:`${C.pink}1f`,borderRadius:7,padding:'2px 7px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}}>🗓 {p.next}</span>
-                      <button onClick={(e)=>{e.stopPropagation();togglePartner(p.id)}} style={{flexShrink:0,fontSize:10,fontWeight:800,color:on?'#EB6BAF':'#fff',background:on?'transparent':'#EB6BAF',border:on?'1px solid #EB6BAF':'none',borderRadius:8,padding:'4px 11px',cursor:'pointer',fontFamily:'inherit'}}>{on?'✓ Suivi':'+ Suivre'}</button>
-                    </div>
+                  <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:6}}>
+                    <span style={{fontSize:10,fontWeight:800,color:'#fff',background:'rgba(235,107,175,.22)',border:'1px solid rgba(235,107,175,.5)',borderRadius:8,padding:'2px 7px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🗓 {p.next}</span>
+                    <button onClick={(e)=>{e.stopPropagation();togglePartner(p.id)}} style={{flexShrink:0,fontSize:10,fontWeight:800,color:on?'#EB6BAF':'#532943',background:on?'transparent':'#fff',border:on?'1px solid #EB6BAF':'none',borderRadius:8,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>{on?'✓ Suivi':'+ Suivre'}</button>
                   </div>
                 </div>
               )})}
@@ -3368,8 +3366,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{fontSize:13,fontWeight:700,color:C.white}}>{lang==='en'?'No events in this category':'Aucun événement dans cette catégorie'}</div>
           </div>
         )}
-        {/* 2 événements par ligne (demande Mel). minmax(0,1fr) = empêche une carte au contenu large de faire DÉPASSER la grille de l'écran (bug overflow « Tout »). */}
-        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:11,width:'100%',boxSizing:'border-box'}}>
+        {/* 2 événements par ligne (demande Mel) — grandes photos qui donnent envie, infos dessus ; clic → détail riche */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11}}>
         {sortedEvs.map(ev=>{
           const photo = eventPhotoFor(ev)
           const isImg = true   // eventPhotoFor garantit toujours une photo (vraie ou de secours)
@@ -3377,7 +3375,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
           const cPhoto = (ev as any).creatorPhoto
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'visible',boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
             {/* Photo qui donne envie — hauteur compacte (David : les cartes prenaient trop de place) */}
             <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
               {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}

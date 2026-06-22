@@ -25,7 +25,10 @@
 html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Police SF UI Text (San Francisco) — demande Mel. -apple-system = SF natif sur iOS/Capacitor. */
+  font-family: -apple-system, "SF Pro Text", "SF UI Text", BlinkMacSystemFont, system-ui, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   /* Le scroll de l'app est géré par JS (position:fixed sur le frame mobile) */
   /* Pas d'overflow:hidden global — ça casse le scroll des pages /flyer /legal /hq */
 }

@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x145'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 73   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x146'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 74   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -210,7 +210,7 @@ function TabSvg({id, size=22, active, filter}:{id:string; size?:number; active:b
 // Logo Clutch officiel (SVG) — réutilisable (floating + footer profil)
 function ClutchMark({ size=40 }:{ size?:number }) {
   return (
-    <svg width={size} height={size*(205/258)} viewBox="103 127 258 205" aria-label="Clutch" style={{display:'block'}}>
+    <svg width={size} height={size*(205/258)} viewBox="103 127 258 205" aria-label="Clutch" style={{display:'block',filter:'drop-shadow(0 1px 1px rgba(44,16,32,.45)) drop-shadow(0 3px 6px rgba(44,16,32,.3))'}}>
       <polygon fill="#EB6BB0" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3 "/>
       <polygon fill="#EB6BB0" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7 "/>
       <path fill="#D76FA9" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
@@ -1490,7 +1490,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           return (
             <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
               <div style={{position:'relative',width:51,height:51,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={51} height={51} alt="" style={{display:'block',filter:'drop-shadow(0 2px 3px rgba(83,41,67,0.16))'}}/>
+                <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={51} height={51} alt="" style={{display:'block',filter:'drop-shadow(0 1px 1px rgba(120,115,125,.45)) drop-shadow(0 3px 6px rgba(120,115,125,.35))'}}/>
                 {/* Pastille dispo sur Profil */}
                 {isProfil&&availInfo&&(
                   <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #fff',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
@@ -3185,14 +3185,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           {/* 🌙 Clutch Night — LUNE ANIMÉE, bouton rond (David : une lune, pas un sablier, et animée) */}
           <button onClick={()=>setNightMode(v=>{ const nv=!v; try{localStorage.setItem('clutch_night_active',nv?'1':'0')}catch{}; return nv })} title={EN?'Clutch Night — nightlife & afters':'Clutch Night — soirées & afters'} style={{flexShrink:0,width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
             border:nightMode?'1px solid rgba(235,107,175,.6)':`1px solid ${C.border}`,
-            background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
+            background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 1px 3px rgba(120,115,125,.18), 0 4px 10px rgba(120,115,125,.20)',transition:'.2s'}}>
             <span className="cn-moon" style={{fontSize:18,lineHeight:1}}>🌙</span>
           </button>
           {/* 🟢 Pastille « Mes events » — apparaît UNIQUEMENT si tu es inscrit à des events (David). Toggle le filtre « mine ». */}
           {registered.size>0 && (
             <button onClick={()=>setEvFilter(f=>f==='mine'?'all':'mine')} title={EN?'My events':'Mes events'} style={{flexShrink:0,position:'relative',width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
               border:evFilter==='mine'?`1px solid ${C.green}`:`1px solid ${C.border}`,
-              background:evFilter==='mine'?`${C.green}1a`:'#fff',boxShadow:evFilter==='mine'?`0 0 10px ${C.green}66`:'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
+              background:evFilter==='mine'?`${C.green}1a`:'#fff',boxShadow:evFilter==='mine'?`0 0 10px ${C.green}66`:'0 1px 3px rgba(120,115,125,.18), 0 4px 10px rgba(120,115,125,.20)',transition:'.2s'}}>
               <span style={{fontSize:17,lineHeight:1}}>🎟️</span>
               <span style={{position:'absolute',top:-3,right:-3,minWidth:16,height:16,padding:'0 4px',borderRadius:8,background:C.green,color:'#fff',fontSize:9,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #fff'}}>{registered.size}</span>
             </button>
@@ -3386,7 +3386,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
           const cPhoto = (ev as any).creatorPhoto
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
             {/* Photo qui donne envie — hauteur compacte (David : les cartes prenaient trop de place) */}
             <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
               {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
@@ -9465,7 +9465,7 @@ export default function App2() {
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
                         onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
-                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'rgba(83,41,67,.18)',pointerEvents:'none'}}/>
+                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'#E3E3E3',pointerEvents:'none'}}/>
                         <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:C.orange,pointerEvents:'none'}}/>
                         <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:C.orange,border:`2px solid ${C.bg}`,pointerEvents:'none'}}/>
                       </div>
@@ -9565,7 +9565,7 @@ export default function App2() {
                         {/* Tuile surélevée — remplie plum quand sélectionnée (design Mel) */}
                         <div style={{width:'100%',height:58,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
                           background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
-                          boxShadow:on?'0 5px 14px rgba(83,41,67,.30)':'0 2px 7px rgba(83,41,67,.12)',transition:'all .15s'}}>
+                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18), 0 4px 11px rgba(120,115,125,.20)',transition:'all .15s'}}>
                           {on ? <img src={m.icon.replace('.svg','_color.svg')} width={32} height={32} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={28}/>}
                         </div>
                         <div style={{fontSize:10.5,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap'}}>{m.l}</div>
@@ -9590,7 +9590,7 @@ export default function App2() {
                         style={{flex:1,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:0}}>
                         <div style={{width:'100%',height:54,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
                           background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
-                          boxShadow:on?'0 5px 14px rgba(83,41,67,.30)':'0 2px 7px rgba(83,41,67,.12)',transition:'all .15s'}}>
+                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18), 0 4px 11px rgba(120,115,125,.20)',transition:'all .15s'}}>
                           {on ? <img src={g.icon.replace('.svg','_color.svg')} width={28} height={28} alt="" style={{display:'block'}}/> : <MelIcon src={g.icon} color={C.borderStrong} size={26}/>}
                         </div>
                         <div style={{fontSize:10,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{g.l}</div>

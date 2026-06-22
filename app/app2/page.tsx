@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x132'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x133'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9435,11 +9435,11 @@ export default function App2() {
                     <div style={{fontSize:17,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t('page2.type')}</div>
                     <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{t('page2.intention')}</div>
                   </div>
-                  {/* Étape 2/2 */}
-                  <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                    <div style={{width:20,height:20,borderRadius:'50%',border:`2px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:C.whiteMid}}>1</div>
-                    <div style={{width:12,height:2,borderRadius:1,background:C.orange}}/>
-                    <div style={{width:20,height:20,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:C.bordeaux}}>2</div>
+                  {/* Étape 2/2 — indicateur Mel : actif = rond rose + chiffre blanc, inactif = gris moyen, trait gris (≈90%) */}
+                  <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
+                    <div style={{width:18,height:18,borderRadius:'50%',border:`1.5px solid ${C.salmonMid}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:C.salmonMid}}>1</div>
+                    <div style={{width:11,height:2,borderRadius:1,background:C.salmonMid}}/>
+                    <div style={{width:18,height:18,borderRadius:'50%',background:C.pink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:900,color:'#fff'}}>2</div>
                   </div>
                   <button onClick={()=>{setFlow('app');setTab('presences')}} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,padding:'5px 10px',cursor:'pointer',color:C.whiteMid,fontSize:11,fontWeight:700,fontFamily:'inherit',flexShrink:0}}>
                     ✕
@@ -9585,17 +9585,20 @@ export default function App2() {
 
               </div>
 
-              {/* Grand bouton CTA */}
+              {/* Boutons CTA — ANNULER (gris) + SUIVANT VERT (design Mel) */}
               <div style={{padding:'12px 16px 40px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-                <button onClick={handleOuvrirFenetre} style={{
-                  width:'100%',padding:'20px',
-                  background:C.bordeaux,
-                  border:'none',borderRadius:20,color:'#fff',
-                  fontSize:17,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
-                  letterSpacing:'-.03em',
-                }}>
-                  {t('page2.cta')}
-                </button>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{padding:'15px 22px',borderRadius:24,background:'transparent',border:`1.5px solid ${C.border}`,color:C.whiteMid,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0,letterSpacing:'.02em'}}>{lang==='en'?'CANCEL':'ANNULER'}</button>
+                  <button onClick={handleOuvrirFenetre} style={{
+                    flex:1,padding:'16px',
+                    background:C.green,
+                    border:'none',borderRadius:24,color:'#fff',
+                    fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
+                    letterSpacing:'-.02em',boxShadow:'0 5px 16px rgba(119,188,31,.32)',
+                  }}>
+                    {t('page2.cta')}
+                  </button>
+                </div>
                 <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>
                   {lang==='fr'?`Visible dans un rayon de ${fmtKm(rayon)} autour de ${nearestCity(meetupPos[0],meetupPos[1])}`:`Visible within ${fmtKm(rayon)} of ${nearestCity(meetupPos[0],meetupPos[1])}`}
                 </div>

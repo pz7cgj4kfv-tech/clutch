@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x138'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x139'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1481,6 +1481,8 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
       {/* Barre d'onglets — design clair (fond blanc cassé + cercles + pastille active violette).
           Transitoire : le reste de l'app passera au clair avec les couleurs de Mel. */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,height:'calc(72px + var(--sab))',paddingBottom:'var(--sab)',boxSizing:'border-box',background:'rgba(255,255,255,0.97)',borderTop:'1px solid #E3E3E3',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
+        {/* Version — tout en bas, centrée sous Clutchs, ultra discrète (David : libérer le haut) */}
+        <span style={{position:'absolute',bottom:'calc(var(--sab) + 1px)',left:0,right:0,textAlign:'center',fontSize:7,fontWeight:600,color:'rgba(0,0,0,.16)',letterSpacing:'.05em',pointerEvents:'none',zIndex:2}}>{V}</span>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
@@ -3210,7 +3212,6 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           <button onClick={()=>setShowRefine(v=>!v)} title={EN?'Refine':'Affiner'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?`${C.pink}14`:'transparent',border:`1px solid ${(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.border}`,color:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.whiteMid,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'.15s'}}>⚙</button>
           {/* + Organiser (compact, rond) */}
           <button onClick={()=>setShowCreateGroup(true)} title={EN?'Host an event':'Organiser un événement'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:21,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,paddingBottom:2}}>+</button>
-          <span style={{flexShrink:0,fontSize:8,fontWeight:600,color:`${C.whiteMid}55`,letterSpacing:'.03em'}}>{V}</span>
         </div>
         {/* 🔍 Panneau « Affiner » — tri + catégories précises (caché par défaut) */}
         {showRefine && (
@@ -5541,7 +5542,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     const r = readMoment(); if (r.modes_until && r.modes_until > Date.now()) return r.modes||[]; return []
   })
   const [modesUntil, setModesUntil] = useState<number>(()=>{ const r=readMoment(); return (r.modes_until && r.modes_until>Date.now())?r.modes_until:0 })
-  // Mode du moment (reset minuit)
+  // Mood (reset minuit)
   const [moment, setMoment] = useState<string|null>(()=>{
     const r = readMoment(); if (r.moment_until && r.moment_until > Date.now()) return r.moment||null; return null
   })
@@ -6438,7 +6439,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
-  // ÉCRAN : Mode du moment 🌙 (éphémère, reset minuit) — riche, par moment de journée, avec « feu vert » de pertinence
+  // ÉCRAN : Mood 🌙 (éphémère, reset minuit) — riche, par moment de journée, avec « feu vert » de pertinence
   const PageMoment = () => {
     const nowP = periodFromHour(new Date().getHours())
     const list = MOMENTS.filter(m => m.p===momentPeriod || m.p==='any')
@@ -6778,7 +6779,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     subscription:'Mon abonnement', preferences:'Préférences',
     security:'Sécurité & SOS', legal:'Légal', contact:'Nous contacter',
     cherche:'Ce que je cherche', algo:'Mon Clutch · l\'algo',
-    secu:'Sécurité & confidentialité', compte:'Mon compte', moment:'Mode du moment 🌙',
+    secu:'Sécurité & confidentialité', compte:'Mon compte', moment:'Mood 🌙',
     fiabilite:'Ma fiabilité', temperament:'Mon tempérament', why:'Pourquoi ces propositions', distance_zones:'Les zones',
     guide:'Comprendre Clutch', pause:'Faire une pause',
   }
@@ -6925,7 +6926,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           <div onClick={()=>setProfilePage('moment')} style={{marginTop:11,display:'flex',alignItems:'center',gap:9,background:C.bg,border:`1.5px dashed ${C.salmon}`,borderRadius:14,padding:'9px 12px',cursor:'pointer'}}>
             <span style={{fontSize:18}}>{moment?MOMENTS.find(m=>m.k===moment)?.e:'🌙'}</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:C.white}}>{moment?MOMENTS.find(m=>m.k===moment)?.l:'Mode du moment'}</div>
+              <div style={{fontSize:13,fontWeight:800,color:C.white}}>{moment?MOMENTS.find(m=>m.k===moment)?.l:'Mood'}</div>
               <div style={{fontSize:11,color:C.whiteMid}}>{moment?'Actif aujourd\'hui':'Une préférence éphémère pour aujourd\'hui'}</div>
             </div>
             <span style={{fontSize:9,fontWeight:800,color:C.salmon,background:`${C.salmon}22`,borderRadius:10,padding:'2px 7px',whiteSpace:'nowrap'}}>{moment?'expire à minuit':'expire demain'}</span>
@@ -9671,7 +9672,6 @@ export default function App2() {
                         {/* Titre « Présences » retiré (déjà dans la nav du bas) — on garde juste l'info utile (David : libérer le haut) */}
                         <div style={{fontSize:12.5,color:C.whiteMid,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           <span style={{fontWeight:700,color:C.white}}>{filtered.length} {lang==='en'?`available nearby`:`disponible${filtered.length!==1?'s':''} dans votre rayon`}</span>
-                          <span style={{fontSize:8,fontWeight:500,color:`${C.whiteMid}66`,letterSpacing:'.03em'}}>{V}</span>
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:14,height:14,borderRadius:'50%',border:`1px solid ${C.border}`,fontSize:8,color:C.whiteMid,cursor:'default'}} title="Seules les personnes qui ont ouvert une fenêtre de disponibilité apparaissent ici.">?</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
@@ -9685,28 +9685,7 @@ export default function App2() {
                       </div>
                       {/* Boutons header Présences */}
                       <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                        {/* Bouton Live SVG */}
-                        <button onClick={activateLive} style={{position:'relative',width:40,height:40,borderRadius:'50%',border:`1.5px solid ${liveMode?'#EB6BB0':'rgba(235,107,175,.35)'}`,background:liveMode?'rgba(235,107,175,.15)':'rgba(235,107,175,.07)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,overflow:'visible',flexShrink:0}}>
-                          <style>{`
-                            @keyframes liveRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-                            @keyframes livePulseRing{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.25);opacity:0}}
-                            @keyframes liveBlast{0%{transform:scale(1);opacity:1}40%{transform:scale(2.5);opacity:.6}100%{transform:scale(4);opacity:0}}
-                          `}</style>
-                          {/* Anneau pulse autour */}
-                          {!liveMode && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'1.5px solid rgba(235,107,175,.5)',animation:'livePulseRing 2s ease-in-out infinite',pointerEvents:'none'}}/>}
-                          {liveActivating && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'2px solid #EB6BB0',animation:'liveBlast .9s ease-out forwards',pointerEvents:'none'}}/>}
-                          {/* SVG Clutch Live */}
-                          <svg width="22" height="21" viewBox="0 0 469.8 450" style={{animation:liveMode?'liveRotate 8s linear infinite':undefined,flexShrink:0}}>
-                            <polygon fill="#EB6BB0" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
-                            <polygon fill="#EB6BB0" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
-                            <path fill="#D76FA9" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
-                            <path fill="#EB6BB0" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
-                            <path fill="#D76FA9" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
-                            <path fill="#D76FA9" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
-                          </svg>
-                          {/* Pastille LIVE quand actif */}
-                          {liveMode && <div style={{position:'absolute',top:-2,right:-2,width:9,height:9,borderRadius:'50%',background:'#FF1493',border:'1.5px solid #542A44',boxShadow:'0 0 6px rgba(255,20,147,.9)'}}/>}
-                        </button>
+                        {/* Bouton Live header RETIRÉ (David : doublon — le Clutch Live flottant en bas suffit) */}
                         {/* 💼 Manoski toggle */}
                         <button onClick={()=>{setProMode(!proMode);setProJobFilter(null)}}
                           style={{padding:'6px 10px',borderRadius:20,border:`1px solid ${proMode?C.gold:C.border}`,background:proMode?`${C.gold}22`:'transparent',color:proMode?C.gold:C.whiteMid,fontSize:11,fontWeight:proMode?800:500,cursor:'pointer',fontFamily:'inherit'}}>
@@ -10161,7 +10140,6 @@ export default function App2() {
                         {/* Titre « Mes Clutchs » retiré (déjà dans la nav du bas) — on garde le compte (David : libérer le haut) */}
                         <div style={{fontSize:12.5,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           <span style={{fontWeight:700,color:C.white}}>{pending} {lang==='en'?'active':'actif'} · {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
-                          <span style={{fontSize:8,fontWeight:500,color:`${C.whiteMid}66`,letterSpacing:'.03em'}}>{V}</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
                               <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>

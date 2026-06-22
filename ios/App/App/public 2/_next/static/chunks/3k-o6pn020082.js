@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,50844,e=>{"use strict";let s=(0,e.i(27795).createClient)("https://fnucdicfcjoxbozpfdau.supabase.co","sb_publishable_TXWkldkILlJ5G9OTOfiCLg_NYZLVMTZ");e.s(["supabase",0,s])}]);

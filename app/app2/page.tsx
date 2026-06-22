@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x146'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 74   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x147'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 75   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1488,7 +1488,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           const isProfil = id==='profil'
           const dotBase: React.CSSProperties = {position:'absolute',top:-2,right:-2,width:11,height:11,borderRadius:'50%',border:'2px solid #fff',zIndex:2}
           return (
-            <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
+            <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',gap:2,border:'none',background:'transparent',cursor:'pointer',padding:'8px 0 0',position:'relative'}}>
               <div style={{position:'relative',width:51,height:51,display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={51} height={51} alt="" style={{display:'block',filter:'drop-shadow(0 1px 1px rgba(120,115,125,.45)) drop-shadow(0 3px 6px rgba(120,115,125,.35))'}}/>
                 {/* Pastille dispo sur Profil */}
@@ -3489,18 +3489,22 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       {selEv&&(
         <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.65)',backdropFilter:'blur(4px)'}} onClick={()=>setSelEv(null)}/>
-          {/* Sheet = flex column, hauteur fixe, scroll sur le corps uniquement */}
-          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'88vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)'}}>
-            {/* Header fixe — padding safe-area pour ne pas passer sous l'encoche */}
-            <div style={{flexShrink:0,padding:'calc(var(--sat) + 14px) 20px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:26}}>{selEv.emoji}</span>
-                <div>
-                  <div style={{fontSize:15,fontWeight:900}}>{selEv.title}</div>
+          {/* Sheet = flex column, hauteur fixe (gap en haut), scroll sur le corps. Swipe-down = fermer. */}
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',height:'90vh',display:'flex',flexDirection:'column',animation:'modalIn .35s cubic-bezier(.22,1,.36,1)',transform:`translateY(${sheetDragY}px)`,transition:sheetStartY.current==null?'transform .25s':'none'}}>
+            {/* Poignée — swipe vers le bas pour fermer */}
+            <div {...sheetHandlers(()=>setSelEv(null))} style={{flexShrink:0,padding:'10px 0 4px',cursor:'grab',touchAction:'none',display:'flex',justifyContent:'center'}}>
+              <div style={{width:44,height:5,borderRadius:3,background:`${C.whiteMid}45`}}/>
+            </div>
+            {/* Header fixe */}
+            <div style={{flexShrink:0,padding:'2px 18px 0',display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                <span style={{fontSize:26,flexShrink:0}}>{selEv.emoji}</span>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis'}}>{selEv.title}</div>
                   <div style={{fontSize:11,color:C.whiteMid}}>{locDay(fixEventDate(selEv.date),EN)} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
                 </div>
               </div>
-              <button onClick={()=>setSelEv(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
+              <button onClick={()=>setSelEv(null)} aria-label="Fermer" style={{flexShrink:0,background:'#fff',border:`1px solid ${C.border}`,color:C.plum,fontSize:17,fontWeight:700,width:34,height:34,borderRadius:'50%',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 8px rgba(120,115,125,.3)'}}>✕</button>
             </div>
             {/* Corps scrollable — flex:'1 1 0' + overflowY:'scroll' obligatoires sur iOS */}
             <div style={{flex:'1 1 0',overflowY:'scroll',WebkitOverflowScrolling:'touch',padding:'12px 20px 100px'}}>
@@ -4595,7 +4599,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
   return (
     <div style={{position:'fixed',inset:0,zIndex:3000,display:'flex',flexDirection:'column'}}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)'}} onClick={onClose}/>
-      <div style={{position:'relative',background:C.bgSheet,marginTop:'auto',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .32s cubic-bezier(.22,1,.36,1)',borderRadius:'20px 20px 0 0',transform:`translateY(${psDragY}px)`,transition:psStart.current==null?'transform .25s':'none'}}>
+      <div style={{position:'relative',background:C.bgSheet,marginTop:'auto',height:'90vh',display:'flex',flexDirection:'column',animation:'modalIn .32s cubic-bezier(.22,1,.36,1)',borderRadius:'20px 20px 0 0',transform:`translateY(${psDragY}px)`,transition:psStart.current==null?'transform .25s':'none'}}>
         {/* Handle — swipe vers le bas pour fermer */}
         <div {...psSwipe} style={{display:'flex',justifyContent:'center',padding:'12px 0 6px',flexShrink:0,cursor:'grab',touchAction:'none',position:'relative',zIndex:4}}>
           <div style={{width:44,height:5,borderRadius:3,background:`${C.whiteMid}55`}}/>
@@ -9718,7 +9722,7 @@ export default function App2() {
                               <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>
                               {(user as any).available_from?new Date((user as any).available_from).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})+'–':''}
                               {new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
-                              {(user as any).available_radius_km?' · '+(user as any).available_radius_km+'km':''}
+                              {(user as any).available_radius_km?' · '+Math.round((user as any).available_radius_km)+'km':''}
                             </span>
                           )}
                         </div>
@@ -10185,7 +10189,7 @@ export default function App2() {
                               <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>
                               {(user as any).available_from?new Date((user as any).available_from).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})+'–':''}
                               {new Date(user.available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}
-                              {(user as any).available_radius_km?' · '+(user as any).available_radius_km+'km':''}
+                              {(user as any).available_radius_km?' · '+Math.round((user as any).available_radius_km)+'km':''}
                             </span>
                           )}
                         </div>

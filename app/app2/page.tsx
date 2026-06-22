@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x123'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x124'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1881,6 +1881,17 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
       showToast(friendly, dup||self ? C.orange : C.red)
       return
     }
+    // 🔔 Push au DESTINATAIRE (David : « il faut que ça s'affiche sur le tél quand il se passe un truc »).
+    // Fonctionne SI : capability Push activée dans Xcode + clé Apple (.p8) dans OneSignal + secret ONESIGNAL_API_KEY dans Supabase.
+    try {
+      const first = (from as any).name?.split(' ')[0] || 'Quelqu\'un'
+      supabase.functions.invoke('send-push', { body: {
+        user_id: to.id,
+        title: '☕ Nouveau Clutch !',
+        body: `${first} te propose ${venueInput.trim()||'un rendez-vous'}${H[hi]?` à ${H[hi]}`:''}`,
+        data: { type:'new_clutch', clutch_id: inserted?.id },
+      }}).catch(()=>{})
+    } catch {}
     onSent(inserted?.id)
   }
 

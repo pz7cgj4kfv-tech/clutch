@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x144'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 72   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x145'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 73   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2716,7 +2716,7 @@ const EV_FILTERS = [
   {id:'all',         trKey:'ev.filter.all',         icon:'✦'},
   {id:'soir',        trKey:'ev.filter.soir',        icon:'🌙'},
   {id:'demain',      trKey:'ev.filter.demain',      icon:'☀️'},
-  {id:'mine',        trKey:'ev.filter.mine',        icon:'📌'},
+  // 'mine' (Mes events) retiré des filtres → remplacé par une pastille VERTE dans l'en-tête (apparaît si inscrit). Demande David.
   {id:'partenaires', trKey:'ev.filter.partenaires', icon:'🫂'},
 ]
 
@@ -3188,6 +3188,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
             <span className="cn-moon" style={{fontSize:18,lineHeight:1}}>🌙</span>
           </button>
+          {/* 🟢 Pastille « Mes events » — apparaît UNIQUEMENT si tu es inscrit à des events (David). Toggle le filtre « mine ». */}
+          {registered.size>0 && (
+            <button onClick={()=>setEvFilter(f=>f==='mine'?'all':'mine')} title={EN?'My events':'Mes events'} style={{flexShrink:0,position:'relative',width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
+              border:evFilter==='mine'?`1px solid ${C.green}`:`1px solid ${C.border}`,
+              background:evFilter==='mine'?`${C.green}1a`:'#fff',boxShadow:evFilter==='mine'?`0 0 10px ${C.green}66`:'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
+              <span style={{fontSize:17,lineHeight:1}}>🎟️</span>
+              <span style={{position:'absolute',top:-3,right:-3,minWidth:16,height:16,padding:'0 4px',borderRadius:8,background:C.green,color:'#fff',fontSize:9,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #fff'}}>{registered.size}</span>
+            </button>
+          )}
           {/* Filtres (scroll horizontal) */}
           <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',flex:1,minWidth:0,paddingBottom:2}}>
           {EV_FILTERS.map(f=>{

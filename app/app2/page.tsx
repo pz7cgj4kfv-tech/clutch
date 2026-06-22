@@ -12,7 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x142'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x143'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 71   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1511,7 +1512,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
         })}
       </div>
       {/* Version — pastille LISIBLE en bas à gauche (hex + décimal), flottante au-dessus de la nav, sur toutes les pages */}
-      <div style={{position:'fixed',left:9,bottom:'calc(72px + var(--sab) + 6px)',zIndex:1001,fontSize:10.5,fontWeight:800,color:'rgba(83,41,67,.72)',background:'rgba(255,255,255,.85)',border:'1px solid rgba(83,41,67,.12)',borderRadius:9,padding:'2px 8px',pointerEvents:'none',letterSpacing:'.03em',backdropFilter:'blur(6px)',boxShadow:'0 1px 5px rgba(83,41,67,.12)'}}>{V} · {Number(V)}</div>
+      <div style={{position:'fixed',left:9,bottom:'calc(72px + var(--sab) + 6px)',zIndex:1001,fontSize:10.5,fontWeight:800,color:'rgba(83,41,67,.72)',background:'rgba(255,255,255,.85)',border:'1px solid rgba(83,41,67,.12)',borderRadius:9,padding:'2px 8px',pointerEvents:'none',letterSpacing:'.03em',backdropFilter:'blur(6px)',boxShadow:'0 1px 5px rgba(83,41,67,.12)'}}>{V} · build {BUILD}</div>
     </>
   )
 }

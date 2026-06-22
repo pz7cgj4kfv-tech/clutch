@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x147'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 75   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x148'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 76   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -703,6 +703,20 @@ function eventPhotoFor(ev:any):string {
   if(d && String(d).startsWith('http')) return d
   let h=0; const s=String(ev?.id||ev?.title||'x'); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0
   return EV_PHOTO_POOL[h % EV_PHOTO_POOL.length]
+}
+// 🎨 PROTOTYPE système couleurs — 7 catégories (audit GPT 23.06) + palette Clutch (pas d'orange/bleu/jaune).
+// Duotone : photo désaturée + voile de la couleur de la catégorie → look unifié par type.
+function eventCat(ev:any):{k:string;l:string;c:string} {
+  const t = (((ev?.tags)||[]).join(' ')+' '+(ev?.title||'')+' '+(ev?.lieu||'')).toLowerCase()
+  const has = (...ws:string[]) => ws.some(w=>t.includes(w))
+  if(has('yoga','médit','medit','bien-être','bien être','respiration','kombucha','ferment','massage','spa','relax')) return {k:'bienetre',l:'Bien-être',c:'#77BC1F'}        // vert (GPT : pas rose !)
+  if(has('run','running','course','escalade','vélo','velo','vtt','foot','basket','ping','tennis','natation','fitness','sport','muscu','rando','nature','montagne','plage','nautique','kayak','paddle')) return {k:'sport',l:'Sport & Aventure',c:'#1FA890'}  // teal
+  if(has('apéro','apero','brunch','dîner','diner','resto','gastro','cuisine','vin','dégustation','degustation','café','cafe','recettes')) return {k:'gastro',l:'Gastronomie',c:'#8E2E5D'}  // bordeaux
+  if(has('jazz','concert','musique','dj','live','techno','soul','rock','art','aquarelle','théâtre','theatre','lecture','camus','expo','musée','musee','poterie','peinture','conférence','conference')) return {k:'culture',l:'Art & Culture',c:'#532943'}  // prune
+  if(has('club','soirée','soiree','after','clubbing','bar','rooftop','karaoké','karaoke','open mic','impro','stand-up','jeux','games')) return {k:'nuit',l:'Soirée',c:'#EB6BAF'}  // rose
+  if(has('vide-dressing','dressing','marché','marche','swap','diy','déco','deco','mode','beauté','beaute','artisan')) return {k:'lifestyle',l:'Lifestyle',c:'#B5179E'}  // magenta
+  if(has('pro','réseau','reseau','network','coworking','business','boulot','startup','bénévolat','benevolat','communauté','communaute','atelier')) return {k:'social',l:'Communauté',c:'#6F6F6E'}  // gris
+  return {k:'autre',l:'Découverte',c:'#8E7CC3'}  // violet doux (à challenger)
 }
 // Heat radar (palette Mel) : proche = vert (vas-y), coin = rose, loin = gris estompé.
 function kmHeat(km:number){ return km<=2 ? {c:'#77BC1F',bg:'rgba(119,188,31,.12)'} : km<=8 ? {c:'#EB6BAF',bg:'rgba(235,107,175,.12)'} : {c:'#B2B2B2',bg:'rgba(178,178,178,.16)'} }
@@ -3385,13 +3399,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))
           const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
           const cPhoto = (ev as any).creatorPhoto
+          const cat = eventCat(ev)  // 🎨 catégorie + couleur (prototype système couleurs)
           return (
           <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
-            {/* Photo qui donne envie — hauteur compacte (David : les cartes prenaient trop de place) */}
+            {/* Photo — DUOTONE par catégorie (photo désaturée + voile de la couleur du type). Prototype système couleurs. */}
             <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
-              {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
+              {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0',filter:'saturate(.5) contrast(1.03)'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
+              {/* Voile couleur de la catégorie (duotone) */}
+              <div style={{position:'absolute',inset:0,background:cat.c,mixBlendMode:'multiply',opacity:.5,borderRadius:'16px 16px 0 0'}}/>
               <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.66) 0%,rgba(0,0,0,.12) 48%,transparent 74%)',borderRadius:'16px 16px 0 0'}}/>
-              {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}
+              {/* Pastille catégorie colorée */}
+              <span style={{position:'absolute',top:7,left:7,fontSize:8,fontWeight:900,letterSpacing:'.02em',color:'#fff',background:cat.c,borderRadius:6,padding:'2px 7px',boxShadow:'0 1px 4px rgba(0,0,0,.35)',display:'inline-flex',alignItems:'center',gap:3}}>{ev.certified&&<span>✓</span>}{cat.l.toUpperCase()}</span>
               {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
               {/* Titre sur la photo (décalé à droite de l'avatar) */}
               <div style={{position:'absolute',bottom:8,left:cPhoto?56:10,right:9}}>

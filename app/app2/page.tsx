@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x120'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5137,6 +5137,70 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   )
 }
 
+// ── Test de personnalité 16 types (cadre MBTI public, NOS questions — pas 16personalities qui est propriétaire) ──
+const MBTI_Q: {q:string; a:string; b:string; axis:number; al:string; bl:string}[] = [
+  {axis:0,q:'Une soirée idéale ?',a:'Entouré·e de plein de monde',b:'Avec 1-2 proches',al:'E',bl:'I'},
+  {axis:0,q:'Après un gros moment social, tu es…',a:'Rechargé·e à bloc',b:'Vidé·e, besoin de calme',al:'E',bl:'I'},
+  {axis:0,q:'Face à un·e inconnu·e…',a:'Tu lances la conversation',b:'Tu attends qu\'on vienne',al:'E',bl:'I'},
+  {axis:1,q:'Tu retiens surtout…',a:'Les détails concrets',b:'Les idées et les possibles',al:'S',bl:'N'},
+  {axis:1,q:'Tu préfères parler de…',a:'Ce qui est réel',b:'Ce qui pourrait être',al:'S',bl:'N'},
+  {axis:1,q:'Pour décider, tu te fies à…',a:'L\'expérience, les faits',b:'Ton intuition',al:'S',bl:'N'},
+  {axis:2,q:'Un·e ami·e a un souci…',a:'Tu cherches LA solution',b:'Tu écoutes et réconfortes',al:'T',bl:'F'},
+  {axis:2,q:'On dit de toi plutôt…',a:'Honnête et direct·e',b:'Attentionné·e et empathique',al:'T',bl:'F'},
+  {axis:2,q:'Une bonne décision est…',a:'Juste et logique',b:'Qui ménage les gens',al:'T',bl:'F'},
+  {axis:3,q:'Ton week-end ?',a:'Planifié à l\'avance',b:'On verra sur le moment',al:'J',bl:'P'},
+  {axis:3,q:'Tu es mieux quand…',a:'C\'est décidé, organisé',b:'Tout reste ouvert, flexible',al:'J',bl:'P'},
+  {axis:3,q:'Une to-do list…',a:'Tu adores',b:'Ça t\'étouffe',al:'J',bl:'P'},
+]
+const MBTI_TYPES: Record<string,{name:string;emoji:string;vibe:string}> = {
+  INTJ:{name:'L\'Architecte',emoji:'🏛',vibe:'stratège, indépendant·e'}, INTP:{name:'Le Penseur',emoji:'🔭',vibe:'curieux·se, inventif·ve'},
+  ENTJ:{name:'Le Meneur',emoji:'⚡',vibe:'leader, ambitieux·se'}, ENTP:{name:'Le Débatteur',emoji:'💥',vibe:'vif·ve, joueur·se'},
+  INFJ:{name:'Le Conseiller',emoji:'🌙',vibe:'profond·e, idéaliste'}, INFP:{name:'Le Rêveur',emoji:'🌸',vibe:'sensible, authentique'},
+  ENFJ:{name:'Le Protagoniste',emoji:'✨',vibe:'chaleureux·se, inspirant·e'}, ENFP:{name:'L\'Étincelle',emoji:'🔥',vibe:'enthousiaste, libre'},
+  ISTJ:{name:'Le Pilier',emoji:'🧱',vibe:'fiable, carré·e'}, ISFJ:{name:'Le Protecteur',emoji:'🛡',vibe:'loyal·e, attentionné·e'},
+  ESTJ:{name:'L\'Organisateur',emoji:'📋',vibe:'efficace, droit·e'}, ESFJ:{name:'L\'Hôte',emoji:'🤝',vibe:'généreux·se, sociable'},
+  ISTP:{name:'Le Bricoleur',emoji:'🔧',vibe:'calme, débrouillard·e'}, ISFP:{name:'L\'Artiste',emoji:'🎨',vibe:'doux·ce, esthète'},
+  ESTP:{name:'L\'Aventurier',emoji:'🏄',vibe:'fonceur·se, fun'}, ESFP:{name:'Le Showman',emoji:'🎉',vibe:'pétillant·e, spontané·e'},
+}
+function MBTITest({ lang, onClose }:{ lang:Lang; onClose:()=>void }){
+  const [ans,setAns]=useState<string[]>([])
+  const done = ans.length===MBTI_Q.length
+  const type = done ? [0,1,2,3].map(ax=>{ const ls=MBTI_Q.map((q,i)=>q.axis===ax?ans[i]:null).filter(Boolean) as string[]; const c:Record<string,number>={}; ls.forEach(l=>{c[l]=(c[l]||0)+1}); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0] }).join('') : ''
+  useEffect(()=>{ if(done && type){ try{localStorage.setItem('clutch_mbti',type)}catch{} } },[done,type])
+  const q = MBTI_Q[ans.length]
+  const EN = lang==='en'
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:5200,background:C.bg,display:'flex',flexDirection:'column',padding:'calc(var(--sat) + 16px) 22px calc(var(--sab) + 24px)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+        <div style={{fontSize:16,fontWeight:900,color:C.white}}>🧬 {EN?'Personality test':'Test de personnalité'}</div>
+        <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer'}}>✕</button>
+      </div>
+      {!done ? (
+        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+          <div style={{height:5,borderRadius:3,background:C.border,marginBottom:24,overflow:'hidden'}}><div style={{height:'100%',width:`${ans.length/MBTI_Q.length*100}%`,background:C.orange,transition:'width .25s'}}/></div>
+          <div style={{fontSize:11,color:C.whiteMid,marginBottom:8}}>{ans.length+1}/{MBTI_Q.length}</div>
+          <div style={{fontSize:21,fontWeight:900,color:C.white,marginBottom:24,lineHeight:1.25}}>{q.q}</div>
+          {[{l:q.al,t:q.a},{l:q.bl,t:q.b}].map((opt,i)=>(
+            <button key={i} onClick={()=>setAns(a=>[...a,opt.l])}
+              style={{width:'100%',textAlign:'left',padding:'16px 18px',marginBottom:11,borderRadius:16,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{opt.t}</button>
+          ))}
+          {ans.length>0 && <button onClick={()=>setAns(a=>a.slice(0,-1))} style={{marginTop:6,background:'none',border:'none',color:C.whiteMid,fontSize:13,cursor:'pointer'}}>← {EN?'Back':'Retour'}</button>}
+        </div>
+      ) : (
+        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',textAlign:'center'}}>
+          <div style={{fontSize:64}}>{MBTI_TYPES[type]?.emoji}</div>
+          <div style={{fontSize:13,fontWeight:800,color:C.orange,letterSpacing:'.1em',marginTop:8}}>{type}</div>
+          <div style={{fontSize:26,fontWeight:900,color:C.white,marginTop:2}}>{MBTI_TYPES[type]?.name}</div>
+          <div style={{fontSize:14,color:C.whiteMid,marginTop:6}}>{MBTI_TYPES[type]?.vibe}</div>
+          <div style={{fontSize:12,color:C.whiteMid,marginTop:18,lineHeight:1.5,maxWidth:300,marginLeft:'auto',marginRight:'auto'}}>{EN?'Saved to your profile. It gently flavours who Clutch suggests — you stay in control.':'Enregistré sur ton profil. Ça assaisonne en douceur qui Clutch te propose — tu gardes le contrôle.'}</div>
+          <button onClick={onClose} style={{marginTop:24,padding:'15px',borderRadius:16,border:'none',background:C.bordeaux,color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Done':'Terminé'}</button>
+          <button onClick={()=>setAns([])} style={{marginTop:8,background:'none',border:'none',color:C.whiteMid,fontSize:13,cursor:'pointer'}}>↺ {EN?'Retake':'Refaire'}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToast, onUserUpdate, lang, setLang, onSetAvailable, isAvailable, rdvBlocked, onFeedback }:{
   user:Profile; flow:AppFlow; setFlow:(f:AppFlow)=>void;
   signOut:()=>void; setShowDelete:(v:boolean)=>void;
@@ -5171,6 +5235,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   }
   const [showBotLab, setShowBotLab] = useState(false)
   const [showConvDemo, setShowConvDemo] = useState(false) // aperçu de la Convergence (demande David)
+  const [showMbti, setShowMbti] = useState(false) // test de personnalité 16 types
+  const [mbtiType, setMbtiType] = useState<string>(()=>{ try{return localStorage.getItem('clutch_mbti')||''}catch{return ''} })
   const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
   const [editField, setEditField] = useState<string|null>(null)
   const [editing, setEditing] = useState(false)
@@ -6359,7 +6425,8 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
         <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations &amp; tests</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
         {advOpen==='algo' && <div style={{borderTop:`1px solid ${C.border}`}}>
-          <DRow label="Test de personnalité" value={temperament?`${TEMP_ARCH[temperament].e} Fait`:'Non fait'} onTap={()=>setProfilePage('temperament')}/>
+          <DRow label="Tempérament de rencontre" value={temperament?`${TEMP_ARCH[temperament].e} Fait`:'Non fait'} onTap={()=>setProfilePage('temperament')}/>
+          <DRow label="🧬 Test de personnalité (16 types)" value={mbtiType?`${MBTI_TYPES[mbtiType]?.emoji||''} ${mbtiType}`:'À faire'} onTap={()=>setShowMbti(true)}/>
           <DRow label="Poids de la fiabilité" value="Élevé"/>
           <DRow label="Réinitialiser mon algo" danger onTap={()=>{ setAlgo('proximite'); setAlgoTrained(0); try{localStorage.setItem(algoKey,JSON.stringify({style:'proximite',trained:0}))}catch{}; showToast('↺ Algo réinitialisé',C.orange) }} right={<span style={{color:C.salmon,fontSize:15}}>↺</span>}/>
         </div>}
@@ -6592,6 +6659,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     <>
     {showBotLab && <BotLab user={user} onClose={()=>setShowBotLab(false)} showToast={showToast}/>}
     {showConvDemo && <ConvergenceOverlay demo myProgress={0} otherProgress={0} mins={0} secs={0} otherName="Anaïs" venueName="Café du Marché" bothArrived={false} onClose={()=>setShowConvDemo(false)}/>}
+    {showMbti && <MBTITest lang={lang} onClose={()=>{ setShowMbti(false); try{setMbtiType(localStorage.getItem('clutch_mbti')||'')}catch{} }}/>}
     <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'var(--sat) 0 32px'}}>
 
       {/* ─── HERO ─── */}

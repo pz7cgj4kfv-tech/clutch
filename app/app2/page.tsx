@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x131'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x132'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9459,33 +9459,26 @@ export default function App2() {
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                     <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>Mode <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'multiple choices allowed':'plusieurs choix possibles'}</span></div>
                   </div>
-                  <div style={{display:'flex',gap:8}}>
+                  <div style={{display:'flex',gap:9}}>
                     {([
-                      {k:'romantic',icon:'/icons/mel/rencontre_amour.svg',  l:'Romance',   sub:lang==='en'?'romantic meetup':'rencontre romantique'},
-                      {k:'friend',  icon:'/icons/mel/rencontre_amis.svg',   l:lang==='en'?'Friendship':'Amitié',sub:lang==='en'?'outing, activity':'sortie, activité'},
-                      {k:'pro',     icon:'/icons/mel/rencontre_pro.svg',    l:'Pro',       sub:lang==='en'?'network, coworking':'réseau, coworking'},
-                      {k:'parent',  icon:'/icons/mel/rencontre_parents.svg',l:'Parents',   sub:lang==='en'?'with kids':'avec enfants'},
+                      {k:'romantic',icon:'/icons/mel/rencontre_amour.svg',  l:'Romance'},
+                      {k:'friend',  icon:'/icons/mel/rencontre_amis.svg',   l:lang==='en'?'Friendship':'Amitié'},
+                      {k:'pro',     icon:'/icons/mel/rencontre_pro.svg',    l:'Pro'},
+                      {k:'parent',  icon:'/icons/mel/rencontre_parents.svg',l:lang==='en'?'Family':'Famille'},
                     ] as const).map(m=>{
                       const on=seekModes.includes(m.k)
                       return <button key={m.k} onClick={()=>{
-                        if (m.k==='parent') {
-                          // Mode Parents = exclusif (pas compatible autres modes)
-                          setSeekModes(on ? [] : ['parent'])
-                        } else {
-                          // Autres modes = multi-select SAUF si parent était sélectionné
-                          const without = seekModes.filter(x=>x!==m.k&&x!=='parent')
-                          setSeekModes(on ? without : [...without, m.k])
-                        }
+                        if (m.k==='parent') { setSeekModes(on ? [] : ['parent']) }       // Mode Famille = exclusif
+                        else { const without = seekModes.filter(x=>x!==m.k&&x!=='parent'); setSeekModes(on ? without : [...without, m.k]) }
                       }}
-                        style={{flex:1,padding:'9px 3px 8px',borderRadius:14,
-                          border:`1.5px solid ${on?C.bordeaux:C.border}`,
-                          background:on?`${C.bordeaux}0d`:'transparent',
-                          cursor:'pointer',fontFamily:'inherit',transition:'all .12s',
-                          position:'relative',display:'flex',flexDirection:'column',alignItems:'center'}}>
-                        {on&&<div style={{position:'absolute',top:4,right:4,width:8,height:8,borderRadius:'50%',background:C.bordeaux}}/>}
-                        {on ? <img src={m.icon.replace('.svg','_color.svg')} width={28} height={28} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={26}/>}
-                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{m.l}</div>
-                        <div style={{fontSize:8,color:C.whiteMid,lineHeight:1.2}}>{m.sub}</div>
+                        style={{flex:1,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:0}}>
+                        {/* Tuile surélevée — remplie plum quand sélectionnée (design Mel) */}
+                        <div style={{width:'100%',height:58,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
+                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
+                          boxShadow:on?'0 5px 14px rgba(83,41,67,.30)':'0 2px 7px rgba(83,41,67,.12)',transition:'all .15s'}}>
+                          {on ? <img src={m.icon.replace('.svg','_color.svg')} width={32} height={32} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={28}/>}
+                        </div>
+                        <div style={{fontSize:10.5,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap'}}>{m.l}</div>
                       </button>
                     })}
                   </div>
@@ -9495,18 +9488,22 @@ export default function App2() {
                 {/* 2. GENRE RECHERCHÉ */}
                 <div style={{marginBottom:16}}>
                   <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>{lang==='en'?'I want to meet…':'Je cherche…'}</div>
-                  <div style={{display:'flex',gap:8}}>
+                  <div style={{display:'flex',gap:9}}>
                     {([
-                      {k:'F',   icon:'/icons/mel/femme.svg',       l:lang==='en'?'Women':'Femmes'},
                       {k:'M',   icon:'/icons/mel/homme.svg',       l:lang==='en'?'Men':'Hommes'},
+                      {k:'F',   icon:'/icons/mel/femme.svg',       l:lang==='en'?'Women':'Femmes'},
                       {k:'X',   icon:'/icons/mel/non-binaire.svg', l:lang==='en'?'Non-binary':'Non-binaire'},
                       {k:'all', icon:'/icons/mel/neutre.svg',      l:lang==='en'?'Doesn\'t matter':'Peu importe'},
                     ] as const).map(g=>{
                       const on=seekGender===g.k
                       return <button key={g.k} onClick={()=>setSeekGender(g.k as any)}
-                        style={{flex:1,padding:'10px 3px',borderRadius:14,border:`1.5px solid ${on?C.bordeaux:C.border}`,background:on?`${C.bordeaux}0d`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .12s',display:'flex',flexDirection:'column',alignItems:'center'}}>
-                        {on ? <img src={g.icon.replace('.svg','_color.svg')} width={26} height={26} alt="" style={{display:'block'}}/> : <MelIcon src={g.icon} color={C.borderStrong} size={24}/>}
-                        <div style={{fontSize:10,fontWeight:on?900:500,color:on?C.bordeaux:C.white,marginTop:3}}>{g.l}</div>
+                        style={{flex:1,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:0}}>
+                        <div style={{width:'100%',height:54,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
+                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
+                          boxShadow:on?'0 5px 14px rgba(83,41,67,.30)':'0 2px 7px rgba(83,41,67,.12)',transition:'all .15s'}}>
+                          {on ? <img src={g.icon.replace('.svg','_color.svg')} width={28} height={28} alt="" style={{display:'block'}}/> : <MelIcon src={g.icon} color={C.borderStrong} size={26}/>}
+                        </div>
+                        <div style={{fontSize:10,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{g.l}</div>
                       </button>
                     })}
                   </div>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x136'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x137'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3155,24 +3155,18 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   return (
     <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:nightMode?'#1a0d18':C.bg,display:'flex',flexDirection:'column',transition:'background .3s'}}>
-      <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${nightMode?'rgba(235,107,175,.2)':C.border}`,flexShrink:0,background:nightMode?'linear-gradient(180deg,#2C1020,#1a0d18)':'transparent'}}>
-        <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'baseline',gap:6,color:nightMode?'#fff':undefined}}>{nightMode?'🌙 Clutch Night':t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
-          <button onClick={()=>setShowCreateGroup(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',borderRadius:20,background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-            <span style={{fontSize:14,lineHeight:1}}>+</span> Organiser
+      <div style={{padding:'8px 14px',paddingTop:'calc(var(--sat) + 8px)',borderBottom:`1px solid ${nightMode?'rgba(235,107,175,.2)':C.border}`,flexShrink:0,background:nightMode?'linear-gradient(180deg,#2C1020,#1a0d18)':'transparent'}}>
+        {/* En-tête COMPACT une ligne (David : libérer l'espace en haut, titre redondant retiré — déjà dans la nav du bas) */}
+        <style>{`@keyframes cnMoonGlow{0%,100%{filter:drop-shadow(0 0 2px rgba(235,107,175,.45))}50%{filter:drop-shadow(0 0 8px rgba(235,107,175,.95))}}@keyframes cnMoonSway{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}.cn-moon{display:inline-block;animation:cnMoonGlow 2.6s ease-in-out infinite,cnMoonSway 4s ease-in-out infinite}`}</style>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {/* 🌙 Clutch Night — LUNE ANIMÉE, bouton rond (David : une lune, pas un sablier, et animée) */}
+          <button onClick={()=>setNightMode(v=>!v)} title={EN?'Clutch Night — nightlife & afters':'Clutch Night — soirées & afters'} style={{flexShrink:0,width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
+            border:nightMode?'1px solid rgba(235,107,175,.6)':`1px solid ${C.border}`,
+            background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 2px 6px rgba(83,41,67,.12)',transition:'.2s'}}>
+            <span className="cn-moon" style={{fontSize:18,lineHeight:1}}>🌙</span>
           </button>
-        </div>
-        {/* ⏳ Clutch Night — toggle COMPACT (sablier) à gauche (David : ne doit pas prendre toute une ligne) */}
-        <div style={{display:'flex',alignItems:'center',marginBottom:8}}>
-          <button onClick={()=>setNightMode(v=>!v)} title={EN?'Night mode — nightlife & afters':'Mode nuit — soirées & afters'} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 12px 6px 10px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',
-            border:nightMode?'1px solid rgba(235,107,175,.55)':`1px solid ${C.border}`,
-            background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':C.bgCard,transition:'.2s'}}>
-            <span style={{fontSize:15,filter:nightMode?'drop-shadow(0 0 6px rgba(235,107,175,.8))':'none'}}>⏳</span>
-            <span style={{fontSize:11.5,fontWeight:800,color:nightMode?'#fff':C.whiteMid}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span>{nightMode?(EN?' · on':' · activé'):''}</span>
-          </button>
-        </div>
-        {/* Filtres avec compteurs dynamiques */}
-        <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',paddingBottom:8,padding:'0 0 8px'}}>
+          {/* Filtres (scroll horizontal) */}
+          <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',flex:1,minWidth:0,paddingBottom:2}}>
           {EV_FILTERS.map(f=>{
             const countForFilter = (fid:string) => {
               if (fid==='all') return events.length
@@ -3201,6 +3195,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </button>
             )
           })}
+          </div>
+          {/* + Organiser (compact, rond) */}
+          <button onClick={()=>setShowCreateGroup(true)} title={EN?'Host an event':'Organiser un événement'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:21,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,paddingBottom:2}}>+</button>
+          <span style={{flexShrink:0,fontSize:8,fontWeight:600,color:`${C.whiteMid}55`,letterSpacing:'.03em'}}>{V}</span>
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
@@ -9641,9 +9639,10 @@ export default function App2() {
                   <div style={{padding:'12px 16px 0',paddingTop:'calc(var(--sat) + 10px)',flexShrink:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:20,fontWeight:900,letterSpacing:-0.3,display:'flex',alignItems:'baseline',gap:6}}>{lang==='en'?'Nearby':'Présences'}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
-                        <div style={{fontSize:11,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <span>{filtered.length} {lang==='en'?`available nearby`:`disponible${filtered.length!==1?'s':''} dans votre rayon`}</span>
+                        {/* Titre « Présences » retiré (déjà dans la nav du bas) — on garde juste l'info utile (David : libérer le haut) */}
+                        <div style={{fontSize:12.5,color:C.whiteMid,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontWeight:700,color:C.white}}>{filtered.length} {lang==='en'?`available nearby`:`disponible${filtered.length!==1?'s':''} dans votre rayon`}</span>
+                          <span style={{fontSize:8,fontWeight:500,color:`${C.whiteMid}66`,letterSpacing:'.03em'}}>{V}</span>
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:14,height:14,borderRadius:'50%',border:`1px solid ${C.border}`,fontSize:8,color:C.whiteMid,cursor:'default'}} title="Seules les personnes qui ont ouvert une fenêtre de disponibilité apparaissent ici.">?</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
@@ -10130,9 +10129,10 @@ export default function App2() {
                     )}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                       <div>
-                        <div style={{fontSize:19,fontWeight:900,display:'flex',alignItems:'baseline',gap:6}}>{t('clutchs.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
-                        <div style={{fontSize:11,color:C.whiteMid,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <span>{pending} {lang==='en'?'active':'actif'} · {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
+                        {/* Titre « Mes Clutchs » retiré (déjà dans la nav du bas) — on garde le compte (David : libérer le haut) */}
+                        <div style={{fontSize:12.5,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontWeight:700,color:C.white}}>{pending} {lang==='en'?'active':'actif'} · {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
+                          <span style={{fontSize:8,fontWeight:500,color:`${C.whiteMid}66`,letterSpacing:'.03em'}}>{V}</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
                               <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>
@@ -10645,10 +10645,9 @@ export default function App2() {
 
                 return (
                   <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
-                    {/* Header */}
-                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(var(--sat) + 16px)',borderBottom:'1px solid rgba(83,41,67,.1)',flexShrink:0}}>
-                      <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
+                    {/* Header compact — titre « Mes contacts » retiré (déjà dans la nav du bas), on garde le compte (David : libérer le haut) */}
+                    <div style={{padding:'10px 16px 8px',paddingTop:'calc(var(--sat) + 8px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:C.white}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
                     </div>
 
                     {/* Liste */}

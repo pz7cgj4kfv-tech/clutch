@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x148'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 76   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x149'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 77   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7290,6 +7290,24 @@ function ClutchNightOverlay({ onClose, onActivate }:{ onClose:()=>void; onActiva
 // Affichage pilotable par l'utilisateur (Geek Setup → masquer/afficher chaque bouton).
 // ════════════════════════════════════════════════════════════════════
 type FabBall = { id:'live'|'night'; x:number; y:number; vx:number; vy:number; docked:boolean }
+// 🔔 Bannière notifs — DISCRÈTE : s'affiche seulement en natif SI les notifs sont coupées, dismissable.
+function NotifBanner({ lang }:{ lang:Lang }) {
+  const [show,setShow] = useState(false)
+  useEffect(()=>{ let on=true; (async()=>{
+    try{ if(localStorage.getItem('clutch_notif_banner')==='off') return }catch{}
+    try{ const m:any = await import('@/lib/onesignal'); const g = await m.notifGranted(); if(on && g===false) setShow(true) }catch{}
+  })(); return ()=>{on=false} },[])
+  if(!show) return null
+  return (
+    <div style={{position:'fixed',top:'calc(var(--sat) + 6px)',left:10,right:10,zIndex:1500,background:'linear-gradient(120deg,#532943,#2C1020)',borderRadius:14,padding:'9px 10px 9px 13px',display:'flex',alignItems:'center',gap:9,boxShadow:'0 4px 16px rgba(83,41,67,.4)',animation:'modalIn .3s ease'}}>
+      <span style={{fontSize:17,flexShrink:0}}>🔔</span>
+      <div style={{flex:1,minWidth:0,fontSize:11.5,color:'#fff',lineHeight:1.3}}>{lang==='en'?'Turn on notifications so you don\'t miss a Clutch':'Active les notifs pour ne rien rater d\'un Clutch'}</div>
+      <button onClick={async()=>{ try{ const m:any = await import('@/lib/onesignal'); await m.enableNotifs() }catch{}; setShow(false) }} style={{background:'#77BC1F',border:'none',borderRadius:10,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 12px',cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{lang==='en'?'Enable':'Activer'}</button>
+      <button onClick={()=>{ try{localStorage.setItem('clutch_notif_banner','off')}catch{}; setShow(false) }} aria-label="Fermer" style={{background:'transparent',border:'none',color:'rgba(255,255,255,.55)',fontSize:15,cursor:'pointer',padding:'0 2px',flexShrink:0}}>✕</button>
+    </div>
+  )
+}
+
 function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
   showLive:boolean; showNight:boolean; hidden:boolean; onTapLive:()=>void; onTapNight:()=>void;
 }) {
@@ -11060,6 +11078,7 @@ export default function App2() {
           <FloatingFabs showLive={fabPrefs.live} showNight={fabPrefs.night} hidden={!!activeVerrou}
             onTapLive={()=>{ setFlow('app'); setTab('presences'); activateLive() }}
             onTapNight={()=>setShowClutchNight(true)} />
+          <NotifBanner lang={lang} />
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🌙 Clutch Night (prototype) */}
           {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ try{localStorage.setItem('clutch_night_active','1')}catch{}; setShowClutchNight(false); setFlow('app'); setTab('evenements'); try{window.dispatchEvent(new Event('clutch-night-sync'))}catch{}; showToast('🌙 Clutch Night activé',C.green) }}/>}

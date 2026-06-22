@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x130'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x131'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -671,6 +671,26 @@ function haversineKm(lat1:number,lng1:number,lat2:number,lng2:number):number {
   const dLat=(lat2-lat1)*d2r, dLng=(lng2-lng1)*d2r
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLng/2)**2
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+}
+
+// 📡 Distance dispo→événement. SÛR : distance à un LIEU fixe (le café), jamais à une personne
+// → aucune triangulation possible (cf. règle ProximityRadar). Réel si venue_lat/lng ; sinon démo stable depuis l'id.
+function eventKm(ev:any, myLat:number, myLng:number):number|null {
+  const la=ev?.venue_lat, lo=ev?.venue_lng
+  if(typeof la==='number' && typeof lo==='number') return haversineKm(myLat,myLng,la,lo)
+  if(ev?.id){ let h=0; const s=String(ev.id); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return Math.round((0.4+(h%1320)/100)*10)/10 } // démo 0.4–13.6 km
+  return null
+}
+// Heat radar (palette Mel) : proche = vert (vas-y), coin = rose, loin = gris estompé.
+function kmHeat(km:number){ return km<=2 ? {c:'#77BC1F',bg:'rgba(119,188,31,.12)'} : km<=8 ? {c:'#EB6BAF',bg:'rgba(235,107,175,.12)'} : {c:'#B2B2B2',bg:'rgba(178,178,178,.16)'} }
+// Chip « radar » : icône cible concentrique + km exact (clair) + couleur de proximité (cue rapide).
+function KmRadar({km, big}:{km:number; big?:boolean}){
+  const h=kmHeat(km); const v = km<10 ? km.toFixed(1) : String(Math.round(km))
+  const r = big?14:12
+  return <span style={{display:'inline-flex',alignItems:'center',gap:3,flexShrink:0,padding: big?'3px 9px 3px 6px':'2px 7px 2px 5px',borderRadius:20,background:h.bg,color:h.c,fontSize:big?11:10,fontWeight:800,letterSpacing:'-.01em'}}>
+    <svg width={r} height={r} viewBox="0 0 24 24" fill="none" stroke={h.c} strokeWidth={1.9}><circle cx={12} cy={12} r={9}/><circle cx={12} cy={12} r={4.5}/><circle cx={12} cy={12} r={1.2} fill={h.c}/></svg>
+    {v} km
+  </span>
 }
 
 // Génère des positions aléatoires STABLES à l'intérieur du cercle rayon
@@ -2763,11 +2783,12 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, isCertified, showToast }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
   lang:Lang;
+  centerLat?:number|null; centerLng?:number|null;
   initialEventId?:string|null;
   onClearInitialEvent?:()=>void;
   onPenalty?:(r:PenaltyReason)=>void;
@@ -3291,26 +3312,35 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const photo = (ev as any).eventPhotos?.[0]
           const isImg = photo && String(photo).startsWith('http')
           const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))
+          const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
+          const cPhoto = (ev as any).creatorPhoto
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'visible',boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
             {/* Photo qui donne envie */}
-            <div style={{position:'relative',height:120,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
-              <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,.1) 45%,transparent 72%)'}}/>
+            <div style={{position:'relative',height:130,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
+              {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
+              <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.66) 0%,rgba(0,0,0,.12) 48%,transparent 74%)',borderRadius:'16px 16px 0 0'}}/>
               {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}
               {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
-              {/* Titre seul sur la photo — on laisse la photo respirer (David : heure+lieu vont SOUS la photo) */}
-              <div style={{position:'absolute',bottom:7,left:9,right:9}}>
-                <div style={{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.7)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
+              {/* Titre sur la photo (décalé à droite de l'avatar) */}
+              <div style={{position:'absolute',bottom:8,left:cPhoto?56:10,right:9}}>
+                <div style={{fontSize:13.5,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.75)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
               </div>
+              {/* Avatar organisateur — overlap coin bas-gauche (design Mel) */}
+              {cPhoto && <img src={cPhoto} alt="" style={{position:'absolute',bottom:-15,left:10,width:38,height:38,borderRadius:'50%',objectFit:'cover',border:'2.5px solid #fff',boxShadow:'0 2px 7px rgba(83,41,67,.28)',zIndex:2}}/>}
             </div>
-            {/* Footer : heure + durée + lieu SOUS la photo (demande David) + jauge */}
-            <div style={{padding:'8px 10px 9px'}}>
+            {/* Footer */}
+            <div style={{padding:'8px 11px 10px',paddingTop:cPhoto?9:8}}>
+              {/* Ligne 1 : créateur (décalé sous l'avatar) + 📡 distance radar à droite */}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:3,marginLeft:cPhoto?40:0,minHeight:cPhoto?16:0}}>
+                <span style={{fontSize:11.5,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.creator||''}</span>
+                {km!=null && <KmRadar km={km}/>}
+              </div>
               <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {locDay(fixEventDate(ev.date),EN)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
-              <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'—').split(',')[0]}</div>
+              <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'—').split(',')[0]}</div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{fontSize:10,fontWeight:800,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
-                <div style={{flex:1,height:3.5,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct>80?C.orange:C.green}}/></div>
+                <span style={{fontSize:10,fontWeight:800,color:pct>=100?C.green:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
+                <div style={{flex:1,height:4,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#77BC1F,#EB6BAF)',borderRadius:2}}/></div>
               </div>
             </div>
           </div>
@@ -10009,6 +10039,8 @@ export default function App2() {
                 onClearInitialEvent={()=>setOpenEventId(null)}
                 onPenalty={applyPenalty}
                 userId={user?.id}
+                centerLat={(user as any)?.center_lat ?? null}
+                centerLng={(user as any)?.center_lng ?? null}
                 showToast={showToast}
                 isCertified={!!(user as any)?.is_certified}
                 onOpenProfile={(name,bio,photo)=>{

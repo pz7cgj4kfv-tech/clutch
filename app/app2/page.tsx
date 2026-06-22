@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x124'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x125'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2742,6 +2742,9 @@ const hasBannedWords = (s?:string):boolean => { const t=(s||'').toLowerCase(); r
 // Corrige le jour de la semaine d'une date absolue (« Sam 21 juin » → « Dim 21 juin »). Laisse « Ce soir »/« Demain » tels quels.
 const FR_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 const FR_WD = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+// Localise les tokens de date relatifs en EN (sans toucher à la valeur stockée FR — donnée utilisée dans la logique)
+const DAY_EN:Record<string,string> = {"Aujourd'hui":'Today','Demain':'Tomorrow','Ce soir':'Tonight','Demain matin':'Tomorrow morning','Demain 14h':'Tomorrow 2pm'}
+const locDay = (s:string|undefined, en:boolean):string => { if(!s) return ''; if(!en) return s; if(DAY_EN[s]) return DAY_EN[s]; return s.replace(/^Dim/,'Sun').replace(/^Lun/,'Mon').replace(/^Mar/,'Tue').replace(/^Mer/,'Wed').replace(/^Jeu/,'Thu').replace(/^Ven/,'Fri').replace(/^Sam/,'Sat').replace(/ janvier/,' Jan').replace(/ février/,' Feb').replace(/ mars/,' Mar').replace(/ avril/,' Apr').replace(/ mai/,' May').replace(/ juin/,' Jun').replace(/ juillet/,' Jul').replace(/ août/,' Aug').replace(/ septembre/,' Sep').replace(/ octobre/,' Oct').replace(/ novembre/,' Nov').replace(/ décembre/,' Dec') }
 function fixEventDate(s:string|undefined):string {
   if(!s) return s||''
   const m = String(s).match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/i)
@@ -2774,6 +2777,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   showToast?:(m:string,c?:string)=>void;
 }) {
   const t = useT(lang)
+  const EN = lang==='en'
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [evLoading, setEvLoading] = useState(true)
   const [cancelledNotice, setCancelledNotice] = useState<string|null>(null)
@@ -3121,8 +3125,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':C.bgCard}}>
           <span style={{fontSize:18,filter:nightMode?'drop-shadow(0 0 8px rgba(235,107,175,.7))':'none'}}>🌙</span>
           <span style={{flex:1,minWidth:0}}>
-            <span style={{display:'block',fontSize:13,fontWeight:900,color:nightMode?'#fff':C.white}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span> {nightMode?'· activé':''}</span>
-            <span style={{display:'block',fontSize:10.5,color:nightMode?'#e8d8e4':C.whiteMid}}>{nightMode?'Soirées & afters près de toi · rayon élargi 🚆':'Ce soir on sort — bascule en mode nuit'}</span>
+            <span style={{display:'block',fontSize:13,fontWeight:900,color:nightMode?'#fff':C.white}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span> {nightMode?(EN?'· on':'· activé'):''}</span>
+            <span style={{display:'block',fontSize:10.5,color:nightMode?'#e8d8e4':C.whiteMid}}>{nightMode?(EN?'Nightlife & afters near you · wider radius 🚆':'Soirées & afters près de toi · rayon élargi 🚆'):(EN?'Going out tonight — switch to night mode':'Ce soir on sort — bascule en mode nuit')}</span>
           </span>
           <span style={{width:38,height:22,borderRadius:11,background:nightMode?'#EB6BAF':C.border,position:'relative',flexShrink:0,transition:'.2s'}}><span style={{position:'absolute',top:2,left:nightMode?18:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'.2s'}}/></span>
         </button>
@@ -3163,13 +3167,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             mis en avant en bannières dans « Tout »). Demande David : ne pas remettre les partenaires ici. */}
         {evFilter==='partenaires' && (<>
           <div style={{background:`${C.plum}0a`,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 14px',marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🫂 Groupes à suivre</div>
-            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}><b>« Tout »</b> = les événements ponctuels. <b>Ici</b> = les <b>groupes récurrents</b> (clubs, collectifs) que tu suis pour être <b>notifié·e</b> de leurs nouveaux events. Ton réseau se construit tout seul.</div>
+            <div style={{fontSize:13,fontWeight:800,color:C.plum,marginBottom:3}}>🫂 {EN?'Groups to follow':'Groupes à suivre'}</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,lineHeight:1.5}}>{EN?<><b>“All”</b> = one-off events. <b>Here</b> = the <b>recurring groups</b> (clubs, collectives) you follow to get <b>notified</b> of their new events. Your network builds itself.</>:<><b>« Tout »</b> = les événements ponctuels. <b>Ici</b> = les <b>groupes récurrents</b> (clubs, collectifs) que tu suis pour être <b>notifié·e</b> de leurs nouveaux events. Ton réseau se construit tout seul.</>}</div>
           </div>
           {/* Groupes suivis — visibles en un coup d'œil (David : « ils apparaissent où ? ») */}
           {(()=>{ const fol = PARTNERS_MOCK.filter((p:any)=>followedPartners.has(p.id)); if(!fol.length) return null; return (
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.green,marginBottom:7}}>✓ Tu suis {fol.length} groupe{fol.length>1?'s':''}</div>
+              <div style={{fontSize:10,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.green,marginBottom:7}}>✓ {EN?`You follow ${fol.length} group${fol.length>1?'s':''}`:`Tu suis ${fol.length} groupe${fol.length>1?'s':''}`}</div>
               <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
                 {fol.map((p:any)=>(
                   <span key={p.id} style={{display:'inline-flex',alignItems:'center',gap:5,background:`${C.green}10`,border:`1px solid ${C.green}44`,borderRadius:20,padding:'5px 11px',fontSize:12,fontWeight:700,color:C.white}}>
@@ -3179,7 +3183,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </div>
             </div>
           )})()}
-          <button onClick={()=>setShowCreatePartner(true)} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px dashed ${C.plum}`,background:'transparent',color:C.plum,fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:14}}>+ Créer mon groupe</button>
+          <button onClick={()=>setShowCreatePartner(true)} style={{width:'100%',padding:'13px',borderRadius:14,border:`1.5px dashed ${C.plum}`,background:'transparent',color:C.plum,fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:14}}>+ {EN?'Create my group':'Créer mon groupe'}</button>
           {/* Mes groupes créés */}
           {myPartners.map((p:any)=>(
             <div key={p.id} style={{background:C.bgCard,border:`1.5px solid ${C.plum}`,borderRadius:16,padding:'13px 14px',marginBottom:11}}>
@@ -3188,16 +3192,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                     <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
-                    <span style={{fontSize:9,fontWeight:800,color:C.plum,background:`${C.plum}14`,borderRadius:8,padding:'1px 6px'}}>Mon groupe</span>
-                    {p.isPrivate&&<span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>🔒 Privé</span>}
+                    <span style={{fontSize:9,fontWeight:800,color:C.plum,background:`${C.plum}14`,borderRadius:8,padding:'1px 6px'}}>{EN?'My group':'Mon groupe'}</span>
+                    {p.isPrivate&&<span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>🔒 {EN?'Private':'Privé'}</span>}
                   </div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
                   <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
                   {p.file&&<div style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:10.5,color:C.green,marginTop:7,background:`${C.green}10`,border:`1px solid ${C.green}33`,borderRadius:8,padding:'4px 8px'}}>📄 {p.file}</div>}
-                  {p.isPrivate&&p.link&&<div style={{fontSize:10.5,color:C.plum,marginTop:7,background:`${C.plum}0a`,borderRadius:8,padding:'5px 8px',wordBreak:'break-all'}}>🔗 Lien privé : {p.link}</div>}
+                  {p.isPrivate&&p.link&&<div style={{fontSize:10.5,color:C.plum,marginTop:7,background:`${C.plum}0a`,borderRadius:8,padding:'5px 8px',wordBreak:'break-all'}}>🔗 {EN?'Private link':'Lien privé'} : {p.link}</div>}
                 </div>
               </div>
-              <button onClick={()=>{ const next=myPartners.filter((x:any)=>x.id!==p.id); setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{} }} style={{width:'100%',marginTop:11,padding:'9px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Supprimer ce groupe</button>
+              <button onClick={()=>{ const next=myPartners.filter((x:any)=>x.id!==p.id); setMyPartners(next); try{localStorage.setItem('clutch_my_partners',JSON.stringify(next))}catch{} }} style={{width:'100%',marginTop:11,padding:'9px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Delete this group':'Supprimer ce groupe'}</button>
             </div>
           ))}
           {PARTNERS_MOCK.filter((p:any)=>!p.verified).map(p=>{ const on=followedPartners.has(p.id); return (
@@ -3207,22 +3211,22 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:5}}>
                     <span style={{fontSize:15,fontWeight:900,color:C.white}}>{p.name}</span>
-                    <span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>Groupe privé</span>
+                    <span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:`${C.border}`,borderRadius:8,padding:'1px 6px'}}>{EN?'Private group':'Groupe privé'}</span>
                   </div>
                   <div style={{fontSize:11,color:C.whiteMid,marginTop:1}}>{p.cat} · 📍 {p.zone}</div>
                   <div style={{fontSize:12,color:C.whiteMid,marginTop:6,lineHeight:1.45}}>{p.desc}</div>
                   <div style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,fontWeight:700,color:C.plum,background:`${C.plum}0d`,borderRadius:8,padding:'3px 8px'}}>🗓 {p.next}</span>
-                    <span style={{fontSize:10.5,color:C.whiteMid}}>👥 {p.members} membres</span>
+                    <span style={{fontSize:10.5,color:C.whiteMid}}>👥 {p.members} {EN?'members':'membres'}</span>
                   </div>
                 </div>
               </div>
               <button onClick={()=>togglePartner(p.id)} style={{width:'100%',marginTop:11,padding:'10px',borderRadius:12,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-                {on?'✓ Suivi · notifs activées':'+ Suivre ce groupe'}
+                {on?(EN?'✓ Following · notifs on':'✓ Suivi · notifs activées'):(EN?'+ Follow this group':'+ Suivre ce groupe')}
               </button>
             </div>
           )})}
-          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — tu peux créer ton groupe (public ou privé par lien), choisir une <b>région</b> (adresse révélée avant le RDV) et y joindre un <b>fichier</b>. La diffusion réelle des notifs arrive en V2.</div>
+          <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>{EN?<>Prototype — you can create your group (public or private by link), pick a <b>region</b> (exact address revealed before the meetup) and attach a <b>file</b>. Real notification delivery comes in V2.</>:<>Prototype — tu peux créer ton groupe (public ou privé par lien), choisir une <b>région</b> (adresse révélée avant le RDV) et y joindre un <b>fichier</b>. La diffusion réelle des notifs arrive en V2.</>}</div>
         </>)}
         {evFilter!=='partenaires' && (<>
         {/* ✨ BANNIÈRES PARTENAIRES (payants = pub) — TOUJOURS affichées sur tous les filtres events (David : non filtrables). */}
@@ -3302,7 +3306,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
             {/* Footer : heure + durée + lieu SOUS la photo (demande David) + jauge */}
             <div style={{padding:'8px 10px 9px'}}>
-              <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {fixEventDate(ev.date)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
+              <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {locDay(fixEventDate(ev.date),EN)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
               <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'—').split(',')[0]}</div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontSize:10,fontWeight:800,color:pct>80?C.orange:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
@@ -3320,20 +3324,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         <div onClick={()=>setShowCreatePartner(false)} style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(42,16,32,.5)',display:'flex',alignItems:'flex-end'}}>
           <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'88vh',overflowY:'auto',background:C.bg,borderTopLeftRadius:22,borderTopRightRadius:22,padding:`18px 18px calc(var(--sab) + 20px)`}}>
             <div style={{width:38,height:4,borderRadius:2,background:C.border,margin:'0 auto 14px'}}/>
-            <div style={{fontSize:18,fontWeight:900,color:C.white,marginBottom:4}}>Créer mon groupe</div>
-            <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12,lineHeight:1.5}}>Un club, un collectif, une activité récurrente. Les gens te suivent → ils sont notifiés de tes events.</div>
+            <div style={{fontSize:18,fontWeight:900,color:C.white,marginBottom:4}}>{EN?'Create my group':'Créer mon groupe'}</div>
+            <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12,lineHeight:1.5}}>{EN?'A club, a collective, a recurring activity. People follow you → they get notified of your events.':'Un club, un collectif, une activité récurrente. Les gens te suivent → ils sont notifiés de tes events.'}</div>
             {/* Anti-malveillance : publier = profil vérifié (demande David « que les gens ne mettent pas n'importe quoi ») */}
             <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',borderRadius:12,marginBottom:16,
               background:isCertified?`${C.green}12`:`${C.plum}0a`,border:`1px solid ${isCertified?`${C.green}55`:C.border}`}}>
               <span style={{fontSize:17}}>{isCertified?'✓':'🔒'}</span>
               <div style={{flex:1,fontSize:11,lineHeight:1.45,color:isCertified?C.green:C.whiteMid}}>
-                {isCertified?<><b>Profil vérifié</b> — tu peux publier en confiance.</>:<>Pour <b>publier publiquement</b>, ton profil devra être <b style={{color:C.plum}}>vérifié</b> (certification selfie). On garde Clutch sain.</>}
+                {isCertified?(EN?<><b>Verified profile</b> — you can publish with confidence.</>:<><b>Profil vérifié</b> — tu peux publier en confiance.</>):(EN?<>To <b>publish publicly</b>, your profile must be <b style={{color:C.plum}}>verified</b> (selfie certification). We keep Clutch healthy.</>:<>Pour <b>publier publiquement</b>, ton profil devra être <b style={{color:C.plum}}>vérifié</b> (certification selfie). On garde Clutch sain.</>)}
               </div>
             </div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
               {CP_EMOJIS.map(e=><span key={e} onClick={()=>setCpEmoji(e)} style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'pointer',border:`1.5px solid ${cpEmoji===e?C.plum:C.border}`,background:cpEmoji===e?`${C.plum}0d`:'transparent'}}>{e}</span>)}
             </div>
-            {[['Nom du groupe',cpName,setCpName,'Ex. Apéro Jazz Collectif'],['Catégorie',cpCat,setCpCat,'Ex. Musique · Apéro']].map(([lab,val,set,ph]:any)=>(
+            {[[EN?'Group name':'Nom du groupe',cpName,setCpName,EN?'E.g. Jazz Apéro Collective':'Ex. Apéro Jazz Collectif'],[EN?'Category':'Catégorie',cpCat,setCpCat,EN?'E.g. Music · Drinks':'Ex. Musique · Apéro']].map(([lab,val,set,ph]:any)=>(
               <div key={lab} style={{marginBottom:11}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>{lab}</div>
                 <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none'}}/>
@@ -3341,41 +3345,41 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             ))}
             {/* Lieu = RÉGION (pas l'adresse exacte). GPS caché, révélé avant le RDV — vision David (oncle/Bibi) */}
             <div style={{marginBottom:11}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Zone <span style={{color:C.whiteMid,fontWeight:600}}>· région, pas l'adresse</span></div>
+              <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>{EN?'Area':'Zone'} <span style={{color:C.whiteMid,fontWeight:600}}>· {EN?'region, not the address':'région, pas l\'adresse'}</span></div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                 {CP_ZONES.map(z=><span key={z} onClick={()=>setCpZone(z)} style={{padding:'7px 12px',borderRadius:11,fontSize:12,fontWeight:700,cursor:'pointer',border:`1.5px solid ${cpZone===z?C.plum:C.border}`,background:cpZone===z?`${C.plum}0d`:'transparent',color:cpZone===z?C.plum:C.whiteMid}}>{z}</span>)}
               </div>
               <div style={{display:'flex',alignItems:'flex-start',gap:7,marginTop:9,padding:'9px 11px',borderRadius:11,background:`${C.green}0d`,border:`1px solid ${C.green}33`}}>
                 <span style={{fontSize:14}}>🛡️</span>
-                <div style={{fontSize:10.5,lineHeight:1.45,color:C.whiteMid}}>L'<b style={{color:C.white}}>adresse exacte reste cachée</b> — elle n'est révélée aux participants qu'<b style={{color:C.green}}>un peu avant le RDV</b>. Comme pour les Clutchs.</div>
+                <div style={{fontSize:10.5,lineHeight:1.45,color:C.whiteMid}}>{EN?<>The <b style={{color:C.white}}>exact address stays hidden</b> — it's revealed to participants only <b style={{color:C.green}}>shortly before the meetup</b>. Just like Clutches.</>:<>L'<b style={{color:C.white}}>adresse exacte reste cachée</b> — elle n'est révélée aux participants qu'<b style={{color:C.green}}>un peu avant le RDV</b>. Comme pour les Clutchs.</>}</div>
               </div>
             </div>
             <div style={{marginBottom:11}}>
               <div style={{fontSize:11,fontWeight:700,color:C.white,marginBottom:5}}>Description</div>
-              <textarea value={cpDesc} onChange={e=>setCpDesc(e.target.value)} placeholder="En 1-2 phrases…" rows={2} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none'}}/>
+              <textarea value={cpDesc} onChange={e=>setCpDesc(e.target.value)} placeholder={EN?'In 1-2 sentences…':'En 1-2 phrases…'} rows={2} style={{width:'100%',boxSizing:'border-box',padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontFamily:'inherit',outline:'none',resize:'none'}}/>
             </div>
             {/* Pièce jointe (idée oncle = PDF partition) — prototype : on capte le nom du fichier, upload réel en V2 */}
             {cpFile ? (
               <div style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.green}55`,background:`${C.green}10`,marginBottom:11}}>
                 <span style={{fontSize:18}}>📄</span>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{cpFile}</div><div style={{fontSize:10.5,color:C.green,marginTop:1}}>Joint au groupe ✓</div></div>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{cpFile}</div><div style={{fontSize:10.5,color:C.green,marginTop:1}}>{EN?'Attached to the group ✓':'Joint au groupe ✓'}</div></div>
                 <span onClick={()=>setCpFile(null)} style={{fontSize:16,color:C.whiteMid,cursor:'pointer',padding:4}}>✕</span>
               </div>
             ) : (
               <label style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px dashed ${C.plum}`,background:'transparent',marginBottom:11,cursor:'pointer'}}>
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0]; if(f)setCpFile(f.name)}}/>
                 <span style={{fontSize:18}}>📎</span>
-                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.white}}>Joindre un fichier</div><div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>PDF, partition, programme… <b style={{color:C.plum}}>choisir</b></div></div>
+                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:C.white}}>{EN?'Attach a file':'Joindre un fichier'}</div><div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>{EN?'PDF, sheet music, program…':'PDF, partition, programme…'} <b style={{color:C.plum}}>{EN?'choose':'choisir'}</b></div></div>
               </label>
             )}
             <div onClick={()=>setCpPrivate(v=>!v)} style={{display:'flex',alignItems:'center',gap:11,padding:'11px 13px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bgCard,marginBottom:16,cursor:'pointer'}}>
               <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.white}}>🔒 Groupe privé (par lien)</div>
-                <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>N'apparaît pas dans la liste publique. Tu partages un lien.</div>
+                <div style={{fontSize:13,fontWeight:700,color:C.white}}>🔒 {EN?'Private group (by link)':'Groupe privé (par lien)'}</div>
+                <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1}}>{EN?'Not shown in the public list. You share a link.':'N\'apparaît pas dans la liste publique. Tu partages un lien.'}</div>
               </div>
               <div style={{width:44,height:26,borderRadius:13,background:cpPrivate?C.green:C.border,position:'relative',flexShrink:0,transition:'.2s'}}><div style={{position:'absolute',top:2,left:cpPrivate?20:2,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'.2s'}}/></div>
             </div>
-            <button onClick={createPartner} disabled={!cpName.trim()} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:cpName.trim()?C.bordeaux:C.border,color:'#fff',fontSize:15,fontWeight:800,cursor:cpName.trim()?'pointer':'default',fontFamily:'inherit'}}>Créer le groupe</button>
+            <button onClick={createPartner} disabled={!cpName.trim()} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:cpName.trim()?C.bordeaux:C.border,color:'#fff',fontSize:15,fontWeight:800,cursor:cpName.trim()?'pointer':'default',fontFamily:'inherit'}}>{EN?'Create the group':'Créer le groupe'}</button>
           </div>
         </div>
       )}
@@ -3392,7 +3396,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <span style={{fontSize:26}}>{selEv.emoji}</span>
                 <div>
                   <div style={{fontSize:15,fontWeight:900}}>{selEv.title}</div>
-                  <div style={{fontSize:11,color:C.whiteMid}}>{fixEventDate(selEv.date)} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
+                  <div style={{fontSize:11,color:C.whiteMid}}>{locDay(fixEventDate(selEv.date),EN)} · {selEv.time} · ⏱ {eventDurLabel(selEv)}</div>
                 </div>
               </div>
               <button onClick={()=>setSelEv(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
@@ -3682,18 +3686,18 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{width:40,height:5,borderRadius:3,background:`${C.whiteMid}40`,margin:'0 auto'}}/>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-              <div style={{fontSize:16,fontWeight:900}}>🎟️ Organiser un événement</div>
+              <div style={{fontSize:16,fontWeight:900}}>🎟️ {EN?'Host an event':'Organiser un événement'}</div>
               <button onClick={tryCloseCreate} style={{background:'none',border:'none',color:C.whiteMid,fontSize:20,cursor:'pointer',padding:4}}>✕</button>
             </div>
 
             {/* Champ 1 : Emoji + Titre */}
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>TON ÉVÉNEMENT</div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>{EN?'YOUR EVENT':'TON ÉVÉNEMENT'}</div>
               <div style={{display:'flex',gap:8}}>
                 <button onClick={()=>setShowEmojiPicker(p=>!p)} style={{fontSize:24,width:52,height:52,borderRadius:12,background:C.whiteFaint,border:`1px solid ${C.border}`,cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {newEvEmoji}
                 </button>
-                <input value={newEvTitle} onChange={e=>setNewEvTitle(e.target.value)} placeholder="Ex : Apéro découverte, Partie d'échecs..."
+                <input value={newEvTitle} onChange={e=>setNewEvTitle(e.target.value)} placeholder={EN?'E.g. Drinks & discovery, Chess game...':"Ex : Apéro découverte, Partie d'échecs..."}
                   style={{flex:1,background:C.whiteFaint,border:`1px solid ${newEvTitle?C.salmon:C.border}`,borderRadius:12,padding:'0 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
               </div>
               {showEmojiPicker&&(
@@ -3710,12 +3714,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
             {/* Champ 2 : Lieu — recherche d'adresse (Nominatim), comme la mise en ligne */}
             <div style={{marginBottom:14,position:'relative'}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>📍 OÙ <span style={{color:C.whiteMid,fontWeight:600}}>· cherche une adresse</span></div>
-              <input value={newEvLieu} onChange={e=>handleEvLieuChange(e.target.value)} onFocus={()=>{if(newEvLieu.length>=3)setEvShowSugg(true)}} placeholder='Bar du Marché, Place de la Palud, Morges...'
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>📍 {EN?'WHERE':'OÙ'} <span style={{color:C.whiteMid,fontWeight:600}}>· {EN?'search an address':'cherche une adresse'}</span></div>
+              <input value={newEvLieu} onChange={e=>handleEvLieuChange(e.target.value)} onFocus={()=>{if(newEvLieu.length>=3)setEvShowSugg(true)}} placeholder={EN?'Café, square, address...':'Bar du Marché, Place de la Palud, Morges...'}
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvLieu?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,boxSizing:'border-box'}}/>
               {evShowSugg && (evAddrResults.length>0 || evAddrLoading) && (
                 <div style={{marginTop:6,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`,overflow:'hidden',boxShadow:'0 6px 20px rgba(83,41,67,.12)'}}>
-                  {evAddrLoading && evAddrResults.length===0 && <div style={{padding:'10px 14px',fontSize:12,color:C.whiteMid}}>Recherche…</div>}
+                  {evAddrLoading && evAddrResults.length===0 && <div style={{padding:'10px 14px',fontSize:12,color:C.whiteMid}}>{EN?'Searching…':'Recherche…'}</div>}
                   {evAddrResults.map((r:any,i:number)=>{ const name=r.name||(r.display_name||'').split(',')[0]; const addr=fmtEvAddr(r); return (
                     <div key={i} onClick={()=>pickEvAddr(name,addr)} style={{padding:'10px 14px',borderBottom:i<evAddrResults.length-1?`1px solid ${C.border}`:'none',cursor:'pointer'}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.white}}>{name}</div>
@@ -3728,12 +3732,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
             {/* Champ 3 : QUAND (jour contraint + molette native) */}
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>🕐 QUAND</div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>🕐 {EN?'WHEN':'QUAND'}</div>
               <div style={{display:'flex',gap:8}}>
                 <div style={{display:'flex',gap:6,flex:1}}>
                   {['Aujourd\'hui','Demain'].map(d=>(
                     <button key={d} onClick={()=>setNewEvDate(d)}
-                      style={{flex:1,padding:'11px 0',borderRadius:10,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvDate===d?C.salmon:C.border}`,background:newEvDate===d?C.salmonFaint:'transparent',color:newEvDate===d?C.salmon:C.whiteMid}}>{d}</button>
+                      style={{flex:1,padding:'11px 0',borderRadius:10,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvDate===d?C.salmon:C.border}`,background:newEvDate===d?C.salmonFaint:'transparent',color:newEvDate===d?C.salmon:C.whiteMid}}>{locDay(d,EN)}</button>
                   ))}
                 </div>
                 <input type='time' value={newEvTime} onChange={e=>setNewEvTime(e.target.value)}
@@ -3744,7 +3748,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
             {/* Champ 4 : Durée (obligatoire) + Places */}
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>⏱ DURÉE <span style={{color:C.whiteMid,fontWeight:600}}>· évite les chevauchements</span></div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>⏱ {EN?'DURATION':'DURÉE'} <span style={{color:C.whiteMid,fontWeight:600}}>· {EN?'avoids overlaps':'évite les chevauchements'}</span></div>
               <div style={{display:'flex',gap:6}}>
                 {EVENT_DUR_OPTS.map(o=>(
                   <button key={o.h} onClick={()=>setNewEvDur(o.h)}
@@ -3756,7 +3760,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </div>
             </div>
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 NOMBRE DE PLACES</div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 {EN?'NUMBER OF SPOTS':'NOMBRE DE PLACES'}</div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                 {[2,4,6,8,10,12].map(n=>(
                   <button key={n} onClick={()=>setNewEvMax(n)}
@@ -3767,25 +3771,25 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
             {/* Champ : PRIX (David : oublié) */}
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💰 PRIX</div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💰 {EN?'PRICE':'PRIX'}</div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:7}}>
-                {['Gratuit','5 CHF','10 CHF','20 CHF'].map(pz=>(
+                {[EN?'Free':'Gratuit','5 CHF','10 CHF','20 CHF'].map(pz=>(
                   <button key={pz} onClick={()=>setNewEvPrice(pz)}
                     style={{flex:1,minWidth:62,padding:'8px 0',borderRadius:10,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvPrice===pz?C.salmon:C.border}`,background:newEvPrice===pz?C.salmonFaint:'transparent',color:newEvPrice===pz?C.salmon:C.whiteMid}}>{pz}</button>
                 ))}
               </div>
-              <input value={newEvPrice} onChange={e=>setNewEvPrice(e.target.value)} placeholder='Ou un autre prix… (ex : Prix libre, 12 CHF)'
+              <input value={newEvPrice} onChange={e=>setNewEvPrice(e.target.value)} placeholder={EN?'Or another price… (e.g. Pay what you want, 12 CHF)':'Ou un autre prix… (ex : Prix libre, 12 CHF)'}
                 style={{width:'100%',boxSizing:'border-box',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
             </div>
 
             {/* Champ 5 : Description (OBLIGATOIRE — David) + aide + limite caractères */}
             <div style={{marginBottom:22}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· obligatoire</span></div>
+                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· {EN?'required':'obligatoire'}</span></div>
                 <div style={{fontSize:10,color:newEvDesc.length>=280?C.orange:C.whiteMid}}>{newEvDesc.length}/300</div>
               </div>
               <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value.slice(0,300))} rows={3} maxLength={300}
-                placeholder={'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
+                placeholder={EN?'Help people decide:\n• What you\'ll do\n• Who it\'s for (beginners? level?)\n• What to bring':'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box',lineHeight:1.5}}/>
               {/* Pièce jointe réelle (PDF/programme/image) — prototype : on capte le nom, upload V2 */}
               {newEvFile ? (
@@ -3798,27 +3802,27 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <label style={{display:'flex',alignItems:'center',gap:9,marginTop:8,padding:'9px 12px',borderRadius:11,border:`1px dashed ${C.salmon}`,cursor:'pointer'}}>
                   <input type='file' accept='.pdf,.png,.jpg,.jpeg,.doc,.docx' style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0]; if(f)setNewEvFile(f.name)}}/>
                   <span style={{fontSize:16}}>📎</span>
-                  <div style={{flex:1,fontSize:12,fontWeight:700,color:C.salmon}}>Joindre un fichier <span style={{color:C.whiteMid,fontWeight:500}}>(PDF, programme…)</span></div>
+                  <div style={{flex:1,fontSize:12,fontWeight:700,color:C.salmon}}>{EN?'Attach a file':'Joindre un fichier'} <span style={{color:C.whiteMid,fontWeight:500}}>({EN?'PDF, program…':'PDF, programme…'})</span></div>
                 </label>
               )}
             </div>
 
             <button onClick={createGroupEvent} disabled={creating}
               style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(255,191,158,0.35)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
-              {creating?'Création...':`✦ Publier l\'événement`}
+              {creating?(EN?'Creating…':'Création...'):(EN?'✦ Publish event':'✦ Publier l\'événement')}
             </button>
-            {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>Touche « Publier » pour voir ce qui manque.</div>}
-            <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>Lieu public · 18+ · Visible dans Événements · Expire après 18h</div>
+            {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>{EN?'Tap “Publish” to see what\'s missing.':'Touche « Publier » pour voir ce qui manque.'}</div>}
+            <div style={{textAlign:'center',marginTop:10,fontSize:10,color:C.whiteMid}}>{EN?'Public place · 18+ · Shown in Events · Expires after 18h':'Lieu public · 18+ · Visible dans Événements · Expire après 18h'}</div>
 
             {/* Confirmation avant de quitter si des champs sont remplis (David) */}
             {confirmCloseEv && (
               <div style={{position:'absolute',inset:0,background:'rgba(42,16,32,.55)',backdropFilter:'blur(4px)',borderRadius:'20px 20px 0 0',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
                 <div style={{background:'#fff',borderRadius:18,padding:'20px 18px',maxWidth:300,textAlign:'center',boxShadow:'0 20px 50px rgba(83,41,67,.4)'}}>
-                  <div style={{fontSize:15,fontWeight:900,color:C.bordeaux,marginBottom:6}}>Quitter sans publier ?</div>
-                  <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.5,marginBottom:16}}>Tu as commencé à remplir l'événement. Tout sera perdu.</div>
+                  <div style={{fontSize:15,fontWeight:900,color:C.bordeaux,marginBottom:6}}>{EN?'Leave without publishing?':'Quitter sans publier ?'}</div>
+                  <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.5,marginBottom:16}}>{EN?'You started filling in the event. Everything will be lost.':'Tu as commencé à remplir l\'événement. Tout sera perdu.'}</div>
                   <div style={{display:'flex',gap:8}}>
-                    <button onClick={()=>setConfirmCloseEv(false)} style={{flex:1,padding:'11px',borderRadius:11,border:`1px solid ${C.border}`,background:'transparent',color:C.bordeaux,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Continuer</button>
-                    <button onClick={resetCreateEv} style={{flex:1,padding:'11px',borderRadius:11,border:'none',background:C.red,color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Quitter</button>
+                    <button onClick={()=>setConfirmCloseEv(false)} style={{flex:1,padding:'11px',borderRadius:11,border:`1px solid ${C.border}`,background:'transparent',color:C.bordeaux,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Continue':'Continuer'}</button>
+                    <button onClick={resetCreateEv} style={{flex:1,padding:'11px',borderRadius:11,border:'none',background:C.red,color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{EN?'Leave':'Quitter'}</button>
                   </div>
                 </div>
               </div>

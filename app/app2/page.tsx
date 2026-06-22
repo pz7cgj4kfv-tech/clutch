@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x139'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x140'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3009,6 +3009,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     initialEventId ? (events.find((e:any)=>e.id===initialEventId) || MOCK_EVENTS.find(e=>e.id===initialEventId) || null) : null
   )
   const [selPartner, setSelPartner] = useState<any|null>(null) // fiche partenaire (clic sur une bannière)
+  // Swipe-down pour fermer les sheets (drag vers le bas)
+  const [sheetDragY, setSheetDragY] = useState(0)
+  const sheetStartY = useRef<number|null>(null)
+  const sheetHandlers = (onClose:()=>void) => ({
+    onPointerDown:(e:React.PointerEvent)=>{ sheetStartY.current=e.clientY },
+    onPointerMove:(e:React.PointerEvent)=>{ if(sheetStartY.current==null)return; const dy=e.clientY-sheetStartY.current; if(dy>0)setSheetDragY(dy) },
+    onPointerUp:()=>{ const dy=sheetDragY; sheetStartY.current=null; if(dy>90){ setSheetDragY(0); onClose() } else setSheetDragY(0) },
+    onPointerCancel:()=>{ sheetStartY.current=null; setSheetDragY(0) },
+  })
   // Ouvre l'event demandé (depuis l'onglet Clutchs → « Mes événements ») dès que les vrais events (DB) sont chargés.
   // ONE-SHOT : on efface initialEventId juste après ouverture, sinon le refresh loadEvents (10s) rouvrait l'event en boucle.
   useEffect(() => {
@@ -3730,9 +3739,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       {selPartner && (()=>{ const p=selPartner; const on=followedPartners.has(p.id); return (
         <div style={{position:'fixed',inset:0,zIndex:9200,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}} onClick={()=>setSelPartner(null)}/>
-          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:`18px 20px calc(var(--sab) + 28px)`,animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'82vh',overflowY:'auto'}}>
-            <div style={{width:38,height:4,borderRadius:2,background:`${C.whiteMid}30`,margin:'0 auto 16px'}}/>
-            <div style={{display:'flex',alignItems:'flex-start',gap:13,marginBottom:14}}>
+          <div style={{position:'relative',background:C.bgSheet,borderRadius:'20px 20px 0 0',padding:`8px 20px calc(var(--sab) + 24px)`,animation:'modalIn .3s cubic-bezier(.22,1,.36,1)',maxHeight:'90vh',overflowY:'auto',transform:`translateY(${sheetDragY}px)`,transition:sheetStartY.current==null?'transform .25s':'none'}}>
+            {/* Poignée + croix (swipe vers le bas pour fermer) */}
+            <div {...sheetHandlers(()=>setSelPartner(null))} style={{padding:'8px 0 6px',cursor:'grab',touchAction:'none'}}>
+              <div style={{width:42,height:5,borderRadius:3,background:`${C.whiteMid}40`,margin:'0 auto'}}/>
+            </div>
+            <button onClick={()=>setSelPartner(null)} aria-label="Fermer" style={{position:'absolute',top:10,right:14,width:30,height:30,borderRadius:'50%',background:C.bgCard,border:`1px solid ${C.border}`,color:C.white,fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2}}>✕</button>
+            <div style={{display:'flex',alignItems:'flex-start',gap:13,marginBottom:14,marginTop:4}}>
               <div style={{width:60,height:60,borderRadius:18,background:'linear-gradient(125deg,#6E2E72,#2C1020)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,flexShrink:0}}>{p.emoji}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -3748,10 +3761,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{fontSize:10,fontWeight:800,letterSpacing:'.05em',color:C.whiteMid,marginBottom:3}}>{lang==='en'?'NEXT EVENT':'PROCHAIN ÉVÉNEMENT'}</div>
               <div style={{fontSize:14,fontWeight:800,color:C.plum}}>🗓 {p.next}</div>
             </div>
-            <button onClick={()=>togglePartner(p.id)} style={{width:'100%',padding:'14px',borderRadius:14,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-              {on?(lang==='en'?'✓ Following · notifications on':'✓ Suivi · notifs activées'):(lang==='en'?'+ Follow this partner':'+ Suivre ce partenaire')}
-            </button>
-            <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginTop:8}}>{lang==='en'?'You\'ll be notified of their new events':'Tu seras notifié·e de leurs nouveaux événements'}</div>
+            {/* 2 actions : Je participe (à la soirée proposée) + Suivre (le partenaire) — design David */}
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>{ showToast?.(lang==='en'?`✦ You're in — ${p.next}`:`✦ Tu participes — ${p.next}`, C.green); setSelPartner(null) }} style={{flex:1,padding:'14px',borderRadius:24,border:'none',background:C.green,color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 14px rgba(119,188,31,.3)'}}>
+                {lang==='en'?'✦ I\'m in':'✦ Je participe'}
+              </button>
+              <button onClick={()=>togglePartner(p.id)} style={{flex:1,padding:'14px',borderRadius:24,border:`1.5px solid ${C.plum}`,background:on?'transparent':C.plum,color:on?C.plum:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                {on?(lang==='en'?'✓ Following':'✓ Suivi'):(lang==='en'?'+ Follow':'+ Suivre')}
+              </button>
+            </div>
+            <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',marginTop:9}}>{lang==='en'?'« I\'m in » = the proposed event · « Follow » = notified of all their future events':'« Je participe » = la soirée proposée · « Suivre » = notifié·e de tous leurs futurs events'}</div>
           </div>
         </div>
       )})()}
@@ -4494,6 +4513,14 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
   const gk = genderKey((profile as any).gender)
   const [faved,setFaved] = useState(false)
   const [blocked,setBlocked] = useState(false)
+  // Swipe-down pour fermer (drag vers le bas sur la poignée)
+  const [psDragY,setPsDragY] = useState(0); const psStart = useRef<number|null>(null)
+  const psSwipe = {
+    onPointerDown:(e:React.PointerEvent)=>{ psStart.current=e.clientY },
+    onPointerMove:(e:React.PointerEvent)=>{ if(psStart.current==null)return; const dy=e.clientY-psStart.current; if(dy>0)setPsDragY(dy) },
+    onPointerUp:()=>{ const dy=psDragY; psStart.current=null; if(dy>90){ setPsDragY(0); onClose() } else setPsDragY(0) },
+    onPointerCancel:()=>{ psStart.current=null; setPsDragY(0) },
+  }
   const [loading,setLoading] = useState(false)
   const isCreator = !!(profile as any).isCreator
   const allowClutch: boolean = isCreator ? !!(profile as any).allowClutch : true
@@ -4555,10 +4582,10 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
   return (
     <div style={{position:'fixed',inset:0,zIndex:3000,display:'flex',flexDirection:'column'}}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)'}} onClick={onClose}/>
-      <div style={{position:'relative',background:C.bgSheet,marginTop:'auto',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .32s cubic-bezier(.22,1,.36,1)',borderRadius:'20px 20px 0 0'}}>
-        {/* Handle */}
-        <div style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',flexShrink:0}}>
-          <div style={{width:36,height:4,borderRadius:2,background:C.border}}/>
+      <div style={{position:'relative',background:C.bgSheet,marginTop:'auto',height:'96vh',display:'flex',flexDirection:'column',animation:'modalIn .32s cubic-bezier(.22,1,.36,1)',borderRadius:'20px 20px 0 0',transform:`translateY(${psDragY}px)`,transition:psStart.current==null?'transform .25s':'none'}}>
+        {/* Handle — swipe vers le bas pour fermer */}
+        <div {...psSwipe} style={{display:'flex',justifyContent:'center',padding:'12px 0 6px',flexShrink:0,cursor:'grab',touchAction:'none',position:'relative',zIndex:4}}>
+          <div style={{width:44,height:5,borderRadius:3,background:`${C.whiteMid}55`}}/>
         </div>
         {/* Photo banner — photo entière visible, pas de crop */}
         <div onTouchStart={handleTouchStart} onTouchEnd={e=>handleTouchEnd(e,allPhotos.length||1)} style={{position:'relative',flexShrink:0,margin:'0 14px 0',borderRadius:16,overflow:'hidden',
@@ -4618,7 +4645,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
             </div>
           </div>
           {/* Close */}
-          <button onClick={onClose} style={{position:'absolute',top:10,right:10,background:'rgba(61,26,51,.75)',border:'none',color:C.white,fontSize:18,width:32,height:32,borderRadius:'50%',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(4px)',zIndex:3}}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" style={{position:'absolute',top:12,right:12,background:'#fff',border:`1px solid ${C.border}`,color:C.plum,fontSize:17,fontWeight:700,width:34,height:34,borderRadius:'50%',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 8px rgba(0,0,0,.25)',zIndex:5}}>✕</button>
           {/* Badge disponible */}
           <div style={{position:'absolute',top:10,left:10,display:'flex',alignItems:'center',gap:5,background:'rgba(61,26,51,.75)',backdropFilter:'blur(4px)',padding:'3px 8px',borderRadius:20,zIndex:2}}>
             <div style={{width:8,height:8,borderRadius:'50%',background:C.green}}/>

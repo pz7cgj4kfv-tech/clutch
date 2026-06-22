@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x129'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x130'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6502,6 +6502,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       <DRow label="Abonnement" value="Gratuit · Premium" onTap={()=>setProfilePage('subscription')}/>
       <DRow label="Ma fiabilité" value={lvl} onTap={()=>setProfilePage('fiabilite')}/>
       <DRow label="Préférences & notifications" value="Langue, réception…" onTap={()=>setProfilePage('preferences')}/>
+      <DRow label="🧪 Geek Setup" value="Réglages fins" onTap={()=>setProfilePage('geek')}/>
       <DRow label="Favoris" value={favorites.length?`${favorites.length}`:'0'} onTap={()=>setProfilePage('favorites')}/>
       <DRow label="Langue" value={lang==='fr'?'🇨🇭 Français':'🇬🇧 English'} onTap={()=>setLang(lang==='fr'?'en':'fr')}/>
       <DRow label="Légal & données" value="CGU · LPD" onTap={()=>setProfilePage('legal')}/>
@@ -6657,8 +6658,43 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
+  // 🧪 Geek Setup — l'utilisateur fabrique sa propre ergonomie (afficher/masquer les boutons flottants).
+  const [geekPrefs,setGeekPrefs] = useState(()=>{ const r=(k:string)=>{ try{return localStorage.getItem(k)!=='0'}catch{return true} }; return { live:r('clutch_show_live'), night:r('clutch_show_night') } })
+  const setFabPref = (k:'live'|'night', v:boolean) => {
+    try{ localStorage.setItem(k==='live'?'clutch_show_live':'clutch_show_night', v?'1':'0') }catch{}
+    setGeekPrefs(p=>({...p,[k]:v}))
+    try{ window.dispatchEvent(new Event('clutch-fab-prefs')) }catch{}
+  }
+  const PageGeek = () => (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.55,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px'}}>
+        🧪 Ici tu fabriques <strong style={{color:C.white}}>ton</strong> Clutch. Tu n'utilises jamais un bouton flottant ? Masque-le. Tu pourras toujours le rallumer ici.
+      </div>
+      <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        {([
+          {k:'live'  as const, t:'Bouton Clutch Live', d:'Le logo flottant — accès rapide à ta présence live'},
+          {k:'night' as const, t:'Bouton Clutch Night', d:'La lune flottante — soirées / clubs / afters'},
+        ]).map((row,idx)=>(
+          <div key={row.k} onClick={()=>setFabPref(row.k,!geekPrefs[row.k])} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 14px',cursor:'pointer',borderTop:idx>0?`1px solid ${C.border}`:'none'}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:C.white}}>{row.t}</div>
+              <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{row.d}</div>
+            </div>
+            <div style={{width:46,height:27,borderRadius:14,background:geekPrefs[row.k]?C.green:C.border,position:'relative',flexShrink:0,transition:'.2s'}}>
+              <div style={{position:'absolute',top:2.5,left:geekPrefs[row.k]?21.5:2.5,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'.2s',boxShadow:'0 1px 3px rgba(83,41,67,.3)'}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.5,padding:'0 4px'}}>
+        💡 Astuce : sur un bouton flottant, un <strong style={{color:C.salmon}}>appui long (2 s)</strong> le fixe en bas ; ré-appuie longtemps pour le relâcher. Et ils <strong style={{color:C.salmon}}>rebondissent</strong> l'un sur l'autre comme au billard 🎱.
+      </div>
+    </div>
+  )
+
   // ── Sous-page container ─────────────────────────────────────
   const subPageTitles: Record<string,string> = {
+    geek:'🧪 Geek Setup',
     edit_profil:'Moi', seeking:'Ce que je cherche',
     favorites:'Favoris', ghosted:'Ghostés',
     subscription:'Mon abonnement', preferences:'Préférences',
@@ -6691,6 +6727,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     distance_zones: PageDistanceZones,
     guide: PageGuide,
     pause: PagePause,
+    geek: PageGeek,
   }
 
   return (
@@ -7104,6 +7141,127 @@ function ClutchNightOverlay({ onClose, onActivate }:{ onClose:()=>void; onActiva
 // ════════════════════════════════════════════════════════════════════
 // 🥚 ÉPHÉMÈRE — Coucou à Mel (À RETIRER AU PROCHAIN BUILD). Visible UNIQUEMENT pour Mel, 1 fois.
 // ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// FloatingFabs — 2 boutons flottants : Clutch Live (logo) + Clutch Night (lune).
+// Physique : throw + friction + rebond sur les bords + COLLISION billard entre les deux.
+// Long-press 2s → dock fixe au-dessus de Contacts / Profil ; re-long-press → libère.
+// Tap court → ouvre la feature. Positions/dock persistés en localStorage.
+// Affichage pilotable par l'utilisateur (Geek Setup → masquer/afficher chaque bouton).
+// ════════════════════════════════════════════════════════════════════
+type FabBall = { id:'live'|'night'; x:number; y:number; vx:number; vy:number; docked:boolean }
+function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
+  showLive:boolean; showNight:boolean; hidden:boolean; onTapLive:()=>void; onTapNight:()=>void;
+}) {
+  const SZ=52, R=26
+  const metrics = () => {
+    let sat=0,sab=0
+    try{const cs=getComputedStyle(document.documentElement);sat=parseInt(cs.getPropertyValue('--sat'))||0;sab=parseInt(cs.getPropertyValue('--sab'))||0}catch{}
+    const w=typeof window!=='undefined'?window.innerWidth:390
+    const h=typeof window!=='undefined'?window.innerHeight:780
+    return {sat,sab,w,h, minX:8, maxX:w-SZ-8, minY:sat+50, maxY:h-72-sab-SZ-10}
+  }
+  // slot de dock : index 3 = Contacts, index 4 = Profil (nav à 5 colonnes), juste au-dessus de la barre
+  const dockSlot = (navIdx:number) => { const m=metrics(); return { x:(navIdx+0.5)/5*m.w - SZ/2, y: m.h - m.sab - 72 - SZ - 2 } }
+  const loadBall = (id:'live'|'night'): FabBall => {
+    const m=metrics()
+    try{ const s=localStorage.getItem('clutch_fab_'+id); if(s){ const o=JSON.parse(s); const b:FabBall={id,x:o.x,y:o.y,vx:0,vy:0,docked:!!o.docked}; if(b.docked){const d=dockSlot(id==='live'?3:4); b.x=d.x; b.y=d.y} return b } }catch{}
+    return { id, x:m.maxX, y: id==='live'? m.maxY : m.maxY-66, vx:0, vy:0, docked:false }  // défaut : empilés à droite
+  }
+  const balls = useRef<FabBall[]>([loadBall('live'), loadBall('night')])
+  const [,force] = useState(0); const rerender = ()=>force(n=>(n+1)%1000000)
+  const raf = useRef(0)
+  const drag = useRef<{i:number;sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number;lp:boolean}|null>(null)
+  const lpTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const persist = (b:FabBall) => { try{ localStorage.setItem('clutch_fab_'+b.id, JSON.stringify({x:b.x,y:b.y,docked:b.docked})) }catch{} }
+
+  const physics = () => {
+    const m=metrics(); const fr=0.94, bo=0.62; const arr=balls.current
+    arr.forEach(b=>{
+      if(b.docked) return
+      b.x+=b.vx; b.y+=b.vy
+      if(b.x<m.minX){b.x=m.minX;b.vx=-b.vx*bo} else if(b.x>m.maxX){b.x=m.maxX;b.vx=-b.vx*bo}
+      if(b.y<m.minY){b.y=m.minY;b.vy=-b.vy*bo} else if(b.y>m.maxY){b.y=m.maxY;b.vy=-b.vy*bo}
+      b.vx*=fr; b.vy*=fr
+    })
+    // 🎱 COLLISION billard entre les deux (centres = pos + R)
+    if(showLive&&showNight){
+      const a=arr[0], c=arr[1]
+      const dx=(c.x+R)-(a.x+R), dy=(c.y+R)-(a.y+R); const dist=Math.hypot(dx,dy)
+      if(dist>0.0001 && dist<SZ){
+        const nx=dx/dist, ny=dy/dist, overlap=SZ-dist
+        if(!a.docked && !c.docked){
+          const vn=(a.vx-c.vx)*nx+(a.vy-c.vy)*ny
+          if(vn>0){ const j=-(1+bo)*vn/2; a.vx+=j*nx; a.vy+=j*ny; c.vx-=j*nx; c.vy-=j*ny }
+          a.x-=nx*overlap/2; a.y-=ny*overlap/2; c.x+=nx*overlap/2; c.y+=ny*overlap/2
+        } else if(!a.docked){ // c docké = immobile → a rebondit dessus
+          const va=a.vx*nx+a.vy*ny; if(va>0){ a.vx-=(1+bo)*va*nx; a.vy-=(1+bo)*va*ny }
+          a.x-=nx*overlap; a.y-=ny*overlap
+        } else if(!c.docked){
+          const vc=c.vx*(-nx)+c.vy*(-ny); if(vc>0){ c.vx-=(1+bo)*vc*(-nx); c.vy-=(1+bo)*vc*(-ny) }
+          c.x+=nx*overlap; c.y+=ny*overlap
+        }
+      }
+    }
+    rerender()
+    if(arr.some(b=>!b.docked && Math.hypot(b.vx,b.vy)>0.4)){ raf.current=requestAnimationFrame(physics) }
+    else { arr.forEach(persist) }
+  }
+
+  const onDown=(i:number,e:React.PointerEvent)=>{
+    cancelAnimationFrame(raf.current)
+    const el=e.currentTarget as HTMLElement; try{el.setPointerCapture(e.pointerId)}catch{}
+    const b=balls.current[i]
+    drag.current={i,sx:e.clientX,sy:e.clientY,ox:b.x,oy:b.y,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0,lp:false}
+    if(lpTimer.current) clearTimeout(lpTimer.current)
+    lpTimer.current=setTimeout(()=>{   // long-press 2s → dock / undock
+      const d=drag.current; if(!d||d.moved)return; d.lp=true
+      const bb=balls.current[d.i]; bb.docked=!bb.docked
+      if(bb.docked){ const s=dockSlot(d.i===0?3:4); bb.x=s.x; bb.y=s.y } ; bb.vx=0; bb.vy=0
+      persist(bb); rerender(); try{ (navigator as any).vibrate?.(30) }catch{}
+    },2000)
+  }
+  const onMove=(e:React.PointerEvent)=>{
+    const d=drag.current; if(!d)return
+    const dx=e.clientX-d.sx, dy=e.clientY-d.sy
+    if(!d.moved && (Math.abs(dx)>5||Math.abs(dy)>5)){ d.moved=true; if(lpTimer.current)clearTimeout(lpTimer.current); balls.current[d.i].docked=false }
+    if(d.moved){
+      const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp
+      const m=metrics(); const bb=balls.current[d.i]
+      bb.x=Math.min(m.maxX,Math.max(m.minX,d.ox+dx)); bb.y=Math.min(m.maxY,Math.max(m.minY,d.oy+dy)); rerender()
+    }
+  }
+  const onUp=()=>{
+    if(lpTimer.current)clearTimeout(lpTimer.current)
+    const d=drag.current; drag.current=null; if(!d)return
+    if(d.lp){ rerender(); return }   // c'était un dock/undock
+    if(!d.moved){ d.i===0?onTapLive():onTapNight(); rerender(); return }
+    const bb=balls.current[d.i]; bb.vx=d.vx; bb.vy=d.vy
+    if(Math.hypot(d.vx,d.vy)>0.6){ cancelAnimationFrame(raf.current); raf.current=requestAnimationFrame(physics) } else persist(bb)
+    rerender()
+  }
+  useEffect(()=>()=>{ cancelAnimationFrame(raf.current); if(lpTimer.current)clearTimeout(lpTimer.current) },[])
+
+  const fab = (i:number, content:React.ReactNode, label:string) => {
+    const b=balls.current[i]; const dragging=!!drag.current && drag.current.i===i
+    return <button key={b.id} className={(!b.docked && !dragging)?'cl-fab':undefined} aria-label={label}
+      onPointerDown={(e)=>onDown(i,e)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+      style={{ position:'fixed', left:b.x, top:b.y, zIndex:1200, width:SZ, height:SZ, borderRadius:'50%', touchAction:'none',
+        background:'#FFFFFF', border:b.docked?`1.5px solid ${C.border}`:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+        boxShadow:b.docked?'0 2px 8px rgba(83,41,67,.18)':undefined }}>{content}</button>
+  }
+  return (<>
+    <style>{`
+      @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
+      @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(83,41,67,.20)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 20px 6px rgba(235,107,175,.55),0 4px 14px rgba(83,41,67,.20)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 13px 4px rgba(235,107,175,.35),0 4px 14px rgba(83,41,67,.20)}}
+      @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
+      .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
+      @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
+    `}</style>
+    {!hidden && showLive && fab(0, <img src="/icons/clutch_live_mel.svg" width={34} height={34} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
+    {!hidden && showNight && fab(1, <svg width={30} height={30} viewBox="0 0 24 24" style={{pointerEvents:'none'}}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="#532943"/><circle cx="15.5" cy="8" r="1" fill="#EB6BAF"/><circle cx="18" cy="11" r="0.7" fill="#EB6BAF"/></svg>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
+  </>)
+}
+
 // QuickSOS — bouclier de sécurité DISCRET, visible UNIQUEMENT pendant un RDV actif.
 // Demande David : la sécurité doit être à 1 geste PENDANT le rendez-vous (pas enfoui dans le profil).
 // Garde-fou anti-faux-positif : le bouclier ouvre une feuille → 1 tap envoie (rapide mais délibéré).
@@ -7957,22 +8115,9 @@ export default function App2() {
   // 🥚 ÉPHÉMÈRE — coucou à Mel + David (À RETIRER au prochain build). Visible qu'eux deux, 1 fois.
   // FAB Clutch Live déplaçable (drag n'importe où, position persistée)
   const [showClutchNight,setShowClutchNight] = useState(false) // 🌙 prototype Clutch Night
-  const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(()=>{ try{const s=typeof localStorage!=='undefined'?localStorage.getItem('clutch_fab_pos'):null;return s?JSON.parse(s):null}catch{return null} })
-  const fabDrag = useRef<{sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number}|null>(null)
-  const fabRaf = useRef<number>(0)
-  // Bornes du Clutch Live : ne JAMAIS passer sous l'encoche/la caméra (haut) ni sur la barre d'onglets (bas).
-  // Il rebondit sur ces limites. sz=46. Nav bar = 72 + safe-area bottom.
-  const fabBounds = () => {
-    const sz=46
-    let sat=0, sab=0
-    try { const cs=getComputedStyle(document.documentElement); sat=parseInt(cs.getPropertyValue('--sat'))||0; sab=parseInt(cs.getPropertyValue('--sab'))||0 } catch {}
-    const w = typeof window!=='undefined'?window.innerWidth:390
-    const h = typeof window!=='undefined'?window.innerHeight:780
-    return { minX:8, maxX:w-sz-8, minY:sat+50, maxY:h-72-sab-sz-10 }
-  }
-  const clampFab = (x:number,y:number) => { const b=fabBounds(); return { x:Math.min(b.maxX,Math.max(b.minX,x)), y:Math.min(b.maxY,Math.max(b.minY,y)) } }
-  // Au montage : re-borner une position sauvegardée qui serait hors zone (ancien bug : coincé sous l'encoche)
-  useEffect(()=>{ setFabPos(p=> p ? clampFab(p.x,p.y) : p) }, [])
+  // Préférences ergonomie (Geek Setup) : afficher/masquer chaque bouton flottant. L'utilisateur fabrique sa propre ergonomie.
+  const [fabPrefs,setFabPrefs] = useState(()=>{ const r=(k:string)=>{ try{return localStorage.getItem(k)!=='0'}catch{return true} }; return { live:r('clutch_show_live'), night:r('clutch_show_night') } })
+  useEffect(()=>{ const h=()=>{ const r=(k:string)=>{ try{return localStorage.getItem(k)!=='0'}catch{return true} }; setFabPrefs({live:r('clutch_show_live'),night:r('clutch_show_night')}) }; window.addEventListener('clutch-fab-prefs',h); return ()=>window.removeEventListener('clutch-fab-prefs',h) },[])
   const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
   const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
   const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
@@ -10788,33 +10933,11 @@ export default function App2() {
           {slotGoneProfile&&<SlotGoneOverlay name={slotGoneProfile.name||''} avatar={(slotGoneProfile as any).photo_url||undefined} lang={lang} onDone={()=>{setSlotGoneProfile(null);setTab('presences')}}/>}
           {showCelebration&&<ClutchSent onDone={()=>setShowCelebration(false)} name={selProfile?.name||''} lang={lang}/>}
           {showVerrou&&<VerrouExplosion onDone={onVerrouDone} verrou={verrouData}/>}
-          {/* Logo Clutch flottant animé (verre + battement néon + flottement). Tap → Présences.
-              (L'ancien bouton 💬 feedback est déplacé tout en bas du Profil.) */}
-          <style>{`
-            @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
-            @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(83,41,67,.20)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 20px 6px rgba(235,107,175,.55),0 4px 14px rgba(83,41,67,.20)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 13px 4px rgba(235,107,175,.35),0 4px 14px rgba(83,41,67,.20)}}
-            @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
-            .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
-            @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
-          `}</style>
-          {/* Clutch Live masqué pendant un Verrou actif (David : ne doit pas être cliquable en plein RDV) */}
-          {!activeVerrou && <button className={fabDrag.current?undefined:'cl-fab'} aria-label="Clutch Live — lance-moi où tu veux"
-            onPointerDown={(e)=>{ cancelAnimationFrame(fabRaf.current); const el=e.currentTarget; try{el.setPointerCapture(e.pointerId)}catch{}; const r=el.getBoundingClientRect(); fabDrag.current={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0} }}
-            onPointerMove={(e)=>{ const d=fabDrag.current; if(!d)return; const dx=e.clientX-d.sx, dy=e.clientY-d.sy; if(Math.abs(dx)>5||Math.abs(dy)>5)d.moved=true; if(d.moved){ const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp; setFabPos(clampFab(d.ox+dx, d.oy+dy)); } }}
-            onPointerUp={()=>{ const d=fabDrag.current; fabDrag.current=null; if(!d)return; if(!d.moved){ setFlow('app');setTab('presences');activateLive(); return }
-              // 🏓 Lancer : glisse avec friction + rebond sur les bords, puis se cale
-              const friction=0.94, bounce=0.62; let vx=d.vx, vy=d.vy;
-              const step=()=>{ setFabPos(p=>{ if(!p)return p; let x=p.x+vx, y=p.y+vy; const b=fabBounds();
-                if(x<b.minX){x=b.minX;vx=-vx*bounce} else if(x>b.maxX){x=b.maxX;vx=-vx*bounce}
-                if(y<b.minY){y=b.minY;vy=-vy*bounce} else if(y>b.maxY){y=b.maxY;vy=-vy*bounce}
-                return {x,y} }); vx*=friction; vy*=friction;
-                if(Math.hypot(vx,vy)>0.4){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } };
-              if(Math.hypot(vx,vy)>0.6){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
-            style={{
-            position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(var(--sab) + 84px)', right:14}),
-            zIndex:1200, width:52, height:52, borderRadius:'50%', touchAction:'none',
-            background:'#FFFFFF', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-          }}><img src="/icons/clutch_live_mel.svg" width={34} height={34} alt="Clutch Live" draggable={false} style={{pointerEvents:'none'}}/></button>}
+          {/* Boutons flottants Clutch Live + Clutch Night (physique billard + dock long-press).
+              Masqués pendant un Verrou actif (ne pas cliquer en plein RDV). Affichage piloté par Geek Setup. */}
+          <FloatingFabs showLive={fabPrefs.live} showNight={fabPrefs.night} hidden={!!activeVerrou}
+            onTapLive={()=>{ setFlow('app'); setTab('presences'); activateLive() }}
+            onTapNight={()=>setShowClutchNight(true)} />
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🌙 Clutch Night (prototype) */}
           {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ setShowClutchNight(false); showToast('🌙 Clutch Night arrive bientôt — on prépare les soirées',C.orange) }}/>}

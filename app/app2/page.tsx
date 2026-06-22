@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x125'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x126'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5312,6 +5312,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [editEducation, setEditEducation] = useState<string>((user as any).education||'')
   const [editKidsPref, setEditKidsPref] = useState<string>((user as any).kids_pref||'')
   const t = useT(lang)
+  const EN = lang==='en'
   const [favorites, setFavorites] = useState<Profile[]>([])
   const [blocked, setBlocked] = useState<Profile[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -6460,12 +6461,12 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       </button>
       {/* Avancé — pondérations & tests (Test de personnalité dedans, comme la maquette validée) */}
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:14}}>
-        <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ Avancé — pondérations &amp; tests</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
+        <div onClick={()=>toggleAdv('algo')} style={{padding:'13px 14px',display:'flex',justifyContent:'space-between',cursor:'pointer',fontSize:13,fontWeight:800,color:C.salmon}}><span>⚙️ {EN?'Advanced — weights & tests':'Avancé — pondérations & tests'}</span><span>{advOpen==='algo'?'⌃':'⌄'}</span></div>
         {advOpen==='algo' && <div style={{borderTop:`1px solid ${C.border}`}}>
-          <DRow label="Tempérament de rencontre" value={temperament?`${TEMP_ARCH[temperament].e} Fait`:'Non fait'} onTap={()=>setProfilePage('temperament')}/>
-          <DRow label="🧬 Test de personnalité (16 types)" value={mbtiType?`${MBTI_TYPES[mbtiType]?.emoji||''} ${mbtiType}`:'À faire'} onTap={()=>setShowMbti(true)}/>
-          <DRow label="Poids de la fiabilité" value="Élevé"/>
-          <DRow label="Réinitialiser mon algo" danger onTap={()=>{ setAlgo('proximite'); setAlgoTrained(0); try{localStorage.setItem(algoKey,JSON.stringify({style:'proximite',trained:0}))}catch{}; showToast('↺ Algo réinitialisé',C.orange) }} right={<span style={{color:C.salmon,fontSize:15}}>↺</span>}/>
+          <DRow label={EN?'Meetup temperament':'Tempérament de rencontre'} value={temperament?`${TEMP_ARCH[temperament].e} ${EN?'Done':'Fait'}`:(EN?'Not done':'Non fait')} onTap={()=>setProfilePage('temperament')}/>
+          <DRow label={EN?'🧬 Personality test (16 types)':'🧬 Test de personnalité (16 types)'} value={mbtiType?`${MBTI_TYPES[mbtiType]?.emoji||''} ${mbtiType}`:(EN?'To do':'À faire')} onTap={()=>setShowMbti(true)}/>
+          <DRow label={EN?'Reliability weight':'Poids de la fiabilité'} value={EN?'High':'Élevé'}/>
+          <DRow label={EN?'Reset my algo':'Réinitialiser mon algo'} danger onTap={()=>{ setAlgo('proximite'); setAlgoTrained(0); try{localStorage.setItem(algoKey,JSON.stringify({style:'proximite',trained:0}))}catch{}; showToast(EN?'↺ Algo reset':'↺ Algo réinitialisé',C.orange) }} right={<span style={{color:C.salmon,fontSize:15}}>↺</span>}/>
         </div>}
       </div>
       <NoteBox>🔒 Éthique : ton algo ne sert jamais à te rendre accro pour rien — il sert à te faire <b style={{color:C.white}}>sortir voir des gens</b>.</NoteBox>

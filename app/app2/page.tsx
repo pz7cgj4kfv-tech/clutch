@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x135'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x136'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -680,6 +680,28 @@ function eventKm(ev:any, myLat:number, myLng:number):number|null {
   if(typeof la==='number' && typeof lo==='number') return haversineKm(myLat,myLng,la,lo)
   if(ev?.id){ let h=0; const s=String(ev.id); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return Math.round((0.4+(h%1320)/100)*10)/10 } // démo 0.4–13.6 km
   return null
+}
+// 📸 Photo d'event : la vraie si fournie, sinon une belle photo de secours (pool testé qui charge).
+// Garantit qu'AUCUN event n'est sans photo (les events réels créés n'en stockent pas).
+const EV_PHOTO_POOL = [
+  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80',
+  'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=600&q=80',
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80',
+  'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=600&q=80',
+  'https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=600&q=80',
+  'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600&q=80',
+  'https://images.unsplash.com/photo-1514362453360-8f94243c9996?w=600&q=80',
+  'https://images.unsplash.com/photo-1522163182402-834f871fd851?w=600&q=80',
+  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80',
+  'https://images.unsplash.com/photo-1566903451935-7e8835ed3e92?w=600&q=80',
+  'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=600&q=80',
+  'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=600&q=80',
+]
+function eventPhotoFor(ev:any):string {
+  const d = ev?.eventPhotos?.[0]
+  if(d && String(d).startsWith('http')) return d
+  let h=0; const s=String(ev?.id||ev?.title||'x'); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0
+  return EV_PHOTO_POOL[h % EV_PHOTO_POOL.length]
 }
 // Heat radar (palette Mel) : proche = vert (vas-y), coin = rose, loin = gris estompé.
 function kmHeat(km:number){ return km<=2 ? {c:'#77BC1F',bg:'rgba(119,188,31,.12)'} : km<=8 ? {c:'#EB6BAF',bg:'rgba(235,107,175,.12)'} : {c:'#B2B2B2',bg:'rgba(178,178,178,.16)'} }
@@ -3140,17 +3162,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <span style={{fontSize:14,lineHeight:1}}>+</span> Organiser
           </button>
         </div>
-        {/* 🌙 Toggle Clutch Night — transforme Événements en mode nuit (David : « ça transforme l'app en truc de night ») */}
-        <button onClick={()=>setNightMode(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:9,padding:'9px 12px',borderRadius:14,marginBottom:8,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
-          border:nightMode?'1px solid rgba(235,107,175,.5)':`1px solid ${C.border}`,
-          background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':C.bgCard}}>
-          <span style={{fontSize:18,filter:nightMode?'drop-shadow(0 0 8px rgba(235,107,175,.7))':'none'}}>🌙</span>
-          <span style={{flex:1,minWidth:0}}>
-            <span style={{display:'block',fontSize:13,fontWeight:900,color:nightMode?'#fff':C.white}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span> {nightMode?(EN?'· on':'· activé'):''}</span>
-            <span style={{display:'block',fontSize:10.5,color:nightMode?'#e8d8e4':C.whiteMid}}>{nightMode?(EN?'Nightlife & afters near you · wider radius 🚆':'Soirées & afters près de toi · rayon élargi 🚆'):(EN?'Going out tonight — switch to night mode':'Ce soir on sort — bascule en mode nuit')}</span>
-          </span>
-          <span style={{width:38,height:22,borderRadius:11,background:nightMode?'#EB6BAF':C.border,position:'relative',flexShrink:0,transition:'.2s'}}><span style={{position:'absolute',top:2,left:nightMode?18:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'.2s'}}/></span>
-        </button>
+        {/* ⏳ Clutch Night — toggle COMPACT (sablier) à gauche (David : ne doit pas prendre toute une ligne) */}
+        <div style={{display:'flex',alignItems:'center',marginBottom:8}}>
+          <button onClick={()=>setNightMode(v=>!v)} title={EN?'Night mode — nightlife & afters':'Mode nuit — soirées & afters'} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 12px 6px 10px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',
+            border:nightMode?'1px solid rgba(235,107,175,.55)':`1px solid ${C.border}`,
+            background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':C.bgCard,transition:'.2s'}}>
+            <span style={{fontSize:15,filter:nightMode?'drop-shadow(0 0 6px rgba(235,107,175,.8))':'none'}}>⏳</span>
+            <span style={{fontSize:11.5,fontWeight:800,color:nightMode?'#fff':C.whiteMid}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span>{nightMode?(EN?' · on':' · activé'):''}</span>
+          </button>
+        </div>
         {/* Filtres avec compteurs dynamiques */}
         <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',paddingBottom:8,padding:'0 0 8px'}}>
           {EV_FILTERS.map(f=>{
@@ -3252,24 +3272,25 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {evFilter!=='partenaires' && (<>
         {/* ✨ BANNIÈRES PARTENAIRES (payants = pub) — TOUJOURS affichées sur tous les filtres events (David : non filtrables). */}
         {PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
-          <div style={{marginBottom:14}}>
+          /* STICKY : la bannière partenaires reste visible quand on scrolle les events (David : les partenaires veulent être vus). */
+          <div style={{position:'sticky',top:-2,zIndex:6,marginBottom:12,paddingTop:2,paddingBottom:4,background:nightMode?'#1a0d18':C.bg}}>
             <style>{`@keyframes ptnShine{0%{background-position:-180% 0}100%{background-position:180% 0}} .ptnShine::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);background-size:200% 100%;animation:ptnShine 3.2s linear infinite;pointer-events:none}`}</style>
-            <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'2px 2px 4px',margin:'0 -2px'}}>
+            <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:9,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'1px 2px 2px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
-                <div key={p.id} onClick={()=>setSelPartner(p)} className="ptnShine" style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#6E2E72,#532943 55%,#2C1020)',border:'1.5px solid rgba(235,107,175,.55)',boxShadow:'0 6px 22px rgba(235,107,175,.28)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                <div key={p.id} onClick={()=>setSelPartner(p)} className="ptnShine" style={{flexShrink:0,width:'72%',maxWidth:270,scrollSnapAlign:'start',cursor:'pointer',borderRadius:14,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#6E2E72,#532943 55%,#2C1020)',border:'1.5px solid rgba(235,107,175,.55)',boxShadow:'0 4px 14px rgba(235,107,175,.24)',padding:'9px 12px',minHeight:72,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
                   {/* Photo de fond (partenaire) + voile prune pour la lisibilité du texte */}
                   {p.photo && <><img src={p.photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:.55}}/><div style={{position:'absolute',inset:0,background:'linear-gradient(115deg,rgba(44,16,32,.92),rgba(83,41,67,.55) 60%,rgba(44,16,32,.85))'}}/></>}
-                  <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.18,lineHeight:1}}>{p.emoji}</div>
+                  <div style={{position:'absolute',top:-14,right:-14,fontSize:62,opacity:.18,lineHeight:1}}>{p.emoji}</div>
                   <div style={{position:'relative'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
-                      <span style={{fontSize:16,fontWeight:900,color:'#fff'}}>{p.name}</span>
-                      <span style={{fontSize:8,fontWeight:900,color:'#2C1020',background:'#EB6BAF',borderRadius:7,padding:'1px 6px',letterSpacing:'.04em'}}>★ PARTENAIRE</span>
+                    <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:1,flexWrap:'wrap'}}>
+                      <span style={{fontSize:14,fontWeight:900,color:'#fff'}}>{p.name}</span>
+                      <span style={{fontSize:7.5,fontWeight:900,color:'#2C1020',background:'#EB6BAF',borderRadius:6,padding:'1px 5px',letterSpacing:'.04em'}}>★ PARTENAIRE</span>
                     </div>
-                    <div style={{fontSize:11,color:'#f0dce9',opacity:.95}}>{p.cat} · 📍 {p.zone}</div>
+                    <div style={{fontSize:10,color:'#f0dce9',opacity:.95}}>{p.cat} · 📍 {p.zone}</div>
                   </div>
-                  <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:10}}>
-                    <span style={{fontSize:11,fontWeight:800,color:'#fff',background:'rgba(235,107,175,.22)',border:'1px solid rgba(235,107,175,.5)',borderRadius:9,padding:'4px 9px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🗓 {p.next}</span>
-                    <button onClick={(e)=>{e.stopPropagation();togglePartner(p.id)}} style={{flexShrink:0,fontSize:11,fontWeight:800,color:on?'#EB6BAF':'#532943',background:on?'transparent':'#fff',border:on?'1px solid #EB6BAF':'none',borderRadius:9,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>{on?'✓ Suivi':'+ Suivre'}</button>
+                  <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:6}}>
+                    <span style={{fontSize:10,fontWeight:800,color:'#fff',background:'rgba(235,107,175,.22)',border:'1px solid rgba(235,107,175,.5)',borderRadius:8,padding:'2px 7px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🗓 {p.next}</span>
+                    <button onClick={(e)=>{e.stopPropagation();togglePartner(p.id)}} style={{flexShrink:0,fontSize:10,fontWeight:800,color:on?'#EB6BAF':'#532943',background:on?'transparent':'#fff',border:on?'1px solid #EB6BAF':'none',borderRadius:8,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>{on?'✓ Suivi':'+ Suivre'}</button>
                   </div>
                 </div>
               )})}
@@ -3309,8 +3330,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {/* 2 événements par ligne (demande Mel) — grandes photos qui donnent envie, infos dessus ; clic → détail riche */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11}}>
         {filteredEvs.map(ev=>{
-          const photo = (ev as any).eventPhotos?.[0]
-          const isImg = photo && String(photo).startsWith('http')
+          const photo = eventPhotoFor(ev)
+          const isImg = true   // eventPhotoFor garantit toujours une photo (vraie ou de secours)
           const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))
           const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
           const cPhoto = (ev as any).creatorPhoto

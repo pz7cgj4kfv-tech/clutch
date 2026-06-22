@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x140'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x141'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1481,8 +1481,6 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
       {/* Barre d'onglets — design clair (fond blanc cassé + cercles + pastille active violette).
           Transitoire : le reste de l'app passera au clair avec les couleurs de Mel. */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,height:'calc(72px + var(--sab))',paddingBottom:'var(--sab)',boxSizing:'border-box',background:'rgba(255,255,255,0.97)',borderTop:'1px solid #E3E3E3',backdropFilter:'blur(18px)',display:'flex',zIndex:1000}}>
-        {/* Version — tout en bas, centrée sous Clutchs, ultra discrète (David : libérer le haut) */}
-        <span style={{position:'absolute',bottom:'calc(var(--sab) + 1px)',left:0,right:0,textAlign:'center',fontSize:7,fontWeight:600,color:'rgba(0,0,0,.16)',letterSpacing:'.05em',pointerEvents:'none',zIndex:2}}>{V}</span>
         {tabs.map(([id,label])=>{
           const badge = badges?.[id] ?? null
           const isActive = tab===id
@@ -1512,6 +1510,8 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           )
         })}
       </div>
+      {/* Version — pastille LISIBLE en bas à gauche, flottante au-dessus de la nav (David : « que je puisse la voir facilement ») */}
+      <div style={{position:'fixed',left:8,bottom:'calc(72px + var(--sab) + 5px)',zIndex:1001,fontSize:9,fontWeight:800,color:'rgba(83,41,67,.55)',background:'rgba(255,255,255,.72)',borderRadius:8,padding:'1px 6px',pointerEvents:'none',letterSpacing:'.04em',backdropFilter:'blur(4px)'}}>{V}</div>
     </>
   )
 }
@@ -3374,8 +3374,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const cPhoto = (ev as any).creatorPhoto
           return (
           <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'visible',boxShadow:'0 3px 12px rgba(83,41,67,.07)'}}>
-            {/* Photo qui donne envie */}
-            <div style={{position:'relative',height:130,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
+            {/* Photo qui donne envie — hauteur compacte (David : les cartes prenaient trop de place) */}
+            <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
               {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
               <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.66) 0%,rgba(0,0,0,.12) 48%,transparent 74%)',borderRadius:'16px 16px 0 0'}}/>
               {ev.certified&&<span style={{position:'absolute',top:7,left:7,fontSize:8,background:'rgba(255,255,255,.95)',color:C.green,borderRadius:5,padding:'1px 5px',fontWeight:800}}>✓</span>}

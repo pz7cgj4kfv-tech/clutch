@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x120'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x121'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2972,6 +2972,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const CP_EMOJIS=['🎉','🎶','🏓','🎷','🥾','🍷','🎨','⚽','🧘','🎲','🍽️','👶','🎸','🎬','📚','🚲']
   const CP_ZONES=['Lausanne centre','Vieille Ville','Flon','Ouchy','Région Lausanne','Lavaux','Renens / Ouest','Autre']
   const [registering, setRegistering] = useState(false)
+  const [nightMode, setNightMode] = useState(false) // 🌙 Clutch Night (mode nuit dans Événements)
   const [regBlock, setRegBlock] = useState('') // alerte inline quand l'inscription est bloquée (plafond/chevauchement)
   useEffect(()=>{ setRegBlock(''); setCancelArmed(false) }, [selEv?.id]) // reset alertes à l'ouverture d'un autre event
   // Bannières partenaires : défilement auto (David). Avance d'une carte toutes les 3.5s, repart au début, pause au toucher.
@@ -3002,7 +3003,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   })
   const [groupInput, setGroupInput] = useState('')
 
+  // 🌙 Clutch Night = mode nuit DANS Événements (David : « ça transforme l'app en truc de night »)
+  const isNightEv = (ev:any):boolean => { const m=parseEventMinutes(ev.time); const s=(((ev?.tags||[]).join(' '))+' '+(ev?.title||'')+' '+(ev?.lieu||'')).toLowerCase(); return (m!=null && (m>=19*60 || m<5*60)) || /club|soir|nuit|jazz|concert|\bdj\b|techno|f[eê]te|danse|\bbar\b|after|rooftop|apéro|apero/.test(s) }
   const filteredEvs = events.filter(ev => {
+    if (nightMode && !isNightEv(ev)) return false   // mode nuit : seulement les sorties du soir/nuit
     if (evFilter==='all') return true
     if (evFilter==='mine') return registered.has(ev.id)
     if (evFilter==='groupe') return !!(ev as any).isGroupe
@@ -3091,14 +3095,25 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   }
 
   return (
-    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:nightMode?'#1a0d18':C.bg,display:'flex',flexDirection:'column',transition:'background .3s'}}>
+      <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${nightMode?'rgba(235,107,175,.2)':C.border}`,flexShrink:0,background:nightMode?'linear-gradient(180deg,#2C1020,#1a0d18)':'transparent'}}>
         <div style={{fontSize:19,fontWeight:900,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'baseline',gap:6}}>{t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
+          <div style={{display:'flex',alignItems:'baseline',gap:6,color:nightMode?'#fff':undefined}}>{nightMode?'🌙 Clutch Night':t('events.title')}<span style={{fontSize:9,fontWeight:500,color:`${C.whiteMid}80`,letterSpacing:'.04em'}}>{V}</span></div>
           <button onClick={()=>setShowCreateGroup(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',borderRadius:20,background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
             <span style={{fontSize:14,lineHeight:1}}>+</span> Organiser
           </button>
         </div>
+        {/* 🌙 Toggle Clutch Night — transforme Événements en mode nuit (David : « ça transforme l'app en truc de night ») */}
+        <button onClick={()=>setNightMode(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:9,padding:'9px 12px',borderRadius:14,marginBottom:8,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+          border:nightMode?'1px solid rgba(235,107,175,.5)':`1px solid ${C.border}`,
+          background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':C.bgCard}}>
+          <span style={{fontSize:18,filter:nightMode?'drop-shadow(0 0 8px rgba(235,107,175,.7))':'none'}}>🌙</span>
+          <span style={{flex:1,minWidth:0}}>
+            <span style={{display:'block',fontSize:13,fontWeight:900,color:nightMode?'#fff':C.white}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span> {nightMode?'· activé':''}</span>
+            <span style={{display:'block',fontSize:10.5,color:nightMode?'#e8d8e4':C.whiteMid}}>{nightMode?'Soirées & afters près de toi · rayon élargi 🚆':'Ce soir on sort — bascule en mode nuit'}</span>
+          </span>
+          <span style={{width:38,height:22,borderRadius:11,background:nightMode?'#EB6BAF':C.border,position:'relative',flexShrink:0,transition:'.2s'}}><span style={{position:'absolute',top:2,left:nightMode?18:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'.2s'}}/></span>
+        </button>
         {/* Filtres avec compteurs dynamiques */}
         <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',paddingBottom:8,padding:'0 0 8px'}}>
           {EV_FILTERS.map(f=>{
@@ -5216,22 +5231,26 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const popPage = () => setPageStack(s => s.slice(0,-1))
   // 🧭 SWIPE-BACK (ergonomie David) : glisser vers la droite ferme la sous-page (feel iOS), sans casser le scroll vertical.
   const swipeOverlayRef = useRef<HTMLDivElement|null>(null)
-  const swipeRef = useRef<{x:number;y:number;active:boolean;decided:boolean;horiz:boolean}>({x:0,y:0,active:false,decided:false,horiz:false})
-  const onSwipeStart = (e:React.TouchEvent) => { const t=e.touches[0]; swipeRef.current={x:t.clientX,y:t.clientY,active:true,decided:false,horiz:false} }
+  const swipeRef = useRef<{x:number;y:number;active:boolean;decided:boolean;horiz:boolean;vert:boolean}>({x:0,y:0,active:false,decided:false,horiz:false,vert:false})
+  const onSwipeStart = (e:React.TouchEvent) => { const t=e.touches[0]; swipeRef.current={x:t.clientX,y:t.clientY,active:true,decided:false,horiz:false,vert:false} }
   const onSwipeMove = (e:React.TouchEvent) => {
     const s=swipeRef.current; if(!s.active) return
     const t=e.touches[0]; const dx=t.clientX-s.x, dy=t.clientY-s.y
-    if(!s.decided){ if(Math.abs(dx)<6 && Math.abs(dy)<6) return; s.decided=true; s.horiz = Math.abs(dx) > Math.abs(dy) }
-    if(!s.horiz) return // scroll vertical → on laisse passer
-    const el=swipeOverlayRef.current; if(el){ const off=Math.max(0,dx); el.style.transition='none'; el.style.transform=`translateX(${off}px)`; el.style.opacity=String(Math.max(.5,1-off/600)) }
+    if(!s.decided){ if(Math.abs(dx)<6 && Math.abs(dy)<6) return; s.decided=true; s.horiz = Math.abs(dx) > Math.abs(dy)
+      // Swipe-DOWN pour revenir (David) : seulement si le geste part du HAUT (≤150px) → pas de conflit avec le scroll du contenu
+      s.vert = !s.horiz && dy>0 && s.y <= 150 }
+    const el=swipeOverlayRef.current
+    if(s.horiz && el){ const off=Math.max(0,dx); el.style.transition='none'; el.style.transform=`translateX(${off}px)`; el.style.opacity=String(Math.max(.5,1-off/600)) }
+    else if(s.vert && el){ const off=Math.max(0,dy); el.style.transition='none'; el.style.transform=`translateY(${off}px)`; el.style.opacity=String(Math.max(.5,1-off/700)) }
   }
   const onSwipeEnd = (e:React.TouchEvent) => {
     const s=swipeRef.current; if(!s.active) return; s.active=false
-    const el=swipeOverlayRef.current; if(!el || !s.horiz) return
-    const dx=(e.changedTouches[0]?.clientX||s.x)-s.x
+    const el=swipeOverlayRef.current; if(!el || (!s.horiz && !s.vert)) return
     el.style.transition='transform .2s ease, opacity .2s ease'
-    if(dx>90){ el.style.transform='translateX(100%)'; el.style.opacity='0'; setTimeout(()=>{ popPage(); setEditField(null); if(el){ el.style.transform=''; el.style.opacity=''; } },170) }
-    else { el.style.transform='translateX(0)'; el.style.opacity='1' }
+    const dx=(e.changedTouches[0]?.clientX||s.x)-s.x, dy=(e.changedTouches[0]?.clientY||s.y)-s.y
+    const dismiss = (s.horiz && dx>90) || (s.vert && dy>90)
+    if(dismiss){ el.style.transform = s.horiz?'translateX(100%)':'translateY(100%)'; el.style.opacity='0'; setTimeout(()=>{ popPage(); setEditField(null); if(el){ el.style.transform=''; el.style.opacity=''; } },170) }
+    else { el.style.transform='translate(0,0)'; el.style.opacity='1' }
   }
   const [showBotLab, setShowBotLab] = useState(false)
   const [showConvDemo, setShowConvDemo] = useState(false) // aperçu de la Convergence (demande David)
@@ -8814,13 +8833,10 @@ export default function App2() {
 
   const handleOuvrirFenetre = async () => {
     if (!user?.id) return
-    // Vérifier si l'utilisateur est déjà disponible
+    // NB : pas de window.confirm (BLOQUÉ dans la WebView iOS). Ouvrir un nouveau créneau remplace l'ancien = comportement
+    // attendu quand l'user le fait volontairement → on procède + on prévient par toast. Fenêtre = depuis le DÉBUT choisi (roues limitées à +18h, décision David).
     const alreadyAvail = user?.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date()
-    if (alreadyAvail) {
-      const existingUntil = new Date((user as any).available_until).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
-      const confirmed = window.confirm(`Tu es déjà disponible jusqu'à ${existingUntil}.\n\nOuvrir un nouveau créneau remplacera celui-ci. Confirmer ?`)
-      if (!confirmed) return
-    }
+    if (alreadyAvail) showToast?.('Nouveau créneau — l\'ancien est remplacé', C.orange)
     const [h,m] = untilTime.split(':').map(Number)
     const until = new Date(); until.setHours(h,m,0,0)
     if (until <= new Date()) until.setDate(until.getDate() + 1)
@@ -9455,13 +9471,7 @@ export default function App2() {
                   {/* ── LISTE ── */}
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
 
-                    {/* ══ 🌙 PASTILLE CLUTCH NIGHT (petite ; masquée pendant un Verrou actif — David) ══ */}
-                    {!activeVerrou && <div style={{display:'flex',justifyContent:'center',marginBottom:12}}>
-                      <button onClick={()=>setShowClutchNight(true)} style={{display:'inline-flex',alignItems:'center',gap:7,background:'linear-gradient(120deg,#532943,#2C1020)',border:'none',borderRadius:20,padding:'7px 14px 7px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:'0 2px 10px rgba(83,41,67,.25)'}}>
-                        <span style={{fontSize:15,filter:'drop-shadow(0 0 6px rgba(235,107,175,.55))'}}>🌙</span>
-                        <span style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>Clutch <span style={{color:'#EB6BAF'}}>Night</span></span>
-                      </button>
-                    </div>}
+                    {/* Pastille Clutch Night DÉPLACÉE → c'est maintenant un MODE dans l'onglet Événements (David : « ne va pas du tout là-haut »). */}
 
                     {/* ══ MODE PRO — MANOSKI ══ */}
                     {proMode && !proJobFilter && (() => {

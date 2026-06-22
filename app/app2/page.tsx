@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x128'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x129'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -556,11 +556,11 @@ function JogWheel({ slots, value, onChange, accent = false }: {
 
   return (
     <div style={{ position:'relative', height:ITEM_H * 3, flex:1, minWidth:0 }}>
-      {/* selection ring — FLAT, prune (demande David : pas d'effet/dégradé moche) */}
+      {/* selection ring — contour GRIS MOYEN #B2B2B2 (design Mel 22.06 ; le chiffre actif reste rose) */}
       <div style={{
         position:'absolute', top:ITEM_H, left:4, right:4, height:ITEM_H,
-        background:`${C.bordeaux}0d`,
-        border:`1.5px solid ${C.bordeaux}`,
+        background:`${C.salmonMid}12`,
+        border:`1.5px solid ${C.salmonMid}`,
         borderRadius:12, pointerEvents:'none', zIndex:2,
       }}/>
       {/* fade top */}
@@ -8043,6 +8043,8 @@ export default function App2() {
   const [ageMin,setAgeMin] = useState('18')
   const [ageMax,setAgeMax] = useState('45')
   const [intentMsg,setIntentMsg]   = useState('')
+  const [intentPinned,setIntentPinned] = useState(false)  // descriptif épinglé / non modifiable (Pin_RDVfixe) — design Mel
+  const [quickClutch,setQuickClutch]   = useState(false)  // RDV limité 1h (QuickClutch) — pastille verte visible des autres
 
   // Anti-saturation femmes
   const MAX_CLUTCHS_PER_DAY_WOMEN = 5
@@ -8911,7 +8913,12 @@ export default function App2() {
       }
     }
 
-    setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon,available_modes:(seekModes.length?seekModes:null)} as any:prev)
+    // Flags Quick Clutch / Pin RDV fixe — colonnes optionnelles (design Mel). DÉFENSIF : update séparé,
+    // si les colonnes ne sont pas encore migrées l'erreur est ignorée → la dispo reste valide (zéro régression).
+    const { error: eFlags } = await supabase.from('profiles').update({ quick_clutch:quickClutch, intent_pinned:intentPinned } as any).eq('id',user.id)
+    if (eFlags) console.warn('[handleOuvrirFenetre] flags quick_clutch/intent_pinned non sauvés (colonnes à migrer ?) :', eFlags.message)
+
+    setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon,available_modes:(seekModes.length?seekModes:null),quick_clutch:quickClutch,intent_pinned:intentPinned,bio:intentMsg||((user as any).bio)} as any:prev)
     showToast(`✦ Fenêtre ouverte · ${city} · ${Math.round(rayon)} km`,C.green)
     requestNotificationPermission()
     setFlow('app')
@@ -9374,10 +9381,34 @@ export default function App2() {
                     <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{t('page2.intMsg')} <span style={{fontWeight:400,textTransform:'none'}}>{t('page2.optional')}</span></div>
                     <div style={{fontSize:9,color:intentMsg.length>48?C.orange:C.whiteMid}}>{intentMsg.length}/60</div>
                   </div>
-                  <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,60))}
-                    placeholder={t('page2.intPlaceholder')}
-                    rows={2} style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',fontSize:12,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon}}/>
+                  <div style={{position:'relative'}}>
+                    <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,60))} readOnly={intentPinned}
+                      placeholder={t('page2.intPlaceholder')}
+                      rows={2} style={{width:'100%',background:intentPinned?C.salmonFaint:C.whiteFaint,border:`1px solid ${intentPinned?C.salmonMid:C.border}`,borderRadius:12,padding:'10px 38px 10px 14px',fontSize:12,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon,boxSizing:'border-box'}}/>
+                    {intentPinned && <img src="/icons/mel/Pin_RDVfixe.svg" width={18} height={18} alt="" style={{position:'absolute',top:10,right:12,opacity:.9,pointerEvents:'none'}}/>}
+                  </div>
+                  {/* Pin RDV fixe — descriptif non modifiable (design Mel) */}
+                  <button onClick={()=>{ if(!intentMsg.trim())return; setIntentPinned(v=>!v) }} style={{marginTop:8,width:'100%',display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderRadius:10,border:`1.5px solid ${intentPinned?C.salmonMid:C.border}`,background:intentPinned?`${C.salmonMid}14`:'transparent',cursor:intentMsg.trim()?'pointer':'default',opacity:intentMsg.trim()?1:.45,fontFamily:'inherit'}}>
+                    <img src="/icons/mel/Pin_RDVfixe.svg" width={16} height={16} alt=""/>
+                    <div style={{flex:1,textAlign:'left'}}>
+                      <div style={{fontSize:11.5,fontWeight:700,color:intentPinned?C.salmon:C.whiteMid}}>{lang==='en'?'Locked description':'Descriptif non modifiable'}</div>
+                      <div style={{fontSize:9,color:C.whiteMid}}>{lang==='en'?'Shown on your mini-profile · can\'t be changed':'Affiché sur ton mini-profil · ne peut plus changer'}</div>
+                    </div>
+                    <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${intentPinned?C.salmonMid:C.border}`,background:intentPinned?C.salmonMid:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{intentPinned&&<span style={{color:'#fff',fontSize:11,fontWeight:900}}>✓</span>}</div>
+                  </button>
                   <div style={{fontSize:9,color:C.whiteMid,marginTop:3}}>{t('page2.note')}</div>
+                </div>
+
+                {/* 6. QUICK CLUTCH — RDV limité 1h, pastille verte visible des autres (design Mel) */}
+                <div style={{marginBottom:16}}>
+                  <button onClick={()=>setQuickClutch(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderRadius:12,border:`1.5px solid ${quickClutch?C.green:C.border}`,background:quickClutch?`${C.green}14`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+                    <img src="/icons/mel/QuickClutch.svg" width={26} height={26} alt=""/>
+                    <div style={{flex:1,textAlign:'left'}}>
+                      <div style={{fontSize:13,fontWeight:800,color:quickClutch?C.green:C.white}}>Quick Clutch · 1h</div>
+                      <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{lang==='en'?'Short meetup — a green dot shows on your photo':'RDV court — une pastille verte s\'affiche sur ta photo'}</div>
+                    </div>
+                    <div style={{width:22,height:22,borderRadius:11,border:`2px solid ${quickClutch?C.green:C.border}`,background:quickClutch?C.green:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{quickClutch&&<span style={{color:'#fff',fontSize:13,fontWeight:900}}>✓</span>}</div>
+                  </button>
                 </div>
 
               </div>
@@ -9658,6 +9689,8 @@ export default function App2() {
                                 </div>
                                 {/* Pastille dispo verte */}
                                 <div style={{position:'absolute',bottom:2,right:2,width:11,height:11,borderRadius:'50%',background:C.green,border:`2px solid ${C.bgCard}`}}/>
+                                {/* Badge Quick Clutch · 1h — coin haut droit (design Mel : pastille verte + icône) */}
+                                {(p as any).quick_clutch && <div title="Quick Clutch · 1h" style={{position:'absolute',top:-7,right:-7,width:24,height:24,borderRadius:'50%',background:'#fff',border:`2px solid ${C.green}`,display:'flex',alignItems:'center',justifyContent:'center',zIndex:3,boxShadow:'0 1px 4px rgba(83,41,67,.25)'}}><img src="/icons/mel/QuickClutch.svg" width={14} height={14} alt=""/></div>}
                               </div>
 
                               {/* Infos */}
@@ -9667,6 +9700,7 @@ export default function App2() {
                                   <GenderSvg gk={genderKey((p as any).gender)} size={14}/>
                                   <span style={{fontSize:16,fontWeight:800,letterSpacing:-0.3}}>{p.name||'Anonyme'}</span>
                                   {p.age&&<span style={{fontSize:13,color:C.whiteMid,fontWeight:500}}>{p.age} ans</span>}
+                                  {(p as any).intent_pinned && (p as any).bio && <img src="/icons/mel/Pin_RDVfixe.svg" width={13} height={13} alt="" title="Descriptif fixe" style={{flexShrink:0}}/>}
                                   {(p as any).verified&&<span style={{fontSize:9,fontWeight:900,padding:'2px 5px',borderRadius:6,background:'rgba(255,20,147,.18)',color:'#FF1493',border:'1px solid rgba(255,20,147,.4)'}}>✓ Vérifié</span>}
                                   {isTestProfile(p.id)&&<span style={{fontSize:8,fontWeight:900,padding:'1px 4px',borderRadius:6,background:'rgba(107,114,128,.2)',color:'#9CA3AF',border:'1px solid rgba(107,114,128,.3)'}}>BOT</span>}
                                   {(p as any)._isGpsTestBot&&<span style={{fontSize:9,fontWeight:900,padding:'2px 7px',borderRadius:8,background:'rgba(34,197,94,.15)',color:'#22C55E',border:'1px solid rgba(34,197,94,.4)',letterSpacing:0.3}}>🛰️ GPS TEST · Morges Gare</span>}

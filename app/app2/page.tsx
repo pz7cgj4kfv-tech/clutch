@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x133'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x134'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7199,6 +7199,7 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
   }
   const balls = useRef<FabBall[]>([loadBall('live'), loadBall('night')])
   const [,force] = useState(0); const rerender = ()=>force(n=>(n+1)%1000000)
+  const [pressing,setPressing] = useState<number|null>(null)  // feedback visuel pendant l'appui long
   const raf = useRef(0)
   const drag = useRef<{i:number;sx:number;sy:number;ox:number;oy:number;moved:boolean;lx:number;ly:number;lt:number;vx:number;vy:number;lp:boolean}|null>(null)
   const lpTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
@@ -7242,18 +7243,19 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
     const el=e.currentTarget as HTMLElement; try{el.setPointerCapture(e.pointerId)}catch{}
     const b=balls.current[i]
     drag.current={i,sx:e.clientX,sy:e.clientY,ox:b.x,oy:b.y,moved:false,lx:e.clientX,ly:e.clientY,lt:e.timeStamp,vx:0,vy:0,lp:false}
+    setPressing(i)
     if(lpTimer.current) clearTimeout(lpTimer.current)
-    lpTimer.current=setTimeout(()=>{   // long-press 2s → dock / undock
-      const d=drag.current; if(!d||d.moved)return; d.lp=true
+    lpTimer.current=setTimeout(()=>{   // appui long ~700ms → GARER (dock) / libérer. Ne JAMAIS ouvrir la feature.
+      const d=drag.current; if(!d||d.moved)return; d.lp=true; setPressing(null)
       const bb=balls.current[d.i]; bb.docked=!bb.docked
       if(bb.docked){ const s=dockSlot(d.i===0?3:4); bb.x=s.x; bb.y=s.y } ; bb.vx=0; bb.vy=0
       persist(bb); rerender(); try{ (navigator as any).vibrate?.(30) }catch{}
-    },2000)
+    },700)
   }
   const onMove=(e:React.PointerEvent)=>{
     const d=drag.current; if(!d)return
     const dx=e.clientX-d.sx, dy=e.clientY-d.sy
-    if(!d.moved && (Math.abs(dx)>5||Math.abs(dy)>5)){ d.moved=true; if(lpTimer.current)clearTimeout(lpTimer.current); balls.current[d.i].docked=false }
+    if(!d.moved && (Math.abs(dx)>5||Math.abs(dy)>5)){ d.moved=true; setPressing(null); if(lpTimer.current)clearTimeout(lpTimer.current); balls.current[d.i].docked=false }
     if(d.moved){
       const dt=Math.max(1,e.timeStamp-d.lt); d.vx=(e.clientX-d.lx)/dt*16; d.vy=(e.clientY-d.ly)/dt*16; d.lx=e.clientX; d.ly=e.clientY; d.lt=e.timeStamp
       const m=metrics(); const bb=balls.current[d.i]
@@ -7262,8 +7264,9 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
   }
   const onUp=()=>{
     if(lpTimer.current)clearTimeout(lpTimer.current)
+    setPressing(null)
     const d=drag.current; drag.current=null; if(!d)return
-    if(d.lp){ rerender(); return }   // c'était un dock/undock
+    if(d.lp){ rerender(); return }   // c'était un GARAGE (dock/undock) → ne JAMAIS ouvrir
     if(!d.moved){ d.i===0?onTapLive():onTapNight(); rerender(); return }
     const bb=balls.current[d.i]; bb.vx=d.vx; bb.vy=d.vy
     if(Math.hypot(d.vx,d.vy)>0.6){ cancelAnimationFrame(raf.current); raf.current=requestAnimationFrame(physics) } else persist(bb)
@@ -7272,12 +7275,13 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
   useEffect(()=>()=>{ cancelAnimationFrame(raf.current); if(lpTimer.current)clearTimeout(lpTimer.current) },[])
 
   const fab = (i:number, content:React.ReactNode, label:string) => {
-    const b=balls.current[i]; const dragging=!!drag.current && drag.current.i===i
-    return <button key={b.id} className={(!b.docked && !dragging)?'cl-fab':undefined} aria-label={label}
+    const b=balls.current[i]; const dragging=!!drag.current && drag.current.i===i; const press=pressing===i
+    return <button key={b.id} className={(!b.docked && !dragging && !press)?'cl-fab':undefined} aria-label={label}
       onPointerDown={(e)=>onDown(i,e)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
       style={{ position:'fixed', left:b.x, top:b.y, zIndex:1200, width:SZ, height:SZ, borderRadius:'50%', touchAction:'none',
         background:'#FFFFFF', border:b.docked?`1.5px solid ${C.border}`:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-        boxShadow:b.docked?'0 2px 8px rgba(83,41,67,.18)':undefined }}>{content}</button>
+        transform: press?'scale(0.86)':undefined, transition: press?'transform .65s cubic-bezier(.4,0,.2,1)':'transform .15s',
+        boxShadow: press?'0 0 0 4px rgba(235,107,175,.35), 0 2px 8px rgba(83,41,67,.2)' : (b.docked?'0 2px 8px rgba(83,41,67,.18)':undefined) }}>{content}</button>
   }
   return (<>
     <style>{`

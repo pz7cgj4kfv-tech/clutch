@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x121'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x122'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -742,22 +742,22 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         const rm = rayon * 1000
         // Couche 1 : fill doux saumon
         const fill = L.circle(ME, {
-          radius:rm, fillColor:'#EB6BAF', fillOpacity:0.05,
+          radius:rm, fillColor:'#EB6BAF', fillOpacity:0.09,
           color:'transparent', opacity:0, weight:0, interactive:false, className:'clutch-fill',
         }).addTo(map)
         fillRef.current = fill
-        // Couche 2 : halo rose Mel, plus subtil (David : « plus subtil », plus de jaune)
+        // Couche 2 : halo rose Mel — visible mais doux (David : « on ne voit pas le rayon » → on remonte un peu)
         const halo = L.circle(ME, {
           radius:rm, fillColor:'transparent', fillOpacity:0,
-          color:'#EB6BAF', opacity:0.12, weight:9,
+          color:'#EB6BAF', opacity:0.20, weight:11,
           interactive:false, className:'clutch-halo',
         }).addTo(map)
         haloRef.current = halo
-        // Couche 3 : bordure principale pointillée animée (rose Mel)
+        // Couche 3 : bordure principale pointillée animée (rose Mel) — bien visible
         const circle = L.circle(ME, {
           radius:rm, fillColor:'transparent', fillOpacity:0,
-          color:'#EB6BAF', opacity:0.85,
-          weight:2, dashArray:'10,7',
+          color:'#EB6BAF', opacity:1,
+          weight:2.5, dashArray:'10,7',
           interactive:false, className:'clutch-radius',
         }).addTo(map)
         circleRef.current = circle
@@ -963,16 +963,17 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
             <div style={{width:10,height:10,borderRadius:'50%',background:'#fff',transform:'rotate(45deg)'}}/>
           </div>
           <div style={{width:2,height:12,background:C.bordeaux,borderRadius:1,opacity:.6}}/>
+          <div style={{marginTop:3,fontSize:9.5,fontWeight:800,color:'#fff',background:'rgba(83,41,67,.82)',borderRadius:10,padding:'2px 8px',whiteSpace:'nowrap'}}>Déplace la carte 👆</div>
         </div>
       )}
       {/* hint inside map removed — see carte overlay */}
       <style>{`
         .leaflet-container{background:${night?'#2A1E28':'#e8e0d8'}!important;}
         .leaflet-tile-pane{filter:${night?'brightness(1.55) contrast(0.88) saturate(0.5) hue-rotate(5deg)':'saturate(1.1) contrast(1.05)'};}
-        /* Cercle RDV — ligne fine seule, sobre */
-        .clutch-radius path{stroke:#FFBF9E!important;fill:transparent!important;stroke-width:1px!important;stroke-opacity:.5!important;stroke-dasharray:none!important;transition:d .35s cubic-bezier(.22,1,.36,1);}
-        .clutch-halo path{display:none!important;}
-        .clutch-fill path{display:none!important;}
+        /* Cercle rayon — ROSE Mel, bien visible (le CSS !important écrasait tout → rayon invisible, bug David) */
+        .clutch-radius path{stroke:#EB6BAF!important;fill:transparent!important;stroke-width:2.5px!important;stroke-opacity:1!important;stroke-dasharray:10 7!important;transition:d .35s cubic-bezier(.22,1,.36,1);}
+        .clutch-halo path{stroke:#EB6BAF!important;stroke-width:11px!important;stroke-opacity:.18!important;fill:transparent!important;display:block!important;}
+        .clutch-fill path{fill:#EB6BAF!important;fill-opacity:.09!important;stroke:none!important;display:block!important;}
         .clutch-fill path{transition:d .35s cubic-bezier(.22,1,.36,1)!important;}
         /* étoiles 4 branches — vrai style étoile cristalline */
         .cs{

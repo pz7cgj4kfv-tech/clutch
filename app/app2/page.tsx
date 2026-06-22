@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x11e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x11f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -742,22 +742,22 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         const rm = rayon * 1000
         // Couche 1 : fill doux saumon
         const fill = L.circle(ME, {
-          radius:rm, fillColor:'#FFBF9E', fillOpacity:0.06,
+          radius:rm, fillColor:'#EB6BAF', fillOpacity:0.05,
           color:'transparent', opacity:0, weight:0, interactive:false, className:'clutch-fill',
         }).addTo(map)
         fillRef.current = fill
-        // Couche 2 : anneau halo pulsant (orange, plus large)
+        // Couche 2 : halo rose Mel, plus subtil (David : « plus subtil », plus de jaune)
         const halo = L.circle(ME, {
           radius:rm, fillColor:'transparent', fillOpacity:0,
-          color:'#E27C00', opacity:0.18, weight:14,
+          color:'#EB6BAF', opacity:0.12, weight:9,
           interactive:false, className:'clutch-halo',
         }).addTo(map)
         haloRef.current = halo
-        // Couche 3 : bordure principale pointillée animée
+        // Couche 3 : bordure principale pointillée animée (rose Mel)
         const circle = L.circle(ME, {
           radius:rm, fillColor:'transparent', fillOpacity:0,
-          color:'#FFBF9E', opacity:1,
-          weight:2.5, dashArray:'12,7',
+          color:'#EB6BAF', opacity:0.85,
+          weight:2, dashArray:'10,7',
           interactive:false, className:'clutch-radius',
         }).addTo(map)
         circleRef.current = circle
@@ -2705,15 +2705,7 @@ const GROUP_EVENTS_DEMO = [
     tags:['groupe','culture','musique'], isGroupe:true, evGender:'X', certified:false,
     eventPhotos:['linear-gradient(135deg,#1a1a3d,#0d0d26)'], eventPhotoEmojis:['🎬'],
   },
-  // ─── Event de test : Max GPS Bot — Casino de Morges ───────────
-  {
-    id:'gGPS', emoji:'🎰', title:'Apéro test — Casino de Morges (BOT)',
-    creator:'Max 🛰️', creatorBio:'Bot GPS de test. Envoyez-moi un Clutch pour tester le flow RDV à Morges !', creatorPhoto:'https://randomuser.me/api/portraits/men/77.jpg',
-    date:'Ce soir', time:'19h30', lieu:'Casino de Morges — Grande salle',
-    spots:10, taken:1, price:'Gratuit (test)', description:'Event créé par le bot GPS de test. Lieu : Casino de Morges. Pour tester le flow Clutch → RDV → J\'y suis depuis Lausanne ou Morges.',
-    tags:['groupe','test','gps'], isGroupe:true, evGender:'X', certified:false, _isBotEvent:true,
-    eventPhotos:['linear-gradient(135deg,#C8860A,#7A4500)'], eventPhotoEmojis:['🎰'],
-  },
+  // (event de test Max GPS — SUPPRIMÉ, demande David)
 ]
 
 const GROUP_EMOJIS = ['🍷','🍕','☕','🏃','♟️','🎸','📚','🧘','🎬','🎨','🌿','🎲','🚴','🍺','💻','🌙','🎵','🧆','🏊','⛰️']
@@ -2845,11 +2837,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvEmoji, setNewEvEmoji] = useState('🍷')
   const [newEvTitle, setNewEvTitle] = useState('')
   const [newEvLieu, setNewEvLieu] = useState('')
-  const [newEvTime, setNewEvTime] = useState('20:00')   // molette native (input type=time)
+  const [newEvTime, setNewEvTime] = useState(()=>{ const d=new Date(); d.setHours(d.getHours()+1,0,0,0); return d.toTimeString().slice(0,5) })   // défaut = prochaine heure ronde (toujours dans le futur)
   const [newEvDate, setNewEvDate] = useState('Aujourd\'hui') // Aujourd'hui / Demain (contraint)
   const [newEvDur, setNewEvDur] = useState(2) // durée en heures (David : obligatoire)
   const [newEvMax, setNewEvMax] = useState(6)
   const [newEvDesc, setNewEvDesc] = useState('')
+  const [newEvPrice, setNewEvPrice] = useState('Gratuit') // prix (David : oublié)
   const [newEvFile, setNewEvFile] = useState<string|null>(null) // nom du fichier joint (prototype)
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -2857,7 +2850,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const newEvValid = !!(newEvTitle.trim() && newEvLieu.trim() && newEvTime.trim() && newEvDesc.trim()) // desc obligatoire (David)
   const newEvDirty = !!(newEvTitle || newEvLieu || newEvDesc) // pour confirmer la fermeture
   const tryCloseCreate = () => { if (newEvDirty && !creating) setConfirmCloseEv(true); else setShowCreateGroup(false) }
-  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvFile(null); setEvAddrResults([]); setEvShowSugg(false) }
+  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setEvAddrResults([]); setEvShowSugg(false) }
   // Recherche d'adresse (réutilise Nominatim, comme la mise en ligne — David)
   const [evAddrResults,setEvAddrResults]=useState<any[]>([])
   const [evShowSugg,setEvShowSugg]=useState(false)
@@ -2896,7 +2889,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     const target = new Date(); if(newEvDate==='Demain') target.setDate(target.getDate()+1); target.setHours(hh||0,mm||0,0,0)
     const now = new Date()
     if (target.getTime() < now.getTime()-60000) { showToast?.(lang==='en'?'That time is already past':'Cette heure est déjà passée', C.orange); return }
-    if (target.getTime() > now.getTime()+18*3600*1000) { showToast?.(lang==='en'?'Pick a slot within the next 18h':'Choisis un créneau dans les 18h', C.orange); return }
+    // NB : fenêtre 18h retirée pour les events (décision David en attente) — « Demain » doit marcher. On garde juste « pas dans le passé ».
     setCreating(true)
     let realId = `g-user-${Date.now()}`
     // Persistance Supabase (additif). Si la migration events_mvp n'est pas encore
@@ -2931,7 +2924,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       lieu: newEvLieu.trim(),
       spots: newEvMax,
       taken: 1,
-      price: 'Gratuit',
+      price: newEvPrice.trim() || 'Gratuit',
       bring: null,
       durationH: newEvDur,
       description: newEvDesc.trim() || 'Événement créé sur Clutch.',
@@ -2947,7 +2940,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime('20:00'); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvFile(null); setEvShowSugg(false)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setEvShowSugg(false)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
@@ -3205,8 +3198,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,opacity:.8,padding:'8px 10px 4px'}}>Prototype — tu peux créer ton groupe (public ou privé par lien), choisir une <b>région</b> (adresse révélée avant le RDV) et y joindre un <b>fichier</b>. La diffusion réelle des notifs arrive en V2.</div>
         </>)}
         {evFilter!=='partenaires' && (<>
-        {/* ✨ BANNIÈRES PARTENAIRES (payants = mis en avant, défilent en haut) — demande David. Visible seulement sur "Tout". */}
-        {evFilter==='all' && PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
+        {/* ✨ BANNIÈRES PARTENAIRES (payants = pub) — TOUJOURS affichées sur tous les filtres events (David : non filtrables). */}
+        {PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
           <div style={{marginBottom:14}}>
             <style>{`@keyframes ptnShine{0%{background-position:-180% 0}100%{background-position:180% 0}} .ptnShine::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);background-size:200% 100%;animation:ptnShine 3.2s linear infinite;pointer-events:none}`}</style>
             <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'2px 2px 4px',margin:'0 -2px'}}>
@@ -3743,10 +3736,26 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </div>
             </div>
 
-            {/* Champ 5 : Description (OBLIGATOIRE — David) + aide */}
+            {/* Champ : PRIX (David : oublié) */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💰 PRIX</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:7}}>
+                {['Gratuit','5 CHF','10 CHF','20 CHF'].map(pz=>(
+                  <button key={pz} onClick={()=>setNewEvPrice(pz)}
+                    style={{flex:1,minWidth:62,padding:'8px 0',borderRadius:10,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvPrice===pz?C.salmon:C.border}`,background:newEvPrice===pz?C.salmonFaint:'transparent',color:newEvPrice===pz?C.salmon:C.whiteMid}}>{pz}</button>
+                ))}
+              </div>
+              <input value={newEvPrice} onChange={e=>setNewEvPrice(e.target.value)} placeholder='Ou un autre prix… (ex : Prix libre, 12 CHF)'
+                style={{width:'100%',boxSizing:'border-box',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
+            </div>
+
+            {/* Champ 5 : Description (OBLIGATOIRE — David) + aide + limite caractères */}
             <div style={{marginBottom:22}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· obligatoire</span></div>
-              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value)} rows={3}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+                <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>💬 DESCRIPTION <span style={{color:C.salmon}}>· obligatoire</span></div>
+                <div style={{fontSize:10,color:newEvDesc.length>=280?C.orange:C.whiteMid}}>{newEvDesc.length}/300</div>
+              </div>
+              <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value.slice(0,300))} rows={3} maxLength={300}
                 placeholder={'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box',lineHeight:1.5}}/>
               {/* Pièce jointe réelle (PDF/programme/image) — prototype : on capte le nom, upload V2 */}
@@ -8148,19 +8157,8 @@ export default function App2() {
         const recent = (lap||[]).filter((f:any)=>{ const ts = f.submitted_at ? new Date(f.submitted_at).getTime() : 0; return ts >= cutoff })
         setLapinIds(new Set(recent.map((f:any)=>f.to_id)))
       } catch {}
-      // Injecter Max (bot GPS de test fixé à Morges Gare) toujours visible
-      const maxBot = {
-        id: 'gpsbotma-0000-0000-0000-000000000001',
-        name: 'Max 🛰️', gender: 'man', age: 30, neighborhood: 'Morges',
-        bio: 'Bot de test GPS — je suis à Morges Gare 📍 Envoyez-moi un Clutch !',
-        job: 'Test Bot GPS', photo_url: 'https://randomuser.me/api/portraits/men/77.jpg',
-        is_available: true, account_type: 'bot',
-        _fixedLat: 46.5099, _fixedLng: 6.4942, // Morges Gare
-        _isGpsTestBot: true,
-        _hasEvent: true, _eventId: 'gGPS', _eventEmoji: '🎰',
-        verified: true, interests: ['Test','GPS','Clutch'], languages: ['Français'],
-      }
-      setProfiles([...real, maxBot as any])
+      // Max (bot GPS de test) SUPPRIMÉ — demande David.
+      setProfiles(real)
     }
   },[user?.id])
 
@@ -9850,28 +9848,7 @@ export default function App2() {
                     </div>
                   </div>
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId ? 180 : 14}}>
-                    {/* Mes événements à venir — AUSSI ici (demande David). Tap → ouvre l'event dans l'onglet Événements. */}
-                    {myUpcomingEvents.length>0 && (
-                      <div style={{marginBottom:14}}>
-                        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:C.whiteMid,margin:'2px 2px 8px'}}>📅 {lang==='en'?'My events':'Mes événements'}</div>
-                        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                          {myUpcomingEvents.map((ev:any)=>(
-                            <div key={ev.id} onClick={()=>{ setTab('evenements'); setOpenEventId(ev.id) }}
-                              style={{display:'flex',alignItems:'center',gap:12,background:C.bgCard,border:`1px solid ${C.green}55`,borderRadius:14,padding:'12px 14px',cursor:'pointer',boxShadow:'0 2px 10px rgba(83,41,67,.06)'}}>
-                              <span style={{fontSize:24,flexShrink:0}}>{ev.emoji||'🎟️'}</span>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:14,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.title}</div>
-                                <div style={{fontSize:11.5,color:C.whiteMid,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                                  <span style={{color:C.green,fontWeight:700}}>✓ {lang==='en'?'Joined':'Inscrit·e'}</span>
-                                  {ev.event_time?` · 🕐 ${ev.event_time}`:''}{ev.lieu?` · 📍 ${(ev.lieu||'').split(',')[0]}`:''}
-                                </div>
-                              </div>
-                              <span style={{color:C.whiteMid,fontSize:18,flexShrink:0}}>›</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
                     {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
                     {actifs.map((c:any)=>{

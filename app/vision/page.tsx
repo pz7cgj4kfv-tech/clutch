@@ -166,6 +166,7 @@ const SECTIONS = [
   { id:'identite',  icon:'🎨', label:'Identité' },
   { id:'tech',      icon:'⚙️', label:'Tech' },
   { id:'legal',     icon:'⚖️', label:'Légal' },
+  { id:'nda',       icon:'📜', label:'NDA' },
   { id:'principes', icon:'🎯', label:'Principes' },
   { id:'questions', icon:'❓', label:'Questions' },
   { id:'changelog', icon:'📜', label:'Décisions' },
@@ -3180,8 +3181,54 @@ const SectionStrategie = () => {
   )
 }
 
+function SectionNDA(){
+  const para:React.CSSProperties = {fontSize:13.5,lineHeight:1.6,margin:'0 0 12px',color:'#1a1a1a'}
+  const h:React.CSSProperties = {fontWeight:800,color:'#000'}
+  return (
+    <div>
+      <style>{`@media print{ body *{visibility:hidden} #nda-paper, #nda-paper *{visibility:visible} #nda-paper{position:absolute;left:0;top:0;width:100%} .no-print{display:none!important} }`}</style>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}} className="no-print">
+        <div>
+          <div style={{fontSize:18,fontWeight:900,color:C.gold}}>📜 Accord de confidentialité (NDA)</div>
+          <div style={{fontSize:11,color:C.dim}}>À faire signer aux personnes à qui on parle du projet · <b style={{color:C.salmon}}>brouillon — faire valider par un avocat suisse</b></div>
+        </div>
+        <button onClick={()=>window.print()} style={{background:C.gold,color:'#0f0810',border:'none',borderRadius:10,padding:'10px 18px',fontWeight:800,fontSize:13,cursor:'pointer'}}>🖨 Imprimer / PDF</button>
+      </div>
+      {/* Le « papier » blanc — propre à imprimer/signer */}
+      <div id="nda-paper" style={{background:'#fff',color:'#1a1a1a',borderRadius:10,padding:'34px 38px',maxWidth:720,margin:'0 auto',boxShadow:'0 4px 24px rgba(0,0,0,.3)'}}>
+        <div style={{textAlign:'center',marginBottom:18}}>
+          <div style={{fontSize:20,fontWeight:900,letterSpacing:'-.01em',color:'#000'}}>CLUTCH — CONFIDENTIALITY &amp; CONTRIBUTION AGREEMENT</div>
+        </div>
+        <p style={{...para,fontSize:12,color:'#666'}}>Between <b>Clutch</b> (David Saugy &amp; Mélanie Brodard, Lausanne, Switzerland) — "Clutch" — and <b>……………………………………</b> ("You"). Date: ……………………</p>
+        <p style={para}>By signing, You agree:</p>
+        <p style={para}><span style={h}>1. Confidential Information.</span> Everything You learn about Clutch — the concept, the name, the designs, the code, the features, the business model, the data, the users, the finances, the strategy, and any of our discussions — is confidential and the exclusive property of Clutch.</p>
+        <p style={para}><span style={h}>2. You keep it secret.</span> You will not share, publish, show, or describe it to anyone, and will not use it for any purpose other than helping Clutch. This obligation lasts during our collaboration and for <b>five (5) years</b> afterwards.</p>
+        <p style={para}><span style={h}>3. You do not copy it.</span> You will not build, help build, advise, or invest in any product that copies or competes with Clutch using what You learned, for <b>two (2) years</b> after our collaboration ends.</p>
+        <p style={para}><span style={h}>4. Your contributions belong to Clutch.</span> Any idea, feedback, design, code, or improvement You provide becomes the exclusive property of Clutch, with no claim or compensation owed — unless agreed separately and in writing (see below).</p>
+        <p style={para}><span style={h}>5. No poaching, no circumvention.</span> For <b>two (2) years</b>, You will not solicit Clutch's team, partners, or users away from Clutch, nor bypass Clutch to deal with them directly using what You learned here.</p>
+        <p style={para}><span style={h}>6. Return.</span> On request, You will promptly delete or return all Clutch materials in Your possession.</p>
+        <p style={para}><span style={h}>7. Breach.</span> You acknowledge a breach would cause Clutch serious and irreparable harm; Clutch may seek an immediate injunction and damages.</p>
+        <p style={para}><span style={h}>8. Governing law.</span> Swiss law. Any dispute is submitted to the courts of <b>Lausanne (Vaud), Switzerland</b>.</p>
+        <div style={{display:'flex',gap:30,marginTop:26,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:200}}><div style={{borderTop:'1px solid #000',paddingTop:5,fontSize:11,color:'#444'}}>You — name, place, date</div></div>
+          <div style={{flex:1,minWidth:200}}><div style={{borderTop:'1px solid #000',paddingTop:5,fontSize:11,color:'#444'}}>Clutch — David Saugy</div></div>
+        </div>
+        <div style={{marginTop:26,paddingTop:16,borderTop:'1px dashed #bbb'}}>
+          <div style={{...h,fontSize:13,marginBottom:6}}>Our promise to You (reciprocity)</div>
+          <p style={{...para,fontSize:12.5,marginBottom:6}}>We never take help for granted. As an <b>early contributor</b>, You will be recognised as part of Clutch's founding circle, get early access, and — at our goodwill and discretion — share in the project's success if it grows.</p>
+          <p style={{...para,fontSize:11,color:'#777',fontStyle:'italic',margin:0}}>This paragraph is a sincere statement of intent, not a binding financial promise. Any equity, revenue share, or payment will be defined in a separate written agreement signed by both founders.</p>
+        </div>
+      </div>
+      <div style={{fontSize:11,color:C.dim,maxWidth:720,margin:'14px auto 0',lineHeight:1.5}} className="no-print">
+        ⚠️ <b>Brouillon</b>. Avant de faire signer : (1) faire relire par un <b>avocat suisse</b> ; (2) ne <b>jamais</b> écrire de % d'equity/revenue ferme ici — ça se fait dans un doc séparé signé par David <b>et</b> Mel ; (3) garder la réciprocité <b>discrétionnaire</b> (cercle des fondateurs, Premium à vie, accès anticipé, merci ponctuel) plutôt qu'un % à vie.
+      </div>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   map: SectionMap,
+  nda: SectionNDA,
   confiance: SectionConfiance,
   strategie: SectionStrategie,
   live: SectionLive,

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x122'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x123'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2642,16 +2642,16 @@ const MOCK_EVENTS = [
 // 🤝 PROTOTYPE — Groupes / Partenaires (vision David : suivre un organisateur récurrent → notifs ciblées = réseau)
 // Données mock pour visualiser le concept. À brancher DB en V2.
 const PARTNERS_MOCK = [
-  {id:'p_dclub',   emoji:'🎶', name:'D Club Lausanne',      cat:'Clubbing · Soirées',   zone:'Flon, Lausanne',     members:1240, desc:'Les meilleures nuits de Lausanne. Soirées chaque week-end.', next:'Techno night · sam. 23h', verified:true},
+  {id:'p_dclub',   emoji:'🎶', name:'D Club Lausanne',      cat:'Clubbing · Soirées',   zone:'Flon, Lausanne',     members:1240, desc:'Les meilleures nuits de Lausanne. Soirées chaque week-end.', next:'Techno night · sam. 23h', verified:true, photo:'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=600&q=80'},
   {id:'p_pingpong',emoji:'🏓', name:'Ping-Pong chez Bibi',  cat:'Sport · Convivial',    zone:'Région Lausanne',    members:38,   desc:'Tournois ping-pong détendus chez un passionné. Lieu donné avant.', next:'Tournoi débutants · dim. 14h', verified:false},
-  {id:'p_jazz',    emoji:'🎷', name:'Apéro Jazz Collectif',  cat:'Musique · Apéro',      zone:'Vieille Ville',      members:212,  desc:'Jam sessions et apéros jazz une fois par mois. Amène ton instrument.', next:'Jam ouverte · ven. 19h', verified:true},
+  {id:'p_jazz',    emoji:'🎷', name:'Apéro Jazz Collectif',  cat:'Musique · Apéro',      zone:'Vieille Ville',      members:212,  desc:'Jam sessions et apéros jazz une fois par mois. Amène ton instrument.', next:'Jam ouverte · ven. 19h', verified:true, photo:'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80'},
   {id:'p_rando',   emoji:'🥾', name:'Rando du Dimanche',     cat:'Nature · Sport',       zone:'Lavaux / Jura',      members:156,  desc:'Balades et randos accessibles à tous, chaque dimanche matin.', next:'Lavaux sunrise · dim. 7h', verified:false},
   {id:'p_parents', emoji:'👶', name:'Parents & Cie',         cat:'Famille · Entraide',   zone:'Lausanne',           members:89,   desc:'Sorties parc, gardes partagées, cafés entre parents.', next:'Pique-nique parc · sam. 15h', verified:false},
   // Partenaires officiels supplémentaires (Lausanne & environs) — bannières "à la une"
-  {id:'p_mad',     emoji:'🪩', name:'MAD Lausanne',          cat:'Clubbing · Concerts',  zone:'Genève-Sud, Lausanne', members:2100, desc:'Le club mythique de Lausanne. Concerts, soirées à thème, afters.', next:'House night · ven. 23h', verified:true},
-  {id:'p_montreux',emoji:'🎺', name:'Montreux Jazz Café',    cat:'Musique · Live',       zone:'Montreux',           members:870,  desc:'Concerts live et jam sessions dans l\'esprit du festival.', next:'Soul session · sam. 20h', verified:true},
-  {id:'p_lakeyoga',emoji:'🧘', name:'Lake Yoga Vidy',        cat:'Bien-être · Plein air', zone:'Vidy, Lausanne',     members:430,  desc:'Yoga au bord du lac, tous niveaux, lever et coucher du soleil.', next:'Sunset flow · dim. 19h', verified:true},
-  {id:'p_caves',   emoji:'🍷', name:'Caves Ouvertes Lavaux', cat:'Dégustation · Vin',    zone:'Lavaux',             members:640,  desc:'Dégustations chez les vignerons du vignoble UNESCO.', next:'Balade & dégustation · sam. 10h', verified:true},
+  {id:'p_mad',     emoji:'🪩', name:'MAD Lausanne',          cat:'Clubbing · Concerts',  zone:'Genève-Sud, Lausanne', members:2100, desc:'Le club mythique de Lausanne. Concerts, soirées à thème, afters.', next:'House night · ven. 23h', verified:true, photo:'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=600&q=80'},
+  {id:'p_montreux',emoji:'🎺', name:'Montreux Jazz Café',    cat:'Musique · Live',       zone:'Montreux',           members:870,  desc:'Concerts live et jam sessions dans l\'esprit du festival.', next:'Soul session · sam. 20h', verified:true, photo:'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80'},
+  {id:'p_lakeyoga',emoji:'🧘', name:'Lake Yoga Vidy',        cat:'Bien-être · Plein air', zone:'Vidy, Lausanne',     members:430,  desc:'Yoga au bord du lac, tous niveaux, lever et coucher du soleil.', next:'Sunset flow · dim. 19h', verified:true, photo:'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&q=80'},
+  {id:'p_caves',   emoji:'🍷', name:'Caves Ouvertes Lavaux', cat:'Dégustation · Vin',    zone:'Lavaux',             members:640,  desc:'Dégustations chez les vignerons du vignoble UNESCO.', next:'Balade & dégustation · sam. 10h', verified:true, photo:'https://images.unsplash.com/photo-1566903451935-7e8835ed3e92?w=600&q=80'},
 ]
 
 // Barre de filtres VOLONTAIREMENT courte (audit David 21.06 : « beaucoup trop de boutons en haut »).
@@ -3221,6 +3221,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:11,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'2px 2px 4px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (
                 <div key={p.id} onClick={()=>setSelPartner(p)} className="ptnShine" style={{flexShrink:0,width:'78%',maxWidth:300,scrollSnapAlign:'start',cursor:'pointer',borderRadius:18,overflow:'hidden',position:'relative',background:'linear-gradient(125deg,#6E2E72,#532943 55%,#2C1020)',border:'1.5px solid rgba(235,107,175,.55)',boxShadow:'0 6px 22px rgba(235,107,175,.28)',padding:'15px 16px',minHeight:128,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                  {/* Photo de fond (partenaire) + voile prune pour la lisibilité du texte */}
+                  {p.photo && <><img src={p.photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:.55}}/><div style={{position:'absolute',inset:0,background:'linear-gradient(115deg,rgba(44,16,32,.92),rgba(83,41,67,.55) 60%,rgba(44,16,32,.85))'}}/></>}
                   <div style={{position:'absolute',top:-18,right:-18,fontSize:90,opacity:.18,lineHeight:1}}>{p.emoji}</div>
                   <div style={{position:'relative'}}>
                     <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x126'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x127'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -210,12 +210,12 @@ function TabSvg({id, size=22, active, filter}:{id:string; size?:number; active:b
 function ClutchMark({ size=40 }:{ size?:number }) {
   return (
     <svg width={size} height={size*(205/258)} viewBox="103 127 258 205" aria-label="Clutch" style={{display:'block'}}>
-      <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3 "/>
-      <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7 "/>
-      <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
-      <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
-      <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
-      <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+      <polygon fill="#EB6BB0" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3 "/>
+      <polygon fill="#EB6BB0" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7 "/>
+      <path fill="#D76FA9" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+      <path fill="#EB6BB0" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+      <path fill="#D76FA9" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+      <path fill="#D76FA9" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
     </svg>
   )
 }
@@ -869,7 +869,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
 
         // Ma position — SUPERNOVA
         const photo = userPhoto
-          ? `<img src="${userPhoto}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid #E27C00;z-index:2;"/>`
+          ? `<img src="${userPhoto}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid #77BC1F;z-index:2;"/>`
           : `<div class="sn-core"></div>`
         const selfMarker = L.marker(ME, { icon: L.divIcon({
           html:`<div class="sn-wrap"><div class="sn-r sn-r1"></div><div class="sn-r sn-r2"></div><div class="sn-r sn-r3"></div>${photo}</div>`,
@@ -978,9 +978,9 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         /* étoiles 4 branches — vrai style étoile cristalline */
         .cs{
           width:${night?10:8}px;height:${night?10:8}px;
-          background:var(--gc,#FFBF9E);
+          background:var(--gc,#EB6BAF);
           clip-path:polygon(50% 0%,56% 44%,100% 50%,56% 56%,50% 100%,44% 56%,0% 50%,44% 44%);
-          filter:drop-shadow(0 0 ${night?4:3}px var(--gc,#FFBF9E)) drop-shadow(0 0 ${night?8:5}px var(--gc,#FFBF9E88));
+          filter:drop-shadow(0 0 ${night?4:3}px var(--gc,#EB6BAF)) drop-shadow(0 0 ${night?8:5}px var(--gc,#EB6BAF88));
           opacity:${night?1:.9};}
         .cs0{animation:s0 2.7s ease-in-out infinite;}
         .cs1{animation:s1 3.3s ease-in-out infinite;}
@@ -994,25 +994,25 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         @keyframes s4{0%,100%{opacity:.55;transform:scale(.85) rotate(30deg)}25%{opacity:1;transform:scale(1.4) rotate(75deg)}}
         /* événements */
         .cevt{width:28px;height:28px;border-radius:8px;background:rgba(26,14,20,.85);
-          border:1px solid rgba(255,191,158,.35);display:flex;align-items:center;
+          border:1px solid rgba(83,41,67,.35);display:flex;align-items:center;
           justify-content:center;font-size:14px;backdrop-filter:blur(4px);}
         /* supernova */
         .sn-wrap{position:relative;width:60px;height:60px;}
         .sn-r{position:absolute;top:50%;left:50%;border-radius:50%;
-          border:1.5px solid rgba(226,124,0,.85);
+          border:1.5px solid rgba(119,188,31,.85);
           transform:translate(-50%,-50%) scale(0);
-          box-shadow:0 0 6px 2px rgba(226,124,0,.3);}
+          box-shadow:0 0 6px 2px rgba(119,188,31,.3);}
         .sn-r1{width:18px;height:18px;animation:snX 2.5s ease-out infinite 0s;}
         .sn-r2{width:18px;height:18px;animation:snX 2.5s ease-out infinite .83s;}
         .sn-r3{width:18px;height:18px;animation:snX 2.5s ease-out infinite 1.67s;}
         @keyframes snX{0%{transform:translate(-50%,-50%) scale(.15);opacity:1;}80%{opacity:.3;}100%{transform:translate(-50%,-50%) scale(3);opacity:0;}}
         .sn-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
           width:16px;height:16px;border-radius:50%;z-index:2;
-          background:radial-gradient(circle at 35% 35%,#fff 0%,#E27C00 55%,#FFBF9E 100%);
-          box-shadow:0 0 14px 5px rgba(226,124,0,.8),0 0 28px 10px rgba(226,124,0,.3);
+          background:radial-gradient(circle at 35% 35%,#fff 0%,#77BC1F 55%,#B6E27A 100%);
+          box-shadow:0 0 14px 5px rgba(119,188,31,.8),0 0 28px 10px rgba(119,188,31,.3);
           animation:snC 1.8s ease-in-out infinite;}
-        @keyframes snC{0%,100%{box-shadow:0 0 14px 5px rgba(226,124,0,.8),0 0 28px 10px rgba(226,124,0,.3);}
-          50%{box-shadow:0 0 20px 8px rgba(255,191,158,1),0 0 40px 14px rgba(226,124,0,.5);}}
+        @keyframes snC{0%,100%{box-shadow:0 0 14px 5px rgba(119,188,31,.8),0 0 28px 10px rgba(119,188,31,.3);}
+          50%{box-shadow:0 0 20px 8px rgba(182,226,122,1),0 0 40px 14px rgba(119,188,31,.5);}}
       `}</style>
       <div ref={divRef} style={{ position:'absolute',inset:0 }}/>
       {/* Tooltip étoile — mini preview profil */}
@@ -1137,9 +1137,9 @@ function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>vo
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:C.whiteMid}}><a href="/" style={{color:C.salmon}}>← Clutch home</a></div>
         <div style={{textAlign:'center',marginTop:14,fontSize:10,color:'rgba(250,250,250,0.35)',lineHeight:1.6}}>
           By using Clutch, you agree to our{' '}
-          <a href="/terms" style={{color:'#FFBF9E',textDecoration:'underline'}}>Terms</a>
+          <a href="/terms" style={{color:'#EB6BAF',textDecoration:'underline'}}>Terms</a>
           {' '}and{' '}
-          <a href="/privacy" style={{color:'#FFBF9E',textDecoration:'underline'}}>Privacy Policy</a>
+          <a href="/privacy" style={{color:'#EB6BAF',textDecoration:'underline'}}>Privacy Policy</a>
         </div>
       </div>
     </div>
@@ -1268,9 +1268,9 @@ function RegisterScreen({onSuccess,onLogin,showToast}:{onSuccess:(p:Profile)=>vo
         <Btn variant="secondary" onClick={onLogin}>Already have an account?</Btn>
         <div style={{textAlign:'center',marginTop:14,fontSize:10,color:'rgba(250,250,250,0.35)',lineHeight:1.6}}>
           By creating an account, you agree to our{' '}
-          <a href="/terms" style={{color:'#FFBF9E',textDecoration:'underline'}}>Terms</a>
+          <a href="/terms" style={{color:'#EB6BAF',textDecoration:'underline'}}>Terms</a>
           {' '}and our{' '}
-          <a href="/privacy" style={{color:'#FFBF9E',textDecoration:'underline'}}>Privacy Policy</a>
+          <a href="/privacy" style={{color:'#EB6BAF',textDecoration:'underline'}}>Privacy Policy</a>
         </div>
       </div>
     </div>
@@ -1379,10 +1379,10 @@ function TrustBadge({profile, lang='fr', showCount=true}:{profile:any; lang?:Lan
   const level = getTrustLevel(profile)
   const rdv = profile.rdv_count ?? 0
   const map: Record<TrustLevel,{stars:string; label:string; color:string; bg:string}> = {
-    new:          {stars:'◦',   label:lang==='en'?'New':'Nouveau',        color:'rgba(255,191,158,0.55)',  bg:'rgba(255,191,158,0.08)'},
+    new:          {stars:'◦',   label:lang==='en'?'New':'Nouveau',        color:'rgba(83,41,67,0.55)',  bg:'rgba(83,41,67,0.08)'},
     reliable:     {stars:'✦',   label:lang==='en'?'Reliable':'Fiable',    color:'#4FC3F7',                 bg:'rgba(79,195,247,0.10)'},
     very_reliable:{stars:'✦✦',  label:lang==='en'?'Very reliable':'Très fiable', color:'#2DBD7E',          bg:'rgba(45,189,126,0.10)'},
-    exemplary:    {stars:'✦✦✦', label:lang==='en'?'Exemplary':'Exemplaire',color:'#E27C00',                bg:'rgba(226,124,0,0.12)'},
+    exemplary:    {stars:'✦✦✦', label:lang==='en'?'Exemplary':'Exemplaire',color:'#77BC1F',                bg:'rgba(119,188,31,0.12)'},
   }
   const m = map[level]
   const countStr = rdv >= TRUST_CONFIG.LEVEL_FIABLE_MIN_RDV ? ` · ${rdv} RDV` : ''
@@ -1430,7 +1430,7 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
             <div style={{fontSize:12,color:C.white,marginBottom:10}}>📍 {availInfo.city}</div>
           )}
           {!availInfo.isAvail&&<div style={{fontSize:11,color:C.whiteMid,marginBottom:10}}>{isFr?'Ouvre un créneau pour apparaître':'Open a slot to appear'}</div>}
-          <button onClick={()=>{setShowAvailTooltip(false);onAvailClick?.()}} style={{width:'100%',padding:'8px 0',borderRadius:10,background:`rgba(200,134,10,0.15)`,border:`1px solid rgba(200,134,10,0.3)`,color:C.orange,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+          <button onClick={()=>{setShowAvailTooltip(false);onAvailClick?.()}} style={{width:'100%',padding:'8px 0',borderRadius:10,background:`rgba(235,107,175,0.15)`,border:`1px solid rgba(235,107,175,0.3)`,color:C.orange,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
             {isFr?'Modifier →':'Change →'}
           </button>
           <div onClick={()=>setShowAvailTooltip(false)} style={{position:'fixed',inset:0,zIndex:-1}}/>
@@ -1446,8 +1446,8 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           const dotBase: React.CSSProperties = {position:'absolute',top:-2,right:-2,width:11,height:11,borderRadius:'50%',border:'2px solid #fff',zIndex:2}
           return (
             <button key={id} onClick={()=>{setShowAvailTooltip(false);set(id)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',background:'transparent',cursor:'pointer',padding:0,position:'relative'}}>
-              <div style={{position:'relative',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={46} height={46} alt="" style={{display:'block'}}/>
+              <div style={{position:'relative',width:51,height:51,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <img src={`/icons/mel/${({presences:'Presence',evenements:'Agenda',clutchs:'Clutch',contacts:'Contact',profil:'Profil'} as Record<string,string>)[id]}_${isActive?'ON':'OFF'}.svg`} width={51} height={51} alt="" style={{display:'block',filter:'drop-shadow(0 2px 3px rgba(83,41,67,0.16))'}}/>
                 {/* Pastille dispo sur Profil */}
                 {isProfil&&availInfo&&(
                   <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #fff',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
@@ -1458,12 +1458,12 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
                   if(badge.type==='clutch-new'||badge.type==='urgent') return <div style={{...dotBase,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
                   if(badge.type==='message') return <div style={{...dotBase,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
                   if(badge.type==='verrou') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 6px rgba(34,197,94,.6)'}}/>
-                  if(badge.type==='contact-msg') return <div style={{...dotBase,background:'#FF8C00',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(255,140,0,.85)'}}/>
+                  if(badge.type==='contact-msg') return <div style={{...dotBase,background:'#EB6BAF',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(235,107,175,.85)'}}/>
                   if(badge.type==='contact-new') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 8px rgba(34,197,94,.8)'}}/>
                   return null
                 })()}
               </div>
-              <div style={{fontSize:9,fontWeight:isActive?800:600,color:isActive?'#EB6BAF':'rgba(0,0,0,0.42)',letterSpacing:0,maxWidth:'100%',whiteSpace:'nowrap',overflow:'visible',textAlign:'center'}}>{label}</div>
+              <div style={{fontSize:9,fontWeight:isActive?800:600,color:isActive?'#EB6BAF':'rgba(0,0,0,0.42)',letterSpacing:id==='clutchs'?'.04em':0,maxWidth:'100%',whiteSpace:'nowrap',overflow:'visible',textAlign:'center'}}>{id==='clutchs'?label.toUpperCase():label}</div>
             </button>
           )
         })}
@@ -1658,28 +1658,28 @@ function SlotGoneOverlay({name, avatar, lang, onDone}:{name:string;avatar?:strin
   useEffect(()=>{ const t=setTimeout(onDone,3800); return ()=>clearTimeout(t) },[onDone])
   return (
     <div onClick={onDone} style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24,background:'rgba(20,5,15,0.88)',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',animation:'fadeIn .25s ease'}}>
-      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:360,background:'linear-gradient(160deg,#3a1828 0%,#251018 100%)',borderRadius:28,padding:'36px 28px 32px',border:`1px solid rgba(200,134,10,0.18)`,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',display:'flex',flexDirection:'column',alignItems:'center',gap:20,textAlign:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:360,background:'linear-gradient(160deg,#3a1828 0%,#251018 100%)',borderRadius:28,padding:'36px 28px 32px',border:`1px solid rgba(235,107,175,0.18)`,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',display:'flex',flexDirection:'column',alignItems:'center',gap:20,textAlign:'center'}}>
         {/* Avatar avec croix */}
         <div style={{position:'relative',width:80,height:80}}>
           {avatar
             ? <img src={avatar} style={{width:80,height:80,borderRadius:'50%',objectFit:'cover',opacity:0.55,filter:'grayscale(40%)'}}/>
-            : <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(255,191,158,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>👤</div>
+            : <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(83,41,67,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>👤</div>
           }
-          <div style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid rgba(200,134,10,0.35)'}}/>
-          <div style={{position:'absolute',bottom:-4,right:-4,width:28,height:28,borderRadius:'50%',background:'#3a1828',border:`2px solid rgba(200,134,10,0.3)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>⏱</div>
+          <div style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid rgba(235,107,175,0.35)'}}/>
+          <div style={{position:'absolute',bottom:-4,right:-4,width:28,height:28,borderRadius:'50%',background:'#3a1828',border:`2px solid rgba(235,107,175,0.3)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>⏱</div>
         </div>
         {/* Message principal */}
         <div>
           <div style={{fontSize:17,fontWeight:800,color:'#f5e8de',marginBottom:6,lineHeight:1.3}}>
             {isFr?`${firstName} n'est plus disponible`:`${firstName} is no longer available`}
           </div>
-          <div style={{fontSize:13,color:'rgba(255,191,158,0.65)',lineHeight:1.5}}>{msg}</div>
+          <div style={{fontSize:13,color:'rgba(83,41,67,0.65)',lineHeight:1.5}}>{msg}</div>
         </div>
         {/* Barre de progression auto-close */}
         <div style={{width:'100%',height:3,borderRadius:2,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
-          <div style={{height:'100%',borderRadius:2,background:'rgba(200,134,10,0.5)',animation:'shrink 3.8s linear forwards'}}/>
+          <div style={{height:'100%',borderRadius:2,background:'rgba(235,107,175,0.5)',animation:'shrink 3.8s linear forwards'}}/>
         </div>
-        <button onClick={onDone} style={{width:'100%',padding:'13px 0',borderRadius:14,background:'rgba(200,134,10,0.12)',border:`1px solid rgba(200,134,10,0.25)`,color:'C.gold',fontSize:14,fontWeight:700,cursor:'pointer',letterSpacing:'.04em'}}>
+        <button onClick={onDone} style={{width:'100%',padding:'13px 0',borderRadius:14,background:'rgba(235,107,175,0.12)',border:`1px solid rgba(235,107,175,0.25)`,color:'C.gold',fontSize:14,fontWeight:700,cursor:'pointer',letterSpacing:'.04em'}}>
           {isFr?'Voir les présences →':'See who\'s available →'}
         </button>
       </div>
@@ -2015,7 +2015,7 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
 
         {/* Alerte lieu manquant — visible juste au-dessus du bouton Envoyer */}
         {venueError && (
-          <div style={{background:'rgba(226,124,0,.12)',border:'1.5px solid rgba(226,124,0,.5)',borderRadius:12,padding:'10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+          <div style={{background:'rgba(235,107,175,.12)',border:'1.5px solid rgba(235,107,175,.5)',borderRadius:12,padding:'10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
             <span style={{fontSize:18}}>📍</span>
             <span style={{fontSize:13,fontWeight:700,color:C.orange}}>
               {lang==='en' ? 'Add a venue before sending' : 'Ajoute un lieu de rendez-vous avant d\'envoyer'}
@@ -2099,9 +2099,9 @@ function VerrouExplosion({ onDone, verrou }:{ onDone:()=>void; verrou?:{venue?:s
         @keyframes vShake{0%,100%{transform:translateX(0)}10%{transform:translateX(-8px)}20%{transform:translateX(8px)}30%{transform:translateX(-6px)}40%{transform:translateX(6px)}50%{transform:translateX(-3px)}60%{transform:translateX(3px)}}
         @keyframes vPart{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px)) scale(0)}}
         .vr{position:absolute;top:50%;left:50%;border-radius:50%;pointer-events:none;}
-        .vr1{width:100px;height:100px;border:3px solid #E27C00;animation:vRing 1.6s ease-out 0s both;}
-        .vr2{width:100px;height:100px;border:2px solid #FFBF9E88;animation:vRing2 2.0s ease-out .1s both;}
-        .vr3{width:100px;height:100px;border:1.5px solid #FF6B9D44;animation:vRing3 2.4s ease-out .2s both;}
+        .vr1{width:100px;height:100px;border:3px solid #EB6BAF;animation:vRing 1.6s ease-out 0s both;}
+        .vr2{width:100px;height:100px;border:2px solid #EB6BAF88;animation:vRing2 2.0s ease-out .1s both;}
+        .vr3{width:100px;height:100px;border:1.5px solid #EB6BAF44;animation:vRing3 2.4s ease-out .2s both;}
       `}</style>
       {/* Background flash */}
       <div style={{position:'absolute',inset:0,animation:'vBg 1.2s ease both,vShake .5s ease .1s both'}}/>
@@ -2131,9 +2131,9 @@ function VerrouExplosion({ onDone, verrou }:{ onDone:()=>void; verrou?:{venue?:s
       <div style={{position:'relative',textAlign:'center',zIndex:2}}>
         <div style={{animation:'vLockIn .9s cubic-bezier(.22,1,.36,1) both',filter:`drop-shadow(0 0 30px ${C.orange}) drop-shadow(0 0 60px ${C.salmon}66)`}}>
           <svg width="90" viewBox="30 140 230 110" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#FFBF9E" d="M185.38,206.473l10.697-10.695l-36.604-36.604l-10.696,10.697l-0.806,32.382l-8.621,0.29l0.862-34.607c0.027-1.104,0.478-2.156,1.26-2.938l14.957-14.957c1.682-1.682,4.408-1.682,6.089,0l42.692,42.691c1.681,1.682,1.681,4.408,0,6.089l-14.959,14.958c-0.781,0.781-1.831,1.231-2.937,1.259l-85.845,2.14l-10.696,10.696l36.604,36.603l10.696-10.697l0.802-32.189l8.617-0.141l-0.854,34.266c-0.028,1.104-0.478,2.156-1.261,2.938l-14.957,14.957c-1.681,1.682-4.407,1.682-6.089,0l-42.69-42.691c-1.683-1.682-1.683-4.408,0-6.089l14.957-14.958c0.781-0.781,1.832-1.232,2.938-1.259L185.38,206.473z"/>
-            <polygon fill="#E27C00" points="153.217,202.325 183.263,201.578 188.846,195.994 182.948,190.122 153.521,190.121"/>
-            <polygon fill="#E27C00" points="127.452,257.386 133.035,251.803 133.422,236.09 106.192,236.09"/>
+            <path fill="#EB6BAF" d="M185.38,206.473l10.697-10.695l-36.604-36.604l-10.696,10.697l-0.806,32.382l-8.621,0.29l0.862-34.607c0.027-1.104,0.478-2.156,1.26-2.938l14.957-14.957c1.682-1.682,4.408-1.682,6.089,0l42.692,42.691c1.681,1.682,1.681,4.408,0,6.089l-14.959,14.958c-0.781,0.781-1.831,1.231-2.937,1.259l-85.845,2.14l-10.696,10.696l36.604,36.603l10.696-10.697l0.802-32.189l8.617-0.141l-0.854,34.266c-0.028,1.104-0.478,2.156-1.261,2.938l-14.957,14.957c-1.681,1.682-4.407,1.682-6.089,0l-42.69-42.691c-1.683-1.682-1.683-4.408,0-6.089l14.957-14.958c0.781-0.781,1.832-1.232,2.938-1.259L185.38,206.473z"/>
+            <polygon fill="#532943" points="153.217,202.325 183.263,201.578 188.846,195.994 182.948,190.122 153.521,190.121"/>
+            <polygon fill="#532943" points="127.452,257.386 133.035,251.803 133.422,236.09 106.192,236.09"/>
           </svg>
         </div>
         <div style={{fontSize:36,fontWeight:900,color:C.white,letterSpacing:'-.04em',marginTop:12,animation:'vText .7s cubic-bezier(.22,1,.36,1) .15s both',textTransform:'uppercase',textShadow:`0 0 40px ${C.orange}`}}>VERROU</div>
@@ -2252,12 +2252,12 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:
               </button>
             </div>
             {onCounter && (
-              <button onClick={()=>setShowCounter(true)} style={{width:'100%',padding:'11px',background:'rgba(200,134,10,.1)',border:'1.5px solid rgba(200,134,10,.33)',borderRadius:14,color:"C.gold",fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+              <button onClick={()=>setShowCounter(true)} style={{width:'100%',padding:'11px',background:'rgba(235,107,175,.1)',border:'1.5px solid rgba(235,107,175,.33)',borderRadius:14,color:"C.gold",fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                 ↩ {isFr?'Contre-clutch…':'Counter-clutch…'}
               </button>
             )}
           </>) : (
-            <div style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(200,134,10,.27)',borderRadius:16,padding:16,display:'flex',flexDirection:'column',gap:10}}>
+            <div style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(235,107,175,.27)',borderRadius:16,padding:16,display:'flex',flexDirection:'column',gap:10}}>
               <div style={{fontSize:13,fontWeight:800,color:"C.gold",marginBottom:2}}>{isFr?'Ton contre-Clutch':'Your counter-Clutch'}</div>
               <input
                 value={counterVenue}
@@ -3808,7 +3808,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
 
             <button onClick={createGroupEvent} disabled={creating}
-              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(255,191,158,0.35)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+              style={{width:'100%',padding:'15px',borderRadius:14,background:newEvValid?C.salmon:'rgba(83,41,67,0.35)',border:'none',color:newEvValid?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
               {creating?(EN?'Creating…':'Création...'):(EN?'✦ Publish event':'✦ Publier l\'événement')}
             </button>
             {!newEvValid && <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>{EN?'Tap “Publish” to see what\'s missing.':'Touche « Publier » pour voir ce qui manque.'}</div>}
@@ -4232,7 +4232,7 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
   return (
     <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center',background:'rgba(0,0,0,.65)',backdropFilter:'blur(6px)'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
-      <div style={{width:'100%',maxWidth:480,background:`linear-gradient(180deg,${C.bordeauxLight} 0%,${C.bordeaux} 100%)`,borderRadius:'24px 24px 0 0',padding:'6px 20px 44px',border:`1px solid ${C.border}`,boxShadow:`0 -8px 40px rgba(200,134,10,.15)`}}>
+      <div style={{width:'100%',maxWidth:480,background:`linear-gradient(180deg,${C.bordeauxLight} 0%,${C.bordeaux} 100%)`,borderRadius:'24px 24px 0 0',padding:'6px 20px 44px',border:`1px solid ${C.border}`,boxShadow:`0 -8px 40px rgba(235,107,175,.15)`}}>
         {/* Handle */}
         <div style={{display:'flex',justifyContent:'center',padding:'10px 0 16px'}}>
           <div style={{width:36,height:4,borderRadius:2,background:C.border}}/>
@@ -4271,7 +4271,7 @@ function AppFeedbackModal({ user, onClose, showToast }: { user: any; onClose: ()
           color:(!text.trim()&&!audioBlob)?C.whiteMid:'#000',
           fontSize:15,fontWeight:900,cursor:(!text.trim()&&!audioBlob)?'default':'pointer',
           fontFamily:'inherit',opacity:sending?.6:1,
-          boxShadow:(!text.trim()&&!audioBlob)?'none':'0 4px 20px rgba(200,134,10,.4)',
+          boxShadow:(!text.trim()&&!audioBlob)?'none':'0 4px 20px rgba(235,107,175,.4)',
           transition:'all .2s',letterSpacing:'-.01em',
         }}>
           {sending ? '✦ Sending…' : '✦ Send feedback'}
@@ -4604,7 +4604,7 @@ function ProfileSheet({ profile, userId, onClutch, onClose, showToast, activeClu
               <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>🗣 {t('profile.languages')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {languages.map((l,i)=>(
-                  <span key={i} style={{fontSize:11,fontWeight:700,padding:'4px 10px',background:`rgba(255,191,158,0.1)`,border:`1px solid rgba(255,191,158,0.35)`,borderRadius:20,color:`rgba(255,191,158,0.7)`}}>{l}</span>
+                  <span key={i} style={{fontSize:11,fontWeight:700,padding:'4px 10px',background:`rgba(83,41,67,0.1)`,border:`1px solid rgba(83,41,67,0.35)`,borderRadius:20,color:`rgba(83,41,67,0.7)`}}>{l}</span>
                 ))}
               </div>
             </div>
@@ -5793,7 +5793,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               {user.photo_url
                 ? <img src={user.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none'}}/>
                 : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,color:C.whiteMid,opacity:.4}}>+</div>}
-              <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(200,134,10,.85)',borderRadius:5,padding:'2px 5px'}}>★ Principale</div>
+              <div style={{position:'absolute',bottom:4,left:5,fontSize:8,fontWeight:800,color:'rgba(255,255,255,.9)',background:'rgba(235,107,175,.85)',borderRadius:5,padding:'2px 5px'}}>★ Principale</div>
             </div>
             )})()}
             {/* 4 slots EXTRAS (idx 0..3) */}
@@ -6636,7 +6636,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         ))}
         <div style={{textAlign:'center',padding:'14px 10px 4px'}}>
           <div style={{fontSize:13,fontStyle:'italic',color:C.salmon,marginBottom:14}}>« Réunir ce qui était séparé. »<br/><span style={{fontSize:11,color:C.whiteMid,fontStyle:'normal'}}>Clutch te ramène vers le vrai, en douceur.</span></div>
-          <button onClick={()=>{ markGuideSeen(); setProfilePage(null) }} style={{padding:'13px 26px',borderRadius:14,border:'none',background:C.orange,color:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(226,124,0,.35)'}}>J'ai compris ✦</button>
+          <button onClick={()=>{ markGuideSeen(); setProfilePage(null) }} style={{padding:'13px 26px',borderRadius:14,border:'none',background:C.orange,color:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(235,107,175,.35)'}}>J'ai compris ✦</button>
         </div>
       </div>
     )
@@ -6884,7 +6884,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           <div style={{fontSize:11,color:`${C.whiteMid}aa`,marginTop:7}}>Designed in Lausanne <span style={{fontSize:12}}>🇨🇭</span> · © 2026</div>
           <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:3,fontStyle:'italic'}}>La vraie vie, maintenant.</div>
 
-          <button onClick={()=>onFeedback?.()} style={{marginTop:20,padding:'13px 22px',borderRadius:14,background:C.orange,border:'none',color:'#fff',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(226,124,0,.4)'}}>
+          <button onClick={()=>onFeedback?.()} style={{marginTop:20,padding:'13px 22px',borderRadius:14,background:C.orange,border:'none',color:'#fff',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(235,107,175,.4)'}}>
             💌 Un mot au boss ?
           </button>
           <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:9,lineHeight:1.5}}>Vocal (max 5 min) ou texte — ça arrive direct<br/>chez les créateurs ✦ Merci de tester Clutch 🙏</div>
@@ -7449,11 +7449,11 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                 <div style={{position:'absolute',inset:0,background:'rgba(42,16,32,.97)',borderRadius:16,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 20px',gap:14,zIndex:99}}>
                   <div style={{fontSize:28}}>😔</div>
                   <div style={{fontSize:15,fontWeight:900,color:'#dc2626',textAlign:'center'}}>Retard refusé</div>
-                  <div style={{fontSize:12,color:'#FFBF9E',lineHeight:1.6,textAlign:'center'}}>
+                  <div style={{fontSize:12,color:'#EB6BAF',lineHeight:1.6,textAlign:'center'}}>
                     {other?.name||'Ton partenaire'} n'a pas pu t'attendre.
                     {refuserMsg && <><br/><span style={{fontStyle:'italic',color:'#f5e8de',marginTop:6,display:'block'}}>«&nbsp;{refuserMsg}&nbsp;»</span></>}
                   </div>
-                  <div style={{fontSize:11,color:'rgba(255,191,158,.6)',textAlign:'center',lineHeight:1.5}}>
+                  <div style={{fontSize:11,color:'rgba(83,41,67,.6)',textAlign:'center',lineHeight:1.5}}>
                     Ce Clutch est annulé.<br/>Ton score de fiabilité est légèrement impacté.
                   </div>
                   <button onClick={async e=>{
@@ -7466,7 +7466,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                       await sb?.from('profiles').update({reliability_score:Math.max(0,cur-3)}).eq('id',userId)
                     } catch {}
                     onRetardAck ? onRetardAck() : onClick()
-                  }} style={{width:'100%',padding:'13px',borderRadius:12,border:'none',background:'#C8860A',color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:.3}}>
+                  }} style={{width:'100%',padding:'13px',borderRadius:12,border:'none',background:'#EB6BAF',color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:.3}}>
                     J'ai compris
                   </button>
                 </div>
@@ -7499,7 +7499,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                   />
                   <div style={{display:'flex',gap:8}}>
                     <button onClick={e=>{e.stopPropagation();setShowRefuseInput(false);setRefuseMsg('')}}
-                      style={{flex:1,padding:'8px',borderRadius:10,border:'1px solid rgba(255,191,158,.3)',background:'transparent',color:'#FFBF9E',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                      style={{flex:1,padding:'8px',borderRadius:10,border:'1px solid rgba(83,41,67,.3)',background:'transparent',color:'#EB6BAF',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                       ← Retour
                     </button>
                     <button onClick={async e=>{
@@ -9190,7 +9190,7 @@ export default function App2() {
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
                         onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
-                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'rgba(255,191,158,.18)',pointerEvents:'none'}}/>
+                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'rgba(83,41,67,.18)',pointerEvents:'none'}}/>
                         <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:C.orange,pointerEvents:'none'}}/>
                         <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:C.orange,border:`2px solid ${C.bg}`,pointerEvents:'none'}}/>
                       </div>
@@ -9452,23 +9452,23 @@ export default function App2() {
                       {/* Boutons header Présences */}
                       <div style={{display:'flex',gap:6,alignItems:'center'}}>
                         {/* Bouton Live SVG */}
-                        <button onClick={activateLive} style={{position:'relative',width:40,height:40,borderRadius:'50%',border:`1.5px solid ${liveMode?'#E27D09':'rgba(226,125,9,.35)'}`,background:liveMode?'rgba(226,125,9,.15)':'rgba(226,125,9,.07)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,overflow:'visible',flexShrink:0}}>
+                        <button onClick={activateLive} style={{position:'relative',width:40,height:40,borderRadius:'50%',border:`1.5px solid ${liveMode?'#EB6BB0':'rgba(235,107,175,.35)'}`,background:liveMode?'rgba(235,107,175,.15)':'rgba(235,107,175,.07)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,overflow:'visible',flexShrink:0}}>
                           <style>{`
                             @keyframes liveRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
                             @keyframes livePulseRing{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.25);opacity:0}}
                             @keyframes liveBlast{0%{transform:scale(1);opacity:1}40%{transform:scale(2.5);opacity:.6}100%{transform:scale(4);opacity:0}}
                           `}</style>
                           {/* Anneau pulse autour */}
-                          {!liveMode && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'1.5px solid rgba(226,125,9,.5)',animation:'livePulseRing 2s ease-in-out infinite',pointerEvents:'none'}}/>}
-                          {liveActivating && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'2px solid #E27D09',animation:'liveBlast .9s ease-out forwards',pointerEvents:'none'}}/>}
+                          {!liveMode && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'1.5px solid rgba(235,107,175,.5)',animation:'livePulseRing 2s ease-in-out infinite',pointerEvents:'none'}}/>}
+                          {liveActivating && <div style={{position:'absolute',inset:-4,borderRadius:'50%',border:'2px solid #EB6BB0',animation:'liveBlast .9s ease-out forwards',pointerEvents:'none'}}/>}
                           {/* SVG Clutch Live */}
                           <svg width="22" height="21" viewBox="0 0 469.8 450" style={{animation:liveMode?'liveRotate 8s linear infinite':undefined,flexShrink:0}}>
-                            <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
-                            <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
-                            <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
-                            <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
-                            <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
-                            <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+                            <polygon fill="#EB6BB0" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
+                            <polygon fill="#EB6BB0" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
+                            <path fill="#D76FA9" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+                            <path fill="#EB6BB0" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+                            <path fill="#D76FA9" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+                            <path fill="#D76FA9" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
                           </svg>
                           {/* Pastille LIVE quand actif */}
                           {liveMode && <div style={{position:'absolute',top:-2,right:-2,width:9,height:9,borderRadius:'50%',background:'#FF1493',border:'1.5px solid #542A44',boxShadow:'0 0 6px rgba(255,20,147,.9)'}}/>}
@@ -9478,7 +9478,7 @@ export default function App2() {
                           style={{padding:'6px 10px',borderRadius:20,border:`1px solid ${proMode?C.gold:C.border}`,background:proMode?`${C.gold}22`:'transparent',color:proMode?C.gold:C.whiteMid,fontSize:11,fontWeight:proMode?800:500,cursor:'pointer',fontFamily:'inherit'}}>
                           💼
                         </button>
-                        <button onClick={rdvBlocked ? ()=>showToast('RDV en cours — reviens 2h après ton RDV',C.orange) : ()=>setFlow('carte')} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${rdvBlocked?C.border:C.orange}`,background:rdvBlocked?'rgba(255,191,158,.1)':C.orange,color:rdvBlocked?`${C.salmon}88`:'#fff',fontSize:11,fontWeight:800,cursor:rdvBlocked?'not-allowed':'pointer',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',opacity:rdvBlocked?.5:1}}>
+                        <button onClick={rdvBlocked ? ()=>showToast('RDV en cours — reviens 2h après ton RDV',C.orange) : ()=>setFlow('carte')} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${rdvBlocked?C.border:C.orange}`,background:rdvBlocked?'rgba(83,41,67,.1)':C.orange,color:rdvBlocked?`${C.salmon}88`:'#fff',fontSize:11,fontWeight:800,cursor:rdvBlocked?'not-allowed':'pointer',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',opacity:rdvBlocked?.5:1}}>
                           {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : (availableRef ? `✦ Actif` : '+ Créneau'))}
                         </button>
                       </div>
@@ -9590,7 +9590,7 @@ export default function App2() {
 
                     {/* Banner invisible */}
                     {!availableRef && (
-                      <div style={{background:'rgba(200,134,10,.08)',border:`1px solid ${C.orange}33`,borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
+                      <div style={{background:'rgba(235,107,175,.08)',border:`1px solid ${C.orange}33`,borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
                         <span style={{fontSize:14,flexShrink:0}}>{isPremium?'👁':'◌'}</span>
                         <div style={{flex:1}}>
                           <div style={{fontSize:11,fontWeight:700,color:C.orange}}>{isPremium?'Mode discret — tu es invisible':'Tu n\'es pas visible pour l\'instant'}</div>
@@ -9694,7 +9694,7 @@ export default function App2() {
                                   {(p as any)._isGpsTestBot&&<span style={{fontSize:9,fontWeight:900,padding:'2px 7px',borderRadius:8,background:'rgba(34,197,94,.15)',color:'#22C55E',border:'1px solid rgba(34,197,94,.4)',letterSpacing:0.3}}>🛰️ GPS TEST · Morges Gare</span>}
                                   {(p as any)._hasEvent&&(
                                     <span onClick={e=>{e.stopPropagation();setTab('evenements');setOpenEventId((p as any)._eventId||null)}}
-                                      style={{fontSize:12,padding:'1px 5px',borderRadius:6,background:'rgba(200,134,10,.15)',border:'1px solid rgba(200,134,10,.35)',cursor:'pointer'}}
+                                      style={{fontSize:12,padding:'1px 5px',borderRadius:6,background:'rgba(235,107,175,.15)',border:'1px solid rgba(235,107,175,.35)',cursor:'pointer'}}
                                       title="Voir l'événement">
                                       {(p as any)._eventEmoji||'📅'}
                                     </span>
@@ -9728,7 +9728,7 @@ export default function App2() {
                                     </div>
                                   )}
                                   {(p.reliability_score!=null&&p.reliability_score<60)&&<RabbitBadge/>}
-                                  {distZone&&<span style={{fontSize:10,color:'rgba(255,191,158,.55)',fontWeight:600,marginLeft:'auto'}}>{distZone}</span>}
+                                  {distZone&&<span style={{fontSize:10,color:'rgba(83,41,67,.55)',fontWeight:600,marginLeft:'auto'}}>{distZone}</span>}
                                 </div>
                               </div>
 
@@ -9757,14 +9757,14 @@ export default function App2() {
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div style={{display:'flex',alignItems:'center',gap:10}}>
                           <div style={{position:'relative',width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                            <div style={{position:'absolute',inset:0,borderRadius:'50%',background:'radial-gradient(circle,rgba(226,125,9,.3),transparent 70%)'}}/>
+                            <div style={{position:'absolute',inset:0,borderRadius:'50%',background:'radial-gradient(circle,rgba(235,107,175,.3),transparent 70%)'}}/>
                             <svg width="28" height="26" viewBox="0 0 469.8 450" style={{animation:'liveRotate 10s linear infinite'}}>
-                              <polygon fill="#E27D09" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
-                              <polygon fill="#E27D09" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
-                              <path fill="#F8BE9F" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
-                              <path fill="#E27D09" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
-                              <path fill="#F8BE9F" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
-                              <path fill="#F8BE9F" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
+                              <polygon fill="#EB6BB0" points="174,294.9 181.3,287.6 181.8,267.3 146.5,267.3"/>
+                              <polygon fill="#EB6BB0" points="207.4,223.5 246.4,222.5 253.6,215.3 246,207.7 207.8,207.7"/>
+                              <path fill="#D76FA9" d="M249.4,229.1l13.9-13.9l-47.5-47.5L202,181.6l-1,42l-11.2,0.4l1.1-44.9c0-1.4,0.6-2.8,1.6-3.8l19.4-19.4c2.2-2.2,5.7-2.2,7.9,0l55.3,55.3c2.2,2.2,2.2,5.7,0,7.9l-19.4,19.4c-1,1-2.4,1.6-3.8,1.6L140.6,243l-13.9,13.9l47.5,47.5l13.9-13.9l1-41.7l11.2-0.2l-1.1,44.4c0,1.4-0.6,2.8-1.6,3.8l-19.4,19.4c-2.2,2.2-5.7,2.2-7.9,0l-55.3-55.3c-2.2-2.2-2.2-5.7,0-7.9l19.4-19.4c1-1,2.4-1.6,3.8-1.6L249.4,229.1z"/>
+                              <path fill="#EB6BB0" d="M338.1,215.6h-42.8v-42.8C318.9,172.8,338.1,192,338.1,215.6z"/>
+                              <path fill="#D76FA9" d="M301.2,154.7v-7.4h4.5c1.6,0,2.8-1.3,2.8-2.8v-9.3c0-1.6-1.3-2.8-2.8-2.8H285c-1.6,0-2.8,1.3-2.8,2.8v9.3c0,1.6,1.3,2.8,2.8,2.8h4.5v7.4c-16,1.5-30.2,9.2-40.2,20.7l8,8c9.2-10.8,22.8-17.7,38-17.7c27.5,0,49.8,22.4,49.8,49.8s-22.4,49.9-49.8,49.9c-15.8,0-29.9-7.4-39.1-19c-1.3,0.5-2.7,0.8-4.1,0.8l-9,0.2c10.8,17.5,30.1,29.3,52.2,29.3c33.7,0,61.2-27.4,61.2-61.2C356.5,183.8,332.2,157.6,301.2,154.7z"/>
+                              <path fill="#D76FA9" d="M346,173.3c1.1,1.1,2.9,1.1,4,0l3.9-3.9c1.1-1.1,1.1-2.9,0-4l-7.1-7.1c-1.1-1.1-2.9-1.1-4,0l-3.9,3.9c-1.1,1.1-1.1,2.9,0,4L346,173.3z"/>
                             </svg>
                           </div>
                           <span style={{fontSize:22,fontWeight:900,color:'#fff',letterSpacing:-.5}}>LIVE</span>
@@ -9899,7 +9899,7 @@ export default function App2() {
                     {pendingFeedbacks >= TRUST_CONFIG.GATE_WARN && (
                       <div onClick={()=>{ const p=(clutches as any[]).find(c=>(c.status==='confirmed'||c.status==='accepted')&&c.proposed_time&&new Date(c.proposed_time).getTime()+30*60*1000<Date.now()&&!localStorage.getItem(`feedback_done_${c.id}`));if(p){setFeedbackClutch(p);setShowFeedback(true)}}}
                         style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,marginBottom:10,cursor:'pointer',
-                          background: pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?'rgba(239,68,68,.12)':pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?'rgba(226,124,0,.12)':'rgba(255,191,158,.08)',
+                          background: pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?'rgba(239,68,68,.12)':pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?'rgba(235,107,175,.12)':'rgba(83,41,67,.08)',
                           border: `1px solid ${pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?C.red:pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?C.orange:C.border}`}}>
                         <span style={{fontSize:20,flexShrink:0}}>{pendingFeedbacks>=TRUST_CONFIG.GATE_BLOCK?'🔒':pendingFeedbacks>=TRUST_CONFIG.GATE_ORANGE?'⚠️':'💬'}</span>
                         <div style={{flex:1}}>
@@ -10233,7 +10233,7 @@ export default function App2() {
                                     return (
                                       <div style={{position:'relative',flexShrink:0}}>
                                         <button onClick={()=>setDelayPickerOpen(isOpen?null:c.id)}
-                                          style={{padding:'8px 10px',background:'rgba(226,124,0,.1)',border:`1px solid ${C.orange}44`,borderRadius:10,color:C.orange,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                                          style={{padding:'8px 10px',background:'rgba(235,107,175,.1)',border:`1px solid ${C.orange}44`,borderRadius:10,color:C.orange,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
                                           ⏰ Retard
                                         </button>
                                         {isOpen && (
@@ -10317,7 +10317,7 @@ export default function App2() {
                             <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:10}}>
                               {/* Contre-Clutch — proposer autre lieu/heure */}
                               <button onClick={()=>{setCounterClutchId(c.id);setCounterVenue(c.venue||'');setCounterTime('');setCounterMsg('')}}
-                                style={{width:'100%',padding:'7px',background:'rgba(255,191,158,.07)',border:`1px dashed ${C.border}`,borderRadius:10,color:C.salmon,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',letterSpacing:0.2}}>
+                                style={{width:'100%',padding:'7px',background:'rgba(83,41,67,.07)',border:`1px dashed ${C.border}`,borderRadius:10,color:C.salmon,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',letterSpacing:0.2}}>
                                 ↩ {lang==='en'?'Counter-propose (other place/time)':'Contre-proposer (autre lieu/heure)'}
                               </button>
                               <div style={{display:'flex',gap:8}}>
@@ -10378,7 +10378,7 @@ export default function App2() {
                             ? (isRec ? (lang==='en'?'↩ Cancelled by them':'↩ Annulé') : (lang==='en'?'↩ You cancelled':'↩ Tu as annulé'))
                             : (lang==='en'?'Expired':'Expiré')
                           return (
-                            <div key={c.id} style={{background:C.bgCard,border:`1px solid ${isMutualContact?'rgba(200,134,10,.3)':'rgba(255,255,255,.06)'}`,borderRadius:12,marginTop:4,padding:'9px 11px',opacity: isMutualContact?1:.65,display:'flex',gap:10,alignItems:'flex-start'}}>
+                            <div key={c.id} style={{background:C.bgCard,border:`1px solid ${isMutualContact?'rgba(235,107,175,.3)':'rgba(255,255,255,.06)'}`,borderRadius:12,marginTop:4,padding:'9px 11px',opacity: isMutualContact?1:.65,display:'flex',gap:10,alignItems:'flex-start'}}>
                               <Av src={other?.photo_url} name={other?.name||'?'} size={30}/>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:11,fontWeight:600,color:isMutualContact?C.salmon:C.whiteMid}}>{isRec?'↙':'↗'} {other?.name||'?'}</div>
@@ -10390,7 +10390,7 @@ export default function App2() {
                                 )}
                                 {isMutualContact&&(
                                   <button onClick={()=>{setChatClutch(c);setShowChat(true)}}
-                                    style={{marginTop:6,width:'100%',padding:'7px 10px',background:'rgba(200,134,10,.15)',border:'1px solid rgba(200,134,10,.4)',borderRadius:9,color:C.gold,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'center'}}>
+                                    style={{marginTop:6,width:'100%',padding:'7px 10px',background:'rgba(235,107,175,.15)',border:'1px solid rgba(235,107,175,.4)',borderRadius:9,color:C.gold,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'center'}}>
                                     💬 {lang==='en'?`Chat with ${other?.name||'...'}`:`Discuter avec ${other?.name||'...'}`}
                                   </button>
                                 )}
@@ -10435,7 +10435,7 @@ export default function App2() {
                 return (
                   <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
                     {/* Header */}
-                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(var(--sat) + 16px)',borderBottom:'1px solid rgba(255,191,158,.1)',flexShrink:0}}>
+                    <div style={{padding:'16px 16px 12px',paddingTop:'calc(var(--sat) + 16px)',borderBottom:'1px solid rgba(83,41,67,.1)',flexShrink:0}}>
                       <div style={{fontSize:18,fontWeight:900,color:'#f5e8de'}}>{t2('contacts.title')}</div>
                       <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
                     </div>
@@ -10456,8 +10456,8 @@ export default function App2() {
                         return (
                           <div key={c.id} style={{marginBottom:8}}>
                           {/* Pas de chat (philosophie Clutch) : le clic ouvre le PROFIL → de là on peut proposer un RDV */}
-                          <button onClick={()=>{ if(other){setSelProfile(other);setShowProfileSheet(true)} }} style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 12px',background:'rgba(255,255,255,.04)',border:`1px solid rgba(255,191,158,.1)`,borderRadius:16,marginBottom:6,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative'}}>
-                            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(200,134,10,.2)',flexShrink:0,overflow:'hidden',border:`2px solid ${unread>0?'#FF8C00':'rgba(255,191,158,.2)'}`}}>
+                          <button onClick={()=>{ if(other){setSelProfile(other);setShowProfileSheet(true)} }} style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 12px',background:'rgba(255,255,255,.04)',border:`1px solid rgba(83,41,67,.1)`,borderRadius:16,marginBottom:6,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',WebkitTapHighlightColor:'transparent',position:'relative'}}>
+                            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(235,107,175,.15)',flexShrink:0,overflow:'hidden',border:`2px solid ${unread>0?'#EB6BAF':'rgba(83,41,67,.2)'}`}}>
                               {otherPhoto ? <img src={otherPhoto} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/> : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{otherName[0]?.toUpperCase()}</div>}
                             </div>
                             <div style={{flex:1,textAlign:'left'}}>
@@ -10465,7 +10465,7 @@ export default function App2() {
                               <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>RDV · {new Date(c.proposed_time||c.created_at).toLocaleDateString('fr-CH',{day:'numeric',month:'short'})}</div>
                             </div>
                             {unread > 0 && (
-                              <div style={{width:22,height:22,borderRadius:'50%',background:'#FF8C00',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#fff',flexShrink:0,boxShadow:'0 0 8px rgba(255,140,0,.6)'}}>
+                              <div style={{width:22,height:22,borderRadius:'50%',background:'#EB6BAF',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#fff',flexShrink:0,boxShadow:'0 0 8px rgba(235,107,175,.6)'}}>
                                 {unread}
                               </div>
                             )}
@@ -10744,17 +10744,17 @@ export default function App2() {
               <div style={{position:'fixed',inset:0,zIndex:4100,background:'rgba(10,4,8,.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={()=>setKeepContactClutch(null)}>
                 <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'20px 20px 0 0',padding:'28px 24px 48px',border:`1px solid ${C.border}`,boxShadow:'0 -8px 30px rgba(0,0,0,.12)'}}>
                   <div style={{textAlign:'center',marginBottom:24}}>
-                    {otherPhoto && <div style={{width:64,height:64,borderRadius:'50%',backgroundImage:`url(${otherPhoto})`,backgroundSize:'cover',backgroundPosition:'center',margin:'0 auto 12px',border:'3px solid rgba(255,191,158,.3)'}}/>}
+                    {otherPhoto && <div style={{width:64,height:64,borderRadius:'50%',backgroundImage:`url(${otherPhoto})`,backgroundSize:'cover',backgroundPosition:'center',margin:'0 auto 12px',border:'3px solid rgba(83,41,67,.3)'}}/>}
                     <div style={{fontSize:18,fontWeight:900,color:'#f5e8de',marginBottom:6}}>{alreadyContact ? '✦ Déjà dans tes contacts' : 'Garder le contact ?'}</div>
-                    <div style={{fontSize:13,color:'rgba(255,191,158,.7)'}}>{alreadyContact ? <>Tu as déjà <strong style={{color:'#FFBF9E'}}>{otherName}</strong> dans tes contacts.</> : <>Veux-tu rester en contact avec <strong style={{color:'#FFBF9E'}}>{otherName}</strong> ?</>}</div>
+                    <div style={{fontSize:13,color:'rgba(83,41,67,.7)'}}>{alreadyContact ? <>Tu as déjà <strong style={{color:'#EB6BAF'}}>{otherName}</strong> dans tes contacts.</> : <>Veux-tu rester en contact avec <strong style={{color:'#EB6BAF'}}>{otherName}</strong> ?</>}</div>
                   </div>
                   <div style={{display:'flex',gap:12}}>
                     <button onClick={()=>handleAnswer(false)}
-                      style={{flex:1,padding:'14px',borderRadius:14,border:'1px solid rgba(255,191,158,.2)',background:'transparent',color:'rgba(255,191,158,.6)',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                      style={{flex:1,padding:'14px',borderRadius:14,border:'1px solid rgba(83,41,67,.2)',background:'transparent',color:'rgba(83,41,67,.6)',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                       Non merci
                     </button>
                     <button onClick={()=>handleAnswer(true)}
-                      style={{flex:2,padding:'14px',borderRadius:14,border:'none',background:'#C8860A',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(200,134,10,.4)'}}>
+                      style={{flex:2,padding:'14px',borderRadius:14,border:'none',background:'#EB6BAF',color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(235,107,175,.4)'}}>
                       Oui, garder contact ✦
                     </button>
                   </div>
@@ -10780,7 +10780,7 @@ export default function App2() {
               (L'ancien bouton 💬 feedback est déplacé tout en bas du Profil.) */}
           <style>{`
             @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
-            @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 0 0 rgba(226,125,9,0),0 6px 16px rgba(0,0,0,.3)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 20px 6px rgba(226,125,9,.55),0 6px 16px rgba(0,0,0,.3)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.5),0 0 13px 4px rgba(226,125,9,.35),0 6px 16px rgba(0,0,0,.3)}}
+            @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(83,41,67,.20)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 20px 6px rgba(235,107,175,.55),0 4px 14px rgba(83,41,67,.20)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 13px 4px rgba(235,107,175,.35),0 4px 14px rgba(83,41,67,.20)}}
             @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
             .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
             @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
@@ -10800,9 +10800,9 @@ export default function App2() {
               if(Math.hypot(vx,vy)>0.6){ fabRaf.current=requestAnimationFrame(step) } else { setFabPos(p=>{ if(p){try{localStorage.setItem('clutch_fab_pos',JSON.stringify(p))}catch{}} return p }) } }}
             style={{
             position:'fixed', ...(fabPos? {left:fabPos.x, top:fabPos.y} : {bottom:'calc(var(--sab) + 84px)', right:14}),
-            zIndex:1200, width:46, height:46, borderRadius:'50%', touchAction:'none',
-            background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
-          }}><img src="/icons/clutch_live_mel.svg" width={46} height={46} alt="Clutch Live" draggable={false} style={{filter:'drop-shadow(0 4px 12px rgba(83,41,67,.35))',pointerEvents:'none'}}/></button>}
+            zIndex:1200, width:52, height:52, borderRadius:'50%', touchAction:'none',
+            background:'#FFFFFF', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+          }}><img src="/icons/clutch_live_mel.svg" width={34} height={34} alt="Clutch Live" draggable={false} style={{pointerEvents:'none'}}/></button>}
           {showAppFeedback && user && <AppFeedbackModal user={user} onClose={()=>setShowAppFeedback(false)} showToast={showToast}/>}
           {/* 🌙 Clutch Night (prototype) */}
           {showClutchNight && <ClutchNightOverlay onClose={()=>setShowClutchNight(false)} onActivate={()=>{ setShowClutchNight(false); showToast('🌙 Clutch Night arrive bientôt — on prépare les soirées',C.orange) }}/>}
@@ -11013,7 +11013,7 @@ function ContactClutchModal({ from, to, onClose, onSent, showToast }: {
         </div>
 
         <button onClick={handleSend} disabled={loading}
-          style={{width:'100%',padding:'15px',borderRadius:14,border:'none',background:C2.gold,color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(200,134,10,.4)',opacity:loading?.6:1}}>
+          style={{width:'100%',padding:'15px',borderRadius:14,border:'none',background:C2.gold,color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 3px 16px rgba(235,107,175,.4)',opacity:loading?.6:1}}>
           {loading?'Envoi…':'✦ Envoyer la proposition'}
         </button>
       </div>

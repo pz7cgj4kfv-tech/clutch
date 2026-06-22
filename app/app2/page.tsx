@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x127'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x128'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9366,37 +9366,15 @@ export default function App2() {
                   </div>
                 </div>
 
-                {/* 4. ACTIVITÉ */}
-                <div style={{marginBottom:16}}>
-                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>{lang==='en'?'I feel like…':'J\'ai envie de…'} <span style={{fontWeight:400,textTransform:'none',fontSize:9,color:C.whiteMid}}>({lang==='en'?'optional':'optionnel'})</span></div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                    {[{e:'☕',l:'Café'},{e:'🍷',l:'Apéro'},{e:'🍕',l:'Dîner'},{e:'🚶',l:'Balade'},{e:'🎭',l:'Culture'},{e:'🏃',l:'Sport'},{e:'🎵',l:'Concert'},{e:'🎮',l:'Jeux'},{e:'📸',l:'Photo'},{e:'🧘',l:'Yoga'},{e:'🌿',l:'Bien-être'},{e:'🍜',l:'Resto'},{e:'✨',l:'Surprise moi'}].map(a=>{
-                      const on=activites.includes(a.l)
-                      const isSurprise = a.l==='Surprise moi'
-                      return <button key={a.l} onClick={()=>{
-                        if(isSurprise) {
-                          // Surprise moi = exclusif, efface tout le reste
-                          setActivites(on ? [] : ['Surprise moi'])
-                        } else {
-                          // Désélectionner Surprise si on choisit autre chose
-                          const without = activites.filter(x=>x!==a.l&&x!=='Surprise moi')
-                          setActivites(on ? without : [...without,a.l])
-                        }
-                      }}
-                        style={{padding:'5px 10px',borderRadius:20,border:`1.5px solid ${on?C.salmon:C.border}`,background:on?C.salmonFaint:'transparent',color:on?C.salmon:C.whiteMid,fontSize:11,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:3}}>
-                        <span>{a.e}</span>{a.l}
-                      </button>
-                    })}
-                  </div>
-                </div>
+                {/* 4. (Menu « J'ai envie de » retiré — design Mel 22.06. L'intention passe par le message libre ci-dessous.) */}
 
                 {/* 5. MESSAGE D'INTENTION */}
                 <div style={{marginBottom:16}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                     <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{t('page2.intMsg')} <span style={{fontWeight:400,textTransform:'none'}}>{t('page2.optional')}</span></div>
-                    <div style={{fontSize:9,color:intentMsg.length>120?C.orange:C.whiteMid}}>{intentMsg.length}/150</div>
+                    <div style={{fontSize:9,color:intentMsg.length>48?C.orange:C.whiteMid}}>{intentMsg.length}/60</div>
                   </div>
-                  <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,150))}
+                  <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,60))}
                     placeholder={t('page2.intPlaceholder')}
                     rows={2} style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',fontSize:12,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon}}/>
                   <div style={{fontSize:9,color:C.whiteMid,marginTop:3}}>{t('page2.note')}</div>

@@ -167,6 +167,8 @@ const SECTIONS = [
   { id:'tech',      icon:'⚙️', label:'Tech' },
   { id:'legal',     icon:'⚖️', label:'Légal' },
   { id:'nda',       icon:'📜', label:'NDA' },
+  { id:'naming',    icon:'🔤', label:'Noms' },
+  { id:'social',    icon:'🧩', label:'Modèle social' },
   { id:'principes', icon:'🎯', label:'Principes' },
   { id:'questions', icon:'❓', label:'Questions' },
   { id:'changelog', icon:'📜', label:'Décisions' },
@@ -3226,9 +3228,96 @@ function SectionNDA(){
   )
 }
 
+function SectionNaming(){
+  const card:React.CSSProperties={background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',marginBottom:10}
+  const names = [
+    {n:'Onde', why:'« être sur la même onde » = même longueur d\'onde. Lie au radar/Doppler. Court, FR+EN, chaleureux.', star:3},
+    {n:'Sona / Sonar', why:'le radar de proximité = cœur du produit. Tech, moderne, mémorable.', star:3},
+    {n:'Subito', why:'italien « tout de suite ». Énergique, spontané, sonne bien.', star:3},
+    {n:'Illico', why:'FR « sur-le-champ ». Joueur, immédiat, identitaire.', star:2},
+    {n:'Brio', why:'énergie, panache. Court, classe, FR+EN.', star:2},
+    {n:'Hop', why:'spontané, léger, « hop on se voit ». Très court.', star:2},
+    {n:'Presto', why:'rapide + musical. Connu, positif.', star:2},
+    {n:'Lume', why:'lumière. Doux, chaleureux, brandable.', star:1},
+    {n:'Encore', why:'FR+EN « encore / again ». Donne envie de revoir les gens.', star:1},
+    {n:'Tilt', why:'l\'instant où ça matche, le déclic.', star:1},
+    {n:'Verve', why:'élan, vivacité.', star:1},
+    {n:'Rendez', why:'de « rendez-vous ». Évoque la rencontre.', star:1},
+  ]
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:900,color:C.gold,marginBottom:4}}>🔤 Recherche de noms</div>
+      <div style={{fontSize:12,color:C.dim,marginBottom:14,lineHeight:1.5}}>Daniella n'accroche pas à « Clutch ». On explore. <b style={{color:C.salmon}}>Daniella + Mel : ajoutez vos propositions ici.</b></div>
+      <div style={{...card,background:'rgba(235,107,175,.06)'}}>
+        <div style={{fontSize:12,fontWeight:800,color:C.salmon,marginBottom:6}}>✅ Critères d'un bon nom</div>
+        <div style={{fontSize:11.5,color:C.white,lineHeight:1.7}}>• <b>Court</b> (1-2 syllabes) · <b>prononçable FR + EN</b> · <b>.com/.ch dispo</b> · évoque <b>spontané / vrai / maintenant / lien</b> · ni trop froid ni trop sexuel · <b>pas « match/swipe »</b> (notre promesse anti-Tinder).</div>
+      </div>
+      <div style={{fontSize:12,fontWeight:800,color:C.dim,margin:'14px 2px 8px',letterSpacing:'.05em'}}>PISTES (Claude) — à challenger</div>
+      {names.map(x=>(
+        <div key={x.n} style={card}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+            <span style={{fontSize:15,fontWeight:900,color:C.white}}>{x.n}</span>
+            <span style={{fontSize:11,color:C.gold}}>{'★'.repeat(x.star)}</span>
+          </div>
+          <div style={{fontSize:11.5,color:C.dim,lineHeight:1.5}}>{x.why}</div>
+        </div>
+      ))}
+      <div style={{...card,borderStyle:'dashed',textAlign:'center',color:C.dim,fontSize:12}}>➕ Vos propositions : …………………………… <span style={{opacity:.6}}>(à compléter)</span></div>
+      <div style={{fontSize:11,color:C.dim,marginTop:10,lineHeight:1.5}}>⚠️ Avant de changer : vérifier <b>marque déposée</b> (IGE Suisse), <b>domaine</b>, <b>réseaux sociaux dispos</b>. Un changement de nom tard = coûteux → trancher tôt.</div>
+    </div>
+  )
+}
+
+function SectionSocialModel(){
+  const card:React.CSSProperties={border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',marginBottom:10}
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:900,color:C.gold,marginBottom:4}}>🧩 Modèle social &amp; algo (challenge à mort)</div>
+      <div style={{fontSize:12,color:C.dim,marginBottom:14,lineHeight:1.5}}>Comment on classe TOUT le monde : individus, gratuits, payants, partenaires, groupes réguliers, groupes privés, activités à 2 / 4 / +.</div>
+
+      <div style={{fontSize:13,fontWeight:800,color:C.salmon,margin:'4px 2px 8px'}}>① La structure proposée</div>
+      <div style={card}><b style={{color:C.white}}>Présences</b> = personnes dispo MAINTENANT (1:1 spontané). <span style={{color:C.dim}}>Bibi qui veut un ping-pong ce soir = une personne dispo avec un <b>badge activité épinglé</b> → visible ici ET dans Événements.</span></div>
+      <div style={card}><b style={{color:C.white}}>Événements</b> = activités à 2+. Ponctuelles (Bibi ce soir) ou issues d'un groupe. Gratuit pour un one-shot.</div>
+      <div style={card}><b style={{color:C.white}}>Communauté</b> = organisateurs <b>récurrents qu'on SUIT</b> → notifs (rando du dimanche, yoga horaire variable, oncle musicien). Suivre = gratuit. <span style={{color:C.dim}}>Créer un groupe récurrent qui s'affiche = <b>profil vérifié</b>, et <b>payant si promotion régulière</b>.</span></div>
+      <div style={card}><b style={{color:C.white}}>Partenaires</b> = clubs qui <b>payent</b> → bannières (pub, non filtrables).</div>
+      <div style={card}><b style={{color:C.white}}>Privé</b> = sur invitation / lien. N'apparaît PAS dans les listes publiques.</div>
+
+      <div style={{fontSize:13,fontWeight:800,color:C.salmon,margin:'16px 2px 8px'}}>② Modèle de prix (logique)</div>
+      <div style={card}><span style={{color:C.dim}}>One-shot = <b style={{color:C.white}}>gratuit</b> (Bibi, l'oncle). Groupe <b>récurrent / promotion</b> = <b style={{color:C.white}}>payant ou premium</b> (c'est du business). Partenaires = <b style={{color:C.white}}>paient la visibilité</b> (bannières). Question ouverte business : billetterie, tracking « vient de Clutch », rabais à l'entrée → à challenger avec GPT.</span></div>
+
+      <div style={{fontSize:13,fontWeight:800,color:'#f87171',margin:'16px 2px 8px'}}>③ ⚠️ ÉTHIQUE — groupes privés (David : « c'est pas dangereux ? »)</div>
+      <div style={{...card,background:'rgba(248,113,113,.06)',border:'1px solid rgba(248,113,113,.3)'}}>
+        <div style={{fontSize:11.5,color:C.white,lineHeight:1.7}}>
+          <b style={{color:'#f87171'}}>OUI, risque réel.</b> Un groupe privé/invisible peut cacher : harcèlement, contenu illégal, exploitation, mineurs. Dans une app de rencontre = <b>danger maximal</b>.<br/>
+          <b style={{color:C.white}}>Garde-fous obligatoires (non négociables) :</b><br/>
+          • Créateur <b>VÉRIFIÉ</b> (selfie certifié) — privé ≠ anonyme.<br/>
+          • <b>Signalement</b> dans tout groupe privé + <b>SOS</b> toujours accessible.<br/>
+          • <b>18+</b> vérifié, consentement clair, GPS caché → adresse révélée tard (règle existante).<br/>
+          • CGU + modération : on n'héberge PAS d'illégal.<br/>
+          <b style={{color:'#f87171'}}>L'angle « kink / sexuel » = données SENSIBLES</b> (orientation/préférences sexuelles) au sens <b>LPD suisse / RGPD</b> → consentement explicite, protection renforcée, gros poids légal. → <b>Produit séparé</b>, pas à bricoler sur Clutch sans avocat.
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:800,color:C.salmon,margin:'16px 2px 8px'}}>④ 💎 LA différenciation : l'algo qu'on CONTRÔLE (idée Daniella — « génial »)</div>
+      <div style={{...card,background:'rgba(235,107,175,.06)'}}>
+        <div style={{fontSize:11.5,color:C.white,lineHeight:1.7}}>
+          On laisse l'utilisateur <b>régler son matching</b> : « <b>qui me ressemble</b> » ↔ « <b>opposés s'attirent</b> », sérieux ↔ fun, et surtout <b>adapté à l'humeur du moment</b>.<br/>
+          Test de perso (cadre MBTI, <b>nos questions</b>) = couche fun + petit poids dans l'algo (le matching sérieux reste sur des signaux validés type « Big Five »).<br/>
+          <b>Options avancées cachées</b> pour ceux qui veulent aller à fond — invisibles pour les autres (simplicité dehors, complexité dedans). <b>C'est là qu'on se démarque.</b>
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:800,color:C.salmon,margin:'16px 2px 8px'}}>⑤ Fenêtre 18h — décision David</div>
+      <div style={card}><span style={{color:C.dim}}>On compte la fenêtre <b style={{color:C.white}}>à partir du DÉBUT de dispo choisi</b> (pas de l'ouverture de l'app). Ex : à 14h je me déclare dispo « à partir de 20h » → fenêtre court dès 20h (~16-18h). Même logique pour les events.</span></div>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   map: SectionMap,
   nda: SectionNDA,
+  naming: SectionNaming,
+  social: SectionSocialModel,
   confiance: SectionConfiance,
   strategie: SectionStrategie,
   live: SectionLive,

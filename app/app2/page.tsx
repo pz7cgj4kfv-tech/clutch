@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x134'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x135'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9399,13 +9399,10 @@ export default function App2() {
                 {/* CTA bas */}
                 <div style={{padding:'8px 20px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
                   {/* Step pill */}
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <div style={{width:22,height:22,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:C.bordeaux}}>1</div>
-                    <div style={{display:'flex',gap:4}}>
-                      <div style={{width:20,height:3,borderRadius:2,background:C.orange}}/>
-                      <div style={{width:20,height:3,borderRadius:2,background:C.border}}/>
-                    </div>
-                    <div style={{width:22,height:22,borderRadius:'50%',border:`2px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:C.whiteMid}}>2</div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <div style={{width:18,height:18,borderRadius:'50%',background:C.pink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:900,color:'#fff'}}>1</div>
+                    <div style={{width:11,height:2,borderRadius:1,background:C.salmonMid}}/>
+                    <div style={{width:18,height:18,borderRadius:'50%',border:`1.5px solid ${C.salmonMid}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:C.salmonMid}}>2</div>
                   </div>
                   <button onClick={()=>{
                     const center = mapGetCenterRef.current?.() || ME
@@ -9413,11 +9410,11 @@ export default function App2() {
                     setFlow('options')
                   }} style={{
                     padding:'13px 32px',
-                    background:C.bordeaux,border:'none',
-                    borderRadius:14,color:'#fff',
+                    background:C.green,border:'none',
+                    borderRadius:24,color:'#fff',
                     fontSize:15,fontWeight:900,
                     cursor:'pointer',fontFamily:'inherit',
-                    letterSpacing:'-.02em',
+                    letterSpacing:'-.02em',boxShadow:'0 5px 16px rgba(119,188,31,.32)',
                   }}>
                     {lang==='en'?'Next →':'Suivant →'}
                   </button>

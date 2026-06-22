@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x137'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x138'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3015,6 +3015,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (found) { setSelEv(found); onClearInitialEvent?.() }
   }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
+  const [sortMode, setSortMode] = useState<'time'|'dist'|'pop'>('time')  // tri : au plus tôt / au plus proche / populaires
+  const [showRefine, setShowRefine] = useState(false)  // panneau « Affiner » (progressive disclosure)
   // 🤝 Partenaires suivis (prototype, persisté localStorage)
   const [followedPartners, setFollowedPartners] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_partners');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
   const togglePartner = (id:string) => setFollowedPartners(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); try{localStorage.setItem('clutch_partners',JSON.stringify([...n]))}catch{}; return n })
@@ -3080,6 +3082,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (evFilter==='evF') return (ev as any).evGender==='F'
     if (evFilter==='evX') return (ev as any).evGender==='X'
     return true
+  })
+
+  // Tri (panneau « Affiner ») : au plus tôt (défaut) · au plus proche · populaires
+  const evTimeRank = (ev:any) => { const d=(ev?.date||'').toLowerCase(); if(d.includes('ce soir')||d.includes('tonight')||d.includes('aujour')||d.includes('today'))return 0; if(d.includes('demain')||d.includes('tomorrow'))return 1; return 2 }
+  const sortedEvs = [...filteredEvs].sort((a:any,b:any)=>{
+    if(sortMode==='dist'){ return (eventKm(a, centerLat ?? 46.5197, centerLng ?? 6.6323) ?? 9999) - (eventKm(b, centerLat ?? 46.5197, centerLng ?? 6.6323) ?? 9999) }
+    if(sortMode==='pop'){ return ((b.taken||0)/(b.spots||1)) - ((a.taken||0)/(a.spots||1)) }
+    const r = evTimeRank(a)-evTimeRank(b); if(r!==0) return r; return String(a.time||'').localeCompare(String(b.time||''))
   })
 
   const isRealEvent = (id:any) => typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
@@ -3196,10 +3206,29 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             )
           })}
           </div>
+          {/* ⚙ Affiner — ouvre le panneau tri + catégories (progressive disclosure) */}
+          <button onClick={()=>setShowRefine(v=>!v)} title={EN?'Refine':'Affiner'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?`${C.pink}14`:'transparent',border:`1px solid ${(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.border}`,color:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.whiteMid,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'.15s'}}>⚙</button>
           {/* + Organiser (compact, rond) */}
           <button onClick={()=>setShowCreateGroup(true)} title={EN?'Host an event':'Organiser un événement'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:21,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,paddingBottom:2}}>+</button>
           <span style={{flexShrink:0,fontSize:8,fontWeight:600,color:`${C.whiteMid}55`,letterSpacing:'.03em'}}>{V}</span>
         </div>
+        {/* 🔍 Panneau « Affiner » — tri + catégories précises (caché par défaut) */}
+        {showRefine && (
+          <div style={{marginTop:8,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
+            <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Sort by':'Trier par'}</div>
+            <div style={{display:'flex',gap:6,marginBottom:10}}>
+              {([{k:'time',e:'⏱',l:EN?'Soonest':'Au plus tôt'},{k:'dist',e:'📡',l:EN?'Nearest':'Au plus proche'},{k:'pop',e:'🔥',l:EN?'Popular':'Populaires'}] as const).map(s=>{ const on=sortMode===s.k; return (
+                <button key={s.k} onClick={()=>setSortMode(s.k)} style={{flex:1,padding:'7px 4px',borderRadius:10,border:`1.5px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:10.5,fontWeight:on?800:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s.e} {s.l}</button>
+              )})}
+            </div>
+            <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Categories':'Catégories'}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {([{k:'sport',e:'🏃',l:'Sport'},{k:'bienetre',e:'🧘',l:EN?'Wellness':'Bien-être'},{k:'culture',e:'🎭',l:'Culture'},{k:'gastro',e:'🍽',l:EN?'Food':'Gastro'},{k:'musique',e:'🎵',l:EN?'Music':'Musique'}] as const).map(c=>{ const on=evFilter===c.k; return (
+                <button key={c.k} onClick={()=>setEvFilter(on?'all':c.k)} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:11,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit'}}>{c.e} {c.l}</button>
+              )})}
+            </div>
+          </div>
+        )}
       </div>
       <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px'}}>
         {/* 🫂 VUE COMMUNAUTÉ (prototype) — UNIQUEMENT les groupes à suivre (les partenaires payants sont déjà
@@ -3327,7 +3356,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         )}
         {/* 2 événements par ligne (demande Mel) — grandes photos qui donnent envie, infos dessus ; clic → détail riche */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11}}>
-        {filteredEvs.map(ev=>{
+        {sortedEvs.map(ev=>{
           const photo = eventPhotoFor(ev)
           const isImg = true   // eventPhotoFor garantit toujours une photo (vraie ou de secours)
           const pct = Math.min(100, Math.round((ev.taken/ev.spots)*100))

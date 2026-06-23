@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x15C'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 90   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x15D'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 91   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5319,6 +5319,25 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
             placeholder={"David — david.saugy@gmail.com — mdp : …\nTafit — email : … — mdp : …\nMélanie — email : … — mdp : …"}
             rows={4} style={{width:'100%',boxSizing:'border-box',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:12,fontFamily:'inherit',padding:'8px 10px',resize:'vertical',lineHeight:1.5}}/>
           <div style={{fontSize:9.5,color:C.whiteMid,marginTop:5,lineHeight:1.4}}>💾 Sauvegardé automatiquement sur CET appareil. Jamais envoyé ni mis dans le code (sécurité : repo public).</div>
+        </div>
+
+        {/* 🧪 JE TESTE EN TANT QUE — transforme MON compte en chaque type (1 tap), pour voir la vue de chacun */}
+        <div style={{marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.white,marginBottom:2}}>🧪 Je teste en tant que…</div>
+          <div style={{fontSize:9.5,color:C.whiteMid,marginBottom:8,lineHeight:1.4}}>Change le type de TON compte ({user?.name||'toi'}). Recharge l'app après.</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {[['H','Hydrogène','gratuit'],['Au','Or','9.90'],['Rh','Rhodium','19.90'],['At','Astate','29.90'],['driver','Driver 🚗','orga']].map(([v,lab,sub])=>{
+              const on = (user as any)?.account_type===v || (v==='H' && !['Au','Rh','At','driver'].includes((user as any)?.account_type))
+              return <button key={v} onClick={async()=>{
+                  if(!user?.id) return
+                  await supabase.from('profiles').update({account_type:v}).eq('id',user.id)
+                  showToast(`Ton compte → ${lab} — recharge l'app pour voir`, C.green)
+                }}
+                style={{flex:'1 0 auto',minWidth:72,padding:'8px 6px',borderRadius:9,border:`1.5px solid ${on?C.gold:C.border}`,background:on?C.gold:'transparent',color:on?'#1a0810':C.white,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',lineHeight:1.2}}>
+                {lab}<div style={{fontSize:8.5,fontWeight:600,opacity:.8}}>{sub}</div></button>
+            })}
+          </div>
+          <div style={{fontSize:9,color:C.whiteMid,marginTop:7,lineHeight:1.45}}>⚠️ Or/Rhodium/Astate = features pas encore codées → se comportent comme Hydrogène pour l'instant. <b style={{color:C.salmon}}>Driver</b> = te masque des Présences, visible seulement en Événements.</div>
         </div>
         <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.

@@ -7224,6 +7224,9 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               S'AFFICHENT sur ton tél (utile avec un seul téléphone). Espacées pour qu'iOS les montre toutes. */}
           <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de chaque type (clutch, event, complet, attente, annulation)" onTap={()=>{
             if(!user?.id){ showToast('Connecte-toi d\'abord',C.orange); return }
+            // ⚠️ Les push n'existent QUE sur l'app native (TestFlight). Sur le web (GitHub Pages) = impossible.
+            const isNative = !!((window as any)?.Capacitor?.isNativePlatform?.())
+            if(!isNative){ showToast('⚠️ Les notifs ne marchent que dans l\'app TestFlight, pas sur le web',C.orange); return }
             const me=user.id
             const seq:[string,string,any][] = [
               ['☕ Nouveau Clutch !','Tafit te propose un café à 18h30',{type:'new_clutch'}],

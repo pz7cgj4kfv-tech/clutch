@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x156'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 84   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x157'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 85   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3214,6 +3214,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setRegistering(true)
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
     try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
+    // J'ai réclamé une place → je quitte la liste d'attente (DB + local).
+    try { if (isRealEvent(ev.id) && userId) await supabase.from('event_waitlist').delete().eq('event_id', ev.id).eq('user_id', userId) } catch {}
+    setWaitlist((prev:Set<string>)=>{ const n=new Set(prev); n.delete(ev.id); return n })
     await new Promise(r=>setTimeout(r,400))
     setRegistered((prev:Set<string>)=>new Set([...prev,ev.id]))
     // Compteur optimiste : +1 inscrit tout de suite (le trigger DB le confirme, loadEvents resynchronise)
@@ -3772,6 +3775,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                             <div style={{display:'flex',gap:8}}>
                               <button onClick={async()=>{
                                 try { if (isRealEvent(selEv.id) && userId) await supabase.from('event_participants').delete().eq('event_id',selEv.id).eq('user_id',userId) } catch {}
+                                // 🔔 Une place se libère → prévenir les gens EN ATTENTE (« viens la prendre », 1er arrivé gagne).
+                                // La désinscription ne peut PAS inscrire quelqu'un d'autre (RLS) → on notifie, ils claiment.
+                                try {
+                                  if (isRealEvent(selEv.id)) {
+                                    const { data:wl } = await supabase.from('event_waitlist').select('user_id').eq('event_id',selEv.id).order('joined_at',{ascending:true})
+                                    ;(wl||[]).forEach((w:any)=>{ if(w.user_id && w.user_id!==userId) pushTo(w.user_id,
+                                      lang==='en'?'🎉 A spot opened up!':'🎉 Une place s\'est libérée !',
+                                      lang==='en'?`Grab your spot at "${selEv.title}" — first come, first served`:`Viens prendre ta place pour « ${selEv.title} » — premier arrivé, premier servi`,
+                                      { type:'event_promote', event_id: selEv.id }) })
+                                  }
+                                } catch {}
                                 setRegistered((prev:Set<string>)=>{const n=new Set(prev);n.delete(selEv.id);return n})
                                 onPenalty?.(reason)
                                 setUnregConfirmId(null)
@@ -3803,11 +3817,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                     <div style={{textAlign:'center',padding:'14px',background:`${C.orange}14`,border:`1px solid ${C.orange}33`,borderRadius:14}}>
                       <div style={{fontSize:13,fontWeight:800,color:C.orange}}>📋 {lang==='en'?'On the waitlist':'Sur la liste d\'attente'}</div>
                       <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>{lang==='en'?'You\'ll be notified if a spot opens up':'Tu seras prévenu·e si une place se libère'}</div>
+                      <button onClick={async()=>{
+                        setWaitlist((prev:Set<string>)=>{const n=new Set(prev);n.delete(selEv.id);return n})
+                        try { if (isRealEvent(selEv.id) && userId) await supabase.from('event_waitlist').delete().eq('event_id',selEv.id).eq('user_id',userId) } catch {}
+                        showToast?.(lang==='en'?'Left the waitlist':'Tu as quitté la liste d\'attente', C.whiteMid)
+                      }} style={{marginTop:8,background:'none',border:'none',color:C.red,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>
+                        {lang==='en'?'Leave the waitlist':'Quitter la liste d\'attente'}
+                      </button>
                     </div>
                   ) : (
-                    <button onClick={()=>{
+                    <button onClick={async()=>{
                       setWaitlist((prev:Set<string>)=>new Set([...prev,selEv.id]))
                       showToast?.(lang==='en'?'📋 You\'re on the waitlist — we\'ll notify you':'📋 Tu es sur la liste d\'attente — on te préviendra', C.orange)
+                      // Persistance EN BASE (cross-device) → permet de te notifier quand une place se libère.
+                      try { if (isRealEvent(selEv.id) && userId) await supabase.from('event_waitlist').insert({ event_id: selEv.id, user_id: userId }) } catch {}
                       const orga=(selEv as any).created_by
                       if (orga && orga!==userId) pushTo(orga, lang==='en'?'📋 New waitlist sign-up':'📋 Nouvelle personne en attente',
                         lang==='en'?`Someone is waiting for a spot at "${selEv.title}"`:`Quelqu'un attend une place pour « ${selEv.title} »`, { type:'event_waitlist', event_id: selEv.id })
@@ -7154,8 +7177,9 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               .in('status',['pending','accepted','confirmed','checked_in'])
             // 🧹 Vide MES cooldowns/lapins (rdv_feedbacks « absent » me masquaient les gens 48h → David+Tafit ne se voyaient plus)
             try{ await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id) }catch{}
-            // Désinscription de TOUS mes événements
+            // Désinscription de TOUS mes événements + liste d'attente
             await supabase.from('event_participants').delete().eq('user_id', user.id)
+            try{ await supabase.from('event_waitlist').delete().eq('user_id', user.id) }catch{}
             await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
             showToast('✅ Reset complet (clutchs + cooldowns + events) — recharge l\'app',C.green)
           }}/>
@@ -8568,6 +8592,24 @@ export default function App2() {
       setRegisteredEvents(prev => {
         const merged = new Set<string>(dbIds)                       // vrais events = vérité DB
         prev.forEach(id => { if (!isUuid(id)) merged.add(id) })      // garde les events locaux/mock
+        return merged
+      })
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
+  // 🔧 HYDRATATION liste d'attente depuis le DB (cross-device). Pareil que les inscriptions : la vérité
+  // est en base (event_waitlist), pas en localStorage. Permet de recevoir « place libérée » sur tout device.
+  useEffect(() => {
+    const uid = user?.id
+    if (!uid) return
+    let cancelled = false
+    supabase.from('event_waitlist').select('event_id').eq('user_id', uid).then(({ data }: any) => {
+      if (cancelled || !data) return
+      const isUuid = (s:any) => typeof s==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
+      const dbIds = data.map((d:any)=>d.event_id).filter(isUuid)
+      setWaitlistEvIds(prev => {
+        const merged = new Set<string>(dbIds)
+        prev.forEach(id => { if (!isUuid(id)) merged.add(id) })   // garde les events locaux/mock
         return merged
       })
     })

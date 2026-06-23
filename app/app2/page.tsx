@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x150'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 78   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x151'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 79   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3055,7 +3055,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (found) { setSelEv(found); onClearInitialEvent?.() }
   }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
-  const [sortMode, setSortMode] = useState<'time'|'dist'|'pop'>('time')  // tri : au plus tôt / au plus proche / populaires
+  const [sortMode, setSortMode] = useState<'time'|'dist'|'pop'|'surprise'>('time')  // tri : au plus tôt / proche / populaires / 🎲 surprise (IA = au hasard les plus folles)
+  const [surpriseSeed, setSurpriseSeed] = useState(0)  // re-tirage Surprise
   const [showRefine, setShowRefine] = useState(false)  // panneau « Affiner » (progressive disclosure)
   // 🤝 Partenaires suivis (prototype, persisté localStorage)
   const [followedPartners, setFollowedPartners] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_partners');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
@@ -3127,7 +3128,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   // Tri (panneau « Affiner ») : au plus tôt (défaut) · au plus proche · populaires
   const evTimeRank = (ev:any) => { const d=(ev?.date||'').toLowerCase(); if(d.includes('ce soir')||d.includes('tonight')||d.includes('aujour')||d.includes('today'))return 0; if(d.includes('demain')||d.includes('tomorrow'))return 1; return 2 }
+  // 🎲 Surprise : ordre pseudo-aléatoire stable (seed) — l'IA te sort les events au hasard (proto). Re-tirage via surpriseSeed.
+  const surpriseRank = (ev:any) => { let h=surpriseSeed*2654435761; const s=String(ev?.id||ev?.title||''); for(let i=0;i<s.length;i++) h=((h<<5)-h+s.charCodeAt(i))>>>0; return h }
   const sortedEvs = [...filteredEvs].sort((a:any,b:any)=>{
+    if(sortMode==='surprise'){ return surpriseRank(a)-surpriseRank(b) }
     if(sortMode==='dist'){ return (eventKm(a, centerLat ?? 46.5197, centerLng ?? 6.6323) ?? 9999) - (eventKm(b, centerLat ?? 46.5197, centerLng ?? 6.6323) ?? 9999) }
     if(sortMode==='pop'){ return ((b.taken||0)/(b.spots||1)) - ((a.taken||0)/(a.spots||1)) }
     const r = evTimeRank(a)-evTimeRank(b); if(r!==0) return r; return String(a.time||'').localeCompare(String(b.time||''))
@@ -3265,9 +3269,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {showRefine && (
           <div style={{marginTop:8,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
             <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Sort by':'Trier par'}</div>
-            <div style={{display:'flex',gap:6,marginBottom:10}}>
-              {([{k:'time',e:'⏱',l:EN?'Soonest':'Au plus tôt'},{k:'dist',e:'📡',l:EN?'Nearest':'Au plus proche'},{k:'pop',e:'🔥',l:EN?'Popular':'Populaires'}] as const).map(s=>{ const on=sortMode===s.k; return (
-                <button key={s.k} onClick={()=>setSortMode(s.k)} style={{flex:1,padding:'7px 4px',borderRadius:10,border:`1.5px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:10.5,fontWeight:on?800:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s.e} {s.l}</button>
+            <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+              {([{k:'time',e:'⏱',l:EN?'Soonest':'Au plus tôt'},{k:'dist',e:'📡',l:EN?'Nearest':'Au plus proche'},{k:'pop',e:'🔥',l:EN?'Popular':'Populaires'},{k:'surprise',e:'🎲',l:'Surprise'}] as const).map(s=>{ const on=sortMode===s.k; const isSurprise=s.k==='surprise'; return (
+                <button key={s.k} onClick={()=>{ setSortMode(s.k); if(isSurprise) setSurpriseSeed(x=>x+1) }} style={{flex:'1 1 0',minWidth:72,padding:'7px 4px',borderRadius:10,border:`1.5px solid ${on?(isSurprise?'#8E7CC3':C.pink):C.border}`,background:on?(isSurprise?'linear-gradient(120deg,#EB6BAF22,#8E7CC322,#77BC1F22)':`${C.pink}12`):'transparent',color:on?(isSurprise?'#7A5BB0':C.pink):C.whiteMid,fontSize:10.5,fontWeight:on?800:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s.e} {s.l}{isSurprise&&on?' ↻':''}</button>
               )})}
             </div>
             <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Categories':'Catégories'}</div>
@@ -3540,7 +3544,18 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
             {/* Corps scrollable — flex:'1 1 0' + overflowY:'scroll' obligatoires sur iOS */}
             <div style={{flex:'1 1 0',overflowY:'scroll',WebkitOverflowScrolling:'touch',padding:'12px 20px 100px'}}>
-              <div style={{fontSize:11,color:C.whiteMid,marginBottom:14}}>{selEv.lieu}</div>
+              {/* 📌 Event fixe (clou) */}
+              {(selEv as any).pinned && (
+                <div style={{display:'flex',alignItems:'center',gap:8,background:`${C.plum}10`,border:`1px solid ${C.plum}44`,borderRadius:12,padding:'9px 12px',marginBottom:12}}>
+                  <span style={{fontSize:16,flexShrink:0}}>📌</span>
+                  <div style={{fontSize:11,color:C.white,lineHeight:1.4}}>{EN?<><b>Fixed event</b> — the host only does this. You can join, no counter-proposal.</>:<><b>Event fixe</b> — l'organisateur ne fait que ça. Tu peux participer, pas de contre-proposition.</>}</div>
+                </div>
+              )}
+              {/* 🏠 Lieu : masqué (quartier) si « chez moi » */}
+              <div style={{fontSize:11,color:C.whiteMid,marginBottom:14,display:'flex',alignItems:'flex-start',gap:5,lineHeight:1.4}}>
+                <span style={{flexShrink:0}}>{(selEv as any).home_private?'🏠':'📍'}</span>
+                <span>{(selEv as any).home_private ? (EN?`${evLieuDisplay(selEv,true)} — exact address unlocked 5 min before (or by the host)`:`${evLieuDisplay(selEv,false)} — adresse exacte débloquée 5 min avant (ou par l'hôte)`) : selEv.lieu}</span>
+              </div>
               {selEv.certified&&<div style={{display:'inline-flex',alignItems:'center',gap:5,background:C.orangeFaint,color:C.orange,border:`1px solid ${C.orange}44`,borderRadius:8,padding:'3px 8px',fontSize:10,fontWeight:800,marginBottom:14}}>✓ {lang==='en'?'CERTIFIED':'CERTIFIÉ'}</div>}
 
               {/* Photos de l'événement — galerie si disponible */}

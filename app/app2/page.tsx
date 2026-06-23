@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x160'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 94   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x161'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 95   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7225,21 +7225,14 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
           {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
               S'AFFICHENT sur ton tél (utile avec un seul téléphone). Espacées pour qu'iOS les montre toutes. */}
-          <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de chaque type (clutch, event, complet, attente, annulation)" onTap={()=>{
+          <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de test → le bandeau en haut affiche le résultat OneSignal (marche aussi sur le web pour diagnostiquer)" onTap={()=>{
             if(!user?.id){ showToast('Connecte-toi d\'abord',C.orange); return }
-            // ⚠️ Les push n'existent QUE sur l'app native (TestFlight). Sur le web (GitHub Pages) = impossible.
-            const isNative = !!((window as any)?.Capacitor?.isNativePlatform?.())
-            if(!isNative){ showToast('⚠️ Les notifs ne marchent que dans l\'app TestFlight, pas sur le web',C.orange); return }
-            const me=user.id
-            const seq:[string,string,any][] = [
-              ['☕ Nouveau Clutch !','Tafit te propose un café à 18h30',{type:'new_clutch'}],
-              ['🎉 Nouvelle inscription','Quelqu\'un a rejoint « Yoga au parc » (4/12)',{type:'event_join'}],
-              ['🔥 Événement complet','« Atelier poterie » est complet (8/8)',{type:'event_full'}],
-              ['📋 Place libérée !','Une place s\'est ouverte pour « Run sunset »',{type:'event_promote'}],
-              ['❌ Événement annulé','« Apéro jazz » a été annulé — aucune pénalité',{type:'event_cancelled'}],
-            ]
-            seq.forEach(([ti,bo,da],i)=> setTimeout(()=> pushTo(me,ti,bo,da), i*1500))
-            showToast('🔔 5 notifs envoyées sur ~7s — regarde ton écran',C.green)
+            hap('medium')
+            // Envoie 1 push de test À SOI-MÊME. Le résultat OneSignal (recipients/erreur) s'affiche dans le
+            // bandeau persistant en haut → diagnostic possible AUSSI sur le web (la bannière iOS, elle, ne
+            // s'affiche que sur l'app native TestFlight).
+            pushTo(user.id, '🔔 Test Clutch', 'Si tu vois cette bannière, les notifs marchent !', { type:'test' })
+            showToast('🔔 Push de test envoyée → regarde le bandeau en haut',C.green)
           }}/>
         </MCard>
 

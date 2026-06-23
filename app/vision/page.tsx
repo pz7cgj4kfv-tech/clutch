@@ -149,6 +149,7 @@ const SECTIONS = [
   { id:'map',       icon:'🗺', label:'Map' },
   { id:'graal',     icon:'🧭', label:'Le Graal' },
   { id:'invariants',icon:'🛡', label:'Invariants' },
+  { id:'lancement', icon:'🚀', label:'Lancement' },
   { id:'confiance', icon:'🏆', label:'Confiance' },
   { id:'strategie', icon:'🧭', label:'Stratégie' },
   { id:'live',      icon:'⚡', label:'En prod' },
@@ -3357,12 +3358,12 @@ const SectionInvariants = () => {
     ['Score non auto-modifiable','Modifiable QUE par le serveur','🟡 PATCH client possible'],
     ['Position ≠ live','Zones ±50 m, distance au LIEU jamais à la personne','🟢 OK'],
     ['Anti-doublon / self-clutch','Pas 2 clutchs pending, pas soi-même','🟢 contraintes DB'],
-    ['Cooldown 48h','Un refusé ne re-spamme pas 48h','🟢 OK (test multi-compte)'],
-    ['Pas de contact hors matching','Aucun contact sans Clutch accepté','🟢 Contacts = re-clutch only'],
+    ['Cooldown 48h','Un refusé ne re-spamme pas 48h','🟢 DB trigger (24.06)'],
+    ['Pas de contact hors matching','Aucun contact sans Clutch accepté','🟢 RLS membership msg (24.06)'],
     ['RDV/dispo expiré jamais réactivé','Gate is_available && until>now','🟢 (2 points)'],
     ['Place event jamais vendue 2×','Capacité respectée','🟢 trigger + PK'],
     ['Banni ne revient pas','Pas de multi-compte/ban contourné','🟡 + multi-comptes'],
-    ['Blocage = invisible total','Forcé côté requête + RLS','🟡 à blinder'],
+    ['Blocage = invisible total','Forcé côté requête + RLS','🟢 insert bloqué DB (24.06)'],
     ['Filtres réception femmes','Women-only / vérifiés / pas après 22h','❌ pas codé'],
     ['Premium ne s\'auto-attribue pas','account_type seulement après paiement','🟡 PATCH possible'],
     ['Pas d\'extraction de masse','Pas de dump profils/GPS','🟡 RLS + rate limit'],
@@ -3392,9 +3393,54 @@ const SectionInvariants = () => {
   )
 }
 
+// ─── 🚀 LANCEMENT — la liquidité est le produit (synthèse GPT + Claude) ───────
+const SectionLancement = () => {
+  const Card = ({icon,title,color,children}:any) => (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${color}`,borderRadius:12,padding:'14px 16px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:800,color,marginBottom:7}}>{icon} {title}</div>
+      <div style={{fontSize:12,color:C.mid,lineHeight:1.7}}>{children}</div>
+    </div>
+  )
+  const Row = ({k,v}:any) => (
+    <div style={{display:'flex',gap:10,alignItems:'flex-start',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',marginBottom:6}}>
+      <div style={{fontSize:11.5,fontWeight:800,color:C.gold,minWidth:96,flexShrink:0}}>{k}</div>
+      <div style={{fontSize:11.5,color:C.mid,lineHeight:1.6}}>{v}</div>
+    </div>
+  )
+  return (
+    <div>
+      <H n={1}>🚀 Lancement — la LIQUIDITÉ est le produit</H>
+      <P>Synthèse croisée (GPT + Claude + audit sécu). Le vrai tueur n'est pas Tinder : <b style={{color:C.red}}>c'est ouvrir l'app et voir personne</b> (la mort de l'espoir). 70% de l'énergie va ici, pas dans l'algo.</P>
+      <Card icon="🎯" title="La nuance qui change tout (David)" color={C.gold}>
+        <b>Réglable = TOUT</b> (poids algo, crédits, %). <b>Mais pensé à fond AVANT le lancement = sécurité, confiance, liquidité.</b> Une app de confiance ne se rattrape pas après une mauvaise 1ʳᵉ expérience. Catastrophes irrattrapables : une femme reçoit <b>25 sollicitations en 20 min</b> · <b>3 no-shows</b> la 1ʳᵉ semaine · impression de <b>marché aux bestiaux</b>. → On a déjà commencé à y répondre (cooldown/blocage verrouillés en base + réception top 5).
+      </Card>
+      <Card icon="🛟" title="L'anti-vide HONNÊTE (mon ajout)" color={C.green}>
+        Jamais de faux profils / faux matchs (ligne rouge — beaucoup de startups meurent là). Mais quand le rayon est vide, on ne montre <b>jamais</b> du vide → des <b>signaux de densité honnêtes</b> : compte à rebours de la prochaine <b>Golden Hour</b>, événements à venir, « 6 personnes étaient dispo ici hier à cette heure ». Le vide devient une <b>promesse</b>, pas un échec.
+      </Card>
+      <Card icon="⏰" title="Golden Hours = point de rendez-vous de Schelling" color={C.salmon}>
+        Au lancement, certaines heures deviennent <b>sacrées</b> (jeu 19h · ven 18h · sam 16h). Tout le monde sait « c'est LÀ qu'il se passe quelque chose » → on concentre la rareté au lieu de la subir. Les <b>événements</b> sont la béquille de démarrage (events → micro-groupes → duos).
+      </Card>
+      <Card icon="🏆" title="Le fossé incopiable = la réputation collective de fiabilité" color={C.gold}>
+        Pas la techno, pas l'IA, pas l'algo. « Sur Clutch, quand quelqu'un dit oui, <b>il vient</b>. » Actif extrêmement rare. → fiabilité <b>hyper-visible</b> (presque avant les photos). Décision contre-intuitive : <b>refuser d'ouvrir trop vite</b> — 500 personnes très actives à Lausanne &gt; 10 000 dispersées en Suisse romande.
+      </Card>
+      <H n={2}>📋 Décisions V1 (ajustables)</H>
+      <Row k="Crédits" v={<>Hommes <b>3 Clutchs/jour</b> · Femmes <b>illimité</b> (asymétrie volontaire — on optimise la réception ♀, pas l'émission ♂).</>} />
+      <Row k="Réception" v={<>Une femme reçoit <b>top 5 max</b>, jamais 50. Chaque Clutch coûte de la rareté (pas de l'argent).</>} />
+      <Row k="Premium" v={<>Gratuit = rencontrer/envoyer/recevoir · <b>9.90</b> confort · <b>19.90</b> power · <b>29.90</b> Club (events/partenaires). Jamais vendre visibilité/fiabilité/priorité (piège = Tinder Gold).</>} />
+      <Row k="Algo" v={<>MVP = 1 curseur <b>« similaire ↔ différent »</b> + 3 priorités max + <b>explication</b> (« affiché car : même quartier · dispo maintenant · goût opposé voyage »). Compréhension &gt; contrôle.</>} />
+      <Row k="Lancement" v={<>Lausanne <b>centre</b> → <b>jeu/ven/sam</b> → <b>18-23h</b> → Golden Hours → events d'abord.</>} />
+      <Row k="Masse critique" v={<>100-150 actifs/sem = respire · 300-500 = intéressant · 1000+ = effet réseau.</>} />
+      <div style={{background:C.card,border:`1px solid ${C.gold}55`,borderRadius:12,padding:'13px 15px',marginTop:6}}>
+        <div style={{fontSize:12,color:C.mid,lineHeight:1.7,fontStyle:'italic'}}>« Le produit n'est ni le matching, ni l'IA, ni les profils. C'est la transformation d'une intention sociale faible (« je devrais sortir ») en rencontre réelle dans les 2h, avec assez de confiance pour que les femmes aient envie d'appuyer sur Disponible. Gagne cette bataille → le reste est de l'optimisation. Perds-la → aucun algo ne te sauve. »</div>
+      </div>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   graal: SectionGraal,
   invariants: SectionInvariants,
+  lancement: SectionLancement,
   map: SectionMap,
   nda: SectionNDA,
   naming: SectionNaming,

@@ -39,19 +39,17 @@ input, textarea, select {
 }
 
 /* 🚫 RIEN DE SÉLECTIONNABLE (demande David) — le double-clic ne doit jamais sélectionner du texte/UI.
-   Exception : les champs de saisie (input/textarea) où l'utilisateur DOIT pouvoir éditer/sélectionner son texte. */
-* {
+   ⚠️ On NE met PAS ça sur `*` (ça casse la saisie input sur iOS — login bloqué). On passe par HÉRITAGE
+   depuis body, et on RÉACTIVE explicitement sur les champs de saisie (qui DOIVENT rester éditables). */
+body {
   -webkit-user-select: none;
   -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;   /* pas de flash gris au tap iOS */
-  -webkit-touch-callout: none;                /* pas de menu « copier » sur appui long iOS */
 }
-input, textarea, [contenteditable="true"] {
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
+input, textarea, select, [contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
 }

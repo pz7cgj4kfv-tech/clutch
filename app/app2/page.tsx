@@ -8609,10 +8609,12 @@ export default function App2() {
     const onResult = (e: any) => {
       if (!ADMIN_IDS.includes((user as any)?.id)) return
       const d = e?.detail || {}
+      const r = d.result || d   // compatible ancienne fonction ({ok,result}) ET nouvelle ({recipients,errors})
       if (d.error) { showToast(`📡 push erreur: ${d.error}`, C.red); return }
-      if (d.errors) { showToast(`📡 push refusé OneSignal: ${JSON.stringify(d.errors)}`, C.orange); return }
-      if (d.recipients === 0) { showToast('📡 push parti mais 0 destinataire (ciblage/abonnement)', C.orange); return }
-      if (typeof d.recipients === 'number') { showToast(`📡 push OK → ${d.recipients} destinataire(s)`, C.green); return }
+      if (r.errors) { showToast(`📡 push refusé OneSignal: ${JSON.stringify(r.errors)}`, C.orange); return }
+      if (r.recipients === 0) { showToast('📡 push parti mais 0 destinataire (ciblage/abonnement)', C.orange); return }
+      if (typeof r.recipients === 'number') { showToast(`📡 push OK → ${r.recipients} destinataire(s)`, C.green); return }
+      showToast(`📡 push réponse: ${JSON.stringify(r).slice(0,120)}`, C.salmon)
     }
     window.addEventListener('clutch:pushresult', onResult as any)
     return () => window.removeEventListener('clutch:pushresult', onResult as any)

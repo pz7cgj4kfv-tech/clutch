@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x15F'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 93   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x160'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 94   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8445,6 +8445,7 @@ export default function App2() {
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)
+  const [pushDiag,setPushDiag] = useState<{msg:string;color:string}|null>(null)  // diagnostic push PERSISTANT (admin) — reste jusqu'au tap
   const [selProfile,setSelProfile] = useState<Profile|null>(null)
   const [showSend,setShowSend] = useState(false)
   const [slotGoneProfile,setSlotGoneProfile] = useState<Profile|null>(null)
@@ -8611,11 +8612,12 @@ export default function App2() {
       if (!ADMIN_IDS.includes((user as any)?.id)) return
       const d = e?.detail || {}
       const r = d.result || d   // compatible ancienne fonction ({ok,result}) ET nouvelle ({recipients,errors})
-      if (d.error) { showToast(`📡 push erreur: ${d.error}`, C.red); return }
-      if (r.errors) { showToast(`📡 push refusé OneSignal: ${JSON.stringify(r.errors)}`, C.orange); return }
-      if (r.recipients === 0) { showToast('📡 push parti mais 0 destinataire (ciblage/abonnement)', C.orange); return }
-      if (typeof r.recipients === 'number') { showToast(`📡 push OK → ${r.recipients} destinataire(s)`, C.green); return }
-      showToast(`📡 push réponse: ${JSON.stringify(r).slice(0,120)}`, C.salmon)
+      // Bandeau PERSISTANT (reste jusqu'au tap) — un toast de 2s c'est trop court pour lire le diagnostic.
+      if (d.error) { setPushDiag({msg:`📡 push ERREUR fonction: ${d.error}`, color:C.red}); return }
+      if (r.errors) { setPushDiag({msg:`📡 push REFUSÉ par OneSignal: ${JSON.stringify(r.errors)}`, color:C.orange}); return }
+      if (r.recipients === 0) { setPushDiag({msg:'📡 push parti mais 0 destinataire (ciblage/abonnement)', color:C.orange}); return }
+      if (typeof r.recipients === 'number') { setPushDiag({msg:`✅ push OK → ${r.recipients} destinataire(s) reçu·s`, color:C.green}); return }
+      setPushDiag({msg:`📡 réponse: ${JSON.stringify(r).slice(0,200)}`, color:C.salmon})
     }
     window.addEventListener('clutch:pushresult', onResult as any)
     return () => window.removeEventListener('clutch:pushresult', onResult as any)
@@ -11466,6 +11468,17 @@ export default function App2() {
             onLater={()=>setIncomingClutch(null)}
           />}
         </>
+      )}
+      {/* 🔧 DIAGNOSTIC PUSH (admin) — bandeau PERSISTANT, reste affiché jusqu'au tap. Pour voir le résultat
+          réel d'un envoi de notif (combien de destinataires / erreur) sans qu'il disparaisse en 2s. */}
+      {pushDiag && (
+        <div onClick={()=>setPushDiag(null)}
+          style={{position:'fixed',top:'calc(var(--sat) + 8px)',left:8,right:8,zIndex:99999,background:pushDiag.color,
+            color:'#fff',borderRadius:12,padding:'12px 14px',fontSize:13,fontWeight:800,lineHeight:1.4,
+            boxShadow:'0 6px 20px rgba(0,0,0,.3)',cursor:'pointer'}}>
+          {pushDiag.msg}
+          <div style={{fontSize:10,fontWeight:600,opacity:.85,marginTop:4}}>👆 touche pour fermer</div>
+        </div>
       )}
     </>
   )

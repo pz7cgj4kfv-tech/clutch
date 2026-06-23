@@ -7570,11 +7570,11 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
       @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
       @keyframes clGlow{0%,100%{box-shadow:0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(44,16,32,.30)}12%{box-shadow:0 0 22px 7px rgba(235,107,175,.55),0 4px 14px rgba(44,16,32,.30)}36%{box-shadow:0 0 14px 4px rgba(235,107,175,.35),0 4px 14px rgba(44,16,32,.30)}}
       @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
-      .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
+      .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
       @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
     `}</style>
-    {!hidden && showLive && fab(0, <img src="/icons/CLUTCH_live_v3.svg" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
-    {!hidden && showNight && fab(1, <img src="/icons/CLUTCH_night_v3.svg" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
+    {!hidden && showLive && fab(0, <img src="/icons/CLUTCH_live.png" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
+    {!hidden && showNight && fab(1, <img src="/icons/CLUTCH_night.png" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
   </>)
 }
 

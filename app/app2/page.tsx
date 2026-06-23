@@ -561,8 +561,8 @@ function JogWheel({ slots, value, onChange, accent = false }: {
       {/* selection ring — contour GRIS MOYEN #B2B2B2 (design Mel 22.06 : roulettes en gris moyen ; chiffre actif rose) */}
       <div style={{
         position:'absolute', top:ITEM_H, left:4, right:4, height:ITEM_H,
-        background:`${C.ink40}12`,
-        border:`1.5px solid ${C.ink40}`,
+        background:`${C.grayIcon}12`,
+        border:`1.5px solid ${C.grayIcon}`,
         borderRadius:12, pointerEvents:'none', zIndex:2,
       }}/>
       {/* fade top */}

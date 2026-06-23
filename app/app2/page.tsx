@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x166'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 100   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x167'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 101   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8517,7 +8517,7 @@ export default function App2() {
   }, [user, clutches])
 
   // Jog wheel states
-  const initSlots = useMemo(() => makeSlots(), [])
+  const [initSlots,setInitSlots] = useState<string[]>(() => makeSlots())   // rafraîchissable (était useMemo([]) figé → heure restait bloquée sur l'ancienne)
   const [fromTime,setFromTime] = useState(() => initSlots[0] || '18:00')
   const [untilTime,setUntilTime] = useState(() => initSlots[4] || '20:00')
   const [rayon,setRayon]       = useState(10)  // défaut 10km : couvre Lausanne + Morges/Renens/Pully (maximise les présences). Slider jusqu'à 100km.
@@ -8527,6 +8527,21 @@ export default function App2() {
     const b = new Date(); b.setHours(h,m,0,0)
     return makeSlots(new Date(b.getTime() + 5*60_000)).slice(0,216)
   }, [fromTime])
+
+  // 🕐 RECALAGE HEURE — quand on OUVRE le flux « se mettre dispo » (flow → 'carte'), on régénère les
+  // créneaux + l'heure par défaut sur MAINTENANT. Sinon ils restaient figés à l'ouverture de l'app
+  // → David proposait une fenêtre DÉJÀ EXPIRÉE (ex. 19h45–20h05 à 20h07) → personne n'était vraiment live.
+  // On ne recale PAS en revenant de 'options' (back) pour ne pas écraser un choix en cours.
+  const prevFlowRef = useRef<AppFlow>(flow)
+  useEffect(() => {
+    const prev = prevFlowRef.current; prevFlowRef.current = flow
+    if (flow === 'carte' && prev !== 'carte' && prev !== 'options') {
+      const fresh = makeSlots()
+      setInitSlots(fresh)
+      setFromTime(fresh[0] || '18:00')
+      setUntilTime(fresh[4] || fresh[0] || '20:00')
+    }
+  }, [flow])
 
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {

@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x161'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 95   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x162'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 96   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7228,11 +7228,12 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de test → le bandeau en haut affiche le résultat OneSignal (marche aussi sur le web pour diagnostiquer)" onTap={()=>{
             if(!user?.id){ showToast('Connecte-toi d\'abord',C.orange); return }
             hap('medium')
-            // Envoie 1 push de test À SOI-MÊME. Le résultat OneSignal (recipients/erreur) s'affiche dans le
-            // bandeau persistant en haut → diagnostic possible AUSSI sur le web (la bannière iOS, elle, ne
-            // s'affiche que sur l'app native TestFlight).
-            pushTo(user.id, '🔔 Test Clutch', 'Si tu vois cette bannière, les notifs marchent !', { type:'test' })
-            showToast('🔔 Push de test envoyée → regarde le bandeau en haut',C.green)
+            // 🎯 Vise l'iPhone de DAVID (id 409e83dc — abonné confirmé OneSignal), pas le compte courant
+            // (utile : depuis le web, on teste le VRAI device au lieu de soi-même-sans-abonnement).
+            // Le résultat (recipients/erreur) s'affiche dans le bandeau persistant en haut.
+            const IPHONE_DAVID = '409e83dc-dda8-42c3-bb98-3ea900857d35'
+            pushTo(IPHONE_DAVID, '🔔 Test Clutch', 'Si tu vois cette bannière sur le tél, les notifs marchent !', { type:'test' })
+            showToast('🔔 Push de test → iPhone David. Regarde le bandeau ici + le tél',C.green)
           }}/>
         </MCard>
 

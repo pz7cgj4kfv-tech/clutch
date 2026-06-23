@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x149'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 77   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x150'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 78   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -717,6 +717,16 @@ function eventCat(ev:any):{k:string;l:string;c:string} {
   if(has('vide-dressing','dressing','marché','marche','swap','diy','déco','deco','mode','beauté','beaute','artisan')) return {k:'lifestyle',l:'Lifestyle',c:'#B5179E'}  // magenta
   if(has('pro','réseau','reseau','network','coworking','business','boulot','startup','bénévolat','benevolat','communauté','communaute','atelier')) return {k:'social',l:'Communauté',c:'#6F6F6E'}  // gris
   return {k:'autre',l:'Découverte',c:'#8E7CC3'}  // violet doux (à challenger)
+}
+// 🏠 Affichage du lieu : si « chez moi » (home_private) → quartier seulement, adresse exacte révélée plus tard.
+function evLieuDisplay(ev:any, en:boolean):string {
+  const lieu = String(ev?.lieu||'—')
+  if(ev?.home_private){
+    const parts = lieu.split(',').map((s:string)=>s.trim()).filter(Boolean)
+    const area = parts[parts.length-1] || lieu
+    return en ? `Around ${area} · address revealed before` : `Quartier de ${area} · adresse révélée avant`
+  }
+  return lieu.split(',')[0]
 }
 // Heat radar (palette Mel) : proche = vert (vas-y), coin = rose, loin = gris estompé.
 function kmHeat(km:number){ return km<=2 ? {c:'#77BC1F',bg:'rgba(119,188,31,.12)'} : km<=8 ? {c:'#EB6BAF',bg:'rgba(235,107,175,.12)'} : {c:'#B2B2B2',bg:'rgba(178,178,178,.16)'} }
@@ -2920,6 +2930,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvDesc, setNewEvDesc] = useState('')
   const [newEvPrice, setNewEvPrice] = useState('Gratuit') // prix (David : oublié)
   const [newEvFile, setNewEvFile] = useState<string|null>(null) // nom du fichier joint (prototype)
+  const [newEvHome, setNewEvHome] = useState(false)   // 🏠 chez moi : on n'affiche que le quartier, adresse révélée 5 min avant / au clic de l'hôte
+  const [newEvPinned, setNewEvPinned] = useState(false) // 📌 event fixe (cloué) : je ne fais que ça, pas contre-clutchable
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmCloseEv, setConfirmCloseEv] = useState(false)
@@ -3007,6 +3019,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       tags: ['groupe'],
       evGender: 'X',
       isGroupe: true,
+      home_private: newEvHome,   // 🏠 adresse privée (quartier seulement)
+      pinned: newEvPinned,       // 📌 event fixe (cloué)
       eventPhotos: [`linear-gradient(135deg,#542A44,#2a1020)`],
       eventPhotoEmojis: [newEvEmoji],
       reviews: [],
@@ -3422,11 +3436,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{padding:'8px 11px 10px',paddingTop:cPhoto?9:8}}>
               {/* Ligne 1 : créateur (décalé sous l'avatar) + 📡 distance radar à droite */}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:3,marginLeft:cPhoto?40:0,minHeight:cPhoto?16:0}}>
-                <span style={{fontSize:11.5,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.creator||''}</span>
+                <span style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}><span style={{fontSize:11.5,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.creator||''}</span>{(ev as any).pinned && <span title={EN?'Fixed event':'Event fixe'} style={{fontSize:10,flexShrink:0}}>📌</span>}</span>
                 {km!=null && <KmRadar km={km}/>}
               </div>
               <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {locDay(fixEventDate(ev.date),EN)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
-              <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {(ev.lieu||'—').split(',')[0]}</div>
+              <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(ev as any).home_private?'🏠 ':'📍 '}{evLieuDisplay(ev,EN)}</div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontSize:10,fontWeight:800,color:pct>=100?C.green:C.whiteMid,flexShrink:0}}>{ev.taken}/{ev.spots}</span>
                 <div style={{flex:1,height:4,borderRadius:2,background:C.border,overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#77BC1F,#EB6BAF)',borderRadius:2}}/></div>
@@ -3861,6 +3875,26 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                   )})}
                 </div>
               )}
+            </div>
+
+            {/* 🏠 Chez moi (adresse privée) + 📌 Event fixe (cloué) */}
+            <div style={{display:'flex',gap:8,marginBottom:14}}>
+              <button onClick={()=>setNewEvHome(v=>!v)} title={EN?'Only the neighbourhood is shown; exact address revealed 5 min before or by you':'On affiche le quartier ; l\'adresse exacte se débloque 5 min avant ou par toi'} style={{flex:1,display:'flex',alignItems:'center',gap:7,padding:'9px 10px',borderRadius:12,border:`1.5px solid ${newEvHome?C.salmon:C.border}`,background:newEvHome?C.salmonFaint:'transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:15,flexShrink:0}}>🏠</span>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:11,fontWeight:800,color:newEvHome?C.salmon:C.white}}>{EN?'At my place':'Chez moi'}</span>
+                  <span style={{display:'block',fontSize:8.5,color:C.whiteMid,lineHeight:1.2}}>{EN?'Area only · address revealed before':'Quartier · adresse révélée avant'}</span>
+                </span>
+                <span style={{width:17,height:17,borderRadius:5,border:`2px solid ${newEvHome?C.salmon:C.border}`,background:newEvHome?C.salmon:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{newEvHome&&<span style={{color:'#fff',fontSize:10,fontWeight:900}}>✓</span>}</span>
+              </button>
+              <button onClick={()=>setNewEvPinned(v=>!v)} title={EN?'Fixed event: people can only join this, no counter-proposal':'Event fixe : on ne peut que participer, pas de contre-proposition'} style={{flex:1,display:'flex',alignItems:'center',gap:7,padding:'9px 10px',borderRadius:12,border:`1.5px solid ${newEvPinned?C.plum:C.border}`,background:newEvPinned?`${C.plum}12`:'transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:15,flexShrink:0}}>📌</span>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:11,fontWeight:800,color:newEvPinned?C.plum:C.white}}>{EN?'Fixed event':'Event fixe'}</span>
+                  <span style={{display:'block',fontSize:8.5,color:C.whiteMid,lineHeight:1.2}}>{EN?'Only this · no counter-clutch':'Je ne fais que ça · pas de contre'}</span>
+                </span>
+                <span style={{width:17,height:17,borderRadius:5,border:`2px solid ${newEvPinned?C.plum:C.border}`,background:newEvPinned?C.plum:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{newEvPinned&&<span style={{color:'#fff',fontSize:10,fontWeight:900}}>✓</span>}</span>
+              </button>
             </div>
 
             {/* Champ 3 : QUAND (jour contraint + molette native) */}

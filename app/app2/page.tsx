@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x169'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 103   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x16A'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 104   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7155,7 +7155,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             // touchées → on AFFICHE le compte (preuve que ça a pris + diagnostic RLS si 0).
             const rC = await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
               .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-              .in('status',['pending','accepted','confirmed','checked_in']).select('id')
+              .in('status',['pending','accepted','confirmed','checked_in','declined']).select('id')   // 'declined' inclus → vide le cooldown 48h (trigger DB) pour les tests
             // 🧹 Mes lapins (rdv_feedbacks « absent » me masquent les gens 48h). ⚠️ RLS peut bloquer le DELETE.
             const lapinsAvant = (await supabase.from('rdv_feedbacks').select('to_id').eq('from_id', user.id).eq('outcome','absent')).data?.length || 0
             const rF = await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id).select('to_id')

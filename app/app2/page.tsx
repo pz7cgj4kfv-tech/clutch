@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x15A'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 88   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x15B'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 89   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7473,9 +7473,10 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
   }
   // slot de dock : index 3 = Contacts, index 4 = Profil (nav à 5 colonnes), juste au-dessus de la barre
   const dockSlot = (navIdx:number) => { const m=metrics(); return { x:(navIdx+0.5)/5*m.w - SZ/2, y: m.h - m.sab - 72 - SZ - 2 } }
+  const clampXY = (x:number,y:number) => { const m=metrics(); return { x:Math.min(m.maxX,Math.max(m.minX,x)), y:Math.min(m.maxY,Math.max(m.minY,y)) } }
   const loadBall = (id:'live'|'night'): FabBall => {
     const m=metrics()
-    try{ const s=localStorage.getItem('clutch_fab_'+id); if(s){ const o=JSON.parse(s); const b:FabBall={id,x:o.x,y:o.y,vx:0,vy:0,docked:!!o.docked}; if(b.docked){const d=dockSlot(id==='live'?3:4); b.x=d.x; b.y=d.y} return b } }catch{}
+    try{ const s=localStorage.getItem('clutch_fab_'+id); if(s){ const o=JSON.parse(s); const c=clampXY(o.x,o.y); const b:FabBall={id,x:c.x,y:c.y,vx:0,vy:0,docked:!!o.docked}; if(b.docked){const d=dockSlot(id==='live'?3:4); b.x=d.x; b.y=d.y} return b } }catch{}
     return { id, x:m.maxX, y: id==='live'? m.maxY : m.maxY-66, vx:0, vy:0, docked:false }  // défaut : empilés à droite
   }
   const balls = useRef<FabBall[]>([loadBall('live'), loadBall('night')])
@@ -7554,6 +7555,15 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
     rerender()
   }
   useEffect(()=>()=>{ cancelAnimationFrame(raf.current); if(lpTimer.current)clearTimeout(lpTimer.current) },[])
+  // 🛟 Re-cadrage : si une position stockée (localStorage) vient d'une autre taille d'écran, elle peut être
+  // HORS écran → le bouton devient invisible. On re-clampe au montage + à chaque resize. (Bug David : boutons absents.)
+  useEffect(()=>{
+    const reclamp = () => { balls.current.forEach(b=>{ if(b.docked){const d=dockSlot(b.id==='live'?3:4); b.x=d.x; b.y=d.y} else { const c=clampXY(b.x,b.y); b.x=c.x; b.y=c.y } }); persist(balls.current[0]); persist(balls.current[1]); rerender() }
+    reclamp()
+    window.addEventListener('resize', reclamp)
+    return ()=>window.removeEventListener('resize', reclamp)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
 
   const fab = (i:number, content:React.ReactNode, label:string) => {
     const b=balls.current[i]; const dragging=!!drag.current && drag.current.i===i; const press=pressing===i

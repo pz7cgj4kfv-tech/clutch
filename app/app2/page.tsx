@@ -8605,8 +8605,9 @@ export default function App2() {
   // 🔧 DEV (admin) : résultat réel de l'envoi push → toast visible (combien de destinataires / erreur).
   // Permet de diagnostiquer les notifs SANS fouiller Supabase (David : « j'en ai marre de chercher »).
   useEffect(() => {
+    const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864']
     const onResult = (e: any) => {
-      if (!isAdmin) return
+      if (!ADMIN_IDS.includes((user as any)?.id)) return
       const d = e?.detail || {}
       if (d.error) { showToast(`📡 push erreur: ${d.error}`, C.red); return }
       if (d.errors) { showToast(`📡 push refusé OneSignal: ${JSON.stringify(d.errors)}`, C.orange); return }
@@ -8615,7 +8616,7 @@ export default function App2() {
     }
     window.addEventListener('clutch:pushresult', onResult as any)
     return () => window.removeEventListener('clutch:pushresult', onResult as any)
-  }, [isAdmin])
+  }, [user])
 
   // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0
   // (bug connu iOS : l'encoche n'est pas rapportée malgré viewport-fit=cover), on applique un fallback

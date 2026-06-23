@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x153'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 81   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x154'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 82   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6276,16 +6276,17 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
 
   const PageSubscription = () => {
     // 4 paliers CONSO nommés par éléments rares (structure validée David 23.06). Driver = compte SÉPARÉ (voir note en bas).
+    const _en = lang==='en'
     const tiers = [
-      {id:'free',  label:'Hydrogène', sub:'Gratuit',  price:'CHF 0',         color:'#9AA0A6', note:'Le plus abondant de l\'univers — base de tout',          features:['3 Clutchs / jour','Présences & événements','Profil standard']},
-      {id:'au',    label:'Or',        sub:'Standard', price:'CHF 9.90/mois', color:'#C8860A', note:'Forgé dans les étoiles géantes',                        features:['Clutchs illimités','👀 Voir qui est en ligne','Profil mis en avant']},
-      {id:'rh',    label:'Rhodium',   sub:'Premium',  price:'CHF 19.90/mois',color:'#8E7CC3', note:'Le métal le plus rare et le plus cher',                 features:['Tout Or, +','🔔 Notif quand quelqu\'un revient en ligne','Voir qui t\'a mis en favori','Événements plus grands']},
-      {id:'at',    label:'Astate',    sub:'Élite',    price:'CHF 29.90/mois',color:'#532943', note:'28 g dans toute la croûte terrestre',                   features:['Tout Rhodium, +','Préférences fines avancées','Accès anticipé aux événements','Badge Élite ✦']},
+      {id:'free',  label:t('sub.h.name'),  sub:t('sub.h.sub'),  price:'CHF 0',         color:'#9AA0A6', note:t('sub.h.note'),  features:_en?['3 Clutchs / day','Presences & events','Standard profile']:['3 Clutchs / jour','Présences & événements','Profil standard']},
+      {id:'au',    label:t('sub.au.name'), sub:t('sub.au.sub'), price:'CHF 9.90/mois', color:'#C8860A', note:t('sub.au.note'), features:_en?['Unlimited Clutchs','👀 See who\'s online','Featured profile']:['Clutchs illimités','👀 Voir qui est en ligne','Profil mis en avant']},
+      {id:'rh',    label:t('sub.rh.name'), sub:t('sub.rh.sub'), price:'CHF 19.90/mois',color:'#8E7CC3', note:t('sub.rh.note'), features:_en?['Everything in Gold, +','🔔 Alert when someone comes back online','See who favourited you','Bigger events']:['Tout Or, +','🔔 Notif quand quelqu\'un revient en ligne','Voir qui t\'a mis en favori','Événements plus grands']},
+      {id:'at',    label:t('sub.at.name'), sub:t('sub.at.sub'), price:'CHF 29.90/mois',color:'#532943', note:t('sub.at.note'), features:_en?['Everything in Rhodium, +','Advanced fine preferences','Early access to events','Elite badge ✦']:['Tout Rhodium, +','Préférences fines avancées','Accès anticipé aux événements','Badge Élite ✦']},
     ]
     const current = (user as any)?.account_type==='Au'?'au':(user as any)?.account_type==='Rh'?'rh':(user as any)?.account_type==='At'?'at':'free'
     return (
       <div>
-        <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,marginBottom:14,fontStyle:'italic'}}>« Les éléments plus lourds que le fer ne naissent que dans les supernovae ✦ »</div>
+        <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,marginBottom:14,fontStyle:'italic'}}>{_en?'« Elements heavier than iron are only born in supernovae ✦ »':'« Les éléments plus lourds que le fer ne naissent que dans les supernovae ✦ »'}</div>
         {tiers.map(tier=>(
           <div key={tier.id} style={{background:C.bgCard,borderRadius:16,padding:'16px',border:`2px solid ${tier.id===current?tier.color:C.border}`,marginBottom:12,position:'relative',overflow:'hidden'}}>
             {tier.id===current&&<div style={{position:'absolute',top:0,right:0,background:tier.color,padding:'4px 12px',borderBottomLeftRadius:10,fontSize:10,fontWeight:800,color:'#fff'}}>ACTUEL</div>}
@@ -6302,16 +6303,16 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               </div>
             ))}
             {tier.id!==current&&<button style={{width:'100%',marginTop:12,padding:'12px',borderRadius:12,border:'none',background:tier.color,color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
-              Passer à {tier.label}
+              {_en?`Get ${tier.label}`:`Passer à ${tier.label}`}
             </button>}
           </div>
         ))}
         {/* Le Clutch Driver est un compte À PART (business), pas un palier premium */}
-        <div onClick={()=>showToast?.('🚗 Clutch Driver — bientôt : crée des events pour ton activité',C.green)} style={{background:`${C.plum}0a`,border:`1.5px solid ${C.plum}33`,borderRadius:14,padding:'13px 14px',marginBottom:12,cursor:'pointer',display:'flex',alignItems:'center',gap:11}}>
+        <div onClick={()=>showToast?.(_en?'🚗 Clutch Driver — soon: create events for your activity':'🚗 Clutch Driver — bientôt : crée des events pour ton activité',C.green)} style={{background:`${C.plum}0a`,border:`1.5px solid ${C.plum}33`,borderRadius:14,padding:'13px 14px',marginBottom:12,cursor:'pointer',display:'flex',alignItems:'center',gap:11}}>
           <span style={{fontSize:22}}>🚗</span>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:900,color:C.plum}}>Tu organises pour ton activité ?</div>
-            <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1,lineHeight:1.4}}>Le compte <b>Clutch Driver</b> (yoga, ateliers…) est <b>séparé</b> des abonnements ci-dessus. Badge CD ★ + feedback qualité.</div>
+            <div style={{fontSize:13,fontWeight:900,color:C.plum}}>{_en?'Do you organise for your activity?':'Tu organises pour ton activité ?'}</div>
+            <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1,lineHeight:1.4}}>{_en?<>The <b>Clutch Driver</b> account (yoga, workshops…) is <b>separate</b> from the plans above. CD ★ badge + quality feedback.</>:<>Le compte <b>Clutch Driver</b> (yoga, ateliers…) est <b>séparé</b> des abonnements ci-dessus. Badge CD ★ + feedback qualité.</>}</div>
           </div>
           <span style={{color:C.plum,fontSize:16}}>→</span>
         </div>

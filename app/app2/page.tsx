@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x154'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 82   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x155'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 83   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5602,7 +5602,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     {k:'romance', e:'💕', l:'Romance'},
     {k:'amitie',  e:'🤝', l:'Amitié'},
     {k:'pro',     e:'💼', l:'Pro'},
-    {k:'parents', e:'👶', l:'Parents'},
+    {k:'parents', e:'👶', l:'Famille'},
     {k:'entraide',e:'🤲', l:'Entraide'},
   ]
   // Moods — liste riche, chacun rattaché à un moment de journée (p). Le « feu vert » = ça colle à l'instant
@@ -7109,16 +7109,18 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             cf mémoire project_test_features_to_remove. N'agit QUE sur le compte connecté. */}
         {SH('🧪 Test (dev)')}
         <MCard>
-          <MRow icon="🔄" label="Reset test" sub="Annule mes clutchs + mes inscriptions events + débloque mon Verrou" onTap={async()=>{
+          <MRow icon="🔄" label="Reset test complet" sub="Clutchs + cooldowns + lapins + events + Verrou → tu revois tout le monde" onTap={async()=>{
             if(!user?.id) return
-            if(!confirm('Reset test : annuler tes clutchs actifs, te désinscrire de tous les événements et débloquer ton Verrou ?')) return
+            // PAS de window.confirm (bloqué WebView iOS = le reset ne marchait pas sur iPhone !). Outil dev → action directe.
             await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
               .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
               .in('status',['pending','accepted','confirmed','checked_in'])
-            // Désinscription de TOUS mes événements (le reset oubliait ça → on restait inscrit partout)
+            // 🧹 Vide MES cooldowns/lapins (rdv_feedbacks « absent » me masquaient les gens 48h → David+Tafit ne se voyaient plus)
+            try{ await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id) }catch{}
+            // Désinscription de TOUS mes événements
             await supabase.from('event_participants').delete().eq('user_id', user.id)
             await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
-            showToast('✅ Reset complet (clutchs + events) — recharge l\'app',C.orange)
+            showToast('✅ Reset complet (clutchs + cooldowns + events) — recharge l\'app',C.green)
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
         </MCard>
@@ -10873,7 +10875,8 @@ export default function App2() {
                   showToast={showToast} onUserUpdate={setUser}
                   lang={lang} setLang={setLang}
                   onSetAvailable={handleOuvrirFenetre}
-                  isAvailable={!!(user as any).is_available}
+                  /* gate à 2 conditions : is_available ET available_until > now (sinon Profil dit "dispo" alors que c'est expiré) */
+                  isAvailable={!!availableRef}
                   rdvBlocked={rdvBlocked}
                   onFeedback={()=>setShowAppFeedback(true)}
                 />

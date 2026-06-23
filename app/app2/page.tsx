@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x165'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 99   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x166'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 100   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7149,18 +7149,27 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         <MCard>
           <MRow icon="🔄" label="Reset test complet" sub="Clutchs + cooldowns + lapins + events + Verrou → tu revois tout le monde" onTap={async()=>{
             if(!user?.id) return
-            hap('medium'); showToast('⏳ Reset en cours…', C.orange)  // feedback IMMÉDIAT (le reset prend ~1s en DB)
-            // PAS de window.confirm (bloqué WebView iOS = le reset ne marchait pas sur iPhone !). Outil dev → action directe.
-            await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
+            const diag = (msg:string,color:string)=>{ try{ window.dispatchEvent(new CustomEvent('clutch:diag',{detail:{msg,color}})) }catch{} }
+            hap('medium'); diag('⏳ Reset en cours…', C.orange)  // feedback IMMÉDIAT + PERSISTANT (bandeau)
+            // PAS de window.confirm (bloqué WebView iOS). On VÉRIFIE l'effet réel (.select()) = combien de lignes
+            // touchées → on AFFICHE le compte (preuve que ça a pris + diagnostic RLS si 0).
+            const rC = await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
               .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-              .in('status',['pending','accepted','confirmed','checked_in'])
-            // 🧹 Vide MES cooldowns/lapins (rdv_feedbacks « absent » me masquaient les gens 48h → David+Tafit ne se voyaient plus)
-            try{ await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id) }catch{}
-            // Désinscription de TOUS mes événements + liste d'attente
-            await supabase.from('event_participants').delete().eq('user_id', user.id)
+              .in('status',['pending','accepted','confirmed','checked_in']).select('id')
+            // 🧹 Mes lapins (rdv_feedbacks « absent » me masquent les gens 48h). ⚠️ RLS peut bloquer le DELETE.
+            const lapinsAvant = (await supabase.from('rdv_feedbacks').select('to_id').eq('from_id', user.id).eq('outcome','absent')).data?.length || 0
+            const rF = await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id).select('to_id')
+            const rE = await supabase.from('event_participants').delete().eq('user_id', user.id).select('event_id')
             try{ await supabase.from('event_waitlist').delete().eq('user_id', user.id) }catch{}
             await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
-            showToast('✅ Reset complet (clutchs + cooldowns + events) — recharge l\'app',C.green)
+            const nC=rC.data?.length||0, nF=rF.data?.length||0, nE=rE.data?.length||0
+            const blocked = lapinsAvant>0 && nF===0  // avait des lapins mais 0 supprimé = RLS bloque
+            diag(
+              blocked
+                ? `⚠️ Reset : ${nC} clutchs · ${nE} events OK, MAIS ${lapinsAvant} lapin(s) NON supprimé(s) (RLS bloque). → colle le SQL de Claude.`
+                : `✅ Reset OK : ${nC} clutchs annulés · ${nF} lapin(s) supprimé(s) · ${nE} events. Recharge l'app.`,
+              blocked ? C.red : C.green,
+            )
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
           {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
@@ -8554,6 +8563,13 @@ export default function App2() {
     window.addEventListener('clutch:pushresult', onResult as any)
     return () => window.removeEventListener('clutch:pushresult', onResult as any)
   }, [user])
+
+  // 🔧 DIAGNOSTIC générique (bandeau persistant) — utilisé par les outils dev (Reset test, etc.).
+  useEffect(() => {
+    const onDiag = (e:any) => { const d=e?.detail; if(d?.msg) setPushDiag({msg:d.msg, color:d.color||C.salmon}) }
+    window.addEventListener('clutch:diag', onDiag as any)
+    return () => window.removeEventListener('clutch:diag', onDiag as any)
+  }, [])
 
   // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0
   // (bug connu iOS : l'encoche n'est pas rapportée malgré viewport-fit=cover), on applique un fallback

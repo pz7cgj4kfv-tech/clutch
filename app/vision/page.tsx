@@ -147,6 +147,8 @@ const Idea = ({emoji,title,desc,badge}:{emoji:string;title:string;desc:string;ba
 
 const SECTIONS = [
   { id:'map',       icon:'🗺', label:'Map' },
+  { id:'graal',     icon:'🧭', label:'Le Graal' },
+  { id:'invariants',icon:'🛡', label:'Invariants' },
   { id:'confiance', icon:'🏆', label:'Confiance' },
   { id:'strategie', icon:'🧭', label:'Stratégie' },
   { id:'live',      icon:'⚡', label:'En prod' },
@@ -3313,7 +3315,86 @@ function SectionSocialModel(){
   )
 }
 
+// ─── 🧭 LE GRAAL — addiction éthique sans temps d'écran (anti-inertie) ───────
+const SectionGraal = () => {
+  const Card = ({icon,title,color,children}:any) => (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${color}`,borderRadius:12,padding:'14px 16px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:800,color,marginBottom:7}}>{icon} {title}</div>
+      <div style={{fontSize:12,color:C.mid,lineHeight:1.7}}>{children}</div>
+    </div>
+  )
+  return (
+    <div>
+      <H n={1}>🧭 Le Graal — accro à la VIE, pas à l'app</H>
+      <P>Le pari contre-intuitif qui peut faire gagner Clutch : <b style={{color:C.gold}}>temps passé dans la vraie vie = succès</b> (et non temps d'écran). Objectif : consulté souvent, mais &lt; 30 s à chaque fois.</P>
+      <Card icon="🛋️" title="Le concurrent, c'est le canapé" color={C.red}>
+        Clutch n'est pas une app de rencontre → c'est un <b>OS des opportunités sociales en temps réel</b> (anti-inertie). L'ennemi n'est ni Tinder ni Insta, c'est « je reste chez moi ». <b>Aune unique de toute décision : est-ce que ça fait sortir quelqu'un dans les 2h ?</b>
+      </Card>
+      <Card icon="🎰" title="Variabilité HONNÊTE = dopamine éthique" color={C.gold}>
+        Les gens ne sont pas accros au swipe, mais à « il peut se passer quelque chose ». Tinder <i>fabrique</i> l'espoir (feed algo = fausse variabilité = dark pattern). <b>Clutch : la variabilité est RÉELLE</b> (la dispo des vrais gens change tout le temps) → la dopamine est honnête car l'opportunité est vraie. On RÉVÈLE le monde, on ne le manipule pas.
+      </Card>
+      <Card icon="🔔" title="Le vrai produit = la NOTIFICATION" color={C.salmon}>
+        « 15 s puis ferme » → l'app est le <b>cockpit, pas la destination</b>. Le produit vit dans le push : « 3 dispo à 12 min dans les 2h » → tap → « 18h30 ? » → tu fermes, tu y vas. <b>L'user parfait n'ouvre presque jamais l'app.</b> Les notifs ne sont pas une feature : c'est LE cœur. Chaque notif = opportunité réelle + fraîche, jamais du bruit.
+      </Card>
+      <Card icon="🧠" title="Les 5 leviers comportementaux (éthiques)" color={C.green}>
+        1. <b>Variabilité honnête</b> (le monde change → « vérifie »). 2. <b>Aversion à la perte &gt; gain</b> (« dispo encore 37 min », Verrou — ×2 plus puissant). 3. <b>Identité, pas points</b> (« tu es quelqu'un qui sort » &gt; « +5 pts »). 4. <b>Momentum social</b> (lun+mer+ven = « quelqu'un qui rencontre des gens »). 5. <b>Boucles ouvertes</b> (Zeigarnik) qui se closent DANS LA VRAIE VIE.
+      </Card>
+      <Card icon="📏" title="La métrique Nord" color={C.gold}>
+        <b>Rencontres réelles ÷ minutes d'écran</b> → on maximise le ratio. Aucune app de rencontre n'ose ça. Toute feature qui ↑ le temps d'écran sans ↑ les vrais RDV = <b>dark pattern → on coupe</b>.
+      </Card>
+      <Card icon="🚪" title="Le Graal qui s'auto-annule" color={C.salmon}>
+        On veut moins d'usage mais des retours fréquents. Résolution : <b>on design pour la SORTIE, pas pour le dwell.</b> La meilleure session se termine quand l'user pose son tél et va au RDV. <b>Une app qu'on est fier de FERMER.</b>
+      </Card>
+      <P dim>Filtre permanent sur CHAQUE feature : « ça augmente les rencontres réelles par minute d'écran, ou juste le temps d'écran ? » Si le 2e → dark pattern.</P>
+    </div>
+  )
+}
+
+// ─── 🛡️ INVARIANTS — la constitution + défi malveillance permanent ──────────
+const SectionInvariants = () => {
+  const INV = [
+    ['Feedbacks/notes privés','Personne ne lit les notes des autres','🟡 JS → blinder RLS (fuite LPD)'],
+    ['Score non auto-modifiable','Modifiable QUE par le serveur','🟡 PATCH client possible'],
+    ['Position ≠ live','Zones ±50 m, distance au LIEU jamais à la personne','🟢 OK'],
+    ['Anti-doublon / self-clutch','Pas 2 clutchs pending, pas soi-même','🟢 contraintes DB'],
+    ['Cooldown 48h','Un refusé ne re-spamme pas 48h','🟢 OK (test multi-compte)'],
+    ['Pas de contact hors matching','Aucun contact sans Clutch accepté','🟢 Contacts = re-clutch only'],
+    ['RDV/dispo expiré jamais réactivé','Gate is_available && until>now','🟢 (2 points)'],
+    ['Place event jamais vendue 2×','Capacité respectée','🟢 trigger + PK'],
+    ['Banni ne revient pas','Pas de multi-compte/ban contourné','🟡 + multi-comptes'],
+    ['Blocage = invisible total','Forcé côté requête + RLS','🟡 à blinder'],
+    ['Filtres réception femmes','Women-only / vérifiés / pas après 22h','❌ pas codé'],
+    ['Premium ne s\'auto-attribue pas','account_type seulement après paiement','🟡 PATCH possible'],
+    ['Pas d\'extraction de masse','Pas de dump profils/GPS','🟡 RLS + rate limit'],
+    ['Mineurs exclus','18+ vérifié partout','🟡 fausse date possible'],
+  ]
+  return (
+    <div>
+      <H n={1}>🛡️ Invariants — la constitution de Clutch</H>
+      <P>Les règles qui ne doivent <b>JAMAIS</b> être fausses. On ne prouve pas le code (Coq = inutile ici). On rend les règles <b>incassables là où on ne peut pas les contourner = la base de données</b> (contraintes + RLS). Un invariant forcé seulement en JS (🟡) = contournable. But : tout passer en 🟢 DB.</P>
+      <div style={{background:C.card,border:`1px solid ${C.red}55`,borderRadius:12,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:800,color:C.red,marginBottom:6}}>⚔️ Le défi PERMANENT (sur chaque feature, pour toujours)</div>
+        <div style={{fontSize:12,color:C.mid,lineHeight:1.7}}>« Comment un malveillant la pète ? » — Que fait un homme qui harcèle / piste / recontacte après un refus ? Qui crée 50 faux comptes / revient après ban ? Qui extrait les GPS ? Qui triche son score / réserve 2× une place ? Si « rien ne l'en empêche » → <b>bloquer AVANT de coder</b>.</div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {INV.map(([t,r,s]:any,i:number)=>(
+          <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.gold}}>{t}</div>
+              <div style={{fontSize:11,color:C.mid,lineHeight:1.5}}>{r}</div>
+            </div>
+            <div style={{fontSize:10,fontWeight:700,color:C.dim,whiteSpace:'nowrap',flexShrink:0}}>{s}</div>
+          </div>
+        ))}
+      </div>
+      <P dim>Plan : 1) classer chaque invariant 🟢 DB vs 🟡 JS · 2) passer tout « sécurité/confiance » 🟡 → 🟢 (contrainte/RLS/trigger/Edge Function) · 3) audit adversarial (essayer de tout casser) · 4) un test auto par invariant. Priorité : fuite feedbacks · scores/premium auto-modifiables · multi-comptes/scraping · filtres femmes.</P>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
+  graal: SectionGraal,
+  invariants: SectionInvariants,
   map: SectionMap,
   nda: SectionNDA,
   naming: SectionNaming,

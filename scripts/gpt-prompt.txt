@@ -1,11 +1,38 @@
-Contexte : Clutch, app suisse de rencontre spontanée EN PERSONNE (région lausannoise, 18+). On veut ajouter des PARTENAIRES PAYANTS (clubs, bars, organisateurs comme « D Club », « Montreux Jazz Café ») qui paient pour mettre en avant leurs événements via des bannières non filtrables dans l'onglet Événements.
+CONTEXTE — App "Clutch" (Suisse, Lausanne) : rencontres SPONTANÉES en vrai (pas du Tinder). On se met "dispo" pour 18h max, on envoie un "Clutch" (invitation à un vrai RDV café/verre), ça se verrouille ("Verrou"), on se retrouve. Il y a aussi des ÉVÉNEMENTS de groupe (apéros, yoga, ateliers). Cœur de cible : femmes 18-35, sécurité = priorité absolue. Modèle éthique : PAS de pay-to-win qui déséquilibre hommes/femmes.
 
-Questions à challenger durement :
-1. Modèle de revenus partenaires : abonnement mensuel pour la visibilité ? coût par clic/inscription ? commission sur billets ? Quel est le plus défendable pour une petite app au lancement (peu d'utilisateurs) ?
-2. Comment un partenaire SAIT combien de personnes viennent de Clutch et combien viennent réellement (présent/absent) ? Faut-il une billetterie intégrée, un QR code de check-in, un tracking d'origine ? Risques (fraude, no-show) ?
-3. Faut-il payer le billet TOUT DE SUITE dans l'app (paiement intégré) ou sur place ? Implications légales suisses (encaissement pour compte de tiers, TVA, LSFin/FINMA si on touche à l'argent) ?
-4. Rabais à l'entrée pour les membres Clutch : bonne idée pour la croissance ou ça dévalue ?
-5. Angle malveillance/éthique : un « partenaire » peut-il être un faux compte qui attire des gens dans un piège ? Comment vérifier/certifier un partenaire ?
-6. Où on se plante le plus probablement avec ce modèle ?
+ON DOIT TRANCHER LA STRUCTURE DES COMPTES + ABONNEMENTS. Voici les briques actuelles, AIDE-NOUS À LES RENDRE COHÉRENTES :
 
-Sois adversarial, concret, structuré. Donne une reco claire de modèle MVP pour le lancement.
+1) ABONNEMENTS CONSO (payants) — 4 paliers nommés par éléments chimiques :
+   - Hydrogène = gratuit (0)
+   - Or = 9.90/mois
+   - Rhodium = 19.90/mois
+   - Astate = 29.90/mois (élite)
+   Idée : le payant donne PLUS de confort. Exemple concret donné par le fondateur : "voir des gens qui ne sont PAS dispo en ce moment + recevoir une alerte quand cette personne devient dispo". Préférences fines, etc.
+
+2) BADGE "CLUTCH DRIVER" (gratuit, mérité) — un user NORMAL qui crée régulièrement de bons événements gagne une reconnaissance communautaire ("ce mec est fiable/cool"), opt-in. Principe : "plus il fait (bons events, gens qui viennent, bons feedbacks), plus il débloque d'avantages". Validation des feedbacks peut-être à la main par l'équipe. IMPORTANT : il NE peut PAS encaisser DANS l'app (s'il se fait payer, ça se passe HORS app).
+
+3) (OPTION) COMPTE "PRO" — certifié par l'équipe Clutch. Le fondateur DOUTE qu'il soit nécessaire. Peut-être redondant avec le Driver.
+
+4) PARTENAIRES — clubs/marques, bannières, pas de feedback. (déjà clair, à part.)
+
+LA VRAIE TENSION À RÉSOUDRE (challenge-nous fort là-dessus) :
+- Si le BADGE Driver (gratuit) débloque des avantages quand on est actif/fiable... est-ce que ça CANNIBALISE les abonnements payants ? Pourquoi quelqu'un paierait Or/Rhodium/Astate s'il peut débloquer gratuitement en créant des events ?
+- Qui paie, et pour QUOI exactement ? Quelles features réserver au PAYANT vs au MÉRITÉ vs au GRATUIT-de-base ?
+- Le "Pro certifié" est-il nécessaire ou bien le Driver + un simple badge "certifié par l'équipe" suffit ?
+- "Voir les gens non-dispo + alerte quand ils se libèrent" = feature payante OU mérité par le Driver ? (le fondateur hésite : il dit que le Driver "aura peut-être le droit aussi")
+
+QUESTIONS QU'ON SE POSE :
+- Driver peut-il faire des Clutchs 1-à-1 normaux EN PLUS de ses events ? (intuition : oui)
+- Distinction "mérité (réputation)" vs "acheté (abo)" : comment éviter que ça paraisse injuste ou pay-to-win ?
+
+CONTRAINTES À INTÉGRER DANS TA RÉPONSE :
+- Apple App Store : les biens/services NUMÉRIQUES passent par l'achat in-app (commission ~15-30%). MAIS les services/événements du MONDE RÉEL (un vrai yoga, un vrai café) sont EXEMPTÉS d'achat in-app -> paiement hors app autorisé. Exploite ça intelligemment.
+- Droit suisse (LPD) : localisation = donnée sensible. Si on encaisse de l'argent pour des tiers -> attention statut d'intermédiaire financier.
+- Éthique : sécurité femmes, anti-harcèlement, anti pay-to-win déséquilibrant H/F. "Voir les non-dispo + alerte" : audite le risque de harcèlement/stalking (un homme premium qui traque une femme précise) AVANT de valider cette feature.
+
+CE QU'ON ATTEND DE TOI (sois adversarial, concret, structuré) :
+A) Démolis ou valide la logique badge-gratuit vs abo-payant. Donne LA règle claire qui sépare "ce qui se MÉRITE" de "ce qui s'ACHÈTE" sans cannibalisation.
+B) Tranche : faut-il un compte "Pro" séparé, oui/non, et pourquoi.
+C) Audite la feature "voir les non-dispo + alerte" sous l'angle harcèlement/sécurité femmes : on la garde ? on la limite comment ?
+D) Propose une STRUCTURE FINALE claire (qui peut faire quoi, qui paie quoi) sous forme de tableau simple, prête à montrer à une cofondatrice non-tech.
+E) Liste les 3 plus gros risques (légal/éthique/business) de la structure que tu proposes.

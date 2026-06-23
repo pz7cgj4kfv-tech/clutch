@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x158'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 86   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x159'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 87   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7560,20 +7560,21 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
     return <button key={b.id} className={(!b.docked && !dragging && !press)?'cl-fab':undefined} aria-label={label}
       onPointerDown={(e)=>onDown(i,e)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
       style={{ position:'fixed', left:b.x, top:b.y, zIndex:1200, width:SZ, height:SZ, borderRadius:'50%', touchAction:'none',
-        background:'#FFFFFF', border:b.docked?`1.5px solid ${C.border}`:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+        // Fond TRANSPARENT : le cercle violet foncé + le néon viennent du SVG de Mel (CLUTCH_*_v3) → il va jusqu'au bord.
+        background:'transparent', border:'none', cursor:'grab', display:'flex', alignItems:'center', justifyContent:'center', padding:0, overflow:'visible',
         transform: press?'scale(0.86)':undefined, transition: press?'transform .65s cubic-bezier(.4,0,.2,1)':'transform .15s',
-        boxShadow: press?'0 0 0 4px rgba(235,107,175,.35), 0 2px 8px rgba(83,41,67,.2)' : (b.docked?'0 2px 8px rgba(83,41,67,.18)':undefined) }}>{content}</button>
+        boxShadow: press?'0 2px 10px rgba(44,16,32,.45)' : (b.docked?'0 2px 8px rgba(44,16,32,.3)':undefined) }}>{content}</button>
   }
   return (<>
     <style>{`
       @keyframes clBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}50%{transform:scale(1)}}
-      @keyframes clGlow{0%,100%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(83,41,67,.20)}12%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 20px 6px rgba(235,107,175,.55),0 4px 14px rgba(83,41,67,.20)}36%{box-shadow:inset 0 1px 6px rgba(255,255,255,.6),0 0 13px 4px rgba(235,107,175,.35),0 4px 14px rgba(83,41,67,.20)}}
+      @keyframes clGlow{0%,100%{box-shadow:0 0 0 0 rgba(235,107,175,0),0 4px 14px rgba(44,16,32,.30)}12%{box-shadow:0 0 22px 7px rgba(235,107,175,.55),0 4px 14px rgba(44,16,32,.30)}36%{box-shadow:0 0 14px 4px rgba(235,107,175,.35),0 4px 14px rgba(44,16,32,.30)}}
       @keyframes clFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
       .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
       @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
     `}</style>
-    {!hidden && showLive && fab(0, <img src="/icons/CLUTCH_live_v2.svg" width={40} height={40} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
-    {!hidden && showNight && fab(1, <img src="/icons/CLUTCH_night_v2.svg" width={40} height={40} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
+    {!hidden && showLive && fab(0, <img src="/icons/CLUTCH_live_v3.svg" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
+    {!hidden && showNight && fab(1, <img src="/icons/CLUTCH_night_v3.svg" width={SZ} height={SZ} alt="" draggable={false} style={{pointerEvents:'none',display:'block'}}/>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
   </>)
 }
 

@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x151'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 79   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x152'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 80   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6275,29 +6275,46 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   )
 
   const PageSubscription = () => {
+    // 4 paliers CONSO nommés par éléments rares (structure validée David 23.06). Driver = compte SÉPARÉ (voir note en bas).
     const tiers = [
-      {id:'free',label:'Gratuit',price:'CHF 0',color:'#6b7280',features:['3 Clutchs / jour','Profil standard','Accès à tous les événements']},
-      {id:'premium',label:'Premium ✦',price:'CHF 19.90/mois',color:C.gold,features:['Clutchs illimités','Profil mis en avant','Voir qui t\'a mis en favoris','Badge ✦ visible','Accès anticipé events']},
+      {id:'free',  label:'Hydrogène', sub:'Gratuit',  price:'CHF 0',         color:'#9AA0A6', note:'Le plus abondant de l\'univers — base de tout',          features:['3 Clutchs / jour','Présences & événements','Profil standard']},
+      {id:'au',    label:'Or',        sub:'Standard', price:'CHF 9.90/mois', color:'#C8860A', note:'Forgé dans les étoiles géantes',                        features:['Clutchs illimités','👀 Voir qui est en ligne','Profil mis en avant']},
+      {id:'rh',    label:'Rhodium',   sub:'Premium',  price:'CHF 19.90/mois',color:'#8E7CC3', note:'Le métal le plus rare et le plus cher',                 features:['Tout Or, +','🔔 Notif quand quelqu\'un revient en ligne','Voir qui t\'a mis en favori','Événements plus grands']},
+      {id:'at',    label:'Astate',    sub:'Élite',    price:'CHF 29.90/mois',color:'#532943', note:'28 g dans toute la croûte terrestre',                   features:['Tout Rhodium, +','Préférences fines avancées','Accès anticipé aux événements','Badge Élite ✦']},
     ]
-    const current = 'free'
+    const current = (user as any)?.account_type==='Au'?'au':(user as any)?.account_type==='Rh'?'rh':(user as any)?.account_type==='At'?'at':'free'
     return (
       <div>
+        <div style={{fontSize:10.5,color:C.whiteMid,textAlign:'center',lineHeight:1.5,marginBottom:14,fontStyle:'italic'}}>« Les éléments plus lourds que le fer ne naissent que dans les supernovae ✦ »</div>
         {tiers.map(tier=>(
           <div key={tier.id} style={{background:C.bgCard,borderRadius:16,padding:'16px',border:`2px solid ${tier.id===current?tier.color:C.border}`,marginBottom:12,position:'relative',overflow:'hidden'}}>
-            {tier.id===current&&<div style={{position:'absolute',top:0,right:0,background:tier.color,padding:'4px 12px',borderBottomLeftRadius:10,fontSize:10,fontWeight:800,color:'#000'}}>ACTUEL</div>}
-            <div style={{fontSize:16,fontWeight:900,color:tier.id===current?tier.color:C.white,marginBottom:2}}>{tier.label}</div>
-            <div style={{fontSize:14,fontWeight:700,color:tier.id===current?tier.color:C.whiteMid,marginBottom:12}}>{tier.price}</div>
+            {tier.id===current&&<div style={{position:'absolute',top:0,right:0,background:tier.color,padding:'4px 12px',borderBottomLeftRadius:10,fontSize:10,fontWeight:800,color:'#fff'}}>ACTUEL</div>}
+            <div style={{display:'flex',alignItems:'baseline',gap:7,marginBottom:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:tier.id===current?tier.color:C.white}}>{tier.label}</div>
+              <div style={{fontSize:10,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:tier.color}}>{tier.sub}</div>
+            </div>
+            <div style={{fontSize:9.5,color:C.whiteMid,fontStyle:'italic',marginBottom:8,lineHeight:1.3}}>{tier.note}</div>
+            <div style={{fontSize:14,fontWeight:800,color:tier.id===current?tier.color:C.white,marginBottom:12}}>{tier.price}</div>
             {tier.features.map((f,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                <span style={{color:tier.id===current?tier.color:C.whiteMid,fontSize:14}}>✓</span>
+                <span style={{color:tier.color,fontSize:13}}>✓</span>
                 <span style={{fontSize:12,color:tier.id===current?C.white:C.whiteMid}}>{f}</span>
               </div>
             ))}
-            {tier.id!==current&&<button style={{width:'100%',marginTop:12,padding:'12px',borderRadius:12,border:'none',background:tier.color,color:'#000',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+            {tier.id!==current&&<button style={{width:'100%',marginTop:12,padding:'12px',borderRadius:12,border:'none',background:tier.color,color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
               Passer à {tier.label}
             </button>}
           </div>
         ))}
+        {/* Le Clutch Driver est un compte À PART (business), pas un palier premium */}
+        <div onClick={()=>showToast?.('🚗 Clutch Driver — bientôt : crée des events pour ton activité',C.green)} style={{background:`${C.plum}0a`,border:`1.5px solid ${C.plum}33`,borderRadius:14,padding:'13px 14px',marginBottom:12,cursor:'pointer',display:'flex',alignItems:'center',gap:11}}>
+          <span style={{fontSize:22}}>🚗</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:900,color:C.plum}}>Tu organises pour ton activité ?</div>
+            <div style={{fontSize:10.5,color:C.whiteMid,marginTop:1,lineHeight:1.4}}>Le compte <b>Clutch Driver</b> (yoga, ateliers…) est <b>séparé</b> des abonnements ci-dessus. Badge CD ★ + feedback qualité.</div>
+          </div>
+          <span style={{color:C.plum,fontSize:16}}>→</span>
+        </div>
         <div style={{fontSize:10,color:C.whiteMid,textAlign:'center',opacity:.5,lineHeight:1.6}}>
           Abonnement mensuel · Résiliable à tout moment<br/>Prix en CHF · Suisse uniquement pour l'instant
         </div>
@@ -7469,8 +7486,8 @@ function FloatingFabs({ showLive, showNight, hidden, onTapLive, onTapNight }:{
       .cl-fab{animation:clBeat 3.6s ease-in-out infinite,clGlow 3.6s ease-in-out infinite,clFloat 5.2s ease-in-out infinite}
       @media (prefers-reduced-motion:reduce){.cl-fab{animation:none}}
     `}</style>
-    {!hidden && showLive && fab(0, <img src="/icons/clutch_live_mel.svg" width={34} height={34} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
-    {!hidden && showNight && fab(1, <svg width={30} height={30} viewBox="0 0 24 24" style={{pointerEvents:'none'}}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="#532943"/><circle cx="15.5" cy="8" r="1" fill="#EB6BAF"/><circle cx="18" cy="11" r="0.7" fill="#EB6BAF"/></svg>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
+    {!hidden && showLive && fab(0, <img src="/icons/CLUTCH_live_v2.svg" width={40} height={40} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Live — lance-moi, ou appui long pour fixer')}
+    {!hidden && showNight && fab(1, <img src="/icons/CLUTCH_night_v2.svg" width={40} height={40} alt="" draggable={false} style={{pointerEvents:'none'}}/>, 'Clutch Night — lance-moi, ou appui long pour fixer')}
   </>)
 }
 

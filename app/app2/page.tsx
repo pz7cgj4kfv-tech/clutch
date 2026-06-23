@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x164'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 98   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x165'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 99   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -554,15 +554,15 @@ function JogWheel({ slots, value, onChange, accent = false }: {
     }, 80)
   }
 
-  const active = C.orange  // heure sélectionnée ALLUMÉE en rose (couleur logo Mel) — demande David
+  const active = C.pink  // valeur sélectionnée ALLUMÉE en ROSE (#EB6BAF, charte Mel ; plus d'orange = anti-orange)
 
   return (
     <div style={{ position:'relative', height:ITEM_H * 3, flex:1, minWidth:0 }}>
-      {/* selection ring — contour GRIS MOYEN #B2B2B2 (design Mel 22.06 ; le chiffre actif reste rose) */}
+      {/* selection ring — contour GRIS MOYEN #B2B2B2 (design Mel 22.06 : roulettes en gris moyen ; chiffre actif rose) */}
       <div style={{
         position:'absolute', top:ITEM_H, left:4, right:4, height:ITEM_H,
-        background:`${C.salmonMid}12`,
-        border:`1.5px solid ${C.salmonMid}`,
+        background:`${C.ink40}12`,
+        border:`1.5px solid ${C.ink40}`,
         borderRadius:12, pointerEvents:'none', zIndex:2,
       }}/>
       {/* fade top */}

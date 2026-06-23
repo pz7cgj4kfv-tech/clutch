@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x155'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 83   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x156'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 84   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -698,6 +698,15 @@ const EV_PHOTO_POOL = [
   'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=600&q=80',
   'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=600&q=80',
 ]
+// 🔔 Envoi d'une push à UN user (via Edge Function send-push → OneSignal). Centralisé ici pour que
+// TOUS les déclencheurs (clutch, events, liste d'attente, annulation) passent par le même chemin.
+// Silencieux si ça échoue (jamais bloquer une action métier à cause d'une notif).
+function pushTo(userId: string|undefined|null, title: string, body: string, data: any = {}) {
+  if (!userId) return
+  try {
+    supabase.functions.invoke('send-push', { body: { user_id: userId, title, body, data } }).catch(()=>{})
+  } catch {}
+}
 function eventPhotoFor(ev:any):string {
   const d = ev?.eventPhotos?.[0]
   if(d && String(d).startsWith('http')) return d
@@ -3147,6 +3156,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setCancelling(true)
     try {
       if (isRealEvent(ev.id)) {
+        // 🔔 Prévenir TOUS les inscrits AVANT de supprimer les participations (sinon on perd la liste).
+        try {
+          const { data: parts } = await supabase.from('event_participants').select('user_id').eq('event_id', ev.id)
+          ;(parts||[]).forEach((p:any)=>{ if (p.user_id && p.user_id !== userId) pushTo(p.user_id,
+            lang==='en'?'❌ Event cancelled':'❌ Événement annulé',
+            lang==='en'?`"${ev.title}" was cancelled by the organizer — no penalty for you.`:`« ${ev.title} » a été annulé par l'organisateur·ice — aucune pénalité pour toi.`,
+            { type:'event_cancelled', event_id: ev.id }) })
+        } catch {}
         await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
         if (userId) {
           await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', userId)
@@ -3204,6 +3221,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setUserGroupEvents(prev=>prev.map((e:any)=>e.id===ev.id?{...e,taken:(e.taken||0)+1}:e))
     setRegistering(false)
     loadEvents()
+    // 🔔 Notifs event (David : « quelqu'un s'inscrit → l'orga est prévenu »). L'orga reçoit la push ;
+    // si l'event devient complet, une 2e push. (Pas de push à soi-même : on a déjà le ✓ in-app.)
+    const newTaken = (ev.taken||0)+1
+    const orga = (ev as any).created_by
+    if (orga && orga !== userId) {
+      pushTo(orga, lang==='en'?'🎉 New sign-up':'🎉 Nouvelle inscription',
+        (lang==='en'?`Someone joined "${ev.title}"`:`Quelqu'un a rejoint « ${ev.title} »`)+` (${newTaken}/${ev.spots})`,
+        { type:'event_join', event_id: ev.id })
+      if (newTaken >= (ev.spots||0)) {
+        pushTo(orga, lang==='en'?'🔥 Event full':'🔥 Événement complet',
+          lang==='en'?`"${ev.title}" is now full (${ev.spots}/${ev.spots})`:`« ${ev.title} » est complet (${ev.spots}/${ev.spots})`,
+          { type:'event_full', event_id: ev.id })
+      }
+    }
     // Auto-ferme la sheet après 1.5s (laisse voir la confirmation)
     setTimeout(() => setSelEv(null), 1500)
   }
@@ -3774,7 +3805,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                       <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>{lang==='en'?'You\'ll be notified if a spot opens up':'Tu seras prévenu·e si une place se libère'}</div>
                     </div>
                   ) : (
-                    <button onClick={()=>setWaitlist((prev:Set<string>)=>new Set([...prev,selEv.id]))}
+                    <button onClick={()=>{
+                      setWaitlist((prev:Set<string>)=>new Set([...prev,selEv.id]))
+                      showToast?.(lang==='en'?'📋 You\'re on the waitlist — we\'ll notify you':'📋 Tu es sur la liste d\'attente — on te préviendra', C.orange)
+                      const orga=(selEv as any).created_by
+                      if (orga && orga!==userId) pushTo(orga, lang==='en'?'📋 New waitlist sign-up':'📋 Nouvelle personne en attente',
+                        lang==='en'?`Someone is waiting for a spot at "${selEv.title}"`:`Quelqu'un attend une place pour « ${selEv.title} »`, { type:'event_waitlist', event_id: selEv.id })
+                    }}
                       style={{width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.orange}`,borderRadius:16,color:C.orange,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
                       📋 {lang==='en'?'Join waitlist':'Rejoindre la liste d\'attente'}
                     </button>
@@ -7123,6 +7160,21 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             showToast('✅ Reset complet (clutchs + cooldowns + events) — recharge l\'app',C.green)
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
+          {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
+              S'AFFICHENT sur ton tél (utile avec un seul téléphone). Espacées pour qu'iOS les montre toutes. */}
+          <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de chaque type (clutch, event, complet, attente, annulation)" onTap={()=>{
+            if(!user?.id){ showToast('Connecte-toi d\'abord',C.orange); return }
+            const me=user.id
+            const seq:[string,string,any][] = [
+              ['☕ Nouveau Clutch !','Tafit te propose un café à 18h30',{type:'new_clutch'}],
+              ['🎉 Nouvelle inscription','Quelqu\'un a rejoint « Yoga au parc » (4/12)',{type:'event_join'}],
+              ['🔥 Événement complet','« Atelier poterie » est complet (8/8)',{type:'event_full'}],
+              ['📋 Place libérée !','Une place s\'est ouverte pour « Run sunset »',{type:'event_promote'}],
+              ['❌ Événement annulé','« Apéro jazz » a été annulé — aucune pénalité',{type:'event_cancelled'}],
+            ]
+            seq.forEach(([ti,bo,da],i)=> setTimeout(()=> pushTo(me,ti,bo,da), i*1500))
+            showToast('🔔 5 notifs envoyées sur ~7s — regarde ton écran',C.green)
+          }}/>
         </MCard>
 
         {/* ── Footer pro / business (version + Lausanne 🇨🇭 + feedback bêta) ── */}
@@ -8452,6 +8504,18 @@ export default function App2() {
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
     import('@/lib/onesignal').then(({ initOneSignal }) => initOneSignal()).catch(() => {})
+  }, [])
+
+  // 🔔 Toast in-app à CHAQUE push reçu app ouverte (David : « je veux que tout ce qui est notifié
+  // s'affiche »). En plus de la bannière système iOS. On affiche titre + corps.
+  useEffect(() => {
+    const onPush = (e: any) => {
+      const d = e?.detail || {}
+      const msg = [d.title, d.body].filter(Boolean).join(' — ') || '🔔 Notification'
+      showToast(msg, C.orange)
+    }
+    window.addEventListener('clutch:push', onPush as any)
+    return () => window.removeEventListener('clutch:push', onPush as any)
   }, [])
 
   // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0

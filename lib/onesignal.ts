@@ -30,13 +30,13 @@ export async function initOneSignal() {
     try { (OneSignal as any).User?.pushSubscription?.optIn?.() } catch (e) { console.warn('[OneSignal] optIn:', e) }
 
     // Handler : notification reçue en foreground — on gère l'affichage nous-mêmes
+    // ⚠️ BUG CORRIGÉ (23.06) : on appelait event.preventDefault() → la bannière système était
+    // SUPPRIMÉE quand l'app était ouverte, et RIEN n'écoutait l'event de remplacement → David ne
+    // voyait AUCUNE notif app ouverte. On NE preventDefault PLUS (la bannière iOS s'affiche), et on
+    // dispatche EN PLUS un toast in-app (« je veux que TOUT ce qui est notifié s'affiche »).
     OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
-      // Prevent l'affichage automatique pour afficher dans l'UI Clutch
-      event.preventDefault()
       const notif = event.getNotification()
-      console.log('[OneSignal] Notification reçue en foreground:', notif)
-
-      // Dispatche un événement custom que l'app peut écouter
+      console.log('[OneSignal] Notification foreground (affichée):', notif)
       window.dispatchEvent(new CustomEvent('clutch:push', {
         detail: {
           title: notif.title,

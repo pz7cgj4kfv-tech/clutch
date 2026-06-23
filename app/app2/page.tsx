@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x15B'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 89   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x15C'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 90   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5055,6 +5055,9 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   const [bots, setBots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string|null>(null)
+  // 🔑 Bloc-notes « comptes de test » — stocké UNIQUEMENT sur cet appareil (localStorage), JAMAIS dans le
+  // code public (repo GitHub déployé). David remplit ses logins de test une fois, il les revoit ici.
+  const [testNote, setTestNote] = useState(()=>{ try{return localStorage.getItem('clutch_test_logins')||''}catch{return ''} })
   const [radius, setRadius] = useState<Record<string,number>>({})
   const [slotFrom, setSlotFrom] = useState<Record<string,string>>({})
   const [slotUntil, setSlotUntil] = useState<Record<string,string>>({})
@@ -5309,6 +5312,14 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         <button onClick={onClose} style={{background:'none',border:'none',color:C.whiteMid,fontSize:22,cursor:'pointer',padding:'4px 4px 4px 12px'}}>✕</button>
       </div>
       <div style={{padding:'12px 16px calc(var(--sab) + 60px)'}}>
+        {/* 🔑 Comptes de test — privé, sur cet appareil uniquement (jamais dans le code public) */}
+        <div style={{marginBottom:14,background:`${C.orange}10`,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.orange}40`}}>
+          <div style={{fontSize:12,fontWeight:800,color:C.orange,marginBottom:6}}>🔑 Mes comptes de test <span style={{fontWeight:600,color:C.whiteMid,fontSize:10}}>· privé (cet appareil)</span></div>
+          <textarea value={testNote} onChange={e=>{ setTestNote(e.target.value); try{localStorage.setItem('clutch_test_logins', e.target.value)}catch{} }}
+            placeholder={"David — david.saugy@gmail.com — mdp : …\nTafit — email : … — mdp : …\nMélanie — email : … — mdp : …"}
+            rows={4} style={{width:'100%',boxSizing:'border-box',background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:12,fontFamily:'inherit',padding:'8px 10px',resize:'vertical',lineHeight:1.5}}/>
+          <div style={{fontSize:9.5,color:C.whiteMid,marginTop:5,lineHeight:1.4}}>💾 Sauvegardé automatiquement sur CET appareil. Jamais envoyé ni mis dans le code (sécurité : repo public).</div>
+        </div>
         <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.6,marginBottom:14,background:C.bgCard,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
           ① <b>Active</b> un bot à une position → il apparaît dans tes Présences. ② <b>Clutche-le</b> depuis l'app. ③ Reviens ici → <b>Accepter</b> (→ Verrou). ④ <b>Rapprocher</b> (×3-4, regarde le radar) puis <b>Au RDV</b>. ⑤ Toi : J'y suis → Terminer.
         </div>

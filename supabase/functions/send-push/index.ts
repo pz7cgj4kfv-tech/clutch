@@ -1,6 +1,7 @@
 // send-push — Edge Function Clutch
-// Envoie une push notification via OneSignal REST API
-// Appelée depuis le client avec le JWT Supabase
+// Envoie une push via OneSignal REST API (API v16 : api.onesignal.com).
+// Version BLINDÉE : ne crash jamais, et renvoie clairement la réponse de OneSignal
+// (recipients / errors) pour qu'on voie EXACTEMENT ce qui se passe.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,26 +10,35 @@ const corsHeaders = {
 
 const ONESIGNAL_APP_ID = '72f8da44-de01-4ad1-b1d8-6d2fbf33daf4'
 
+function json(obj: unknown, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { user_id, title, body, data } = await req.json()
+    const payload_in = await req.json().catch(() => ({}))
+    const { user_id, title, body, data } = payload_in as any
     if (!user_id || !title) {
-      return new Response(JSON.stringify({ error: 'user_id et title requis' }), { status: 400, headers: corsHeaders })
+      return json({ ok: false, error: 'user_id et title requis', got: payload_in }, 400)
     }
 
-    const apiKey = Deno.env.get('ONESIGNAL_API_KEY')!
+    const apiKey = Deno.env.get('ONESIGNAL_API_KEY')
+    if (!apiKey) {
+      return json({ ok: false, error: 'ONESIGNAL_API_KEY ABSENT des secrets Supabase' }, 200)
+    }
 
     const payload = {
       app_id: ONESIGNAL_APP_ID,
-      include_aliases: { external_id: [user_id] },
+      include_aliases: { external_id: [String(user_id)] },
       target_channel: 'push',
       headings: { en: title, fr: title },
-      contents: { en: body || '', fr: body || '' },
+      contents: { en: body || ' ', fr: body || ' ' },
       data: data || {},
-      url: 'https://pz7cgj4kfv-tech.github.io/app',
-      chrome_web_icon: 'https://pz7cgj4kfv-tech.github.io/icon-192.png',
       ttl: 3600,
     }
 
@@ -37,21 +47,28 @@ Deno.serve(async (req) => {
       headers: {
         'Authorization': `Key ${apiKey}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(payload),
     })
 
-    const result = await res.json()
-    console.log('[OneSignal] Push sent:', result)
+    const raw = await res.text()
+    let result: any
+    try { result = JSON.parse(raw) } catch { result = { raw } }
 
-    return new Response(JSON.stringify({ ok: true, result }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    const out = {
+      ok: res.ok && !result?.errors,
+      onesignal_status: res.status,
+      recipients: result?.recipients ?? null,
+      errors: result?.errors ?? null,
+      notification_id: result?.id ?? null,
+    }
+    // Visible dans l'onglet Logs
+    console.log('[send-push]', JSON.stringify(out))
+    return json(out, 200)
 
   } catch (e) {
-    console.error('[send-push] Error:', e)
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: corsHeaders
-    })
+    console.error('[send-push] Exception:', e)
+    return json({ ok: false, error: String(e) }, 200)
   }
 })

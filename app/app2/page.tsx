@@ -705,7 +705,9 @@ const EV_PHOTO_POOL = [
 function pushTo(userId: string|undefined|null, title: string, body: string, data: any = {}) {
   if (!userId) return
   try {
-    supabase.functions.invoke('send-push', { body: { user_id: userId, title, body, data } }).catch(()=>{})
+    supabase.functions.invoke('send-push', { body: { user_id: userId, title, body, data } })
+      .then((r:any)=>{ try{ window.dispatchEvent(new CustomEvent('clutch:pushresult',{detail: r?.data ?? r?.error ?? r})) }catch{} })
+      .catch((e:any)=>{ try{ window.dispatchEvent(new CustomEvent('clutch:pushresult',{detail:{error:String(e)}})) }catch{} })
   } catch {}
 }
 function eventPhotoFor(ev:any):string {
@@ -8599,6 +8601,21 @@ export default function App2() {
     window.addEventListener('clutch:push', onPush as any)
     return () => window.removeEventListener('clutch:push', onPush as any)
   }, [])
+
+  // 🔧 DEV (admin) : résultat réel de l'envoi push → toast visible (combien de destinataires / erreur).
+  // Permet de diagnostiquer les notifs SANS fouiller Supabase (David : « j'en ai marre de chercher »).
+  useEffect(() => {
+    const onResult = (e: any) => {
+      if (!isAdmin) return
+      const d = e?.detail || {}
+      if (d.error) { showToast(`📡 push erreur: ${d.error}`, C.red); return }
+      if (d.errors) { showToast(`📡 push refusé OneSignal: ${JSON.stringify(d.errors)}`, C.orange); return }
+      if (d.recipients === 0) { showToast('📡 push parti mais 0 destinataire (ciblage/abonnement)', C.orange); return }
+      if (typeof d.recipients === 'number') { showToast(`📡 push OK → ${d.recipients} destinataire(s)`, C.green); return }
+    }
+    window.addEventListener('clutch:pushresult', onResult as any)
+    return () => window.removeEventListener('clutch:pushresult', onResult as any)
+  }, [isAdmin])
 
   // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0
   // (bug connu iOS : l'encoche n'est pas rapportée malgré viewport-fit=cover), on applique un fallback

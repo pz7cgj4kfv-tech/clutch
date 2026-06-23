@@ -12,8 +12,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 
-const V = '0x152'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 80   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x153'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 81   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6714,7 +6714,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       <DRow label="Langue" value={lang==='fr'?'🇨🇭 Français':'🇬🇧 English'} onTap={()=>setLang(lang==='fr'?'en':'fr')}/>
       <DRow label="Légal & données" value="CGU · LPD" onTap={()=>setProfilePage('legal')}/>
       <DRow label="Nous contacter" onTap={()=>setProfilePage('contact')}/>
-      <DRow label="Se déconnecter" danger onTap={()=>{ if(confirm('Se déconnecter ?')) signOut() }}/>
+      <DRow label={logoutArmed?'Confirmer la déconnexion ?':'Se déconnecter'} value={logoutArmed?'Appuie encore':undefined} danger onTap={()=>{ if(logoutArmed){ signOut() } else { setLogoutArmed(true); setTimeout(()=>setLogoutArmed(false),4000) } }}/>
       <DRow label="Supprimer mon compte" danger onTap={()=>setShowDelete(true)}/>
     </div>
   )}
@@ -6865,6 +6865,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     </div>
   )
 
+  const [logoutArmed,setLogoutArmed] = useState(false)  // confirmation 2-temps déconnexion (window.confirm bloqué iOS)
   // 🧪 Geek Setup — l'utilisateur fabrique sa propre ergonomie (afficher/masquer les boutons flottants).
   const [geekPrefs,setGeekPrefs] = useState(()=>{ const r=(k:string)=>{ try{return localStorage.getItem(k)!=='0'}catch{return true} }; return { live:r('clutch_show_live'), night:r('clutch_show_night') } })
   const setFabPref = (k:'live'|'night', v:boolean) => {
@@ -8350,6 +8351,7 @@ export default function App2() {
   const [waitingMutualContact,setWaitingMutualContact] = useState<{clutchId:string,clutch:any}|null>(null)
   const [mutualContactIds,setMutualContactIds] = useState<Set<string>>(new Set())
   const [counterClutchId,setCounterClutchId] = useState<string|null>(null) // ID du clutch en contre-proposition
+  const [contactArmedId,setContactArmedId] = useState<string|null>(null) // confirmation 2-temps retrait contact (window.confirm bloqué iOS)
   const [counterVenue,setCounterVenue] = useState('')
   const [counterTime,setCounterTime] = useState('')
   const [counterMsg,setCounterMsg] = useState('')
@@ -10842,14 +10844,16 @@ export default function App2() {
                           {/* Retrait DISCRET : on passe MON keep_contact à false → le contact n'est plus mutuel → disparaît. L'autre n'est PAS notifié. */}
                           <button onClick={async()=>{
                             if(!user?.id) return
-                            if(!confirm(`Retirer ${otherName} de tes contacts ?\n(discret — l'autre personne n'est pas prévenue)`)) return
+                            // 2-temps inline (window.confirm bloqué dans la WebView iOS)
+                            if(contactArmedId!==c.id){ setContactArmedId(c.id); setTimeout(()=>setContactArmedId(p=>p===c.id?null:p),4000); return }
+                            setContactArmedId(null)
                             const otherId = c.sender_id===user.id ? c.receiver_id : c.sender_id
                             const ids = (clutches as any[]).filter(x=>mutualContactIds.has(x.id)&&(x.sender_id===otherId||x.receiver_id===otherId)).map(x=>x.id)
                             try{ await supabase.from('rdv_feedbacks').update({keep_contact:false}).in('rdv_id',ids).eq('from_id',user.id) }catch{}
                             setMutualContactIds(prev=>{const n=new Set(prev);ids.forEach((id:string)=>n.delete(id));return n})
                           }}
-                            style={{padding:'10px 14px',borderRadius:12,border:`1px solid ${C.salmon}33`,background:'transparent',color:`${C.salmon}aa`,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',whiteSpace:'nowrap'}}>
-                            Retirer
+                            style={{padding:'10px 14px',borderRadius:12,border:`1px solid ${contactArmedId===c.id?C.red:`${C.salmon}33`}`,background:contactArmedId===c.id?`${C.red}12`:'transparent',color:contactArmedId===c.id?C.red:`${C.salmon}aa`,fontSize:13,fontWeight:contactArmedId===c.id?800:700,cursor:'pointer',fontFamily:'inherit',touchAction:'manipulation',whiteSpace:'nowrap'}}>
+                            {contactArmedId===c.id?'Confirmer ?':'Retirer'}
                           </button>
                           </div>
                           </div>

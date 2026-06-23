@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x163'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 97   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x164'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 98   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9834,6 +9834,19 @@ export default function App2() {
 
               <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'14px 16px 0'}}>
 
+                {/* ⚡ QUICK CLUTCH — juste sous l'heure (design Mel : bouton rond gris/rose). Compact, pas une grosse ligne. */}
+                <button onClick={()=>{ hap('light'); setQuickClutch(v=>!v) }}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 11px',marginBottom:16,borderRadius:14,
+                    border:`1.5px solid ${quickClutch?'#EB6BB0':C.border}`,background:quickClutch?'rgba(235,107,176,.09)':'transparent',
+                    cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+                  <img src={quickClutch?'/icons/quickclutch_on.svg':'/icons/quickclutch_off.svg'} width={38} height={38} alt=""
+                    style={{flexShrink:0,transition:'transform .25s cubic-bezier(.22,1,.36,1)',transform:quickClutch?'scale(1.06)':'none'}}/>
+                  <div style={{flex:1,textAlign:'left'}}>
+                    <div style={{fontSize:13,fontWeight:800,color:quickClutch?'#EB6BB0':C.white}}>Quick Clutch · 1h</div>
+                    <div style={{fontSize:10,color:C.whiteMid,marginTop:1,lineHeight:1.3}}>{lang==='en'?'Short & spontaneous — a dot shows on your photo':'RDV court & spontané — une pastille s\'affiche sur ta photo'}</div>
+                  </div>
+                </button>
+
                 {/* 1. MODE — multi-select (pas exclusif : on peut chercher rencontre ET amitié) */}
                 <div style={{marginBottom:16}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -9951,17 +9964,6 @@ export default function App2() {
                   <div style={{fontSize:9,color:C.whiteMid,marginTop:3}}>{t('page2.note')}</div>
                 </div>
 
-                {/* 6. QUICK CLUTCH — RDV limité 1h, pastille verte visible des autres (design Mel) */}
-                <div style={{marginBottom:16}}>
-                  <button onClick={()=>setQuickClutch(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderRadius:12,border:`1.5px solid ${quickClutch?C.green:C.border}`,background:quickClutch?`${C.green}14`:'transparent',cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
-                    <img src="/icons/mel/QuickClutch.svg" width={26} height={26} alt=""/>
-                    <div style={{flex:1,textAlign:'left'}}>
-                      <div style={{fontSize:13,fontWeight:800,color:quickClutch?C.green:C.white}}>Quick Clutch · 1h</div>
-                      <div style={{fontSize:10,color:C.whiteMid,marginTop:1}}>{lang==='en'?'Short meetup — a green dot shows on your photo':'RDV court — une pastille verte s\'affiche sur ta photo'}</div>
-                    </div>
-                    <div style={{width:22,height:22,borderRadius:11,border:`2px solid ${quickClutch?C.green:C.border}`,background:quickClutch?C.green:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{quickClutch&&<span style={{color:'#fff',fontSize:13,fontWeight:900}}>✓</span>}</div>
-                  </button>
-                </div>
 
               </div>
 

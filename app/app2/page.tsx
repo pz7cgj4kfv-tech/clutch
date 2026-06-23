@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x15E'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 92   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x15F'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 93   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7209,6 +7209,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         <MCard>
           <MRow icon="🔄" label="Reset test complet" sub="Clutchs + cooldowns + lapins + events + Verrou → tu revois tout le monde" onTap={async()=>{
             if(!user?.id) return
+            hap('medium'); showToast('⏳ Reset en cours…', C.orange)  // feedback IMMÉDIAT (le reset prend ~1s en DB)
             // PAS de window.confirm (bloqué WebView iOS = le reset ne marchait pas sur iPhone !). Outil dev → action directe.
             await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
               .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)

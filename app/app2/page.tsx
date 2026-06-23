@@ -11,9 +11,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
+import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 
-const V = '0x157'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 85   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x158'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 86   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1970,6 +1971,7 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
         data: { type:'new_clutch', clutch_id: inserted?.id },
       }}).catch(()=>{})
     } catch {}
+    hap('success')  // vibration de confirmation : le Clutch est parti
     onSent(inserted?.id)
   }
 
@@ -4267,8 +4269,12 @@ function ChatSheet({ clutch, userId, onClose, showToast, onMarkRead, maxMessages
       if (error) {
         showToast('⚠️ ' + error.message, C.red)
         setMsgs(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      } else if (myCount+1 >= MAX) {
-        showToast(`Limit reached: ${MAX} messages max`, C.orange)
+      } else {
+        hap('light')
+        // 🔔 Notif « message reçu » au destinataire (aperçu tronqué). Titre « Message » = neutre FR/EN
+        // (ChatSheet n'a pas lang/user en props).
+        if (otherId) pushTo(otherId, '💬 Message', text.length>80?text.slice(0,80)+'…':text, { type:'message', clutch_id: clutch.id })
+        if (myCount+1 >= MAX) showToast(`Limit reached: ${MAX} messages max`, C.orange)
       }
     }
   }
@@ -7644,6 +7650,7 @@ function QuickSOS({ user, supabase: sb, lang, showToast }:{ user:any; supabase:a
 
 function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, onRetardAck, supabase: sb }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void; onCheckin?:()=>void; onTerminer?:()=>void; onRetardAck?:()=>void; supabase?:any }) {
   const [showConv, setShowConv] = useState(false)
+  const [checkinHint,setCheckinHint] = useState('')  // indice « trop loin / pas l'heure » au tap sur J'y suis bloqué
   const [now,setNow] = useState(new Date())
   const [myPos,setMyPos] = useState<{lat:number,lng:number,ts:number}|null>(null)
   const [otherPos,setOtherPos] = useState<{lat:number,lng:number}|null>(null)
@@ -8003,7 +8010,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
           <div style={{textAlign:'center',padding:'4px 0 2px'}}>
             <div style={{fontSize:14,fontWeight:900,color:'#77BC1F',marginBottom:6}}>🎉 Les deux sur place !</div>
             {past ? (
-              <button onClick={e=>{e.stopPropagation();onTerminer?.()}}
+              <button onClick={e=>{e.stopPropagation();hap('success');onTerminer?.()}}
                 style={{width:'100%',padding:'10px',borderRadius:12,border:'none',background:'#77BC1F',
                   color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
                   boxShadow:'0 3px 12px rgba(119,188,31,.4)',letterSpacing:.3}}>
@@ -8022,14 +8029,21 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
             <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4}}>
               <div>{distLabel(myDistKm)}</div>
               {!myArrived ? (
-                <button onClick={e=>{e.stopPropagation();if(canCheckin)onCheckin?.()}}
+                <>
+                <button onClick={e=>{
+                    e.stopPropagation()
+                    if(canCheckin){ hap('success'); onCheckin?.() }
+                    else { hap('warning'); setCheckinHint(myDistKm!==null ? (lang==='en'?`Too far — ${Math.round(myDistKm*1000)}m from the spot`:`Trop loin — ${Math.round(myDistKm*1000)}m du lieu`) : (lang==='en'?'Waiting for GPS / not time yet':'GPS en attente / pas encore l\'heure')); setTimeout(()=>setCheckinHint(''),2800) }
+                  }}
                   style={{padding:'7px 12px',borderRadius:10,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:900,
-                    cursor:canCheckin?'pointer':'default',
+                    cursor:'pointer',
                     background:canCheckin?'#77BC1F':'#E3E3E3',
                     color:canCheckin?'#fff':'#B2B2B2',
                     animation:canCheckin?'jySuisPulse 1.5s ease-in-out infinite':undefined}}>
                   ✓ {"J'y suis !"}
                 </button>
+                {checkinHint && <div style={{fontSize:10,color:C.orange,fontWeight:700,marginTop:2,maxWidth:140}}>{checkinHint}</div>}
+                </>
               ) : (
                 <div style={{fontSize:13,color:'#77BC1F',fontWeight:900}}>✓ Arrivé·e</div>
               )}
@@ -11086,6 +11100,12 @@ export default function App2() {
                   setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===activeVerrou.id?{...cl,[arrivedField]:true}:cl))
                   await supabase.from('clutches').update({ [arrivedField]:true }).eq('id',activeVerrou.id)
                   Sounds.checkin()
+                  // 🔔 Prévenir l'autre que je suis arrivé·e au lieu.
+                  const otherId = isSnd ? (activeVerrou as any).receiver_id : (activeVerrou as any).sender_id
+                  const myFirst = ((user as any)?.name||'').split(' ')[0] || (lang==='en'?'Someone':'Quelqu\'un')
+                  if (otherId) pushTo(otherId, lang==='en'?'📍 They\'ve arrived!':'📍 Iel est arrivé·e !',
+                    lang==='en'?`${myFirst} is at the spot — your turn!`:`${myFirst} est sur place — à toi !`,
+                    { type:'arrived', clutch_id: activeVerrou.id })
                   showToast(gpsVerified?(lang==='en'?'✓ GPS verified 📍':'✓ Présence vérifiée GPS 📍'):(lang==='en'?'✓ Check-in done !':'✓ Check-in fait !'), C.green)
                 }
                 const vLat = (activeVerrou as any).venue_lat
@@ -11349,7 +11369,14 @@ export default function App2() {
                 try { localStorage.setItem(`verrou_shown_${incomingClutch.id}`, String(Date.now())); localStorage.setItem(`clutch_locked_at_${incomingClutch.id}`, String(Date.now())) } catch {}
                 setTimeout(()=>setShowVerrou(true),100)
               } else {
+                hap('success')
                 supabase.from('clutches').update({status:'accepted'}).eq('id',incomingClutch.id).then(()=>{
+                  // 🔔 Prévenir l'EXPÉDITEUR que son Clutch est accepté (étape clé du parcours).
+                  const sid = (incomingClutch as any).sender_id || incomingClutch.sender?.id
+                  const myFirst = ((user as any)?.name||'').split(' ')[0] || (lang==='en'?'Someone':'Quelqu\'un')
+                  if (sid) pushTo(sid, lang==='en'?'✅ Clutch accepted!':'✅ Clutch accepté !',
+                    lang==='en'?`${myFirst} accepted — head to ${incomingClutch.venue||'the spot'}`:`${myFirst} a accepté — direction ${incomingClutch.venue||'le lieu'}`,
+                    { type:'clutch_accepted', clutch_id: incomingClutch.id })
                   setVerrouData({venue:incomingClutch.venue||'',name:incomingClutch.sender?.name||'',photo:incomingClutch.sender?.photo_url||null})
                   setIncomingClutch(null)
                   loadClutches()
@@ -11359,7 +11386,13 @@ export default function App2() {
               }
             }}
             onDecline={()=>{
+              hap('warning')
               if (!incomingClutch.id?.startsWith('sim-')) {
+                // 🔔 Prévenir l'expéditeur que son Clutch est décliné (il est libéré, pas de attente inutile).
+                const sid = (incomingClutch as any).sender_id || incomingClutch.sender?.id
+                if (sid) pushTo(sid, lang==='en'?'Clutch declined':'Clutch décliné',
+                  lang==='en'?'Your Clutch wasn\'t accepted this time — plenty of others around!':'Ton Clutch n\'a pas été accepté cette fois — plein d\'autres personnes sont dispo !',
+                  { type:'clutch_declined', clutch_id: incomingClutch.id })
                 supabase.from('clutches').update({status:'declined'}).eq('id',incomingClutch.id).then(()=>loadClutches())
               }
               setIncomingClutch(null)

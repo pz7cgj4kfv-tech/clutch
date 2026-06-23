@@ -38,18 +38,8 @@ input, textarea, select {
   font-size: 16px !important;
 }
 
-/* 🚫 RIEN DE SÉLECTIONNABLE (demande David) — le double-clic ne doit jamais sélectionner du texte/UI.
-   ⚠️ On NE met PAS ça sur `*` (ça casse la saisie input sur iOS — login bloqué). On passe par HÉRITAGE
-   depuis body, et on RÉACTIVE explicitement sur les champs de saisie (qui DOIVENT rester éditables). */
-body {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;   /* pas de flash gris au tap iOS */
-}
-input, textarea, select, [contenteditable="true"] {
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  user-select: text !important;
-  -webkit-touch-callout: default !important;
-}
+/* ⚠️ « Rien de sélectionnable » RETIRÉ — `user-select:none` (même sur body) CASSE la saisie dans la
+   WebView iOS native (login bloqué, espace inséré au tap). Le web tolérait, pas le natif (Capacitor).
+   On garde juste le tap-highlight transparent (inoffensif). À refaire plus tard de façon native-safe
+   (ex. user-select:none ciblé sur des éléments décoratifs précis, JAMAIS sur les ancêtres d'un input). */
+* { -webkit-tap-highlight-color: transparent; }

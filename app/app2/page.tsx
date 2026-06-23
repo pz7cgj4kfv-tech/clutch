@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x16B'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 105   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x16C'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 106   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10202,7 +10202,6 @@ export default function App2() {
                           /* Compatibilité RÉELLE (intérêts 50% · proximité 30% · fiabilité 20%) + raisons */
                           const ci = compatInfo.get((p as any).id)
                           const cdScore = ci ? ci.dots : 3
-                          const compatReasons = ci ? ci.reasons : []
                           const fiabStars = p.reliability_score!=null ? Math.round(p.reliability_score/20) : null
                           const distZone = getDistanceZone((p as any).center_lat, (p as any).center_lng)
 
@@ -10278,15 +10277,9 @@ export default function App2() {
                                   {(p.reliability_score!=null&&p.reliability_score<60)&&<RabbitBadge/>}
                                   {distZone&&<span style={{fontSize:10,color:'rgba(83,41,67,.55)',fontWeight:600,marginLeft:'auto'}}>{distZone}</span>}
                                 </div>
-                                {/* Ligne 4 : « affiché car… » — transparence du tri (compréhension > contrôle) */}
-                                {compatReasons.length>0&&(
-                                  <div style={{display:'flex',alignItems:'center',gap:5,marginTop:5,flexWrap:'wrap'}}>
-                                    <span style={{fontSize:9.5,color:`${C.whiteMid}99`,fontWeight:700}}>✨ {lang==='en'?'Shown because':'Affiché car'}</span>
-                                    {compatReasons.slice(0,2).map((r,ri)=>(
-                                      <span key={ri} style={{fontSize:9.5,fontWeight:700,color:C.orange,background:`${C.orange}14`,border:`1px solid ${C.orange}33`,borderRadius:7,padding:'1px 6px'}}>{r}</span>
-                                    ))}
-                                  </div>
-                                )}
+                                {/* (transparence : la version explicite « Affiché car » a été retirée —
+                                    David la trouve trop clinquante. Le tri reste, on concevra un signal
+                                    subtil/ressenti ensemble. cf. mémoire project-algo-scaling-architecture) */}
                               </div>
 
                               {/* Bouton + = voir profil */}

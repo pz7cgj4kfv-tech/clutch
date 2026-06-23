@@ -150,6 +150,7 @@ const SECTIONS = [
   { id:'graal',     icon:'🧭', label:'Le Graal' },
   { id:'invariants',icon:'🛡', label:'Invariants' },
   { id:'lancement', icon:'🚀', label:'Lancement' },
+  { id:'dynamique', icon:'🌀', label:'Dynamique' },
   { id:'confiance', icon:'🏆', label:'Confiance' },
   { id:'strategie', icon:'🧭', label:'Stratégie' },
   { id:'live',      icon:'⚡', label:'En prod' },
@@ -3437,10 +3438,49 @@ const SectionLancement = () => {
   )
 }
 
+// ─── 🌀 DYNAMIQUE & SCALING — la mécanique à l'échelle (corrigé 24.06) ────────
+const SectionDynamique = () => {
+  const Card = ({icon,title,color,children}:any) => (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${color}`,borderRadius:12,padding:'14px 16px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:800,color,marginBottom:7}}>{icon} {title}</div>
+      <div style={{fontSize:12,color:C.mid,lineHeight:1.7}}>{children}</div>
+    </div>
+  )
+  return (
+    <div>
+      <H n={1}>🌀 Dynamique & Scaling — la mécanique quand ça cartonne</H>
+      <P>Comment Clutch tient de <b>20 personnes</b> (lancement) à <b>50 000 en ligne</b> (Paris/NY un vendredi). La réponse n'est pas de cacher la foule — c'est de la <b>trier</b> et de <b>plafonner la clutchabilité</b>.</P>
+      <Card icon="📏" title="Les 2 fenêtres — ne JAMAIS confondre" color={C.gold}>
+        <b>Dispo perso = 18h max</b> (depuis que tu te mets dispo). <b>Réponse à un clutch = 2h</b> (puis il expire). Ce sont deux choses différentes.
+      </Card>
+      <Card icon="🎟️" title="Les PLACES — la clé (David)" color={C.salmon}>
+        On ne cache personne : <b>scroll infini, on voit tout le monde</b>, juste trié (les + compatibles/proches/fiables en haut). Le plafond est sur la <b>clutchabilité</b> : chacun (surtout les femmes) choisit son <b>nombre de places</b> (clutchs simultanés). Plein = <b>visible mais plus clutchable</b> (« complète ce soir »). Les places se libèrent par réponse OU expiration (2h). Défaut ~<b>10+</b> (pas 5), réglable jusqu'à 50+. Bloqué <b>à la porte</b> → jamais 500 refus à gérer. Pas de liste d'attente classée.
+      </Card>
+      <Card icon="💎" title="Idées Premium (confort, jamais pay-to-win)" color={C.green}>
+        1. <b>Alerte « place libérée »</b> : si ton filtre matche une personne pleine, notif dès qu'une place se libère → tu cliques, tu la clutch en 1er. 2. <b>Alerte « redevenue dispo »</b> : voir les présents non-clutchables + poser une alerte → notif quand ils repassent dispo. 3. Pouvoir <b>clutcher sans être clutchable</b>. → du confort de réactivité, jamais acheter le mérite/la fiabilité.
+      </Card>
+      <Card icon="🎁" title="Mode Surprise / Mégaclutch (nom à trouver)" color={C.gold}>
+        Activités hors du commun (parachute, parapente…). L'IA <b>détecte qu'un event est exceptionnel</b> et le met en avant aux gens qui ont payé pour voir l'exceptionnel. Un classifieur d'événements + une mise en avant premium.
+      </Card>
+      <Card icon="🌡️" title="Le thermostat — auto, par zone, mondial" color={C.salmon}>
+        Un algo <b>déterministe</b> (pas une boîte noire) dans la base (pg_cron) calcule la <b>densité par zone + heure</b> et règle SEUL l'intensité du tri de cette zone. <b>Par zone = ça scale mondialement sans humain par ville</b> (on ne peut pas être 2 devant l'écran pour chaque ville !). Filet de sécurité : si ça plante → « tri neutre, montre tout », jamais cassé. ⚡ densité = auto temps réel · 🐢 forme de la formule = David+Claude, rare, sur vraies données.
+      </Card>
+      <Card icon="🤫" title="Transparence — subtile, pas naïve" color={C.gold}>
+        « Vous aimez le jazz tous les deux » = trop nul. On veut <b>intelligent, subtil, éthique</b> : un ordre malin + au mieux un signal discret <i>ressenti</i>, jamais la machinerie exposée. L'influence se règle dans le profil sans montrer les chiffres. → l'étiquette « Affiché car » actuelle sera remplacée par bien plus subtil (2-3 directions à proposer).
+      </Card>
+      <Card icon="📊" title="Les vrais chiffres" color={C.green}>
+        Genève ~2000 online un bon soir (peu de tri). <b>Paris ~15 000+</b> (cercle central = dizaines de milliers). <b>New York ~65 000+</b>. → à l'échelle, la curation (tri + places) est <b>vitale</b>. Au lancement c'est l'inverse : 20-80/ville → thermostat éteint, priorité anti-vide.
+      </Card>
+      <P dim>Détail complet en mémoire : <b>project-algo-scaling-architecture</b> · constantes : <b>project-constantes-systeme</b> · dynamique/roadmap : <b>project-dynamique-et-roadmap</b>.</P>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   graal: SectionGraal,
   invariants: SectionInvariants,
   lancement: SectionLancement,
+  dynamique: SectionDynamique,
   map: SectionMap,
   nda: SectionNDA,
   naming: SectionNaming,

@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x16A'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 104   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x16B'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 105   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9586,6 +9586,33 @@ export default function App2() {
     return true
   })
 
+  // ─── 🧠 LE CERVEAU : tri par compatibilité réelle + explication « affiché car… » ───
+  // Poids v1 (ajustables) : intérêts communs 50% · proximité 30% · fiabilité 20%.
+  // GPT validé : « compréhension > contrôle » → on EXPLIQUE pourquoi chaque profil remonte.
+  const myInterestsLC = (Array.isArray((user as any)?.interests) ? (user as any).interests : []).map((x:string)=>String(x).toLowerCase())
+  const compatScored = filtered.map(p => {
+    const theirInt:string[] = Array.isArray((p as any).interests) ? (p as any).interests : []
+    const shared = theirInt.filter(i => myInterestsLC.includes(String(i).toLowerCase()))
+    const compat = (theirInt.length && myInterestsLC.length) ? shared.length / Math.max(theirInt.length, myInterestsLC.length) : 0
+    const lat = (p as any).center_lat, lng = (p as any).center_lng
+    const km = (lat!=null && lng!=null) ? haversineKm(meetupPos[0], meetupPos[1], lat, lng) : null
+    const myR = (user as any)?.available_radius_km ?? rayon
+    const prox = km==null ? 0.3 : Math.max(0, 1 - km/Math.max(myR,1))
+    const fiab = (p as any).reliability_score!=null ? (p as any).reliability_score/100 : 0.5
+    const score = compat*0.5 + prox*0.3 + fiab*0.2
+    // dots 1..5 + raisons lisibles (les 2 plus fortes)
+    const dots = Math.max(1, Math.min(5, Math.round(1 + score*4)))
+    const reasons:string[] = []
+    if (shared.length>=2) reasons.push(`${shared.length} goûts communs`)
+    else if (shared.length===1) reasons.push(`Goût commun : ${shared[0]}`)
+    if (km!=null && km<2) reasons.push('Tout près')
+    else if (km!=null && km<10) reasons.push('Dans la ville')
+    if ((p as any).reliability_score!=null && (p as any).reliability_score>=80) reasons.push('Très fiable')
+    return { p, score, dots, reasons }
+  }).sort((a,b)=> b.score - a.score)
+  const sortedFiltered = compatScored.map(s => s.p)
+  const compatInfo = new Map(compatScored.map(s => [(s.p as any).id, s]))
+
   // Fenêtre bloquée pour l'utilisateur courant (calculée depuis activeVerrou)
   const myRdvWindow = useMemo(() => {
     if (!activeVerrou?.proposed_time) return null
@@ -10168,12 +10195,14 @@ export default function App2() {
 
                       : (proMode && proJobFilter
                           ? (proJobFilter === '__job__'
-                              ? filtered.filter(p => !(p as any).job_category && (p as any).job)
-                              : filtered.filter(p => (p as any).job_category === proJobFilter))
-                          : filtered
+                              ? sortedFiltered.filter(p => !(p as any).job_category && (p as any).job)
+                              : sortedFiltered.filter(p => (p as any).job_category === proJobFilter))
+                          : sortedFiltered
                         ).map((p,i)=>{
-                          /* Score CD (Clutch Driver) = compatibilité fictive basée sur index + score fiabilité */
-                          const cdScore = Math.max(1, Math.min(5, 5 - i + (p.reliability_score!=null ? Math.floor(p.reliability_score/30) : 0)))
+                          /* Compatibilité RÉELLE (intérêts 50% · proximité 30% · fiabilité 20%) + raisons */
+                          const ci = compatInfo.get((p as any).id)
+                          const cdScore = ci ? ci.dots : 3
+                          const compatReasons = ci ? ci.reasons : []
                           const fiabStars = p.reliability_score!=null ? Math.round(p.reliability_score/20) : null
                           const distZone = getDistanceZone((p as any).center_lat, (p as any).center_lng)
 
@@ -10249,6 +10278,15 @@ export default function App2() {
                                   {(p.reliability_score!=null&&p.reliability_score<60)&&<RabbitBadge/>}
                                   {distZone&&<span style={{fontSize:10,color:'rgba(83,41,67,.55)',fontWeight:600,marginLeft:'auto'}}>{distZone}</span>}
                                 </div>
+                                {/* Ligne 4 : « affiché car… » — transparence du tri (compréhension > contrôle) */}
+                                {compatReasons.length>0&&(
+                                  <div style={{display:'flex',alignItems:'center',gap:5,marginTop:5,flexWrap:'wrap'}}>
+                                    <span style={{fontSize:9.5,color:`${C.whiteMid}99`,fontWeight:700}}>✨ {lang==='en'?'Shown because':'Affiché car'}</span>
+                                    {compatReasons.slice(0,2).map((r,ri)=>(
+                                      <span key={ri} style={{fontSize:9.5,fontWeight:700,color:C.orange,background:`${C.orange}14`,border:`1px solid ${C.orange}33`,borderRadius:7,padding:'1px 6px'}}>{r}</span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Bouton + = voir profil */}

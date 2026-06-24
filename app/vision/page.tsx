@@ -146,6 +146,7 @@ const Idea = ({emoji,title,desc,badge}:{emoji:string;title:string;desc:string;ba
 )
 
 const SECTIONS = [
+  { id:'plan',      icon:'📋', label:'Plan d\'attaque' },
   { id:'map',       icon:'🗺', label:'Map' },
   { id:'graal',     icon:'🧭', label:'Le Graal' },
   { id:'invariants',icon:'🛡', label:'Invariants' },
@@ -186,7 +187,7 @@ const GROUPS = [
   { id:'strat', icon:'🎯', label:'Stratégie',      ids:['graal','lancement','dynamique','strategie','fosse','danger','principes'] },
   { id:'prod',  icon:'👥', label:'Produit',        ids:['femmes','modes','algo','flow','radar','ux','confiance','idees','brainstorm'] },
   { id:'biz',   icon:'💰', label:'Business',       ids:['business','growth','identite','naming','social'] },
-  { id:'exec',  icon:'🛠', label:'Exécution',      ids:['live','sprint','roadmap','map','tech','invariants'] },
+  { id:'exec',  icon:'🛠', label:'Exécution',      ids:['plan','live','sprint','roadmap','map','tech','invariants'] },
   { id:'cadre', icon:'⚖️', label:'Cadre & Audits', ids:['legal','nda','questions','changelog','gpt','sqltests'] },
 ]
 const secOf = (id:string) => SECTIONS.find(s=>s.id===id)
@@ -3486,11 +3487,105 @@ const SectionDynamique = () => {
   )
 }
 
+// ─── 📋 PLAN D'ATTAQUE — la carte de TOUT ce qu'il reste (24.06) ──────────────
+const SectionPlan = () => {
+  const S = { done:'✅', wip:'🔄', todo:'⏳' }
+  const Item = ({s,v1,children}:any) => (
+    <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'5px 0',fontSize:12,color:C.mid,lineHeight:1.5}}>
+      <span style={{flexShrink:0}}>{s}</span>
+      <span style={{flex:1}}>{children}</span>
+      <span style={{flexShrink:0,fontSize:9,fontWeight:800,padding:'1px 6px',borderRadius:6,whiteSpace:'nowrap',
+        background:v1?`${C.gold}1a`:`${C.blue}12`,color:v1?C.gold:C.blue,border:`1px solid ${v1?C.gold+'40':C.blue+'30'}`}}>{v1?'🚀 V1':'🔭 après'}</span>
+    </div>
+  )
+  const Axe = ({icon,title,color,children}:any) => (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${color}`,borderRadius:12,padding:'12px 15px',marginBottom:11}}>
+      <div style={{fontSize:13.5,fontWeight:800,color,marginBottom:5}}>{icon} {title}</div>
+      <div>{children}</div>
+    </div>
+  )
+  return (
+    <div>
+      <H n={1}>📋 Plan d'attaque — où on en est, ce qui reste</H>
+      <P><b>Légende :</b> ✅ fait · 🔄 en cours · ⏳ à faire · <b style={{color:C.gold}}>🚀 V1</b> = nécessaire pour LANCER · <b style={{color:C.blue}}>🔭 après</b> = on améliore avec de vraies données. <b>Ne jamais coder un 🔭 avant d'avoir lancé.</b></P>
+
+      <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}50`,borderRadius:12,padding:'13px 15px',marginBottom:16}}>
+        <div style={{fontSize:13,fontWeight:800,color:C.gold,marginBottom:6}}>🎯 La ligne de lancement V1 (le strict nécessaire)</div>
+        <div style={{fontSize:12,color:C.mid,lineHeight:1.7}}>1. Sécurité bloc B finie · 2. Cœur produit re-testé + places + bugs corrigés · 3. Fiabilité finie · 4. Events testés + mis en avant · 5. UNE zone dense + Golden Hours + anti-vide + pricing · 6. Profil/onboarding + démo · 7. TestFlight + screenshots. <b>Tout le reste = après.</b></div>
+      </div>
+
+      <Axe icon="🔒" title="AXE 1 — Solidité & Sécurité (que ça tienne)" color={C.red}>
+        <Item s={S.done} v1>RLS active partout + bloc A (anti-harcèlement, anti-injection, anti-annulation)</Item>
+        <Item s={S.todo} v1>Bloc B : position floutée (fonction serveur RPC, jamais les coords brutes)</Item>
+        <Item s={S.todo} v1>Bloc B : score &amp; premium côté serveur (Edge Function + webhook Stripe)</Item>
+        <Item s={S.done} v1>Suppression de compte (LPD)</Item>
+        <Item s={S.todo} v1>Sauvegardes régulières + plan de panne (Supabase Pro au lancement)</Item>
+        <Item s={S.todo}>Tous les invariants verrouillés en base + 1 test auto par invariant</Item>
+      </Axe>
+
+      <Axe icon="❤️" title="AXE 2 — Cœur produit (la rencontre)" color={C.salmon}>
+        <Item s={S.wip} v1>Flow clutch complet (envoi → Verrou → RDV → J'y suis → feedback) — à re-tester à fond</Item>
+        <Item s={S.todo} v1>Les PLACES / saturation (cap réglable, défaut ~10, blocage « complet » à la porte)</Item>
+        <Item s={S.todo} v1>Crédits / quota neutre (même règle pour tous, l'asymétrie émerge seule)</Item>
+        <Item s={S.wip} v1>Fiabilité (J'y suis 300m, double feedback caché 3h, score) — finir + re-tester</Item>
+        <Item s={S.todo} v1>Bugs ouverts : anti-doublon clutch · events « No » non traduit · écran feedback post-RDV</Item>
+      </Axe>
+
+      <Axe icon="🧠" title="AXE 3 — Intelligence (l'algo)" color={C.purple}>
+        <Item s={S.done} v1>Tri compatibilité v1 (intérêts 50 / proximité 30 / fiabilité 20)</Item>
+        <Item s={S.todo} v1>Curseur d'influence dans le profil (similaire ↔ différent) — simple</Item>
+        <Item s={S.todo} v1>Transparence subtile (je te proposerai 2-3 directions, pas « vous aimez le jazz »)</Item>
+        <Item s={S.wip}>Thermostat densité par zone (prototypé dans le simulateur → à brancher en vrai)</Item>
+        <Item s={S.todo}>Boucle d'apprentissage (logger + analyser les vraies données ensemble)</Item>
+        <Item s={S.todo}>Premium : alertes « place libérée » / « redevenue dispo »</Item>
+        <Item s={S.todo}>Mode Surprise / Mégaclutch (l'IA repère les events exceptionnels)</Item>
+      </Axe>
+
+      <Axe icon="🎉" title="AXE 4 — Événements" color={C.teal}>
+        <Item s={S.wip} v1>Création / inscription / liste d'attente / notifs — à tester (en cours par toi)</Item>
+        <Item s={S.todo} v1>Events comme béquille de lancement (les mettre en avant au début)</Item>
+        <Item s={S.wip}>Catégories, Clutch Night</Item>
+      </Axe>
+
+      <Axe icon="🚀" title="AXE 5 — Liquidité & Go-to-market (LE vrai tueur)" color={C.gold}>
+        <Item s={S.todo} v1>Plan de lancement : Lausanne centre · jeu-ven-sam · 18-23h</Item>
+        <Item s={S.todo} v1>Golden Hours (heures sacrées) — vraie feature</Item>
+        <Item s={S.todo} v1>Anti-vide honnête (compte à rebours + events + densité historique, jamais de faux profils)</Item>
+        <Item s={S.todo} v1>Pricing 4 paliers (0 / 9.90 / 19.90 / 29.90)</Item>
+        <Item s={S.todo} v1>Recruter la 1ʳᵉ vague (les 100-150 premiers actifs)</Item>
+      </Axe>
+
+      <Axe icon="🎨" title="AXE 6 — Design & Expérience" color={C.orange}>
+        <Item s={S.wip} v1>Palette Mel partout (continu)</Item>
+        <Item s={S.todo} v1>Contenu du profil (qu'est-ce qu'on demande ?) — décision toi + Mel</Item>
+        <Item s={S.todo} v1>Onboarding d'un nouveau user (1re expérience)</Item>
+        <Item s={S.todo} v1>Démo (pour investisseurs / 1ers users)</Item>
+        <Item s={S.todo}>Notifications perso qui donnent envie de cliquer</Item>
+      </Axe>
+
+      <Axe icon="📱" title="AXE 7 — Mise en production (App Store)" color={C.blue}>
+        <Item s={S.wip} v1>TestFlight / Apple (compte développeur en attente d'activation)</Item>
+        <Item s={S.todo} v1>Screenshots App Store iPhone 6.9″ (Mel)</Item>
+        <Item s={S.wip} v1>Build vert, zéro régression (discipline permanente)</Item>
+      </Axe>
+
+      <Axe icon="🧪" title="AXE 8 — Outils de test (pour toi, seul)" color={C.green}>
+        <Item s={S.done} v1>Simulateur cockpit v1 (/sim)</Item>
+        <Item s={S.todo}>Simulateur : arbre d'une rencontre 1-à-1 + arbre des événements</Item>
+        <Item s={S.done} v1>Bots / Reset de test</Item>
+      </Axe>
+
+      <P dim>Détail en mémoire : project-plan-attaque · project-dynamique-et-roadmap · project-algo-scaling-architecture · project-strategie-lancement.</P>
+    </div>
+  )
+}
+
 const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
   graal: SectionGraal,
   invariants: SectionInvariants,
   lancement: SectionLancement,
   dynamique: SectionDynamique,
+  plan: SectionPlan,
   map: SectionMap,
   nda: SectionNDA,
   naming: SectionNaming,
@@ -3706,8 +3801,8 @@ const SectionSecret = () => (
 )
 
 export default function VisionPage() {
-  const [tab, setTab] = useState('graal')
-  const [activeGroup, setActiveGroup] = useState('strat')
+  const [tab, setTab] = useState('plan')
+  const [activeGroup, setActiveGroup] = useState('exec')
   const [secretOpen, setSecretOpen] = useState(false)
   const [secretInput, setSecretInput] = useState('')
   const [secretErr, setSecretErr] = useState(false)

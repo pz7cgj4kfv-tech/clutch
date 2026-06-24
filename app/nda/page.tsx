@@ -22,9 +22,9 @@ const VERSIONS = [
 
 function Art({ n, t, children }: any) {
   return (
-    <div style={{ marginBottom: 11, breakInside: 'avoid' }}>
-      <div style={{ fontSize: '10.5pt', fontWeight: 700, color: M.ink, marginBottom: 3 }}>Article {n} — {t}</div>
-      <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.55, textAlign: 'justify' }}>{children}</div>
+    <div style={{ marginBottom: 14, breakInside: 'avoid' }}>
+      <div style={{ fontSize: '10.5pt', fontWeight: 700, color: M.ink, marginBottom: 4 }}>Article {n} — {t}</div>
+      <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.75, textAlign: 'justify' }}>{children}</div>
     </div>
   )
 }
@@ -102,7 +102,7 @@ export default function NDA() {
             né·e le <Blank w={95} />, ci-après «&nbsp;<b>le Récipiendaire</b>&nbsp;», d'autre part.
           </div>
 
-          <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.6, marginBottom: 16, textAlign: 'justify' }}>
+          <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.75, marginBottom: 18, textAlign: 'justify' }}>
             <b>Préambule.</b>&nbsp; Les Transmetteurs ont conçu et développent un produit novateur, <b>CLUTCH</b> : une application mobile et un site internet de rencontres réelles (amoureuses, amicales, professionnelles et événementielles) fondés sur la disponibilité en temps réel des utilisateurs et un algorithme de mise en relation. Les Transmetteurs souhaitent présenter ce concept au Récipiendaire afin d'obtenir un avis et/ou d'envisager un partenariat. Cette présentation implique la transmission d'informations confidentielles. Les parties conviennent que la confidentialité de ces échanges est essentielle et arrêtent ce qui suit :
           </div>
 

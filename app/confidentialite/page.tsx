@@ -30,8 +30,23 @@ function Art({ n, t, children }: any) {
 }
 const Blank = ({ w = 160 }: any) => <span style={{ display: 'inline-block', borderBottom: '1px solid #999', width: w, height: 11, margin: '0 3px' }} />
 
+const TEXTE_AVOCAT = `Contexte (volontairement général)
+Nous développons un service numérique (application mobile + site web) de mise en relation sociale entre particuliers, fondé sur leur disponibilité en temps réel, avec une dimension événementielle. Le concept, le fonctionnement, le design, l'algorithme et le nom sont originaux et propriétaires. Le produit est déjà développé et fonctionnel. Nous souhaitons le protéger avant d'en parler plus largement.
+
+Nous aimerions un avis sur trois points précis :
+
+1. La nature de la protection (propriété intellectuelle)
+Quels droits s'appliquent et comment les sécuriser : marque (le nom + le logo), droit d'auteur (code, design, contenus), dessins & modèles (l'interface), et éventuellement brevet ou protection d'un procédé si applicable ? Lequel est prioritaire pour ce type de produit ?
+
+2. Le champ / le territoire + le coût
+Quelle étendue géographique viser : d'abord la Suisse, puis l'international (ex. dépôt de marque via le système de Madrid) ? Quel est l'ordre de grandeur des coûts et des délais pour chaque niveau (Suisse seule vs international) ?
+
+3. La détention de la propriété intellectuelle entre les fondateurs
+Comment structurer la propriété entre les deux co-fondateurs (et/ou via une société à créer) pour que la PI soit clairement détenue, partagée et protégée entre nous — y compris en cas de désaccord futur ou d'arrivée d'un partenaire ?`
+
 export default function Confidentialite() {
   const [tab, setTab] = useState<'doc' | 'strat'>('doc')
+  const [copied, setCopied] = useState(false)
   const pageStyle: React.CSSProperties = {
     width: '210mm', minHeight: '297mm', boxSizing: 'border-box', padding: '18mm 18mm 14mm',
     background: '#fff', color: M.ink, margin: '0 auto 18px', boxShadow: '0 6px 24px rgba(83,41,67,.12)',
@@ -162,6 +177,17 @@ export default function Confidentialite() {
       {/* ───────── STRATÉGIE (écran seulement) ───────── */}
       {tab === 'strat' && (
         <div className="noprint" style={{ maxWidth: 760, margin: '0 auto 50px', padding: '0 16px' }}>
+          {/* Texte à transmettre à l'avocat (sans dévoiler le projet) */}
+          <div style={{ background: '#fff', border: `1px solid ${M.pink}`, borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: M.plum, flex: 1 }}>📋 Texte à transmettre à un·e avocat·e</div>
+              <button onClick={() => { try { navigator.clipboard.writeText(TEXTE_AVOCAT); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { } }} style={{ fontSize: 12, fontWeight: 800, padding: '6px 13px', borderRadius: 8, cursor: 'pointer', border: 'none', background: copied ? M.green : M.pink, color: '#fff' }}>{copied ? '✓ Copié' : '📋 Copier'}</button>
+            </div>
+            <div style={{ fontSize: 11.5, color: M.ink40, marginBottom: 12, lineHeight: 1.5 }}>Décrit l'app <b>juste assez</b> pour poser les bonnes questions PI, <b>sans dévoiler</b> le concept, la mécanique ni le nom. À utiliser sous NDA signé.</div>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 12.5, color: M.ink70, lineHeight: 1.65, background: '#F7F4F6', border: `1px solid ${M.border}`, borderRadius: 10, padding: '14px 16px', fontFamily: 'Georgia, serif' }}>{TEXTE_AVOCAT}</div>
+            <div style={{ fontSize: 11, color: M.ink40, marginTop: 10, lineHeight: 1.5 }}>⚠️ Idéalement, faites-vous aussi conseiller par <b>votre propre</b> avocat·e — la PI doit être détenue par <b>vous</b>.</div>
+          </div>
+
           <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 14, padding: '20px 22px' }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: M.plum, marginBottom: 4 }}>🛡️ Stratégie pour ne pas se faire piquer l'idée</div>
             <div style={{ fontSize: 12.5, color: M.ink40, marginBottom: 16 }}>Petit planning concret — temps & coût indicatifs. Une idée seule ne se protège pas ; c'est l'exécution + les preuves + les contrats qui protègent.</div>

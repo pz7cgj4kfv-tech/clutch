@@ -12,7 +12,7 @@ import {
 
 const C = {
   bg: '#0B1020', panel: '#141B2E', panel2: '#1B2540', border: '#2A3550',
-  text: '#E6ECF7', dim: '#8A97B5', accent: '#4F8BFF', good: '#34D399',
+  text: '#E6ECF7', dim: '#8A97B5', accent: '#532943', good: '#77BC1F',
   warn: '#FBBF24', bad: '#F87171', pink: '#EB6BAF', track: '#243150',
 }
 const CENTER: [number, number] = [46.5197, 6.6323] // Lausanne
@@ -50,6 +50,10 @@ export default function SimPage() {
   const [wProx, setWProx] = useState(30)
   const [wFiab, setWFiab] = useState(20)
   const [thermoOn, setThermoOn] = useState(true)
+  // ── Filtres (comme dans l'app réelle) ──
+  const [fGender, setFGender] = useState<'all' | 'M' | 'F'>('all')
+  const [fAgeMin, setFAgeMin] = useState(18)
+  const [fAgeMax, setFAgeMax] = useState(60)
   // ── Moi ──
   const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS_DEFAULT)
   // ── État ──
@@ -80,15 +84,20 @@ export default function SimPage() {
 
   const me = useMemo(() => ({ interests: myInterests, lat: CENTER[0], lng: CENTER[1] }), [myInterests])
 
-  // Tri (le VRAI algo) — on calcule sur toute la population, on n'affiche que le haut
+  // Filtres comme dans la vraie app : genre + tranche d'âge (appliqués AVANT le tri)
+  const visible = useMemo(() => pop.filter(p =>
+    (fGender === 'all' || p.gender === fGender) && p.age >= fAgeMin && p.age <= fAgeMax
+  ), [pop, fGender, fAgeMin, fAgeMax])
+
+  // Tri (le VRAI algo) — sur la population FILTRÉE, on n'affiche que le haut
   const ranked = useMemo(() => {
-    const arr = pop.map(p => ({ p, s: scoreProfile(me, p, effW, Math.max(cityRadius * 2, 5)) }))
+    const arr = visible.map(p => ({ p, s: scoreProfile(me, p, effW, Math.max(cityRadius * 2, 5)) }))
     arr.sort((a, b) => b.s.score - a.s.score)
     return arr
-  }, [pop, me, effW, cityRadius])
+  }, [visible, me, effW, cityRadius])
 
-  const clutchableCount = useMemo(() => pop.reduce((n, p) => n + (isClutchable(p) ? 1 : 0), 0), [pop])
-  const fullCount = pop.length - clutchableCount
+  const clutchableCount = useMemo(() => visible.reduce((n, p) => n + (isClutchable(p) ? 1 : 0), 0), [visible])
+  const fullCount = visible.length - clutchableCount
 
   const Stat = ({ label, value, color }: any) => (
     <div style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', flex: 1, minWidth: 0 }}>
@@ -149,6 +158,16 @@ export default function SimPage() {
               <input type="checkbox" checked={thermoOn} onChange={e => setThermoOn(e.target.checked)} /> Thermostat automatique
             </label>
 
+            <div style={{ fontSize: 12.5, fontWeight: 800, margin: '18px 0 8px', color: C.pink }}>②bis TES FILTRES (comme dans l'app)</div>
+            <div style={{ fontSize: 11, color: C.dim, marginBottom: 5 }}>Je veux voir :</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {([['all', 'Tout le monde'], ['F', '♀ Femmes'], ['M', '♂ Hommes']] as const).map(([g, lab]) => (
+                <button key={g} onClick={() => setFGender(g)} style={{ flex: 1, fontSize: 11, fontWeight: 700, padding: '6px 4px', borderRadius: 9, cursor: 'pointer', border: `1px solid ${fGender === g ? C.pink : C.border}`, background: fGender === g ? `${C.pink}22` : 'transparent', color: fGender === g ? C.pink : C.dim }}>{lab}</button>
+              ))}
+            </div>
+            <Slider label="Âge min" value={fAgeMin} min={18} max={fAgeMax} onChange={(v: number) => setFAgeMin(Math.min(v, fAgeMax))} suffix=" ans" />
+            <Slider label="Âge max" value={fAgeMax} min={fAgeMin} max={70} onChange={(v: number) => setFAgeMax(Math.max(v, fAgeMin))} suffix=" ans" />
+
             <div style={{ fontSize: 12.5, fontWeight: 800, margin: '18px 0 8px', color: C.good }}>③ TES GOÛTS</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {POOL.map(it => {
@@ -182,7 +201,7 @@ export default function SimPage() {
 
             {/* Ton feed */}
             <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>📲 Ton feed — les 40 premiers sur {pop.length.toLocaleString('fr-CH')} <span style={{ color: C.dim, fontWeight: 500 }}>(scroll infini en vrai)</span></div>
+              <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>📲 Ton feed — les 40 premiers sur {visible.length.toLocaleString('fr-CH')} <span style={{ color: C.dim, fontWeight: 500 }}>après tes filtres (scroll infini en vrai)</span></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {ranked.slice(0, 40).map((row, i) => {
                   const { p, s } = row

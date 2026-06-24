@@ -9,7 +9,7 @@ import React, { useState } from 'react'
 
 const C = {
   bg: '#FAF6F0', card: '#FFFFFF', card2: '#FFF8F2', border: 'rgba(42,16,32,0.12)',
-  ink: '#1a0810', gold: '#A06808', salmon: '#C0603A', mid: 'rgba(26,8,16,0.78)', dim: 'rgba(26,8,16,0.45)',
+  ink: '#1a0810', gold: '#532943', salmon: '#C0603A', mid: 'rgba(26,8,16,0.78)', dim: 'rgba(26,8,16,0.45)',
   pink: '#EB6BAF', prune: '#2a1020',
 }
 

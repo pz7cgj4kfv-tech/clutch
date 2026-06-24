@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 const C = {
-  ink: '#ECE6F5', dim: 'rgba(236,230,245,.55)', gold: '#F5C04A',
+  ink: '#ECE6F5', dim: 'rgba(236,230,245,.55)', gold: '#FFBF9E',
   pink: '#EB6BAF', purple: '#9B7CF0', border: 'rgba(155,124,240,.25)', panel: '#16101F',
 }
 const LINKS: [string, string][] = [

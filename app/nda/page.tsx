@@ -1,8 +1,8 @@
 'use client'
 // ─────────────────────────────────────────────────────────────────────────────
-// NDA — /nda. Mise en page « juriste » : 2 pages A4, marges @page aérées (20mm),
-// saut de page net, impression PROPRE (seul le contrat sort, pas de 3e page).
-// (Remplace /confidentialite, dont le fichier était verrouillé.)
+// NDA — /nda. Document qui COULE naturellement (pas de hauteur forcée → page 1
+// se remplit, pas de page fantôme). Interligne aéré, lignes à remplir hautes.
+// Impression propre (seul le contrat sort). @page A4, marges 22mm.
 // ⚠️ Pas un conseil juridique ; relecture avocat·e vaudois·e recommandée.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from 'react'
@@ -16,39 +16,38 @@ const LINKS: [string, string][] = [
   ['/clutchlive', '⚡ Live'], ['/clutchnight', '🌙 Night'], ['/vision2', '📖 Vision 2'],
 ]
 const VERSIONS = [
-  { v: 'v2 · 24 juin 2026', tag: 'À JOUR', note: 'Clauses non-développement, non-contournement, clause pénale. Pour la réunion.' },
+  { v: 'v2 · 24 juin 2026', tag: 'À JOUR', note: 'Non-développement, non-contournement, clause pénale. Pour la réunion.' },
   { v: 'v1 · (ancienne)', tag: 'archive', note: 'Interdisait la divulgation mais PAS le développement. Ne plus utiliser.' },
 ]
 
 function Art({ n, t, children }: any) {
   return (
-    <div style={{ marginBottom: 14, breakInside: 'avoid' }}>
-      <div style={{ fontSize: '10.5pt', fontWeight: 700, color: M.ink, marginBottom: 4 }}>Article {n} — {t}</div>
-      <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.75, textAlign: 'justify' }}>{children}</div>
+    <div style={{ marginBottom: 17, breakInside: 'avoid' }}>
+      <div style={{ fontSize: '11pt', fontWeight: 700, color: M.ink, marginBottom: 5 }}>Article {n} — {t}</div>
+      <div style={{ fontSize: '10.5pt', color: M.ink70, lineHeight: 1.95, textAlign: 'justify' }}>{children}</div>
     </div>
   )
 }
-const Blank = ({ w = 150 }: any) => <span style={{ display: 'inline-block', borderBottom: '1px solid #888', width: w, height: 11, margin: '0 4px' }} />
+const Blank = ({ w = 160 }: any) => <span style={{ display: 'inline-block', borderBottom: '1px solid #777', width: w, height: 15, margin: '0 5px', verticalAlign: 'baseline' }} />
 
 export default function NDA() {
   const [tab, setTab] = useState<'doc' | 'strat'>('doc')
   const sheet: React.CSSProperties = {
-    width: 780, maxWidth: '100%', boxSizing: 'border-box', background: '#fff', color: M.ink,
-    margin: '0 auto 26px', padding: '40px 52px', boxShadow: '0 6px 24px rgba(83,41,67,.12)',
+    width: 794, maxWidth: '100%', boxSizing: 'border-box', background: '#fff', color: M.ink,
+    margin: '0 auto', padding: '54px 64px 60px', boxShadow: '0 6px 24px rgba(83,41,67,.12)',
     fontFamily: 'Georgia, "Times New Roman", serif',
   }
-  const foot: React.CSSProperties = { textAlign: 'right', fontSize: '8.5pt', color: M.ink40, marginTop: 18, fontFamily: 'Georgia, serif' }
 
   return (
     <div style={{ minHeight: '100vh', background: M.studio, fontFamily: 'ui-sans-serif,system-ui,-apple-system,sans-serif' }}>
       <style>{`
-        @page { size: A4; margin: 20mm; }
+        @page { size: A4; margin: 0; }
         @media print {
           html, body { background:#fff !important; }
           .noprint { display:none !important; }
           .print-area { display:block !important; }
-          .sheet { box-shadow:none !important; margin:0 !important; padding:0 !important; width:auto !important; max-width:none !important; }
-          .sheet--p1 { page-break-after: always; }
+          /* Marges DANS le contenu (insensibles à « Ajuster à la largeur ») : 24mm gauche/droite, 18mm haut/bas */
+          .sheet { box-shadow:none !important; margin:0 auto !important; width:210mm !important; max-width:none !important; padding:18mm 24mm !important; }
         }
       `}</style>
 
@@ -77,32 +76,30 @@ export default function NDA() {
           ))}
         </div>
         <div style={{ background: '#FFF7DE', border: '1px solid #E8C766', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 11.5, color: '#7a5a00', lineHeight: 1.6 }}>
-          ⚠️ <b>Pour un PDF propre (2 pages) :</b> clique « Imprimer / PDF » → destination <b>« Enregistrer en PDF »</b> → dans <b>Options, décoche « En-têtes et pieds de page »</b>. Le contrat sort en <b>2 pages A4 exactement</b>, sans le site. · Modèle solide mais non juridique : relecture avocat·e vaudois·e conseillée. À faire signer AVANT toute présentation.
+          ⚠️ <b>Pour un PDF propre :</b> « Imprimer / PDF » → <b>« Enregistrer au format PDF »</b> → décoche <b>« En-têtes et pieds de page »</b>. Le document coule sur 2 pages (page 1 pleine), sans le site. · Modèle solide mais non juridique : relecture avocat·e vaudois·e conseillée. À faire signer AVANT toute présentation.
         </div>
       </div>
 
-      {/* ───────── LE DOCUMENT (2 pages A4) ───────── */}
+      {/* ───────── LE DOCUMENT (coule naturellement) ───────── */}
       <div className="print-area" style={{ display: tab === 'doc' ? 'block' : 'none', paddingBottom: 40 }}>
-
-        {/* PAGE 1 */}
-        <div className="sheet sheet--p1" style={sheet}>
-          <div style={{ textAlign: 'center', marginBottom: 18 }}>
-            <div style={{ fontSize: '16pt', fontWeight: 700, color: M.ink, letterSpacing: '.05em' }}>ACCORD DE CONFIDENTIALITÉ</div>
-            <div style={{ width: 90, height: 2, background: M.plum, margin: '8px auto 6px' }} />
-            <div style={{ fontSize: '8.5pt', color: M.ink40, fontStyle: 'italic' }}>Non-divulgation · Non-développement · Non-contournement — version 2 du 24 juin 2026</div>
+        <div className="sheet" style={sheet}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: '17pt', fontWeight: 700, color: M.ink, letterSpacing: '.05em' }}>ACCORD DE CONFIDENTIALITÉ</div>
+            <div style={{ width: 96, height: 2, background: M.plum, margin: '9px auto 7px' }} />
+            <div style={{ fontSize: '9pt', color: M.ink40, fontStyle: 'italic' }}>Non-divulgation · Non-développement · Non-contournement — version 2 du 24 juin 2026</div>
           </div>
 
-          <div style={{ fontSize: '10.5pt', color: M.ink70, lineHeight: 1.8, marginBottom: 14 }}>
-            <div style={{ fontWeight: 700, color: M.ink, marginBottom: 2 }}>ENTRE</div>
-            Madame <b>Mélanie Brodard</b>, domiciliée à <Blank w={150} />,<br />
-            et Monsieur <b>David Saugy</b>, domicilié à <Blank w={150} />,<br />
+          <div style={{ fontSize: '11pt', color: M.ink70, lineHeight: 2.1, marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, color: M.ink, marginBottom: 3 }}>ENTRE</div>
+            Madame <b>Mélanie Brodard</b>, domiciliée à <Blank w={160} />,<br />
+            et Monsieur <b>David Saugy</b>, domicilié à <Blank w={160} />,<br />
             ci-après désignés ensemble «&nbsp;<b>les Transmetteurs</b>&nbsp;», d'une part&nbsp;;
-            <div style={{ fontWeight: 700, color: M.ink, margin: '8px 0 2px' }}>ET</div>
-            Monsieur / Madame <Blank w={185} />, domicilié·e à <Blank w={150} />,<br />
-            né·e le <Blank w={95} />, ci-après «&nbsp;<b>le Récipiendaire</b>&nbsp;», d'autre part.
+            <div style={{ fontWeight: 700, color: M.ink, margin: '10px 0 3px' }}>ET</div>
+            Monsieur / Madame <Blank w={200} />, domicilié·e à <Blank w={160} />,<br />
+            né·e le <Blank w={110} />, ci-après «&nbsp;<b>le Récipiendaire</b>&nbsp;», d'autre part.
           </div>
 
-          <div style={{ fontSize: '10pt', color: M.ink70, lineHeight: 1.75, marginBottom: 18, textAlign: 'justify' }}>
+          <div style={{ fontSize: '10.5pt', color: M.ink70, lineHeight: 1.95, marginBottom: 20, textAlign: 'justify' }}>
             <b>Préambule.</b>&nbsp; Les Transmetteurs ont conçu et développent un produit novateur, <b>CLUTCH</b> : une application mobile et un site internet de rencontres réelles (amoureuses, amicales, professionnelles et événementielles) fondés sur la disponibilité en temps réel des utilisateurs et un algorithme de mise en relation. Les Transmetteurs souhaitent présenter ce concept au Récipiendaire afin d'obtenir un avis et/ou d'envisager un partenariat. Cette présentation implique la transmission d'informations confidentielles. Les parties conviennent que la confidentialité de ces échanges est essentielle et arrêtent ce qui suit :
           </div>
 
@@ -121,12 +118,6 @@ export default function NDA() {
           <Art n="5" t="Propriété intellectuelle">
             La transmission n'emporte aucune cession de droit ni de propriété intellectuelle. Toutes les informations demeurent l'entière et exclusive propriété des Transmetteurs. Aucune licence n'est accordée. Le Récipiendaire s'interdit toute reproduction, copie ou rétro-ingénierie.
           </Art>
-
-          <div style={foot}>Accord de confidentialité Clutch · 1 / 2</div>
-        </div>
-
-        {/* PAGE 2 */}
-        <div className="sheet" style={sheet}>
           <Art n="6" t="Restitution et destruction">
             Au terme des discussions — qu'un partenariat soit conclu ou non — le Récipiendaire restitue sans délai, à première demande, l'ensemble des informations confidentielles et détruit toute copie ou support en sa possession.
           </Art>
@@ -143,20 +134,18 @@ export default function NDA() {
             Le présent accord est soumis au <b>droit suisse</b>. Tout litige relatif à sa validité, son interprétation ou son exécution relève de la compétence exclusive des <b>tribunaux du canton de Vaud</b>, à Lausanne.
           </Art>
 
-          <div style={{ fontSize: '10pt', color: M.ink70, marginTop: 26, lineHeight: 1.7 }}>
-            Fait à Lausanne, le <Blank w={150} />, en deux (2) exemplaires originaux, chaque partie reconnaissant en avoir reçu un.
+          <div style={{ fontSize: '10.5pt', color: M.ink70, marginTop: 28, lineHeight: 1.9, breakInside: 'avoid' }}>
+            Fait à Lausanne, le <Blank w={170} />, en deux (2) exemplaires originaux, chaque partie reconnaissant en avoir reçu un.
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 46, gap: 40 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 56, gap: 44, breakInside: 'avoid' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ borderTop: '1px solid #555', paddingTop: 5, fontSize: '9pt', color: M.ink70 }}>Les Transmetteurs<br /><span style={{ color: M.ink40 }}>Mélanie Brodard&nbsp;·&nbsp;David Saugy</span></div>
+              <div style={{ borderTop: '1px solid #555', paddingTop: 6, fontSize: '9.5pt', color: M.ink70 }}>Les Transmetteurs<br /><span style={{ color: M.ink40 }}>Mélanie Brodard&nbsp;·&nbsp;David Saugy</span></div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ borderTop: '1px solid #555', paddingTop: 5, fontSize: '9pt', color: M.ink70 }}>Le Récipiendaire<br /><span style={{ color: M.ink40 }}>Signature précédée de «&nbsp;lu et approuvé&nbsp;»</span></div>
+              <div style={{ borderTop: '1px solid #555', paddingTop: 6, fontSize: '9.5pt', color: M.ink70 }}>Le Récipiendaire<br /><span style={{ color: M.ink40 }}>Signature précédée de «&nbsp;lu et approuvé&nbsp;»</span></div>
             </div>
           </div>
-
-          <div style={foot}>Accord de confidentialité Clutch · 2 / 2</div>
         </div>
       </div>
 

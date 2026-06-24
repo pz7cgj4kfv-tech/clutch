@@ -3187,8 +3187,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   }
 
   return (
-    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:nightMode?'#1a0d18':C.bg,display:'flex',flexDirection:'column',transition:'background .3s'}}>
-      <div style={{padding:'8px 14px',paddingTop:'calc(var(--sat) + 8px)',borderBottom:`1px solid ${nightMode?'rgba(235,107,175,.2)':C.border}`,flexShrink:0,background:nightMode?'linear-gradient(180deg,#2C1020,#1a0d18)':'transparent'}}>
+    <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',transition:'background .3s'}}>
+      <div style={{padding:'8px 14px',paddingTop:'calc(var(--sat) + 8px)',borderBottom:`1px solid ${C.border}`,flexShrink:0,background:'transparent'}}>
         {/* En-tête COMPACT une ligne (David : libérer l'espace en haut, titre redondant retiré — déjà dans la nav du bas) */}
         <style>{`@keyframes cnMoonGlow{0%,100%{filter:drop-shadow(0 0 2px rgba(235,107,175,.45))}50%{filter:drop-shadow(0 0 8px rgba(235,107,175,.95))}}@keyframes cnMoonSway{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}.cn-moon{display:inline-block;animation:cnMoonGlow 2.6s ease-in-out infinite,cnMoonSway 4s ease-in-out infinite}`}</style>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -3331,7 +3331,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         {/* ✨ BANNIÈRES PARTENAIRES (payants = pub) — TOUJOURS affichées sur tous les filtres events (David : non filtrables). */}
         {PARTNERS_MOCK.filter((p:any)=>p.verified).length>0 && (
           /* STICKY : la bannière partenaires reste visible quand on scrolle les events (David : les partenaires veulent être vus). */
-          <div style={{position:'sticky',top:-2,zIndex:6,marginBottom:12,paddingTop:2,paddingBottom:4,background:nightMode?'#1a0d18':C.bg}}>
+          <div style={{position:'sticky',top:-2,zIndex:6,marginBottom:12,paddingTop:2,paddingBottom:4,background:C.bg}}>
             <style>{`@keyframes ptnShine{0%{background-position:-180% 0}100%{background-position:180% 0}} .ptnShine::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);background-size:200% 100%;animation:ptnShine 3.2s linear infinite;pointer-events:none}`}</style>
             <div ref={bannerRef} onPointerDown={()=>{bannerPause.current=Date.now()+7000}} style={{display:'flex',gap:9,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollSnapType:'x mandatory',scrollBehavior:'smooth',padding:'1px 2px 2px',margin:'0 -2px'}}>
               {PARTNERS_MOCK.filter((p:any)=>p.verified).map((p:any)=>{ const on=followedPartners.has(p.id); return (

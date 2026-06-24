@@ -181,6 +181,16 @@ const SECTIONS = [
   { id:'sqltests',  icon:'🧪', label:'SQL Tests' },
 ]
 
+// ── Dossiers de direction : on range les 33 onglets en 5 grandes familles ─────
+const GROUPS = [
+  { id:'strat', icon:'🎯', label:'Stratégie',      ids:['graal','lancement','dynamique','strategie','fosse','danger','principes'] },
+  { id:'prod',  icon:'👥', label:'Produit',        ids:['femmes','modes','algo','flow','radar','ux','confiance','idees','brainstorm'] },
+  { id:'biz',   icon:'💰', label:'Business',       ids:['business','growth','identite','naming','social'] },
+  { id:'exec',  icon:'🛠', label:'Exécution',      ids:['live','sprint','roadmap','map','tech','invariants'] },
+  { id:'cadre', icon:'⚖️', label:'Cadre & Audits', ids:['legal','nda','questions','changelog','gpt','sqltests'] },
+]
+const secOf = (id:string) => SECTIONS.find(s=>s.id===id)
+
 // ─── Section : MAP (mindmap zoomable) ────────────────────────────────────────
 const SectionMap = () => {
   type MN = {id:string;label:string;emoji:string;color:string;status?:'done'|'todo'|'p2'|'block';bugs?:number;eth?:boolean;q?:boolean;premium?:boolean;detail?:string;children?:MN[]}
@@ -3052,7 +3062,7 @@ const SectionConfiance = () => {
   const why:React.CSSProperties = { fontSize:11, color:'rgba(200,134,10,.75)', fontStyle:'italic', lineHeight:1.6, marginTop:4 }
   const Badge = ({e,t,c}:{e:string;t:string;c:string}) => <span style={{display:'inline-flex',alignItems:'center',gap:5,background:`${c}18`,border:`1px solid ${c}55`,color:c,borderRadius:20,padding:'4px 11px',fontSize:12,fontWeight:700,margin:'0 6px 6px 0'}}>{e} {t}</span>
   return (
-    <div style={{minHeight:'100vh',background:'#080510',fontFamily:'system-ui',color:'#e8e0f0',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
+    <div style={{minHeight:'100vh',background:'#FAF6F0',fontFamily:'system-ui',color:'#1a0810',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
       <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🏆 Système de Confiance</div>
       <div style={{fontSize:12,color:'rgba(232,224,240,.5)',marginBottom:8}}>Le chantier produit n°1 — ce qui rend Clutch incopiable. (GPT + Claude convergent : + important que l'algo.)</div>
       <div style={{fontSize:11,color:'rgba(232,224,240,.45)',marginBottom:20,lineHeight:1.6}}>Légende décisions : <b style={{color:'#4ade80'}}>✅ retenu</b> · <b style={{color:'#f87171'}}>❌ écarté</b> · <b style={{color:'#fbbf24'}}>🟡 à décider</b></div>
@@ -3127,7 +3137,7 @@ const SectionStrategie = () => {
   const p:React.CSSProperties = { fontSize:13, color:'rgba(232,224,240,.75)', lineHeight:1.7, margin:'0 0 8px' }
   const why:React.CSSProperties = { fontSize:11, color:'rgba(200,134,10,.75)', fontStyle:'italic', lineHeight:1.6, marginTop:4 }
   return (
-    <div style={{minHeight:'100vh',background:'#080510',fontFamily:'system-ui',color:'#e8e0f0',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
+    <div style={{minHeight:'100vh',background:'#FAF6F0',fontFamily:'system-ui',color:'#1a0810',padding:'28px 20px 80px',maxWidth:760,margin:'0 auto'}}>
       <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🧭 Stratégie 2026</div>
       <div style={{fontSize:12,color:'rgba(232,224,240,.5)',marginBottom:20,lineHeight:1.6}}>Synthèse des audits GPT (20.06) + décisions. Légende : <b style={{color:'#4ade80'}}>✅ retenu</b> · <b style={{color:'#f87171'}}>❌ écarté</b> · <b style={{color:'#fbbf24'}}>🟡 à décider</b></div>
 
@@ -3514,7 +3524,7 @@ const SECTION_CONTENT:Record<string,(()=>React.ReactElement)> = {
 
 // ─── Section SECRÈTE — David uniquement ──────────────────────────────────────
 const SectionSecret = () => (
-  <div style={{minHeight:'100vh',background:'#080510',fontFamily:'system-ui',color:'#e8e0f0',padding:'32px 20px 80px',maxWidth:740,margin:'0 auto'}}>
+  <div style={{minHeight:'100vh',background:'#FAF6F0',fontFamily:'system-ui',color:'#1a0810',padding:'32px 20px 80px',maxWidth:740,margin:'0 auto'}}>
     <div style={{fontSize:11,letterSpacing:'.2em',color:'rgba(200,134,10,.6)',marginBottom:24}}>PERSONNEL · CONFIDENTIEL · POUR TOI SEUL</div>
     <div style={{fontSize:26,fontWeight:900,color:'#C8860A',marginBottom:4}}>🧠 Analyse psychologique</div>
     <div style={{fontSize:13,color:'rgba(232,224,240,.5)',marginBottom:32}}>Synthèse Claude + GPT-4o · Mis à jour à chaque session · 17.06.2026</div>
@@ -3696,7 +3706,8 @@ const SectionSecret = () => (
 )
 
 export default function VisionPage() {
-  const [tab, setTab] = useState('live')
+  const [tab, setTab] = useState('graal')
+  const [activeGroup, setActiveGroup] = useState('strat')
   const [secretOpen, setSecretOpen] = useState(false)
   const [secretInput, setSecretInput] = useState('')
   const [secretErr, setSecretErr] = useState(false)
@@ -3712,8 +3723,8 @@ export default function VisionPage() {
     setIsDay(h >= 7 && h < 20)
   }, [])
 
-  // Muter C globalement selon l'heure (les sections fermées sur C liront la bonne palette)
-  Object.assign(C, isDay ? CDay : CDark)
+  // Thème CLAIR forcé en permanence (David : page de doc = blanc lisible, pas de mode nuit)
+  Object.assign(C, CDay)
 
   const SectionComp = SECTION_CONTENT[tab]
 
@@ -3721,18 +3732,18 @@ export default function VisionPage() {
   if (!pageAuth) {
     const check = () => { if (pageInput === PASS) setPageAuth(true); else setPageErr(true) }
     return (
-      <div style={{minHeight:'100vh',background:'#080510',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',padding:20}}>
-        <div style={{background:'#120d1e',border:'1px solid rgba(200,134,10,.3)',borderRadius:16,padding:32,width:300,maxWidth:'100%',textAlign:'center'}}>
+      <div style={{minHeight:'100vh',background:'#FAF6F0',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',padding:20}}>
+        <div style={{background:'#FFFFFF',border:'1px solid rgba(42,16,32,0.12)',borderRadius:16,padding:32,width:300,maxWidth:'100%',textAlign:'center',boxShadow:'0 8px 30px rgba(42,16,32,.10)'}}>
           <div style={{fontSize:26,marginBottom:8}}>🔒</div>
-          <div style={{fontSize:15,fontWeight:900,color:'#C8860A',marginBottom:4}}>Vision 2026</div>
-          <div style={{fontSize:11,color:'rgba(232,224,240,.4)',marginBottom:20}}>Bible produit interne · accès restreint</div>
+          <div style={{fontSize:15,fontWeight:900,color:'#A06808',marginBottom:4}}>Vision 2026</div>
+          <div style={{fontSize:11,color:'rgba(26,8,16,.5)',marginBottom:20}}>Bible produit interne · accès restreint</div>
           <input autoFocus type="password" value={pageInput}
             onChange={e=>{setPageInput(e.target.value);setPageErr(false)}}
             onKeyDown={e=>{if(e.key==='Enter')check()}}
             placeholder="mot de passe"
-            style={{background:'#1a1228',border:`2px solid ${pageErr?'#f87171':'rgba(200,134,10,.4)'}`,borderRadius:10,padding:'10px 16px',color:'#e8e0f0',fontSize:14,width:'100%',outline:'none',textAlign:'center',boxSizing:'border-box',marginBottom:8}}/>
-          {pageErr && <div style={{fontSize:11,color:'#f87171',marginBottom:8}}>Code incorrect</div>}
-          <button onClick={check} style={{background:'#C8860A',color:'#0f0810',border:'none',borderRadius:10,padding:'10px 24px',fontWeight:800,fontSize:13,cursor:'pointer',width:'100%'}}>Entrer</button>
+            style={{background:'#FFF8F2',border:`2px solid ${pageErr?'#c0392b':'rgba(200,134,10,.4)'}`,borderRadius:10,padding:'10px 16px',color:'#1a0810',fontSize:14,width:'100%',outline:'none',textAlign:'center',boxSizing:'border-box',marginBottom:8}}/>
+          {pageErr && <div style={{fontSize:11,color:'#c0392b',marginBottom:8}}>Code incorrect</div>}
+          <button onClick={check} style={{background:'#A06808',color:'#fff',border:'none',borderRadius:10,padding:'10px 24px',fontWeight:800,fontSize:13,cursor:'pointer',width:'100%'}}>Entrer</button>
         </div>
       </div>
     )
@@ -3747,13 +3758,30 @@ export default function VisionPage() {
             <span style={{fontSize:15,fontWeight:900,color:C.gold,flexShrink:0}}>🔒 Vision 2026</span>
             <span style={{fontSize:10,color:C.dim}}>bible produit interne</span>
           </div>
+          {/* Niveau 1 : les 5 dossiers de direction */}
+          <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:6}}>
+            {GROUPS.map(g=>{
+              const on=activeGroup===g.id
+              return (
+                <button key={g.id} onClick={()=>{setActiveGroup(g.id); if(!g.ids.includes(tab)) setTab(g.ids[0])}}
+                  style={{padding:'5px 13px',borderRadius:10,border:`1px solid ${on?C.gold:C.border}`,background:on?C.gold:C.card,color:on?'#fff':C.mid,fontSize:12,fontWeight:on?800:600,cursor:'pointer',whiteSpace:'nowrap',boxShadow:on?`0 2px 8px ${C.gold}40`:'none'}}>
+                  {g.icon} {g.label}
+                </button>
+              )
+            })}
+          </div>
+          {/* Niveau 2 : onglets du dossier actif */}
           <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-            {SECTIONS.map(s=>(
-              <button key={s.id} onClick={()=>setTab(s.id)}
-                style={{padding:'3px 9px',borderRadius:16,border:`1px solid ${tab===s.id?C.gold+'70':C.border}`,background:tab===s.id?`${C.gold}18`:'transparent',color:tab===s.id?C.gold:C.dim,fontSize:10,fontWeight:tab===s.id?800:500,cursor:'pointer',whiteSpace:'nowrap'}}>
-                {s.icon} {s.label}
-              </button>
-            ))}
+            {GROUPS.find(g=>g.id===activeGroup)?.ids.map(id=>{
+              const s=secOf(id); if(!s) return null
+              const on=tab===id
+              return (
+                <button key={id} onClick={()=>setTab(id)}
+                  style={{padding:'3px 10px',borderRadius:16,border:`1px solid ${on?C.gold+'70':C.border}`,background:on?`${C.gold}18`:'transparent',color:on?C.gold:C.mid,fontSize:10.5,fontWeight:on?800:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                  {s.icon} {s.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>

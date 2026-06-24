@@ -61,6 +61,14 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
     </>)
   },
   {
+    id: 'qui-voit-pleins', icon: '👁️', title: 'Qui voit les personnes pleines ? (raffinement)', tag: 'NOUVEAU',
+    body: () => (<>
+      <P>Ton raffinement : <B>une personne pleine (non-clutchable) ne devrait plus être visible par les utilisateurs gratuits — seulement par ceux qui paient.</B> La logique : un gratuit ne peut de toute façon pas l'inviter, donc autant lui éviter la frustration du « complète » ; et ça donne une vraie raison de payer (la voir, et poser une alerte « place libérée »).</P>
+      <Quote>« Les personnes qui sont pleines, à mon avis, elles ne doivent plus être visibles par les gens normaux. Elles sont visibles que par les gens qui paient. Ça paraît logique. »</Quote>
+      <Fix><B>Mon challenge (à trancher avec Mel).</B> Attention à notre ligne éthique : « ne jamais vendre la visibilité, ne pas traiter les femmes comme le produit ». Comme les gens « pleins » seront surtout des femmes très demandées, « le premium voit les pleines » peut se lire comme <B>« payer pour voir plus de femmes »</B>. La nuance qui peut sauver : le gratuit voit déjà <B>toutes les personnes disponibles</B> ; le premium ne gagne que l'accès aux personnes <B>occupées</B> (+ l'alerte de réactivité), jamais un avantage de mérite. À valider ensemble : est-ce que ça reste du confort, ou est-ce que ça franchit la ligne ? C'est une décision produit toi + Mel, pas un automatisme.</Fix>
+    </>)
+  },
+  {
     id: 'invisible', icon: '🥷', title: 'Premium (à valider) : clutcher sans être clutchable',
     body: () => (<>
       <P>Tu as aussi lancé l'idée de pouvoir <B>ne plus être clutchable tout en continuant de clutcher les autres</B>. Candidat de fonction premium. À valider éthiquement avec Mel : est-ce que ça déséquilibre le rapport hommes/femmes ? À creuser, pas tranché.</P>

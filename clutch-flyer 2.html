@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clutch — Pitch Deck</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#EDE8E3; font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif; color:#2C1810; padding:40px 20px 60px; }
+.page { max-width:680px; margin:0 auto; }
+
+.header { background:#2C1810; border-radius:20px; padding:40px 40px 36px; margin-bottom:12px; position:relative; overflow:hidden; }
+.header::before { content:''; position:absolute; top:-60px; right:-60px; width:200px; height:200px; background:radial-gradient(circle, rgba(196,116,138,0.3) 0%, transparent 70%); border-radius:50%; }
+.logo { font-size:64px; font-weight:900; color:#fff; letter-spacing:-4px; line-height:1; font-style:italic; position:relative; z-index:1; }
+.logo span { color:#C4748A; }
+.tagline { font-size:14px; font-weight:700; color:#C4748A; letter-spacing:0.2em; text-transform:uppercase; margin-top:8px; position:relative; z-index:1; }
+.header-sub { font-size:15px; color:rgba(255,255,255,0.6); margin-top:10px; line-height:1.5; position:relative; z-index:1; max-width:440px; }
+.badges { display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; position:relative; z-index:1; }
+.badge { background:rgba(196,116,138,0.2); border:1px solid rgba(196,116,138,0.4); border-radius:20px; padding:5px 12px; font-size:11px; font-weight:700; color:#C4748A; }
+
+.card { background:#FDFAF7; border-radius:16px; padding:28px 32px; margin-bottom:12px; border:1px solid #EDE8E3; }
+.card-title { font-size:11px; font-weight:800; letter-spacing:0.2em; text-transform:uppercase; color:#C4748A; margin-bottom:16px; }
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+.block { border-radius:12px; padding:16px; }
+.block-light { background:#F5F0EA; border:1px solid #EDE8E3; }
+.block-rose { background:rgba(196,116,138,0.08); border:1px solid rgba(196,116,138,0.25); }
+.block-sage { background:rgba(122,158,138,0.08); border:1px solid rgba(122,158,138,0.25); }
+.block-gold { background:rgba(201,169,110,0.08); border:1px solid rgba(201,169,110,0.25); }
+
+.label { font-size:10px; font-weight:800; letter-spacing:0.15em; text-transform:uppercase; color:#A08878; margin-bottom:6px; }
+.label-rose { color:#C4748A; }
+.label-sage { color:#7A9E8A; }
+.label-gold { color:#C9A96E; }
+.body-text { font-size:12.5px; color:#6B4C3B; line-height:1.55; }
+.body-dark { color:#2C1810; }
+
+.step { display:flex; gap:16px; align-items:flex-start; margin-bottom:16px; }
+.step-ico { width:36px; height:36px; min-width:36px; background:linear-gradient(135deg,#C4748A,#A85C72); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.step-title { font-size:14px; font-weight:800; color:#2C1810; margin-bottom:3px; }
+.step-desc { font-size:12.5px; color:#6B4C3B; line-height:1.5; }
+.pill { display:inline-block; margin-top:5px; background:rgba(196,116,138,0.1); border:1px solid rgba(196,116,138,0.2); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; color:#C4748A; }
+
+.feat { background:#F5F0EA; border-radius:12px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start; }
+.feat-ico { font-size:20px; min-width:24px; }
+.feat-name { font-size:12.5px; font-weight:800; color:#2C1810; margin-bottom:2px; }
+.feat-desc { font-size:11px; color:#A08878; line-height:1.4; }
+
+.row { display:flex; justify-content:space-between; align-items:center; font-size:12.5px; padding:7px 0; border-bottom:1px solid rgba(196,116,138,0.1); }
+.row:last-child { border-bottom:none; }
+.price { font-weight:800; color:#2C1810; }
+.price-free { color:#7A9E8A; }
+
+.phase { border-radius:12px; padding:16px; margin-bottom:8px; }
+.phase-num { font-size:11px; font-weight:800; letter-spacing:0.15em; text-transform:uppercase; margin-bottom:4px; }
+.phase-title { font-size:15px; font-weight:800; margin-bottom:4px; }
+.phase-desc { font-size:12px; line-height:1.5; }
+
+.sec-row { display:flex; gap:12px; align-items:center; background:#F5F0EA; border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+.sec-ico { font-size:18px; min-width:22px; }
+.sec-text { font-size:12.5px; color:#4A2E20; line-height:1.4; }
+
+.stat { background:#F5F0EA; border-radius:12px; padding:14px; text-align:center; }
+.stat-num { font-size:22px; font-weight:900; color:#C4748A; letter-spacing:-1px; }
+.stat-label { font-size:10px; color:#A08878; margin-top:3px; line-height:1.3; }
+
+.cta-card { background:linear-gradient(135deg,#2C1810 0%,#4A2E20 100%); border-radius:16px; padding:28px 32px; margin-bottom:12px; }
+.cta-title { font-size:20px; font-weight:900; color:#fff; margin-bottom:8px; }
+.cta-sub { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; margin-bottom:20px; }
+.cta-box { background:rgba(196,116,138,0.15); border:1px solid rgba(196,116,138,0.3); border-radius:12px; padding:14px 16px; margin-bottom:20px; }
+.cta-box-title { font-size:11px; font-weight:800; color:#C4748A; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px; }
+.cta-item { font-size:12.5px; color:rgba(255,255,255,0.75); padding:4px 0 4px 16px; position:relative; }
+.cta-item::before { content:'→'; position:absolute; left:0; color:#C4748A; }
+.btn-main { background:#C4748A; color:#fff; border:none; border-radius:10px; padding:12px 20px; font-size:13px; font-weight:800; cursor:pointer; text-decoration:none; display:inline-block; margin-right:8px; margin-top:4px; }
+.btn-sec { background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; margin-top:4px; }
+
+.footer { text-align:center; font-size:12px; color:#A08878; margin-top:8px; }
+.footer a { color:#C4748A; text-decoration:none; font-weight:600; }
+
+.vocab-word { font-size:13px; font-weight:800; color:#C4748A; margin-bottom:3px; }
+.vocab-def { font-size:11.5px; color:#6B4C3B; line-height:1.4; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">CLUTCH<span>.</span></div>
+    <div class="tagline">Be Spontaneous</div>
+    <div class="header-sub">L'app qui transforme chaque connexion en vrai rendez-vous physique — en 18 heures maximum. Lausanne, Suisse romande et au-delà.</div>
+    <div class="badges">
+      <span class="badge">Bêta · Juin 2026</span>
+      <span class="badge">Lausanne 🇨🇭</span>
+      <span class="badge">Freemium</span>
+      <span class="badge">Sécurité incluse 🛡</span>
+    </div>
+  </div>
+
+  <!-- PROBLÈME / SOLUTION -->
+  <div class="card">
+    <div class="card-title">Le constat</div>
+    <div class="grid2">
+      <div class="block block-light">
+        <div style="font-size:22px;margin-bottom:8px">💀</div>
+        <div class="label">Le problème</div>
+        <div class="body-text">Les apps de rencontres sont des cimetières de matchs. On swipe, on tchat des jours. On ne se rencontre jamais vraiment. 90% des matchs = zéro RDV.</div>
+      </div>
+      <div class="block block-rose">
+        <div style="font-size:22px;margin-bottom:8px">⚡</div>
+        <div class="label label-rose">La solution Clutch</div>
+        <div class="body-text body-dark">Clutch force l'action. Un clutch = un RDV proposé dans les 2h. Ou ça expire. Pas de chit-chat infini. Des vraies rencontres.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOCABULAIRE -->
+  <div class="card">
+    <div class="card-title">Le vocabulaire Clutch</div>
+    <div class="grid2">
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Clutcher</div>
+        <div class="vocab-def">Envoyer une proposition de RDV. "Je t'ai clutché ce soir !"</div>
+      </div>
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Un clutch</div>
+        <div class="vocab-def">La proposition : lieu + heure + message. Expire si pas de réponse en 2h.</div>
+      </div>
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Score de fiabilité</div>
+        <div class="vocab-def">Note 0–100. Baisse si tu no-show. Monte si tu honores le RDV.</div>
+      </div>
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Check-in</div>
+        <div class="vocab-def">Tu confirmes ton arrivée. Lance le feedback mutuel.</div>
+      </div>
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Disponible maintenant</div>
+        <div class="vocab-def">Tu actives ta dispo (maintenant ou plus tard) → ton profil apparaît.</div>
+      </div>
+      <div class="block block-light" style="padding:12px 14px">
+        <div class="vocab-word">Score de compatibilité</div>
+        <div class="vocab-def">Passions communes + fiabilité. Affiché sur chaque profil. 60–100%.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMENT ÇA MARCHE -->
+  <div class="card">
+    <div class="card-title">Comment ça marche</div>
+    <div class="step">
+      <div class="step-ico">👤</div>
+      <div>
+        <div class="step-title">1. Tu crées ton profil</div>
+        <div class="step-desc">Prénom, photo, passions, ville de RDV (Lausanne, Genève, Fribourg…) et créneau de dispo. Tu peux travailler à Genève et vouloir te retrouver à Lausanne le soir — c'est possible.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-ico">🔍</div>
+      <div>
+        <div class="step-title">2. Tu découvres des profils disponibles</div>
+        <div class="step-desc">Seuls les gens qui ont activé leur disponibilité apparaissent. Tu vois leur score de compatibilité, passions communes et quartier.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-ico">⚡</div>
+      <div>
+        <div class="step-title">3. Tu clutches</div>
+        <div class="step-desc">Tu proposes un lieu, une heure, un message. Le clutch expire si pas de réponse.</div>
+        <span class="pill">⏳ L'autre a 2h pour répondre</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-ico">☕</div>
+      <div>
+        <div class="step-title">4. Le RDV a lieu</div>
+        <div class="step-desc">Compte à rebours live. Vous vous retrouvez dans un lieu public. Check-in à l'arrivée.</div>
+        <span class="pill">📍 Maximum 18h après l'envoi</span>
+      </div>
+    </div>
+    <div class="step" style="margin-bottom:0">
+      <div class="step-ico">⭐</div>
+      <div>
+        <div class="step-title">5. Feedback mutuel</div>
+        <div class="step-desc">Super ⭐ / Ok 👍 / Rabbit 🐰 (timide) / Ghost 👻 (no-show). Impacte le score de fiabilité.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FONCTIONNALITÉS -->
+  <div class="card">
+    <div class="card-title">Fonctionnalités</div>
+    <div class="grid2">
+      <div class="feat"><div class="feat-ico">🔒</div><div><div class="feat-name">Profils certifiés</div><div class="feat-desc">Selfie de vérification. Badge visible. Réduit les faux profils.</div></div></div>
+      <div class="feat"><div class="feat-ico">⚡</div><div><div class="feat-name">Disponibilité flexible</div><div class="feat-desc">Maintenant, ce soir, demain. Choisis où tu veux te retrouver — pas où tu es.</div></div></div>
+      <div class="feat"><div class="feat-ico">🎯</div><div><div class="feat-name">Score de compatibilité</div><div class="feat-desc">Passions communes + fiabilité. Affiché sur chaque profil.</div></div></div>
+      <div class="feat"><div class="feat-ico">💬</div><div><div class="feat-name">Messagerie sécurisée</div><div class="feat-desc">Chat uniquement après clutch accepté. Modération automatique.</div></div></div>
+      <div class="feat"><div class="feat-ico">🚨</div><div><div class="feat-name">Bouton SOS</div><div class="feat-desc">Position en direct + appel 117. Recommandé pour les premiers RDV.</div></div></div>
+      <div class="feat"><div class="feat-ico">🚩</div><div><div class="feat-name">Signalement</div><div class="feat-desc">6 catégories. Traitement en 24h. Suspension immédiate si grave.</div></div></div>
+      <div class="feat"><div class="feat-ico">🎉</div><div><div class="feat-name">Événements Lausanne</div><div class="feat-desc">Jazz, expo, brunch, rando… Clutch organise ou partenaires locaux.</div></div></div>
+      <div class="feat"><div class="feat-ico">📊</div><div><div class="feat-name">Score de fiabilité</div><div class="feat-desc">No-show = perte de points. Visible par tous. Crée la confiance.</div></div></div>
+      <div class="feat"><div class="feat-ico">🛡</div><div><div class="feat-name">Contrôle & sécurité</div><div class="feat-desc">Filtres : qui peut te clutcher, âge min, score min. Mode discret.</div></div></div>
+      <div class="feat"><div class="feat-ico">🤝</div><div><div class="feat-name">Partenaires locaux</div><div class="feat-desc">Cafés, restos, salles de sport avec offres exclusives pour clutcheurs.</div></div></div>
+    </div>
+  </div>
+
+  <!-- PARTENAIRES -->
+  <div class="card">
+    <div class="card-title">Partenaires & Événements</div>
+    <div style="font-size:13px;color:#6B4C3B;line-height:1.6;margin-bottom:16px">Clutch intègre des partenaires locaux lausannois directement dans l'app. Les utilisateurs voient des événements et lieux recommandés, les partenaires gagnent en visibilité ciblée.</div>
+    <div class="grid2">
+      <div class="block block-light">
+        <div class="label" style="margin-bottom:8px">☕ Cafés & Restos</div>
+        <div class="body-text">Lieux de RDV recommandés. Offre de bienvenue pour les clutcheurs (café offert, réduction…). Win-win : le client vient, le café signe.</div>
+      </div>
+      <div class="block block-light">
+        <div class="label" style="margin-bottom:8px">🎷 Événements culturels</div>
+        <div class="body-text">Jazz, expo, stand-up, brunch, rando. Clutch vend des places groupées ou propose des tables réservées pour ses utilisateurs.</div>
+      </div>
+      <div class="block block-light">
+        <div class="label" style="margin-bottom:8px">🏋️ Sport & Bien-être</div>
+        <div class="body-text">Cours de yoga, escalade, natation. Réservation directe depuis l'app. Commission sur billet vendu.</div>
+      </div>
+      <div class="block block-light">
+        <div class="label" style="margin-bottom:8px">💰 Modèle partenaire</div>
+        <div class="body-text">Inscription gratuite. Commission 10–15% sur les billets/réservations générés via Clutch. Visibilité premium disponible.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SÉCURITÉ -->
+  <div class="card">
+    <div class="card-title">Sécurité & Confiance</div>
+    <div class="sec-row"><div class="sec-ico">📍</div><div class="sec-text"><strong>GPS jamais stocké</strong> — converti en quartier au moment de l'activation, puis supprimé. Tu n'apparais qu'avec "Lausanne-Flon", jamais ta rue.</div></div>
+    <div class="sec-row"><div class="sec-ico">🔐</div><div class="sec-text"><strong>Données chiffrées</strong> — Supabase Frankfurt (UE). Conforme RGPD et loi suisse LPD (sept. 2023).</div></div>
+    <div class="sec-row"><div class="sec-ico">🚨</div><div class="sec-text"><strong>Bouton SOS</strong> — partage position en temps réel à un proche + appel 117 direct. Recommandé pour tous les premiers RDV.</div></div>
+    <div class="sec-row"><div class="sec-ico">🤖</div><div class="sec-text"><strong>Modération automatique</strong> — mots bannis détectés avant envoi. Signalements traités en 24h ouvrables.</div></div>
+    <div class="sec-row" style="margin-bottom:0"><div class="sec-ico">⏱</div><div class="sec-text"><strong>Max 3 clutches/jour</strong> — anti-spam. Chaque clutch doit être intentionnel.</div></div>
+  </div>
+
+  <!-- MARCHÉ & MODÈLE -->
+  <div class="card">
+    <div class="card-title">Marché & Modèle économique</div>
+    <div class="grid3" style="margin-bottom:16px">
+      <div class="stat"><div class="stat-num">500K</div><div class="stat-label">18–35 ans<br>Suisse romande</div></div>
+      <div class="stat"><div class="stat-num">2.7Md$</div><div class="stat-label">marché mondial<br>dating apps 2025</div></div>
+      <div class="stat"><div class="stat-num">0</div><div class="stat-label">app spontanéité<br>en Suisse romande</div></div>
+    </div>
+    <div class="block block-rose" style="margin-bottom:10px">
+      <div class="label label-rose" style="margin-bottom:10px">Modèle Freemium — sans discrimination</div>
+      <div class="row"><span style="color:#4A2E20">🆓 Gratuit — profil, découverte, 3 clutches/jour, SOS, événements</span><span class="price price-free">Gratuit</span></div>
+      <div class="row"><span style="color:#4A2E20">🛡 Sécurité+ — filtres avancés, mode discret, contrôle des clutches reçus</span><span class="price price-free">Inclus</span></div>
+      <div class="row"><span style="color:#4A2E20">💎 Premium — clutches illimités, boost visibilité, voir qui a vu le profil</span><span class="price">CHF 19.90/mois</span></div>
+      <div class="row"><span style="color:#4A2E20">🤝 Partenaires — commission sur billets & réservations</span><span class="price">Commission 10–15%</span></div>
+    </div>
+  </div>
+
+  <!-- STRATÉGIE DE DÉPLOIEMENT -->
+  <div class="card">
+    <div class="card-title">Stratégie de déploiement</div>
+    <div class="phase block-rose phase" style="border:1px solid rgba(196,116,138,0.3)">
+      <div class="phase-num label-rose">Phase 1 · Juin–Déc 2026</div>
+      <div class="phase-title">🏙 Lausanne — terrain d'expérimentation</div>
+      <div class="phase-desc" style="color:#6B4C3B">Bêta fermée. 200–500 utilisateurs. Validation du concept, du score de fiabilité, et des partenariats cafés/événements. Toutes les fonctionnalités actives. Objectif : 30% de clutches qui aboutissent à un RDV.</div>
+    </div>
+    <div class="phase block-sage phase" style="border:1px solid rgba(122,158,138,0.3)">
+      <div class="phase-num label-sage">Phase 2 · T1 2027</div>
+      <div class="phase-title">🌆 Genève + Fribourg + Neuchâtel</div>
+      <div class="phase-desc" style="color:#6B4C3B">Expansion Suisse romande. Recrutement via bouche-à-oreille + partenaires locaux. Objectif 2 000 utilisateurs actifs. Modèle partenaires répliqué dans chaque ville.</div>
+    </div>
+    <div class="phase block-gold phase" style="border:1px solid rgba(201,169,110,0.3)">
+      <div class="phase-num label-gold">Phase 3 · T3 2027</div>
+      <div class="phase-title">🌍 Berne + Zurich + expansion internationale</div>
+      <div class="phase-desc" style="color:#6B4C3B">Ouverture Suisse alémanique avec version allemande. Puis Lyon, Bordeaux, Montréal. App native iOS/Android (Expo). Levée de fonds seed si traction validée.</div>
+    </div>
+    <div class="phase block-light phase" style="border:1px solid #EDE8E3">
+      <div class="phase-num" style="color:#A08878">Pourquoi Lausanne d'abord ?</div>
+      <div class="phase-desc" style="color:#6B4C3B">Ville étudiante dense (UNIL, EPFL, HEP). Mobilité piétonne forte. Scène culturelle active. Réseau personnel de l'équipe. Taille parfaite pour valider sans diluer — assez grand pour avoir de la masse critique, assez petit pour itérer vite.</div>
+    </div>
+  </div>
+
+  <!-- CTA BÊTA -->
+  <div class="cta-card">
+    <div class="cta-title">On a besoin de toi 🙏</div>
+    <div class="cta-sub">Clutch est en phase bêta à Lausanne. On cherche des premiers utilisateurs curieux, des amis qui veulent tester et donner leur avis honnête. Pas besoin d'être tech — juste envie d'essayer quelque chose de nouveau.</div>
+    <div class="cta-box">
+      <div class="cta-box-title">Ce qu'on te demande</div>
+      <div class="cta-item">Créer un profil sur la vraie app (2 min)</div>
+      <div class="cta-item">Envoyer au moins 1 clutch à quelqu'un cette semaine</div>
+      <div class="cta-item">Nous dire ce qui t'a bloqué, plu, manqué</div>
+      <div class="cta-item">Partager l'app à 2–3 amis lausannois</div>
+    </div>
+    <a href="https://pz7cgj4kfv-tech.github.io/demo" class="btn-main">🎬 Essaie la démo</a>
+    <a href="https://pz7cgj4kfv-tech.github.io/app" class="btn-sec">Créer mon profil →</a>
+  </div>
+
+  <div class="footer">
+    Construit à Lausanne 🇨🇭 &nbsp;·&nbsp;
+    <a href="mailto:david.saugy@gmail.com">david.saugy@gmail.com</a> &nbsp;·&nbsp;
+    <a href="https://pz7cgj4kfv-tech.github.io/flyer">pz7cgj4kfv-tech.github.io/flyer</a>
+  </div>
+
+</div>
+</body>
+</html>

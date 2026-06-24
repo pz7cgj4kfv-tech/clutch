@@ -20,6 +20,7 @@ const TABS: { href: string; icon: string; t: string; d: string; group: string; a
   { href: '/animation', icon: '✨', t: 'Animation', d: 'Le labo des animations', group: 'Coulisses' },
   { href: '/sim', icon: '🧪', t: 'Simulateur', d: 'L\'algo, de 5 à 50 000 personnes', group: 'Coulisses' },
   { href: '/cockpit', icon: '🛰️', t: 'Cockpit', d: 'Le centre de contrôle de la dynamique', group: 'Coulisses' },
+  { href: '/manifeste', icon: '✨', t: 'ADN & Slogans', d: 'Ce qui définit Clutch — phrases clés', group: 'Docs', accent: M.pink },
   { href: '/vision', icon: '🧭', t: 'Vision · le Graal', d: 'La stratégie et la philosophie', group: 'Docs' },
   { href: '/vision2', icon: '📓', t: 'Vision 2', d: 'Toutes les idées, en entier', group: 'Docs' },
   { href: '/confidentialite', icon: '🔒', t: 'Confidentialité', d: 'Le contrat (NDA) à signer', group: 'Docs', accent: M.green },

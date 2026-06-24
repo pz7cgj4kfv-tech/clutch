@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Guide de test — Clutch Bêta · Lausanne</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:#FDFAF7;color:#2C1810;line-height:1.6}
+  .page{max-width:820px;margin:0 auto;padding:40px 32px}
+
+  /* HEADER */
+  .hero{background:linear-gradient(135deg,#2C1810,#4A2E20);color:#fff;border-radius:20px;padding:36px 40px;margin-bottom:32px;position:relative;overflow:hidden}
+  .hero::after{content:'☕';position:absolute;right:40px;top:50%;transform:translateY(-50%);font-size:80px;opacity:0.15}
+  .hero h1{font-size:38px;font-weight:900;letter-spacing:-0.04em;margin-bottom:6px}
+  .hero h1 span{color:#C4748A}
+  .hero .sub{font-size:13px;letter-spacing:0.25em;text-transform:uppercase;color:#A08878;margin-bottom:16px}
+  .hero p{color:#D4C4BC;font-size:14px;line-height:1.7;max-width:500px}
+  .links-bar{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+  .link-btn{padding:9px 18px;border-radius:30px;font-size:13px;font-weight:700;text-decoration:none;display:inline-block}
+  .link-btn.primary{background:#C4748A;color:#fff}
+  .link-btn.secondary{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+
+  /* SECTIONS */
+  h2{font-size:20px;font-weight:800;color:#2C1810;margin-bottom:4px}
+  .section{margin-bottom:36px}
+  .section-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #EDE8E3}
+  .section-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
+  /* CARDS */
+  .card{background:#fff;border:1px solid #EDE8E3;border-radius:14px;padding:18px 20px;margin-bottom:10px;box-shadow:0 1px 4px rgba(44,24,16,0.06)}
+  .card h3{font-size:15px;font-weight:700;margin-bottom:6px;color:#2C1810}
+  .card p{font-size:13px;color:#6B4C3B;line-height:1.6}
+  .card .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-right:6px;margin-bottom:4px}
+  .tag.green{background:#D4E8DE;color:#3A7A5A}
+  .tag.red{background:#FDEAEA;color:#D64545}
+  .tag.orange{background:#FFF0E0;color:#C07830}
+  .tag.blue{background:#E8F0FE;color:#1a73e8}
+  .tag.purple{background:#EAE6F8;color:#6B5B9A}
+
+  /* CHECKLIST */
+  .checklist{list-style:none}
+  .checklist li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #F5F0EA;font-size:13px;color:#4A2E20}
+  .checklist li:last-child{border-bottom:none}
+  .check-box{width:20px;height:20px;border:2px solid #C4748A;border-radius:5px;flex-shrink:0;margin-top:1px}
+  .check-label{flex:1}
+  .check-note{font-size:11px;color:#A08878;margin-top:2px}
+
+  /* SCENARIO */
+  .scenario{background:linear-gradient(135deg,#F9F4FF,#FDF0F4);border:1px solid #E8D8E0;border-radius:14px;padding:18px 20px;margin-bottom:12px}
+  .scenario h3{font-size:14px;font-weight:700;color:#8B5E6A;margin-bottom:10px}
+  .steps{list-style:none;counter-reset:step}
+  .steps li{counter-increment:step;display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:13px;color:#4A2E20}
+  .steps li::before{content:counter(step);min-width:22px;height:22px;border-radius:50%;background:#C4748A;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+  /* BUGS */
+  .bug{background:#FFFAF0;border-left:3px solid #E8A87C;padding:12px 16px;border-radius:0 10px 10px 0;margin-bottom:8px;font-size:13px;color:#5A3A1A}
+
+  /* COSTS */
+  .cost-table{width:100%;border-collapse:collapse}
+  .cost-table th{background:#F5F0EA;padding:10px 14px;text-align:left;font-size:12px;font-weight:700;letter-spacing:0.05em;color:#A08878;text-transform:uppercase}
+  .cost-table td{padding:11px 14px;border-bottom:1px solid #F5F0EA;font-size:13px;color:#2C1810;vertical-align:top}
+  .cost-table tr:last-child td{border-bottom:none}
+  .free{color:#3A7A5A;font-weight:700}
+  .paid{color:#C4748A;font-weight:700}
+
+  /* PRINT */
+  @media print{
+    body{background:#fff}
+    .hero{background:#2C1810!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{padding:20px}
+    .no-print{display:none}
+  }
+
+  /* INFO BOX */
+  .info{background:#EAF4FB;border:1px solid #B0D8EE;border-radius:12px;padding:14px 18px;font-size:13px;color:#1A5A7A;margin-bottom:16px}
+  .warn{background:#FFF8E0;border:1px solid #E8D080;border-radius:12px;padding:14px 18px;font-size:13px;color:#7A5A00;margin-bottom:16px}
+  .success{background:#EDFBF0;border:1px solid #90D4A8;border-radius:12px;padding:14px 18px;font-size:13px;color:#1A6A3A;margin-bottom:16px}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.two-col{grid-template-columns:1fr}}
+
+  h4{font-size:13px;font-weight:700;color:#6B4C3B;margin-bottom:6px;margin-top:14px;text-transform:uppercase;letter-spacing:0.06em}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="hero">
+    <div class="sub">Guide de test bêta · Juin 2026</div>
+    <h1>CLU<span>TCH</span> — Session de test</h1>
+    <p>Ce guide est pour David & Mel. Il couvre tous les scénarios à tester ce soir, les bugs connus, et ce qui doit fonctionner parfaitement avant le lancement.</p>
+    <div class="links-bar">
+      <a href="https://pz7cgj4kfv-tech.github.io/" class="link-btn primary">🏠 Page d'accueil</a>
+      <a href="https://pz7cgj4kfv-tech.github.io/app" class="link-btn secondary">📱 App réelle</a>
+      <a href="https://pz7cgj4kfv-tech.github.io/demo" class="link-btn secondary">🎬 Démo interactive</a>
+      <a href="https://pz7cgj4kfv-tech.github.io/admin" class="link-btn secondary">⚙️ Admin (David)</a>
+    </div>
+  </div>
+
+  <!-- AVANT DE COMMENCER -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#EAF4FB">ℹ️</div>
+      <h2>Avant de commencer</h2>
+    </div>
+    <div class="success">✅ La base de données Supabase est <strong>partagée</strong> — peu importe l'URL utilisée (pz7cgj4kfv, clutch-mel.netlify.app, etc.), vous voyez les mêmes données.</div>
+    <div class="info">📱 <strong>Conseil :</strong> David utilise son téléphone, Mel utilise le sien. Créez chacun un compte sur <strong>pz7cgj4kfv-tech.github.io/app</strong>. Ça permet de tester les vraies interactions entre deux utilisateurs.</div>
+    <div class="warn">⚠️ L'app est en bêta — certaines fonctions comme les notifications push et le partage de position temps réel ne sont pas encore implémentées. Tout le reste fonctionne.</div>
+    <div class="card">
+      <h3>🔑 Comptes de test recommandés</h3>
+      <p><strong>David :</strong> david.saugy@gmail.com → compte admin (voir panel /admin)<br/>
+      <strong>Mel :</strong> créer un nouveau compte sur /app avec n'importe quel email<br/><br/>
+      Si vous voulez vous envoyer un clutch, il faut être connectés sur deux appareils différents en même temps.</p>
+    </div>
+  </div>
+
+  <!-- SCÉNARIOS À TESTER -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#F9F4FF">🎯</div>
+      <h2>Scénarios à tester ce soir</h2>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 1 — Création de compte & Onboarding (5 min)</h3>
+      <ol class="steps">
+        <li>Ouvrir <strong>pz7cgj4kfv-tech.github.io/app</strong> sur mobile</li>
+        <li>Cliquer "Créer mon compte" → entrer email + mot de passe (6 car. min)</li>
+        <li>Remplir les 5 étapes : prénom, genre, date de naissance, photo, passions (3 à 5)</li>
+        <li>Arriver sur l'écran de découverte</li>
+        <li>Se déconnecter puis se reconnecter → <strong>vérifier que l'onboarding ne recommence PAS</strong></li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 2 — Disponibilité & Découverte (5 min)</h3>
+      <ol class="steps">
+        <li>Sur "Mon profil" → activer le toggle "Je suis disponible"</li>
+        <li>Cliquer "Modifier" pour définir : lieu GPS ou quartier, heure de début, heure de fin, mode (café / sport / pro)</li>
+        <li>Sauvegarder → vérifier que ton profil apparaît dans la liste de l'autre téléphone</li>
+        <li>L'autre personne clique sur ton profil → voir la fiche détaillée</li>
+        <li>Vérifier que le score de compatibilité s'affiche</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 3 — Envoyer un Clutch (proposition de RDV) (10 min)</h3>
+      <ol class="steps">
+        <li>Cliquer sur le profil de l'autre personne</li>
+        <li>Appuyer "✦ Proposer un Clutch"</li>
+        <li>Étape 1 : choisir un lieu (ou taper le sien)</li>
+        <li>Étape 2 : choisir un créneau horaire dans les 18h</li>
+        <li>Étape 3 : écrire un message (10 car. minimum)</li>
+        <li>Envoyer → l'autre personne reçoit la notif dans son inbox 💬</li>
+        <li>L'autre accepte ou refuse → les deux voient le statut mis à jour</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 4 — Chat & RDV actif (5 min)</h3>
+      <ol class="steps">
+        <li>Après acceptation du clutch → 8 messages maximum autorisés</li>
+        <li>Tester l'envoi de messages en temps réel (les deux téléphones)</li>
+        <li>Écran "RDV actif" → voir le compte à rebours jusqu'à l'heure du RDV</li>
+        <li>Tester "Check-in" pour simuler l'arrivée au café</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 5 — Événements (5 min)</h3>
+      <ol class="steps">
+        <li>Onglet "Événements" → voir la liste (si vide, vous êtes les premiers bêta-testeurs !)</li>
+        <li>Cliquer "+ Créer" → remplir le formulaire d'événement</li>
+        <li>Soumettre → l'événement passe en "En attente" (admin doit approuver)</li>
+        <li>David va sur /admin → approuver l'événement → il apparaît dans la liste</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 6 — SOS & Sécurité (2 min)</h3>
+      <ol class="steps">
+        <li>Bouton "SOS" (rouge) depuis la liste de profils ou Mon profil</li>
+        <li>Tester "Activer le partage de position" → vérifier que le lien Google Maps s'ouvre</li>
+        <li>Ajouter un contact de confiance (nom + numéro)</li>
+        <li>Vérifier les boutons 117 (police) et 144 (urgences)</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h3>Scénario 7 — Démo interactive (3 min)</h3>
+      <ol class="steps">
+        <li>Aller sur <strong>pz7cgj4kfv-tech.github.io/demo</strong></li>
+        <li>Tester les différents scénarios</li>
+        <li>Vérifier que la navigation fonctionne sur mobile (scroll, retour en arrière)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- CHECKLIST CRITIQUE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#EDFBF0">✅</div>
+      <h2>Checklist — À vérifier absolument</h2>
+    </div>
+    <div class="card" style="padding:0 20px">
+      <ul class="checklist">
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">L'app charge sans rester bloquée sur "Chargement…"
+            <div class="check-note">Si bloqué : faire Cmd+Shift+R (hard refresh) sur iPhone = tenir appuyé le bouton refresh</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">Les profils des autres utilisateurs s'affichent dans Discover
+            <div class="check-note">Bug critique corrigé aujourd'hui — si aucun profil, recharger la page</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">Le scroll fonctionne sur mobile dans tous les écrans
+            <div class="check-note">Passions, événements, profil — corrigé aujourd'hui (touchAction)</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">L'onboarding ne se répète pas à chaque connexion</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">On peut s'envoyer un Clutch entre deux téléphones</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">Le chat temps réel fonctionne (messages qui apparaissent sans recharger)</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">La disponibilité s'affiche correctement sur le profil des autres</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">Le panel /admin est accessible avec le compte David</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">La page d'accueil + formulaire liste d'attente fonctionnent</div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div class="check-label">La démo interactive est complète et fluide sur mobile</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- BUGS CONNUS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#FDEAEA">⚠️</div>
+      <h2>Bugs connus / Limitations actuelles</h2>
+    </div>
+    <div class="bug">🔄 <strong>Sélecteur "jusqu'à"</strong> — le time picker n'est pas très ergonomique sur mobile. Fonctionnel mais à améliorer.</div>
+    <div class="bug">🔙 <strong>Démo : retour en arrière</strong> — après avoir fini un scénario, on ne peut pas revenir à la page d'accueil de la démo sans recharger.</div>
+    <div class="bug">🗓 <strong>Démo : menu événements</strong> — le menu du bas peut bloquer le contenu. Scroller vers le haut.</div>
+    <div class="bug">🔑 <strong>Mot de passe oublié</strong> — pas encore implémenté. Si oublié, contacter David.</div>
+    <div class="bug">🔔 <strong>Notifications push</strong> — pas encore actives. Les clutches reçus sont visibles dans l'inbox mais pas de notif mobile.</div>
+    <div class="bug">📍 <strong>Partage de position temps réel</strong> — le GPS SOS fonctionne (lien ponctuel), mais le suivi en continu pendant un RDV n'est pas encore fait.</div>
+  </div>
+
+  <!-- COÛTS & INFRASTRUCTURE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#EAF4FB">💰</div>
+      <h2>Coûts & Infrastructure — Ce qui est gratuit, ce qui est payant</h2>
+    </div>
+
+    <table class="cost-table" style="border-radius:12px;overflow:hidden;border:1px solid #EDE8E3">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Usage actuel</th>
+          <th>Gratuit jusqu'à</th>
+          <th>Prix si dépassé</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Supabase</strong><br/><span style="font-size:11px;color:#A08878">Base de données, auth, storage, realtime</span></td>
+          <td>Toute la logique de l'app</td>
+          <td class="free">500 MB DB · 1 GB storage · 2 projets · 50k utilisateurs</td>
+          <td class="paid">25 CHF/mois (Pro)</td>
+        </tr>
+        <tr>
+          <td><strong>GitHub Pages</strong><br/><span style="font-size:11px;color:#A08878">Hosting actuel</span></td>
+          <td>pz7cgj4kfv-tech.github.io</td>
+          <td class="free">Illimité (open source)</td>
+          <td class="free">Toujours gratuit ✅</td>
+        </tr>
+        <tr>
+          <td><strong>Netlify</strong><br/><span style="font-size:11px;color:#A08878">Ancien hosting (limité)</span></td>
+          <td>clutch-mel.netlify.app (démo)</td>
+          <td class="free">100 GB bande passante/mois</td>
+          <td class="paid">19$/mois si dépassé</td>
+        </tr>
+        <tr>
+          <td><strong>Nominatim / OpenStreetMap</strong><br/><span style="font-size:11px;color:#A08878">Géocodage inverse (GPS → adresse)</span></td>
+          <td>Quand l'utilisateur active sa position</td>
+          <td class="free">Gratuit · limite = 1 req/sec</td>
+          <td class="free">Toujours gratuit ✅</td>
+        </tr>
+        <tr>
+          <td><strong>GPS / Localisation</strong><br/><span style="font-size:11px;color:#A08878">Comment ça marche ?</span></td>
+          <td colspan="3">
+            <span class="tag green">API navigateur</span> Pas de SMS. Le navigateur du téléphone demande la permission GPS. L'app récupère lat/lng, Nominatim convertit en adresse. Le lien Google Maps généré peut être partagé manuellement (copier/envoyer sur WhatsApp). Pas de suivi continu côté serveur pour l'instant.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Notifications push</strong><br/><span style="font-size:11px;color:#A08878">À venir</span></td>
+          <td>Pas encore actif</td>
+          <td colspan="2">
+            <span class="tag orange">Option A : Web Push</span> Gratuit, API navigateur<br/>
+            <span class="tag blue">Option B : Expo (app native)</span> Gratuit jusqu'à 1M notifs/mois<br/>
+            <span class="tag purple">Option C : OneSignal</span> Gratuit jusqu'à 10k abonnés
+          </td>
+        </tr>
+        <tr>
+          <td><strong>SMS / vérification téléphone</strong><br/><span style="font-size:11px;color:#A08878">Optionnel pour sécurité</span></td>
+          <td>Pas actif</td>
+          <td>—</td>
+          <td class="paid">Twilio ~0.10 CHF/SMS · ou Supabase Phone Auth 0.01$/SMS</td>
+        </tr>
+        <tr>
+          <td><strong>Domaine personnalisé</strong><br/><span style="font-size:11px;color:#A08878">clutch.ch ou clutchapp.ch</span></td>
+          <td>Pas encore</td>
+          <td>—</td>
+          <td class="paid">~15-30 CHF/an (Infomaniak recommandé CH)</td>
+        </tr>
+        <tr>
+          <td><strong>App Store / Play Store</strong><br/><span style="font-size:11px;color:#A08878">App native (étape suivante)</span></td>
+          <td>Pas encore</td>
+          <td>—</td>
+          <td class="paid">Apple : 99$/an · Google : 25$ une fois</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="info" style="margin-top:16px">💡 <strong>Budget réaliste aujourd'hui :</strong> 0 CHF/mois. Tout fonctionne dans les tiers gratuits. Supabase Pro à 25 CHF/mois sera nécessaire quand on dépasse ~500 utilisateurs actifs ou 500 MB de données. Pour l'instant on est très loin de ça.</div>
+  </div>
+
+  <!-- GPS — EXPLICATION DÉTAILLÉE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#EDFBF0">📍</div>
+      <h2>GPS & Partage de localisation — Comment ça fonctionne ?</h2>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <h3>📍 Disponibilité (actuel)</h3>
+        <p>Quand tu actives ta dispo, tu peux :<br/>
+        1. Laisser le GPS détecter ta position (quartier)<br/>
+        2. Choisir manuellement ville + quartier<br/><br/>
+        La position <strong>exacte</strong> n'est jamais partagée — seulement le quartier. ✅ Privacy OK.</p>
+      </div>
+      <div class="card">
+        <h3>🆘 SOS (actuel)</h3>
+        <p>Quand tu actives le SOS GPS :<br/>
+        1. Le navigateur demande accès GPS<br/>
+        2. Un lien Google Maps est généré<br/>
+        3. Tu peux <strong>copier le lien</strong> et l'envoyer sur WhatsApp à un proche<br/><br/>
+        Pas automatique — c'est toi qui décides d'envoyer.</p>
+      </div>
+      <div class="card">
+        <h3>🗺 Partage en temps réel (à faire)</h3>
+        <p>Pendant un RDV actif, on pourrait partager la position en temps réel jusqu'à ce que le check-in soit fait. La personne de confiance reçoit un lien qui se met à jour.<br/><br/>
+        <span class="tag orange">À développer — 1-2 jours de travail</span></p>
+      </div>
+      <div class="card">
+        <h3>📱 Par SMS ? Non, par lien</h3>
+        <p>On n'envoie pas de SMS (coûte cher). Le partage se fait via :<br/>
+        • <strong>WhatsApp</strong> (bouton partage natif)<br/>
+        • <strong>Copier le lien</strong> → coller où tu veux<br/>
+        • <strong>Web Share API</strong> → partage natif iOS/Android</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROADMAP IMMÉDIATE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#F9F4FF">🗺</div>
+      <h2>Ce qui reste à faire — Roadmap</h2>
+    </div>
+    <div class="two-col">
+      <div>
+        <h4>🔴 Cette semaine</h4>
+        <ul class="checklist">
+          <li><div class="check-box"></div><div class="check-label">Mot de passe oublié / reset</div></li>
+          <li><div class="check-box"></div><div class="check-label">Liste profils inspirée idealvoyance.fr</div></li>
+          <li><div class="check-box"></div><div class="check-label">CGU & Politique de confidentialité (Suisse)</div></li>
+          <li><div class="check-box"></div><div class="check-label">Modération automatique (mots bannis)</div></li>
+          <li><div class="check-box"></div><div class="check-label">Panel admin complet pour Mel</div></li>
+          <li><div class="check-box"></div><div class="check-label">Ergonomie sélecteur "jusqu'à"</div></li>
+          <li><div class="check-box"></div><div class="check-label">Demo UX : retour après scénario</div></li>
+        </ul>
+      </div>
+      <div>
+        <h4>🟡 Dans les 2-3 semaines</h4>
+        <ul class="checklist">
+          <li><div class="check-box"></div><div class="check-label">Notifications push (Web Push gratuit)</div></li>
+          <li><div class="check-box"></div><div class="check-label">Profils Pro / RDV business</div></li>
+          <li><div class="check-box"></div><div class="check-label">Partage de position temps réel (RDV actif)</div></li>
+          <li><div class="check-box"></div><div class="check-label">Domaine clutch.ch ou clutchapp.ch</div></li>
+          <li><div class="check-box"></div><div class="check-label">Système de feedback après RDV</div></li>
+          <li><div class="check-box"></div><div class="check-label">Vérification téléphone (optionnel)</div></li>
+        </ul>
+        <h4 style="margin-top:16px">⚪ Plus tard (app native)</h4>
+        <ul class="checklist">
+          <li><div class="check-box"></div><div class="check-label">React Native / Expo</div></li>
+          <li><div class="check-box"></div><div class="check-label">Apple App Store + Google Play</div></li>
+          <li><div class="check-box"></div><div class="check-label">Paiement Premium in-app (Stripe)</div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#FFF0E0">⚙️</div>
+      <h2>Panel Admin — david.saugy@gmail.com</h2>
+    </div>
+    <div class="card">
+      <h3>Accès admin</h3>
+      <p>URL : <strong>pz7cgj4kfv-tech.github.io/admin</strong><br/>
+      Connecté avec le compte david.saugy@gmail.com → accès complet à la modération.<br/><br/>
+      <strong>Ce que l'admin peut faire :</strong><br/>
+      • Voir tous les événements en attente → Approuver / Refuser<br/>
+      • Voir tous les profils utilisateurs<br/>
+      • Voir les clutches en cours<br/><br/>
+      <strong>SQL à lancer dans Supabase pour activer l'admin :</strong><br/>
+      Aller sur <strong>supabase.com → ton projet → SQL Editor</strong> et lancer :</p>
+      <pre style="background:#F5F0EA;border-radius:8px;padding:12px;font-size:12px;margin-top:10px;overflow:auto">update public.profiles
+set account_type = 'admin'
+where id = (select id from auth.users
+            where email = 'david.saugy@gmail.com');</pre>
+    </div>
+    <div class="warn">⚠️ Si tu veux que Mel ait aussi accès admin, lance la même requête avec l'email de Mel.</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="text-align:center;padding:24px;border-top:1px solid #EDE8E3;margin-top:20px;color:#A08878;font-size:12px">
+    <p>Clutch · Bêta Lausanne · Guide v1 · Juin 2026</p>
+    <p style="margin-top:4px">App : <strong>pz7cgj4kfv-tech.github.io/app</strong> · Démo : <strong>pz7cgj4kfv-tech.github.io/demo</strong></p>
+    <button onclick="window.print()" class="no-print" style="margin-top:12px;padding:8px 18px;border-radius:20px;border:1px solid #C4748A;background:none;color:#C4748A;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Imprimer / Sauvegarder en PDF</button>
+  </div>
+
+</div>
+</body>
+</html>

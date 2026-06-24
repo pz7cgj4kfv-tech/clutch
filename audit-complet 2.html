@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Audit Complet — Clutch · Document Stratégique</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#0E0E0F;color:#F0EDE8;line-height:1.65;font-size:14px}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;background:rgba(14,14,15,0.92);backdrop-filter:blur(12px);z-index:100;border-bottom:1px solid #222;padding:0 24px;display:flex;gap:0;overflow-x:auto}
+nav a{padding:14px 16px;color:#888;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+nav a:hover,nav a.active{color:#E8564A;border-bottom-color:#E8564A}
+
+.page{max-width:900px;margin:0 auto;padding:80px 28px 60px}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#1A0A08,#2A0F0B);border:1px solid #3A1510;border-radius:20px;padding:44px 48px;margin-bottom:48px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,#E8564A22,transparent 70%)}
+.hero .kicker{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:#E8564A;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:40px;font-weight:900;letter-spacing:-.04em;line-height:.95;margin-bottom:16px;color:#F0EDE8}
+.hero h1 em{font-style:normal;color:#E8564A}
+.hero p{color:#9A8A80;font-size:15px;line-height:1.7;max-width:540px}
+
+/* SECTIONS */
+.section{margin-bottom:60px;scroll-margin-top:56px}
+.section-label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#E8564A;font-weight:700;margin-bottom:8px}
+.section-title{font-size:26px;font-weight:800;letter-spacing:-.02em;color:#F0EDE8;margin-bottom:6px}
+.section-sub{color:#7A6A60;font-size:13px;margin-bottom:24px}
+hr.divider{border:none;border-top:1px solid #1E1E20;margin-bottom:28px}
+
+/* CARDS */
+.card{background:#141416;border:1px solid #222;border-radius:14px;padding:20px 22px;margin-bottom:12px}
+.card h3{font-size:14px;font-weight:700;color:#F0EDE8;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.card p,.card li{font-size:13px;color:#7A6A60;line-height:1.65}
+.card ul{padding-left:16px}
+.card li{margin-bottom:3px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:680px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* STATUS TAGS */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;margin-right:4px}
+.done{background:#0D2E1A;color:#4ADE80;border:1px solid #1A4A2A}
+.todo{background:#2A1A08;color:#FBB040;border:1px solid #4A2A10}
+.later{background:#1A1A2E;color:#818CF8;border:1px solid #2A2A4A}
+.critical{background:#2A0A08;color:#F87171;border:1px solid #4A1010}
+.paid-tag{background:#2A1A28;color:#E879F9;border:1px solid #3A1A3A}
+.free-tag{background:#0D2E1A;color:#4ADE80;border:1px solid #1A4A2A}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#141416;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5A5A5A;border-bottom:1px solid #222}
+td{padding:12px 14px;border-bottom:1px solid #1A1A1C;color:#9A8A80;vertical-align:top}
+td strong{color:#D0C8C0}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#0A0A0C}
+
+/* SCORE */
+.score-bar{height:6px;border-radius:3px;background:#1E1E20;margin:8px 0}
+.score-fill{height:6px;border-radius:3px}
+
+/* HIGHLIGHT BOXES */
+.box-red{background:#1A0808;border:1px solid #4A1010;border-radius:12px;padding:16px 20px;margin-bottom:12px;color:#F87171;font-size:13px}
+.box-green{background:#081A10;border:1px solid #104A20;border-radius:12px;padding:16px 20px;margin-bottom:12px;color:#4ADE80;font-size:13px}
+.box-yellow{background:#1A1408;border:1px solid #4A3010;border-radius:12px;padding:16px 20px;margin-bottom:12px;color:#FBB040;font-size:13px}
+.box-blue{background:#08101A;border:1px solid #103048;border-radius:12px;padding:16px 20px;margin-bottom:12px;color:#60A5FA;font-size:13px}
+.box-purple{background:#10081A;border:1px solid #301048;border-radius:12px;padding:16px 20px;margin-bottom:12px;color:#C084FC;font-size:13px}
+
+/* IDEA CARD */
+.idea{background:linear-gradient(135deg,#12080E,#080C14);border:1px solid #2A1A30;border-radius:14px;padding:20px 22px;margin-bottom:12px}
+.idea h3{font-size:14px;font-weight:700;color:#C084FC;margin-bottom:8px}
+.idea p{font-size:13px;color:#7A6A80;line-height:1.6}
+.idea .meta{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* STEP */
+.step{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid #1A1A1C}
+.step:last-child{border-bottom:none}
+.step-num{width:32px;height:32px;border-radius:50%;background:#E8564A22;border:1px solid #E8564A44;color:#E8564A;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-body h4{font-size:14px;font-weight:700;color:#F0EDE8;margin-bottom:4px}
+.step-body p{font-size:13px;color:#7A6A60;line-height:1.6}
+
+/* VERIFY */
+.verify-card{border-radius:14px;padding:20px 22px;margin-bottom:12px;border:1px solid}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#etat">🔍 État</a>
+  <a href="#fonctionnalites">⚙️ Fonctionnalités</a>
+  <a href="#couts">💰 Coûts</a>
+  <a href="#notifs">🔔 Notifs & GPS</a>
+  <a href="#securite">🔒 Sécurité</a>
+  <a href="#legal">⚖️ Légal</a>
+  <a href="#design">🎨 Design</a>
+  <a href="#verification">✅ Profils certifiés</a>
+  <a href="#idees">💡 Idées</a>
+  <a href="#app-native">📱 App native</a>
+  <a href="#roadmap">🗺 Roadmap</a>
+</nav>
+
+<div class="page">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="kicker">Document stratégique · Juin 2026 · Confidentiel</div>
+  <h1>Audit <em>complet</em><br/>Clutch Lausanne</h1>
+  <p>État des lieux exhaustif de l'app — fonctionnalités, sécurité, légal, design, coûts, notifs, GPS, profils certifiés, idées non explorées, chemin vers l'app native. Document pour prise de décision.</p>
+</div>
+
+<!-- ─── 1. ÉTAT ACTUEL ──────────────────────────────────────────────────────── -->
+<div class="section" id="etat">
+  <div class="section-label">01 — État actuel</div>
+  <div class="section-title">Ce qui existe vraiment</div>
+  <div class="section-sub">Audit honnête de l'état du produit aujourd'hui</div>
+  <hr class="divider"/>
+
+  <div class="box-green">✅ <strong>Ce qui fonctionne :</strong> Auth (inscription/connexion), onboarding 5 étapes, disponibilité avec GPS + quartier + modes, découverte profils, envoi/réception de clutch, chat temps réel (8 messages), RDV actif + check-in, événements (création + modération), SOS GPS, liste d'attente avec compteur, panel admin basique.</div>
+  <div class="box-red">🔴 <strong>Bugs confirmés à corriger :</strong> Sélecteur "jusqu'à" peu ergonomique mobile. Démo : retour impossible après scénario. Demo : menu bas bloque scroll. Mot de passe oublié absent. Profils certifiés non implémentés. Notifications push non actives.</div>
+  <div class="box-yellow">⚠️ <strong>Limitations structurelles :</strong> App web (pas native) = pas dans l'App Store. Pas de notifications push fiables sur iOS sans app native. GitHub Pages = URL peu professionnelle. Pas de CGU/Privacy affiché. Pas de vérification téléphone.</div>
+
+  <div class="grid3" style="margin-top:20px">
+    <div class="card">
+      <h3>📊 Maturité globale</h3>
+      <div style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A6A60;margin-bottom:4px"><span>Fonctionnalités core</span><span style="color:#4ADE80">72%</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:72%;background:#4ADE80"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A6A60;margin-bottom:4px;margin-top:8px"><span>Sécurité</span><span style="color:#FBB040">45%</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:45%;background:#FBB040"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A6A60;margin-bottom:4px;margin-top:8px"><span>Légal</span><span style="color:#F87171">20%</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:20%;background:#F87171"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A6A60;margin-bottom:4px;margin-top:8px"><span>UX/Design</span><span style="color:#60A5FA">60%</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:60%;background:#60A5FA"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>👥 Utilisateurs potentiels</h3>
+      <p style="margin-top:6px">Lausanne 18-35 ans : ~35 000 personnes<br/>
+      Cible initiale bêta : 50-200 utilisateurs<br/>
+      Taille critique pour que ça "vive" : ~300 actifs simultanés<br/><br/>
+      <span style="color:#FBB040">Challenge principal :</span> masse critique. Sans profils disponibles, personne n'active sa dispo. Effet réseau pur.</p>
+    </div>
+    <div class="card">
+      <h3>🏆 Concurrence directe</h3>
+      <p style="margin-top:6px"><strong style="color:#F0EDE8">Happn</strong> — basé sur croisements<br/>
+      <strong style="color:#F0EDE8">Bumble BFF</strong> — amitié, pas RDV physique<br/>
+      <strong style="color:#F0EDE8">Spontacts</strong> — proche de vous mais peu connu CH<br/>
+      <strong style="color:#F0EDE8">Meetup</strong> — événements de groupe<br/><br/>
+      <span style="color:#4ADE80">Votre différence :</span> RDV 1:1 dans les 18h, window de 2h, focus physique immédiat. Personne ne fait ça proprement en Suisse.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 2. FONCTIONNALITÉS ─────────────────────────────────────────────────── -->
+<div class="section" id="fonctionnalites">
+  <div class="section-label">02 — Fonctionnalités</div>
+  <div class="section-title">Audit complet — fait / manque / à repenser</div>
+  <div class="section-sub">Chaque fonctionnalité évaluée pour sa valeur, sa qualité d'implémentation, et ce qui manque</div>
+  <hr class="divider"/>
+
+  <table style="border-radius:12px;overflow:hidden;border:1px solid #222;margin-bottom:20px">
+    <thead>
+      <tr><th>Fonctionnalité</th><th>État</th><th>Qualité</th><th>Priorité fix</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Inscription / Connexion</strong><br/>Email + password, Supabase auth</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Onboarding 5 étapes</strong><br/>Nom, genre, âge, photo, passions</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Mot de passe oublié</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>Découverte profils</strong><br/>Liste avec dispo, quartier, modes</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>Améliorer design</td></tr>
+      <tr><td><strong>Fiche profil détaillée</strong><br/>Photo, bio, passions, score fiabilité</td><td><span class="tag done">✅ Fait</span></td><td>Moyenne</td><td>🟡 Enrichir</td></tr>
+      <tr><td><strong>Disponibilité</strong><br/>GPS, quartier, fenêtre horaire, modes</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>Ergonomie picker</td></tr>
+      <tr><td><strong>Envoyer un Clutch</strong><br/>Lieu, heure, message</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Répondre à un Clutch</strong><br/>Accepter / refuser avec countdown 2h</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Chat limité</strong><br/>8 messages max avant le RDV</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>RDV actif + countdown</strong></td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Check-in au lieu</strong></td><td><span class="tag done">✅ Fait</span></td><td>Basique</td><td>—</td></tr>
+      <tr><td><strong>Événements (liste + création)</strong></td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>SOS GPS</strong><br/>Partage position ponctuel, 117/144</td><td><span class="tag done">✅ Fait</span></td><td>Bonne</td><td>—</td></tr>
+      <tr><td><strong>Notifications push</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>Partage position temps réel</strong><br/>Suivi GPS pendant RDV</td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Profils certifiés / vérifiés</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>Vérification téléphone</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Feedback après RDV</strong><br/>Super / Rabbit / Ghost rating</td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Mot de passe oublié</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>CGU / Privacy</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🔴 Légal urgent</td></tr>
+      <tr><td><strong>Modération auto (mots bannis)</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Panel admin complet</strong></td><td><span class="tag todo">🚧 Basique</span></td><td>Basique</td><td>🟡 Enrichir</td></tr>
+      <tr><td><strong>Profils Pro / RDV business</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟣 Plus tard</td></tr>
+      <tr><td><strong>Premium (19.90 CHF/mois)</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟣 Plus tard</td></tr>
+      <tr><td><strong>Design liste profils (idealvoyance.fr)</strong></td><td><span class="tag todo">🚧 Basique</span></td><td>Moyenne</td><td>🟡 Cette semaine</td></tr>
+      <tr><td><strong>Domaine clutch.ch</strong></td><td><span class="tag critical">❌ Absent</span></td><td>—</td><td>🟡 Important</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ─── 3. COÛTS ───────────────────────────────────────────────────────────── -->
+<div class="section" id="couts">
+  <div class="section-label">03 — Coûts</div>
+  <div class="section-title">Budget complet — maintenant et à l'avenir</div>
+  <div class="section-sub">Chaque service, son modèle de prix, et quand ça devient payant</div>
+  <hr class="divider"/>
+
+  <div class="box-green" style="margin-bottom:20px">💰 <strong>Budget actuel : 0 CHF/mois.</strong> Tout fonctionne dans les tiers gratuits. Aucune dépense obligatoire pour les 6 prochains mois avec moins de 500 utilisateurs actifs.</div>
+
+  <table style="border-radius:12px;overflow:hidden;border:1px solid #222;margin-bottom:24px">
+    <thead><tr><th>Service / Fonctionnalité</th><th>Gratuit jusqu'à</th><th>Prix payant</th><th>Quand payer ?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Supabase</strong><br/>DB, Auth, Storage, Realtime</td>
+        <td><span class="tag free-tag">GRATUIT</span> 500 MB DB · 1 GB storage · 50k users · 2 projets</td>
+        <td><span class="tag paid-tag">25$/mois Pro</span></td>
+        <td>Quand &gt;500 utilisateurs actifs quotidiens ou &gt;500 MB de données</td>
+      </tr>
+      <tr>
+        <td><strong>GitHub Pages</strong><br/>Hosting actuel</td>
+        <td><span class="tag free-tag">GRATUIT pour toujours</span></td>
+        <td>—</td>
+        <td>Jamais (tant que repo public)</td>
+      </tr>
+      <tr>
+        <td><strong>Domaine clutch.ch</strong></td>
+        <td>—</td>
+        <td><span class="tag paid-tag">~20 CHF/an</span> chez Infomaniak</td>
+        <td>Dès que vous voulez être pro (recommandé maintenant)</td>
+      </tr>
+      <tr>
+        <td><strong>Notifications push WEB</strong><br/>Web Push API</td>
+        <td><span class="tag free-tag">GRATUIT pour toujours</span><br/>API navigateur native</td>
+        <td>—</td>
+        <td>Jamais — mais ne marche pas sur iOS sans app native</td>
+      </tr>
+      <tr>
+        <td><strong>Notifications push MOBILE</strong><br/>Via Expo / OneSignal</td>
+        <td><span class="tag free-tag">GRATUIT</span> OneSignal : 10k abonnés · Expo : 1M notifs/mois</td>
+        <td>OneSignal : 9$/mois &gt;10k · Expo inclus dans abonnement</td>
+        <td>Seulement quand vous avez l'app native</td>
+      </tr>
+      <tr>
+        <td><strong>SMS vérification téléphone</strong><br/>Supabase Phone Auth ou Twilio</td>
+        <td>Supabase : 0 (avec Twilio gratuit 10$ crédit)</td>
+        <td><span class="tag paid-tag">~0.05 CHF/SMS</span> (Twilio) · ou Supabase Phone 0.01$/SMS</td>
+        <td>Si tu veux vérifier le numéro à l'inscription</td>
+      </tr>
+      <tr>
+        <td><strong>GPS / Localisation</strong><br/>Nominatim (OpenStreetMap)</td>
+        <td><span class="tag free-tag">GRATUIT pour toujours</span><br/>API navigateur + Nominatim = 0€</td>
+        <td>Si &gt;1 req/sec → Google Maps API 0.005$/req</td>
+        <td>Jamais tant que &lt;10k utilisateurs simultanés</td>
+      </tr>
+      <tr>
+        <td><strong>Paiement Premium (Stripe)</strong><br/>19.90 CHF/mois</td>
+        <td>Intégration gratuite</td>
+        <td><span class="tag paid-tag">1.4% + 0.25 CHF par transaction</span></td>
+        <td>Dès que vous activez le Premium</td>
+      </tr>
+      <tr>
+        <td><strong>App iOS (App Store)</strong></td>
+        <td>—</td>
+        <td><span class="tag paid-tag">99$/an Apple Developer</span></td>
+        <td>Quand vous publiez sur l'App Store</td>
+      </tr>
+      <tr>
+        <td><strong>App Android (Play Store)</strong></td>
+        <td>—</td>
+        <td><span class="tag paid-tag">25$ une seule fois</span></td>
+        <td>Quand vous publiez sur Play Store</td>
+      </tr>
+      <tr>
+        <td><strong>Expo EAS Build</strong><br/>(compilation app native)</td>
+        <td><span class="tag free-tag">GRATUIT</span> 30 builds/mois</td>
+        <td>29$/mois pour builds illimités</td>
+        <td>En phase de développement = gratuit suffit</td>
+      </tr>
+      <tr>
+        <td><strong>Stockage photos (Supabase Storage)</strong></td>
+        <td><span class="tag free-tag">GRATUIT</span> 1 GB (≈ 2000 photos 500 KB)</td>
+        <td>0.021$/GB supplémentaire</td>
+        <td>À partir de ~2000 utilisateurs avec photos</td>
+      </tr>
+      <tr>
+        <td><strong>Modération contenu (IA)</strong><br/>OpenAI Moderation API</td>
+        <td><span class="tag free-tag">GRATUIT</span> (moderation endpoint est gratuit)</td>
+        <td>—</td>
+        <td>Jamais (endpoint gratuit d'OpenAI)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid3">
+    <div class="card">
+      <h3>💸 Budget phase bêta<br/><span style="font-size:11px;color:#4ADE80">0-500 utilisateurs</span></h3>
+      <p style="margin-top:8px;font-size:22px;font-weight:800;color:#4ADE80">0 CHF<span style="font-size:13px;color:#7A6A60">/mois</span></p>
+      <p style="margin-top:6px">Supabase free · GitHub Pages · Nominatim · Web Push</p>
+    </div>
+    <div class="card">
+      <h3>💸 Budget lancement<br/><span style="font-size:11px;color:#FBB040">500-2000 utilisateurs</span></h3>
+      <p style="margin-top:8px;font-size:22px;font-weight:800;color:#FBB040">45 CHF<span style="font-size:13px;color:#7A6A60">/mois</span></p>
+      <p style="margin-top:6px">Supabase Pro 25$ · Domaine 2$/mois · Buffer 18$</p>
+    </div>
+    <div class="card">
+      <h3>💸 Budget app native<br/><span style="font-size:11px;color:#C084FC">App Store + croissance</span></h3>
+      <p style="margin-top:8px;font-size:22px;font-weight:800;color:#C084FC">170 CHF<span style="font-size:13px;color:#7A6A60">/mois</span></p>
+      <p style="margin-top:6px">Supabase 25$ · Apple 8$/mois · Expo 29$ · OneSignal 9$ · Domaine 2$ · SMS ~50$/mois</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 4. NOTIFS & GPS ────────────────────────────────────────────────────── -->
+<div class="section" id="notifs">
+  <div class="section-label">04 — Notifications & GPS</div>
+  <div class="section-title">Comment ça marche vraiment ?</div>
+  <div class="section-sub">Explication technique claire — SOS, position, notifications push</div>
+  <hr class="divider"/>
+
+  <div style="margin-bottom:24px">
+    <div class="section-label" style="margin-bottom:12px">🔔 Notifications — 3 options</div>
+    <div class="grid3">
+      <div class="verify-card" style="background:#081018;border-color:#103048">
+        <div style="font-size:20px;margin-bottom:8px">🌐</div>
+        <h3 style="font-size:13px;font-weight:700;color:#60A5FA;margin-bottom:6px">Option A — Web Push</h3>
+        <p style="font-size:12px;color:#5A6A80;line-height:1.6">API navigateur native. Gratuit. Fonctionne sur Chrome/Firefox/Android. <strong style="color:#F87171">Ne fonctionne pas sur iOS</strong> sans app dans l'App Store (sauf Safari 16.4+ si ajouté à l'écran d'accueil).</p>
+        <div style="margin-top:10px"><span class="tag free-tag">GRATUIT</span> <span class="tag todo">Faisable en 1 jour</span></div>
+      </div>
+      <div class="verify-card" style="background:#100818;border-color:#301048">
+        <div style="font-size:20px;margin-bottom:8px">📱</div>
+        <h3 style="font-size:13px;font-weight:700;color:#C084FC;margin-bottom:6px">Option B — Expo Push (app native)</h3>
+        <p style="font-size:12px;color:#6A5A80;line-height:1.6">Fonctionne sur iOS ET Android. Notifications natives vraies. Nécessite l'app dans l'App Store. <strong style="color:#C084FC">La vraie solution long terme.</strong></p>
+        <div style="margin-top:10px"><span class="tag free-tag">GRATUIT</span> <span class="tag paid-tag">App Store 99$/an</span></div>
+      </div>
+      <div class="verify-card" style="background:#081018;border-color:#183048">
+        <div style="font-size:20px;margin-bottom:8px">✉️</div>
+        <h3 style="font-size:13px;font-weight:700;color:#38BDF8;margin-bottom:6px">Option C — Email + SMS fallback</h3>
+        <p style="font-size:12px;color:#5A6A80;line-height:1.6">Supabase envoie un email "Tu as reçu un Clutch !" Pas idéal mais fonctionne partout. SMS via Twilio : 0.05 CHF/SMS.</p>
+        <div style="margin-top:10px"><span class="tag free-tag">Email gratuit</span> <span class="tag paid-tag">SMS payant</span></div>
+      </div>
+    </div>
+    <div class="box-yellow" style="margin-top:12px">💡 <strong>Recommandation :</strong> Maintenant → implémenter Web Push (gratuit, 1 jour de travail, marche sur Android). Plus tard avec l'app native → Expo Push pour iOS aussi. Les emails Supabase servent de fallback immédiat (déjà configurés).</div>
+  </div>
+
+  <div>
+    <div class="section-label" style="margin-bottom:12px">📍 GPS & Localisation — 3 usages différents</div>
+    <div class="card">
+      <h3>Usage 1 — Disponibilité (quartier)</h3>
+      <p>Le navigateur demande l'accès GPS → coordonnées → Nominatim (OpenStreetMap) convertit en "Lausanne, Ouchy". On stocke <strong>uniquement le quartier</strong>, pas les coordonnées exactes. Gratuit, sans clé API, respectueux de la vie privée. ✅</p>
+    </div>
+    <div class="card">
+      <h3>Usage 2 — SOS ponctuel (actuel)</h3>
+      <p>GPS → lien Google Maps généré → l'utilisateur <strong>choisit de le partager</strong> manuellement (copier, WhatsApp, partage natif). Ce n'est <strong>pas automatique</strong> — c'est l'utilisateur qui décide. Conforme RGPD. ✅<br/><br/>Pas de SMS envoyé automatiquement (coûterait 0.05 CHF/envoi). On garde le contrôle chez l'utilisateur.</p>
+    </div>
+    <div class="card">
+      <h3>Usage 3 — Suivi temps réel (à faire)</h3>
+      <p>Pendant un RDV actif : l'utilisateur active le partage → position envoyée à Supabase toutes les 30 sec → l'autre personne (ou contact de confiance) reçoit un lien qui se rafraîchit automatiquement. <strong>Expire quand le check-in est fait ou l'utilisateur arrête.</strong><br/><br/>Implémentation : Supabase Realtime + table `location_shares` + page publique `/share/[token]`. <span class="tag todo">~2 jours de travail</span> <span class="tag free-tag">Gratuit</span></p>
+    </div>
+    <div class="box-blue" style="margin-top:8px">🔐 <strong>Important légal GPS :</strong> En Suisse (LPD), collecter une position GPS exacte est une donnée personnelle sensible. Il faut : (1) consentement explicite avant activation, (2) expiration automatique, (3) possibilité de couper à tout moment, (4) mentionner dans la politique de confidentialité. Votre design actuel respecte ces règles.</div>
+  </div>
+</div>
+
+<!-- ─── 5. SÉCURITÉ ────────────────────────────────────────────────────────── -->
+<div class="section" id="securite">
+  <div class="section-label">05 — Sécurité</div>
+  <div class="section-title">Audit de sécurité complet</div>
+  <div class="section-sub">Vulnérabilités, risques, et comment les corriger</div>
+  <hr class="divider"/>
+
+  <div class="box-red" style="margin-bottom:20px">⚠️ <strong>Risque principal :</strong> L'app gère des rencontres physiques entre inconnus. Un profil fake, une fausse photo, ou un comportement prédateur peut causer du tort réel. La sécurité ici n'est pas optionnelle.</div>
+
+  <div class="grid2">
+    <div>
+      <div class="card" style="border-color:#4A1010">
+        <h3>🔴 Failles actuelles — Critiques</h3>
+        <ul style="padding-left:16px;margin-top:8px">
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Pas de vérification que l'email existe (quelqu'un peut s'inscrire avec n'importe quoi)</li>
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Pas de vérification téléphone → impossible de bannir quelqu'un vraiment</li>
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Pas de modération des messages (quelqu'un peut envoyer du contenu inapproprié)</li>
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Pas de signalement d'utilisateur (bouton "Signaler")</li>
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Pas de limitation des clutches envoyés (quelqu'un peut spammer)</li>
+          <li style="color:#F87171;margin-bottom:6px;font-size:13px">Photos non modérées (quelqu'un peut uploader n'importe quoi)</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-color:#104A20">
+        <h3>🟢 Ce qui est bien — Points forts</h3>
+        <ul style="padding-left:16px;margin-top:8px">
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">Auth Supabase sécurisée (JWT, bcrypt passwords)</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">RLS (Row Level Security) activé sur les tables</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">Position exacte jamais stockée (seulement quartier)</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">Limite 8 messages par RDV (anti-harcèlement)</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">SOS avec 117/144 intégré</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">Lieux suggérés = lieux publics sûrs uniquement</li>
+          <li style="color:#4ADE80;margin-bottom:6px;font-size:13px">Gratuité pour les femmes = signal de bienveillance</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="section-label" style="margin-bottom:12px">🛡 Fixes sécurité recommandés</div>
+    <div class="card">
+      <h3>1. Rate limiting sur les clutches envoyés</h3>
+      <p>Maximum 3 clutches envoyés par jour. Simple à implémenter : vérifier dans Supabase combien de clutches ont été envoyés par cet utilisateur dans les dernières 24h avant d'autoriser. <span class="tag todo">2h de travail</span></p>
+    </div>
+    <div class="card">
+      <h3>2. Signalement utilisateur</h3>
+      <p>Bouton "Signaler" sur chaque profil → envoie une ligne dans la table `reports` → admin voit et peut bannir. Simple et essentiel. <span class="tag todo">4h de travail</span></p>
+    </div>
+    <div class="card">
+      <h3>3. Modération photo automatique</h3>
+      <p>À l'upload d'une photo : appel à <strong>OpenAI Moderation API</strong> (gratuit) ou <strong>Google Cloud Vision Safe Search</strong> (1000 req/mois gratuit). Si la photo est NSFW → refusée automatiquement. <span class="tag todo">4h de travail</span></p>
+    </div>
+    <div class="card">
+      <h3>4. Vérification email obligatoire</h3>
+      <p>Supabase propose déjà la confirmation par email. Il suffit d'activer "Email confirmation required" dans les paramètres Supabase Auth. <span class="tag todo">10 minutes</span> — juste activer dans les settings Supabase.</p>
+    </div>
+    <div class="card">
+      <h3>5. Score de fiabilité réel</h3>
+      <p>Actuellement c'est une valeur fixe de 100%. Il faudrait le calculer : (clutches acceptés / clutches reçus) × fiabilité passée. Quelqu'un qui fait un "rabbit" (ne se présente pas) voit son score baisser et devient moins visible. <span class="tag todo">1 jour de travail</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 6. LÉGAL ───────────────────────────────────────────────────────────── -->
+<div class="section" id="legal">
+  <div class="section-label">06 — Légal</div>
+  <div class="section-title">Conformité suisse — Ce qui est obligatoire</div>
+  <div class="section-sub">LPD (Loi sur la Protection des Données suisse, en vigueur depuis sept. 2023) + RGPD si utilisateurs EU</div>
+  <hr class="divider"/>
+
+  <div class="box-red">🚨 <strong>Risque légal actuel :</strong> Sans CGU ni politique de confidentialité, vous êtes techniquement en infraction avec la LPD suisse (entrée en vigueur sept. 2023). En cas de plainte d'un utilisateur, l'amende peut aller jusqu'à 250 000 CHF. Le risque est faible en bêta avec des amis, mais il faut régler ça avant tout lancement public.</div>
+
+  <div class="grid2">
+    <div class="card" style="border-color:#4A1010">
+      <h3>🔴 Obligations immédiates</h3>
+      <ul style="padding-left:16px;margin-top:8px">
+        <li style="color:#F87171;font-size:13px;margin-bottom:6px">Politique de confidentialité accessible depuis l'app</li>
+        <li style="color:#F87171;font-size:13px;margin-bottom:6px">CGU acceptées à l'inscription (case à cocher)</li>
+        <li style="color:#F87171;font-size:13px;margin-bottom:6px">Mentions légales (nom de la société ou de la personne responsable)</li>
+        <li style="color:#F87171;font-size:13px;margin-bottom:6px">Indiquer que les données sont stockées en Europe (Supabase = Frankfurt)</li>
+        <li style="color:#F87171;font-size:13px;margin-bottom:6px">Droit à l'effacement : l'utilisateur doit pouvoir supprimer son compte et toutes ses données</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📋 Contenu minimum CGU</h3>
+      <ul style="padding-left:16px;margin-top:8px">
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Qui collecte les données (toi, David Saugy / Clutch)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Quelles données (email, prénom, photo, GPS quartier, messages)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Pourquoi (fonctionnement de l'app)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Où stockées (Supabase, serveurs Frankfurt, EU)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Durée de conservation (ex: 2 ans après dernière connexion)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Comment exercer ses droits (email de contact)</li>
+        <li style="color:#9A8A80;font-size:13px;margin-bottom:6px">Règles de comportement (pas de contenu illégal, pas de harcèlement)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="box-yellow" style="margin-top:12px">💡 <strong>Solution rapide :</strong> Je peux générer un texte CGU et politique de confidentialité adapté à la LPD suisse et pré-rempli avec vos informations. À ajouter sur une page /legal de l'app. Estimé : <strong>2h de travail</strong>.</div>
+</div>
+
+<!-- ─── 7. DESIGN & UX ────────────────────────────────────────────────────── -->
+<div class="section" id="design">
+  <div class="section-label">07 — Design & UX</div>
+  <div class="section-title">Audit graphique et ergonomique</div>
+  <div class="section-sub">Ce qui est bien, ce qui peut mieux, et des idées concrètes</div>
+  <hr class="divider"/>
+
+  <div class="grid2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>✅ Points forts design</h3>
+      <ul style="padding-left:16px;margin-top:8px">
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Identité visuelle cohérente (rose primaire + beige)</li>
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Frame "téléphone" sur desktop = effet app immédiat</li>
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Typographie clean, hiérarchie lisible</li>
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Plein écran sur mobile (100dvh)</li>
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Animations légères (toggle dispo)</li>
+        <li style="color:#4ADE80;font-size:13px;margin-bottom:5px">Score fiabilité visible (facteur de confiance)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>⚠️ Problèmes UX identifiés</h3>
+      <ul style="padding-left:16px;margin-top:8px">
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Liste profils trop sobre — pas assez "vie" dedans</li>
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Sélecteur "jusqu'à" : dropdown mal ergonomique sur mobile</li>
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Pas de micro-animations sur les transitions d'écran</li>
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Onboarding : la photo est optionnelle = beaucoup de profils sans photo</li>
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Démo : on ne comprend pas immédiatement les scénarios disponibles</li>
+        <li style="color:#FBB040;font-size:13px;margin-bottom:5px">Pas de splash screen d'attente pendant le chargement des profils</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-bottom:12px">🎨 Améliorations design concrètes</div>
+  <div class="card">
+    <h3>Liste profils — style magazine / card horizontal</h3>
+    <p>Inspiré d'idealvoyance.fr : grande photo à gauche (56px), nom + âge + badge en gras, quartier + disponibilité en sous-titre, pastilles de passions. Ajouter un indicateur "disponible maintenant" (point vert pulsant). Effet "vie" = voir que ce sont de vraies personnes disponibles maintenant.</p>
+  </div>
+  <div class="card">
+    <h3>Sélecteur horaire — roue de défilement (drum roll)</h3>
+    <p>Remplacer le `<select>` HTML par un composant type "roue iOS" (drum picker). Il existe des librairies légères pour ça. Beaucoup plus ergonomique sur mobile. Montrer les créneaux : 30 min, 1h, 1h30, 2h, 3h, 4h... jusqu'à 18h max.</p>
+  </div>
+  <div class="card">
+    <h3>Transitions entre écrans</h3>
+    <p>Ajouter des transitions de slide (écran entrant depuis la droite, sortant vers la gauche). CSS animation `transform: translateX`. Rend l'app beaucoup plus vivante. 2h de travail, impact énorme sur la perception qualité.</p>
+  </div>
+  <div class="card">
+    <h3>Empty states — "personne n'est dispo"</h3>
+    <p>Quand 0 profils disponibles → ne pas juste dire "vide". Montrer : "Sois le premier à activer ta dispo ! Les profils apparaissent ici dès que quelqu'un est disponible." + CTA pour activer. Transformer la frustration en action.</p>
+  </div>
+</div>
+
+<!-- ─── 8. PROFILS CERTIFIÉS ──────────────────────────────────────────────── -->
+<div class="section" id="verification">
+  <div class="section-label">08 — Profils certifiés</div>
+  <div class="section-title">Comment vérifier et certifier les utilisateurs</div>
+  <div class="section-sub">Options du plus simple au plus fiable — avec prix et mise en oeuvre</div>
+  <hr class="divider"/>
+
+  <div class="box-blue" style="margin-bottom:20px">💡 <strong>Pourquoi c'est crucial :</strong> Dans une app de rencontres physiques, un profil fake peut mener à une situation dangereuse. La certification est à la fois un outil de sécurité ET un outil marketing ("badge certifié = profil sérieux = plus de clutches reçus").</div>
+
+  <div class="card" style="border-color:#103048;margin-bottom:12px">
+    <h3>🥇 Option A — Selfie de vérification (recommandé) <span class="tag free-tag">GRATUIT</span> <span class="tag done">Faisable en 2 jours</span></h3>
+    <p style="margin-top:8px">L'utilisateur prend un selfie en tenant un code unique affiché à l'écran. L'admin compare le selfie avec la photo de profil. Si OK → badge "✓ Vérifié" sur le profil.<br/><br/>
+    <strong style="color:#60A5FA">Avantages :</strong> Gratuit, simple, visuel. Humain en boucle.<br/>
+    <strong style="color:#F87171">Inconvénients :</strong> Requiert une vérification manuelle par l'admin (David ou Mel). À l'échelle, ça devient du travail.<br/><br/>
+    <strong style="color:#F0EDE8">Comment motiver :</strong> Les profils certifiés apparaissent en premier dans la liste. Leur photo a un cadre doré ✓. Ils reçoivent 2× plus de clutches. Message : "Sois certifié pour booster ton profil."</p>
+  </div>
+
+  <div class="card" style="border-color:#301048;margin-bottom:12px">
+    <h3>🥈 Option B — Vérification téléphone (SMS) <span class="tag paid-tag">~0.05 CHF/SMS</span> <span class="tag todo">3 jours de travail</span></h3>
+    <p style="margin-top:8px">À l'inscription ou dans les paramètres, l'utilisateur entre son numéro → reçoit un SMS avec code → le saisit → badge "📱 Téléphone vérifié".<br/><br/>
+    <strong style="color:#C084FC">Avantages :</strong> Automatique, scalable, prouve que la personne a un vrai téléphone suisse.<br/>
+    <strong style="color:#F87171">Inconvénients :</strong> Coût (0.05 CHF/utilisateur). Quelqu'un peut quand même avoir plusieurs numéros.<br/><br/>
+    <strong style="color:#F0EDE8">Via :</strong> Supabase Phone Auth (intégré) + Twilio. Twilio donne 10$ de crédit gratuit au départ = 200 SMS offerts.</p>
+  </div>
+
+  <div class="card" style="border-color:#183048;margin-bottom:12px">
+    <h3>🥉 Option C — Vérification pièce d'identité (IA) <span class="tag paid-tag">0.50-2 CHF/vérification</span> <span class="tag later">Quand vous avez du budget</span></h3>
+    <p style="margin-top:8px">L'utilisateur photographie sa carte d'identité/passeport → service IA vérifie l'authenticité → extrait prénom/âge/pays → badge "🪪 Identité vérifiée".<br/><br/>
+    <strong style="color:#60A5FA">Services :</strong> Onfido (0.50-2$/vérif), Stripe Identity (1.50$/vérif), Veriff (1-3$/vérif).<br/>
+    <strong style="color:#4ADE80">Avantages :</strong> Le niveau le plus élevé de confiance. Utilisé par Airbnb, Uber, etc.<br/>
+    <strong style="color:#F87171">Inconvénients :</strong> Coûteux. Requiert de stocker (temporairement) des documents d'identité → contraintes légales très fortes (RGPD, LPD). À faire uniquement avec un avocat.</p>
+  </div>
+
+  <div class="card" style="border-color:#1A2A0A;margin-bottom:12px">
+    <h3>✨ Option D — Certification via LinkedIn <span class="tag free-tag">GRATUIT</span> <span class="tag todo">2 jours de travail</span></h3>
+    <p style="margin-top:8px">"Se connecter avec LinkedIn" → on vérifie que le compte LinkedIn est réel (photo, emploi, connexions). Badge "💼 Profil LinkedIn vérifié". Idéal pour les profils Pro.<br/><br/>
+    <strong style="color:#4ADE80">Avantages :</strong> Gratuit, API OAuth LinkedIn, prouve une vraie identité professionnelle.<br/>
+    <strong style="color:#FBB040">Adapté pour :</strong> Les modes "professionnel" ou "networking" de Clutch.</p>
+  </div>
+
+  <div class="box-green" style="margin-top:4px">✅ <strong>Recommandation :</strong> Commencer par l'Option A (selfie manuel, gratuit) combinée avec l'Option B (SMS 0.05 CHF). Les deux ensemble = badge "✓ Certifié" qui apparaît sur le profil. L'Option C (ID) peut venir quand vous avez 1000+ utilisateurs et un avocat.</div>
+
+  <div style="margin-top:16px">
+    <div class="section-label" style="margin-bottom:12px">🎁 Comment motiver les utilisateurs à se certifier</div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Avantages visibles</h3>
+        <ul style="padding-left:16px;margin-top:8px">
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Profil mis en avant dans la liste (badge doré)</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Accès prioritaire aux clutches reçus</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Badge visible sur la fiche profil</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Plus de visibilité dans les événements</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Pour les femmes : badge "Femme certifiée" = sécurité pour les hommes aussi</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Messages incitatifs</h3>
+        <ul style="padding-left:16px;margin-top:8px">
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">"Les profils certifiés reçoivent 3× plus de clutches"</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">"1 photo + 30 secondes = profil de confiance"</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Notification 24h après inscription : "Complete ton profil"</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Progress bar "Profil X% complet" visible sur son propre profil</li>
+          <li style="color:#9A8A80;font-size:13px;margin-bottom:5px">Gamification : "Niveau 1 : Inscrit → Niveau 2 : Vérifié → Niveau 3 : Clutcheur actif"</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 9. IDÉES NON EXPLORÉES ────────────────────────────────────────────── -->
+<div class="section" id="idees">
+  <div class="section-label">09 — Idées & Innovation</div>
+  <div class="section-title">Ce à quoi on n'a pas pensé</div>
+  <div class="section-sub">Fonctionnalités qui pourraient transformer Clutch en quelque chose d'unique</div>
+  <hr class="divider"/>
+
+  <div class="idea">
+    <h3>💥 Idea 1 — "Clutch Collectif" : 3 à 5 personnes dispo en même temps</h3>
+    <p>Quand 3+ personnes activent leur dispo dans le même quartier dans la même fenêtre → notification "Il y a 4 personnes dispo dans ton quartier ce soir. Créer un groupe ?" → RDV de groupe spontané dans un bar. Complètement différent de ce qui existe. Moins de pression sociale qu'un 1:1.</p>
+    <div class="meta"><span class="tag todo">Complexe à développer</span> <span class="tag free-tag">0 coût</span> <span class="tag later">V2</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🎰 Idea 2 — "Clutch Surprise" : lieu révélé au dernier moment</h3>
+    <p>L'app choisit le lieu à leur place → révélé 30 minutes avant le RDV. Deux personnes qui n'ont jamais choisi → moins de tergiversations, plus d'aventure. Le lieu est toujours un lieu partenaire sûr. Potentiel de partenariat avec des cafés qui "sponsorisent" des Clutch Surprise.</p>
+    <div class="meta"><span class="tag todo">2-3 jours de travail</span> <span class="tag free-tag">Gratuit</span> <span class="tag paid-tag">Source de revenus partenariats</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🧲 Idea 3 — "Radar" : voir qui est dans ton café en ce moment</h3>
+    <p>Quand tu es dans un café et que tu actives ta dispo → les autres personnes dans le même rayon de 200m voient "Quelqu'un est au Café du Grütli". Comme Happn mais en temps réel et uniquement si les deux ont activé leur dispo. Sentiment d'instantanéité absolue.</p>
+    <div class="meta"><span class="tag todo">1 semaine de travail</span> <span class="tag free-tag">Gratuit (Nominatim)</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🎯 Idea 4 — Score de compatibilité visible et détaillé</h3>
+    <p>Actuellement c'est "fiabilité 100%". On pourrait calculer un vrai score : passions communes (30%), fenêtre horaire qui overlap (20%), quartier proche (20%), historique (20%), genre préféré (10%). Afficher "87% compatible" avec explication "vous aimez tous les deux la rando et êtes disponibles ce soir". Ça donne une raison d'envoyer un clutch.</p>
+    <div class="meta"><span class="tag todo">1 journée de travail</span> <span class="tag free-tag">Gratuit</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🏆 Idea 5 — Tableau de bord "Clutcheur de la semaine"</h3>
+    <p>Chaque semaine, les 3 utilisateurs avec le meilleur score de fiabilité (qui se présentent vraiment) sont mis en avant. Gamification positive. Pas de "like" mais de la réputation réelle basée sur des actes réels.</p>
+    <div class="meta"><span class="tag todo">1 journée de travail</span> <span class="tag free-tag">Gratuit</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>☕ Idea 6 — Programme partenaires cafés Lausanne</h3>
+    <p>Partenariat avec 5-10 cafés lausannois : si un Clutch est confirmé dans leur café, ils reçoivent une notification "Un Clutch arrive dans 30 minutes". En échange, ils offrent un rabais de 10% aux Clutchers. Revenue sharing ou abonnement café partenaire (50 CHF/mois). C'est votre première source de revenue sans Premium.</p>
+    <div class="meta"><span class="tag done">Business model immédiat</span> <span class="tag paid-tag">50-200 CHF/mois par café</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🔮 Idea 7 — Mode "Incognito" avant le match</h3>
+    <p>La photo de profil est floutée jusqu'à ce que les deux personnes se soient mutuellement "aimées". Comme Hinge blur. Ça crée du suspense, protège la vie privée, et réduit le jugement sur l'apparence. Mais ça risque de casser le concept "spontané"... Tension à étudier.</p>
+    <div class="meta"><span class="tag todo">2 jours de travail</span> <span class="tag free-tag">Gratuit</span><span class="tag later">Débat à avoir</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>🎓 Idea 8 — Clutch Étudiants / Uni Lausanne</h3>
+    <p>Partenariat avec l'UNIL ou l'EPFL. Accès spécial pour les étudiants avec email @unil.ch ou @epfl.ch. Badge "Étudiant UNIL". Communauté dans une communauté. Peut servir de "traction" initiale pour atteindre la masse critique.</p>
+    <div class="meta"><span class="tag done">Stratégie go-to-market</span> <span class="tag free-tag">0 coût</span></div>
+  </div>
+
+  <div class="idea">
+    <h3>💼 Idea 9 — Clutch Business : RDV pro 20 minutes</h3>
+    <p>Mode "Professionnel" : tu indiques que tu es disponible pour un café business de 20 minutes. L'autre voit ton LinkedIn, ton domaine, et peut proposer un RDV pro. Différent du dating — réseau professionnel impromptu. LinkedIn n'a pas ça. Potentiel énorme dans une ville comme Lausanne (startups, finance, pharma).</p>
+    <div class="meta"><span class="tag todo">2-3 jours de travail</span> <span class="tag paid-tag">Peut être Premium 9.90/mois séparé</span></div>
+  </div>
+</div>
+
+<!-- ─── 10. APP NATIVE ─────────────────────────────────────────────────────── -->
+<div class="section" id="app-native">
+  <div class="section-label">10 — App native iOS & Android</div>
+  <div class="section-title">Comment, combien, combien de temps ?</div>
+  <div class="section-sub">Le chemin de l'app web vers l'App Store — réalité et options</div>
+  <hr class="divider"/>
+
+  <div class="box-blue" style="margin-bottom:20px">📱 <strong>Bonne nouvelle :</strong> Vous utilisez déjà React + TypeScript. La migration vers React Native (Expo) réutilise 40-60% du code — toute la logique Supabase, les types, les fonctions utilitaires. Ce n'est pas repartir de zéro.</div>
+
+  <div style="margin-bottom:24px">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>Installer Expo CLI et créer le projet</h4>
+        <p>Commande : <code style="background:#1A1A1C;padding:2px 6px;border-radius:4px;font-size:12px">npx create-expo-app clutch-native --template blank-typescript</code><br/>
+        Expo gère iOS et Android depuis un seul projet. Pas besoin de Mac pour Android. Pour iOS : besoin d'un Mac pour compiler. <strong>Estimé : 1h</strong></p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Réutiliser la logique Supabase</h4>
+        <p>Le fichier `lib/supabase.ts` est identique. Les appels API, les types, les subscriptions Realtime — tout se copie-colle. <strong>Estimé : 1 jour</strong></p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>Réécrire les composants en React Native</h4>
+        <p>`div` → `View`, `p` → `Text`, `img` → `Image`, `button` → `TouchableOpacity`. La logique reste. Le style change (StyleSheet de React Native). Les formulaires, les listes, la navigation — à réécrire. C'est le gros du travail. <strong>Estimé : 2-4 semaines selon le rythme</strong></p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>Ajouter les fonctions natives</h4>
+        <p>GPS avec `expo-location`, notifications push avec `expo-notifications`, appareil photo avec `expo-camera`, stockage local avec `expo-secure-store`. Ces librairies sont maintenues par Expo et fonctionnent sans configuration native complexe. <strong>Estimé : 3-5 jours</strong></p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h4>Compiler et soumettre aux stores</h4>
+        <p>Expo EAS Build compile le projet sur leurs serveurs (30 builds/mois gratuits). Soumission à l'App Store = review Apple 1-7 jours. Play Store = review 1-3 jours. Il faut un compte Apple Developer (99$/an) et Google Play (25$ une fois). <strong>Estimé : 2-3 jours de configuration + attente review</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <table style="border-radius:12px;overflow:hidden;border:1px solid #222;margin-bottom:20px">
+    <thead><tr><th>Scénario</th><th>Qui code</th><th>Temps estimé</th><th>Coût</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Claude + toi (comme maintenant)</strong></td>
+        <td>Claude génère, tu copie-colle et teste</td>
+        <td><span style="color:#4ADE80">4-8 semaines</span></td>
+        <td>Abonnement Claude ~20$/mois · App Store 99$/an</td>
+      </tr>
+      <tr>
+        <td><strong>Freelance React Native</strong></td>
+        <td>Développeur senior externe</td>
+        <td>3-6 semaines</td>
+        <td><span style="color:#FBB040">5 000 - 15 000 CHF</span></td>
+      </tr>
+      <tr>
+        <td><strong>Agence (clé en main)</strong></td>
+        <td>Agence avec design + dev + tests</td>
+        <td>2-4 mois</td>
+        <td><span style="color:#F87171">20 000 - 60 000 CHF</span></td>
+      </tr>
+      <tr>
+        <td><strong>Associé technique</strong></td>
+        <td>Co-fondateur dev</td>
+        <td>6-12 semaines</td>
+        <td>Parts de la société (equity)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="box-green">✅ <strong>Recommandation :</strong> Continuez avec Claude jusqu'à avoir un produit web sans bug et avec 50+ bêta-testeurs satisfaits. Ensuite seulement, investissez dans l'app native (ou cherchez un co-fondateur technique). Le site web fonctionne déjà sur mobile comme une app — pour valider le concept, il est suffisant.</div>
+
+  <div class="box-yellow" style="margin-top:8px">⚠️ <strong>Piège à éviter :</strong> Ne commencez pas l'app native avant d'avoir validé que les gens aiment le produit. Trop de startups ont investi 30 000 CHF dans une app native pour un concept que personne n'utilisait. La web app est votre outil de validation — gratuit et rapide.</div>
+</div>
+
+<!-- ─── 11. ROADMAP ────────────────────────────────────────────────────────── -->
+<div class="section" id="roadmap">
+  <div class="section-label">11 — Roadmap</div>
+  <div class="section-title">Plan d'action priorisé</div>
+  <div class="section-sub">Par ordre de priorité et d'impact — avec estimations honnêtes</div>
+  <hr class="divider"/>
+
+  <div style="margin-bottom:20px">
+    <div class="section-label" style="margin-bottom:12px;color:#F87171">🔴 Cette semaine — Bloquant</div>
+    <table style="border-radius:12px;overflow:hidden;border:1px solid #222">
+      <thead><tr><th>Tâche</th><th>Effort</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Mot de passe oublié</strong> — page /reset-password + email Supabase</td><td>4h</td><td>🔴 Bloquant pour les utilisateurs</td></tr>
+        <tr><td><strong>CGU + Privacy policy</strong> — texte légal + page /legal + case à cocher inscription</td><td>4h</td><td>🔴 Risque légal LPD</td></tr>
+        <tr><td><strong>Passer David en admin</strong> — SQL dans Supabase</td><td>5 min</td><td>🔴 Accès admin requis</td></tr>
+        <tr><td><strong>Confirmation email obligatoire</strong> — activer dans Supabase settings</td><td>10 min</td><td>🟡 Sécurité</td></tr>
+        <tr><td><strong>Signalement utilisateur</strong> — bouton "Signaler" + table reports</td><td>3h</td><td>🔴 Sécurité</td></tr>
+        <tr><td><strong>Bugfix démo : retour après scénario</strong></td><td>1h</td><td>🟡 UX</td></tr>
+        <tr><td><strong>Ergonomie sélecteur "jusqu'à"</strong> — améliorer le picker horaire</td><td>2h</td><td>🟡 UX mobile</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-bottom:20px">
+    <div class="section-label" style="margin-bottom:12px;color:#FBB040">🟡 Semaine 2 — Important</div>
+    <table style="border-radius:12px;overflow:hidden;border:1px solid #222">
+      <thead><tr><th>Tâche</th><th>Effort</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Profils certifiés (selfie)</strong> — flow + admin review + badge</td><td>1 jour</td><td>🔴 Confiance utilisateurs</td></tr>
+        <tr><td><strong>Vérification téléphone (SMS)</strong> — Supabase + Twilio</td><td>1 jour</td><td>🟡 Sécurité</td></tr>
+        <tr><td><strong>Web Push notifications</strong> — nouveau Clutch reçu</td><td>1 jour</td><td>🔴 Rétention</td></tr>
+        <tr><td><strong>Redesign liste profils</strong> — style magazine / card horizontal</td><td>4h</td><td>🟡 Conversion</td></tr>
+        <tr><td><strong>Score de compatibilité réel</strong> — calcul passions + dispo + quartier</td><td>4h</td><td>🟡 Engagement</td></tr>
+        <tr><td><strong>Feedback après RDV</strong> — Super / Rabbit / Ghost</td><td>4h</td><td>🟡 Fiabilité</td></tr>
+        <tr><td><strong>Modération automatique messages</strong> — liste mots bannis</td><td>2h</td><td>🟡 Sécurité</td></tr>
+        <tr><td><strong>Rate limiting clutches</strong> — max 3/jour</td><td>2h</td><td>🟡 Anti-spam</td></tr>
+        <tr><td><strong>Domaine clutch.ch</strong> — Infomaniak + DNS GitHub Pages</td><td>2h</td><td>🟡 Professionnalisme</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <div class="section-label" style="margin-bottom:12px;color:#818CF8">🟣 Mois 2-3 — Croissance</div>
+    <table style="border-radius:12px;overflow:hidden;border:1px solid #222">
+      <thead><tr><th>Tâche</th><th>Effort</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Partage position temps réel</strong> — GPS live pendant RDV</td><td>2 jours</td><td>🟡 Sécurité</td></tr>
+        <tr><td><strong>Profils Pro / RDV business</strong></td><td>3 jours</td><td>🟣 Revenue</td></tr>
+        <tr><td><strong>Programme cafés partenaires</strong></td><td>2 jours + commercial</td><td>🟣 Revenue</td></tr>
+        <tr><td><strong>Clutch Collectif (groupe 3-5)</strong></td><td>1 semaine</td><td>🟡 Différenciation</td></tr>
+        <tr><td><strong>Premium (19.90 CHF/mois) — Stripe</strong></td><td>3 jours</td><td>🔴 Revenue</td></tr>
+        <tr><td><strong>App native React Native / Expo</strong></td><td>4-8 semaines</td><td>🔴 Scale</td></tr>
+        <tr><td><strong>Transitions d'écrans animées</strong></td><td>1 jour</td><td>🟡 Qualité perçue</td></tr>
+        <tr><td><strong>Clutch Surprise (lieu révélé)</strong></td><td>2 jours</td><td>🟡 Différenciation</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:32px 0;border-top:1px solid #1A1A1C;margin-top:20px;color:#3A3A3A;font-size:11px">
+  <p style="color:#5A5A5A">Clutch · Audit stratégique · Confidentiel · Juin 2026</p>
+  <p style="margin-top:4px">pz7cgj4kfv-tech.github.io · david.saugy@gmail.com</p>
+  <button onclick="window.print()" style="margin-top:16px;padding:8px 20px;border-radius:20px;border:1px solid #333;background:none;color:#666;font-size:12px;cursor:pointer;font-family:inherit">🖨 Imprimer en PDF</button>
+</div>
+
+</div>
+</body>
+</html>

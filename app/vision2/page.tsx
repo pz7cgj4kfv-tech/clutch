@@ -139,6 +139,16 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
     </>)
   },
   {
+    id: 'ia-temps-reel', icon: '🤖', title: 'Intégrer l\'IA en temps réel une fois l\'app lancée', tag: 'À FAIRE',
+    body: () => (<>
+      <P>Ta question, que je n'avais pas vraiment traitée : <B>une fois l'app lancée, comment l'intelligence s'ajuste en temps réel ?</B> Voici ma réponse, en 3 couches, de la plus sûre à la plus avancée — on ne saute jamais une marche.</P>
+      <P><B>Couche 1 — le thermostat (déterministe, pas une IA).</B> Un programme dans la base règle la densité par zone en temps réel. Automatique, borné, prévisible. C'est la fondation, et ça tourne dès le lancement.</P>
+      <P><B>Couche 2 — le tuning supervisé (semi-automatique).</B> L'app <B>logge tout</B> (clutch → réponse → présence → lapin → feedback). Un job régulier calcule des statistiques par zone et par heure et <B>propose</B> des ajustements de poids ; toi et moi on valide. Ici l'IA = <B>analyse + recommandation</B>, jamais décision. C'est ta règle : « l'IA explique et oriente, l'humain décide ».</P>
+      <P><B>Couche 3 — l'apprentissage en ligne (avancé, plus tard, prudent).</B> Quand il y aura assez de données, on peut laisser un modèle ajuster <B>certains</B> poids tout seul — MAIS toujours entre des <B>bornes</B> (garde-fous) et avec un <B>kill switch</B> qui retombe sur le déterministe si ça dérape. Jamais une boîte noire qui décide seule sans filet.</P>
+      <P><B>Où ça tourne (vu qu'on n'a pas de serveur à nous) :</B> dans des <B>Edge Functions Supabase</B> déclenchées par un cron (elles lisent les logs, écrivent des paramètres en base), et plus tard un petit service externe si on grossit. <B>Jamais d'IA dans le navigateur du user</B> : le client lit seulement des paramètres en base. Avec logs + sauvegardes + kill switch. → à mettre dans les chantiers (axe 3 du plan, couche « après lancement »).</P>
+    </>)
+  },
+  {
     id: 'principe', icon: '📐', title: 'Le principe : on ne compresse JAMAIS tes idées', tag: 'RÈGLE',
     body: () => (<>
       <P>Cette page existe parce que je compressais tes explications de dix minutes en une carte de deux lignes, et qu'on y perdait toute la richesse. Plus jamais.</P>
@@ -175,7 +185,7 @@ export default function Vision2() {
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 18px 80px' }}>
         {/* Barre de liens vers les autres pages internes */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
-          {[['/vision2', '📖 Vision 2', true], ['/vision', '🗺 Vision (carte)', false], ['/sim', '🧪 Simulateur', false], ['/animation', '✨ Animations', false], ['/hq', '🔒 QG', false]].map(([href, label, here]: any) => (
+          {[['/vision2', '📖 Vision 2', true], ['/vision', '🗺 Vision (carte)', false], ['/eventsmap', '🗺️ Carte events', false], ['/sim', '🧪 Simulateur', false], ['/animation', '✨ Animations', false], ['/hq', '🔒 QG', false]].map(([href, label, here]: any) => (
             <a key={href} href={href} style={{ fontSize: 11.5, fontWeight: here ? 800 : 600, textDecoration: 'none', color: here ? '#fff' : C.mid, background: here ? C.gold : C.card, border: `1px solid ${here ? C.gold : C.border}`, borderRadius: 9, padding: '5px 11px', whiteSpace: 'nowrap' }}>{label}{here ? ' · ici' : ''}</a>
           ))}
         </div>

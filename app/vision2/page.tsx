@@ -66,6 +66,7 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
       <P>Ton raffinement : <B>une personne pleine (non-clutchable) ne devrait plus être visible par les utilisateurs gratuits — seulement par ceux qui paient.</B> La logique : un gratuit ne peut de toute façon pas l'inviter, donc autant lui éviter la frustration du « complète » ; et ça donne une vraie raison de payer (la voir, et poser une alerte « place libérée »).</P>
       <Quote>« Les personnes qui sont pleines, à mon avis, elles ne doivent plus être visibles par les gens normaux. Elles sont visibles que par les gens qui paient. Ça paraît logique. »</Quote>
       <Fix><B>Mon challenge (à trancher avec Mel).</B> Attention à notre ligne éthique : « ne jamais vendre la visibilité, ne pas traiter les femmes comme le produit ». Comme les gens « pleins » seront surtout des femmes très demandées, « le premium voit les pleines » peut se lire comme <B>« payer pour voir plus de femmes »</B>. La nuance qui peut sauver : le gratuit voit déjà <B>toutes les personnes disponibles</B> ; le premium ne gagne que l'accès aux personnes <B>occupées</B> (+ l'alerte de réactivité), jamais un avantage de mérite. À valider ensemble : est-ce que ça reste du confort, ou est-ce que ça franchit la ligne ? C'est une décision produit toi + Mel, pas un automatisme.</Fix>
+      <Fix><B>Ma recommandation (position nette).</B> Je serais CONTRE « les premium voient les pleines » — ça sent trop le « payer pour voir des femmes ». Mieux, même bénéfice sans la ligne franchie : les pleines disparaissent de la liste clutchable <B>pour tout le monde</B> (gratuit ET premium), et le vrai perk premium, c'est l'<B>alerte</B> : tu mets quelqu'un en favori, et si cette personne est pleine/occupée, tu reçois une notif quand une place se libère. Tu poses l'alerte sur quelqu'un que tu as <B>déjà vu / mis en favori</B>, pas sur « les femmes occupées » en général. On vend de la réactivité, jamais de la visibilité.</Fix>
     </>)
   },
   {
@@ -106,6 +107,15 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
       <P>Tes mots : <B>le mode surprise, je veux que ce soit des activités hors du commun.</B> Quelqu'un crée un événement — un saut en parachute, un vol en parapente. Pour lui, c'est un événement lambda. Mais <B>l'IA va déterminer que c'est un événement exceptionnel</B>, et le proposer en avant à des gens qui auront payé pour voir les trucs exceptionnels.</P>
       <Quote>« On va appeler ça surprise, ou mégaclutch, ou je ne sais pas, il faut trouver un nom. »</Quote>
       <P>Techniquement : un classifieur qui repère le rare/extraordinaire + une mise en avant premium. Vrai facteur de désir et de différenciation. Le nom est à trouver.</P>
+    </>)
+  },
+  {
+    id: 'carte-events', icon: '🗺️', title: 'Une carte interactive des événements', tag: 'NOUVEAU',
+    body: () => (<>
+      <P>Ton idée : <B>une vraie carte qu'on manipule. On clique dessus, on voit les événements, on peut dézoomer, se déplacer dessus virtuellement</B> — puis se placer à un endroit pour voir/s'inscrire aux events de ce coin.</P>
+      <Quote>« J'aimerais avoir une carte interactive. On clique sur une carte, on voit les événements, on peut dézoomer, se déplacer dessus virtuellement. Pour ensuite se placer à un endroit… il faudrait se placer là-bas pour s'inscrire, puis ça reset le côté présence. »</Quote>
+      <P><B>Faisable :</B> oui. L'app utilise déjà Leaflet (carte des présences, /scenario). Une carte d'events (épingles cliquables, zoom, déplacement, fiche au clic) est tout à fait à portée.</P>
+      <Fix><B>Mon challenge sur « se placer là-bas → ça reset la présence ».</B> Attention à coupler deux choses qui peuvent se contredire. Ta « présence » obéit déjà à une logique stricte (zone de dispo + fenêtre 18h + le gate). Si s'inscrire à un event te <B>téléporte</B> ta présence ailleurs et la reset, ça peut surprendre l'utilisateur et entrer en conflit avec sa dispo en cours. Trois options à choisir : (a) s'inscrire à un event = ça remplace ta présence par « je suis à cet event à telle heure » (cohérent mais à rendre très clair) ; (b) l'event et la présence restent <B>séparés</B> (tu peux être dispo ET inscrit à un event, deux choses distinctes) ; (c) un entre-deux : l'event crée une présence « verrouillée » sur ce lieu/heure sans toucher le reste. Mon instinct : <B>(b) au début</B> (plus simple, moins de surprises), et (a) seulement si les tests montrent que les gens le veulent. Décision à prendre avant de coder.</Fix>
     </>)
   },
   {

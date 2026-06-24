@@ -173,6 +173,11 @@ export default function ClutchLive() {
           </div>
         </div>
 
+        {/* Mode d'emploi */}
+        <div style={{ background: night ? 'rgba(255,255,255,.05)' : '#fff', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: panelDim, lineHeight: 1.65 }}>
+          <b style={{ color: panelInk }}>Comment ça marche : </b>tu te balades dans la ville et <b style={{ color: C.pink }}>les opportunités s'allument autour de toi</b> — événements (épingles) et gens (en <b>densité floue</b>, jamais leur position exacte). Appuie sur <b style={{ color: panelInk }}>« Je me balade »</b> : ton point bouge comme ton vrai GPS et les distances (🚶/🚗) se recalculent. Le but : voir, en un coup d'œil, ce qu'il peut se passer <b>maintenant</b>, près de toi.
+        </div>
+
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
           {/* Carte */}
           <div style={{ flex: '2 1 520px', minWidth: 300, position: 'relative', borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.border}`, boxShadow: '0 6px 24px rgba(42,16,32,.12)' }}>

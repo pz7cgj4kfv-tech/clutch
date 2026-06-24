@@ -4,7 +4,7 @@
 // les lieux qui bougent CE SOIR s'allument et pulsent. Fait pour donner envie de
 // sortir. Gens en densité floue (jamais leur position). Page isolée, démo.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 const C = {
   ink: '#ECE6F5', dim: 'rgba(236,230,245,.55)', gold: '#FFBF9E',
@@ -35,9 +35,13 @@ const CROWDS = [{ lat: 46.5210, lng: 6.6300, n: 14 }, { lat: 46.5205, lng: 6.628
 export default function ClutchNight() {
   const divRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
+  const userRef = useRef<any>(null)
+  const headingRef = useRef(Math.PI / 3)
   const [ready, setReady] = useState(false)
   const [sel, setSel] = useState<Ev | null>(null)
-  const pos: [number, number] = [46.5200, 6.6310]
+  const [pos, setPos] = useState<[number, number]>([46.5200, 6.6310])
+  const [walking, setWalking] = useState(false)
+  const [liveCount, setLiveCount] = useState(29)
   const [stars] = useState(() => Array.from({ length: 90 }, (_, i) => ({ x: (i * 41 % 100), y: (i * 27 % 100), s: (i % 3) + 1, d: (i % 6) * 0.5 })))
 
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function ClutchNight() {
       map = L.map(divRef.current, { center: pos, zoom: 15, zoomControl: true })
       mapRef.current = map
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map)
-      L.marker(pos, { icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13], html: `<div class="cn-me"><span class="cn-mering"></span><span class="cn-medot"></span></div>` }), zIndexOffset: 1000 }).addTo(map)
+      userRef.current = L.marker(pos, { icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13], html: `<div class="cn-me"><span class="cn-mering"></span><span class="cn-medot"></span></div>` }), zIndexOffset: 1000 }).addTo(map)
       CROWDS.forEach(cr => L.marker([cr.lat, cr.lng], { icon: L.divIcon({ className: '', iconSize: [80, 80], iconAnchor: [40, 40], html: `<div class="cn-crowd"><span class="cn-cring"></span><span class="cn-clabel">≈${cr.n}</span></div>` }) }).addTo(map))
       NIGHT.forEach(ev => {
         const m = L.marker([ev.lat, ev.lng], { icon: L.divIcon({ className: '', iconSize: [44, 52], iconAnchor: [22, 50], html: `<div class="cn-pin ${ev.hot ? 'cn-hot' : ''}"><span>${ev.emoji}</span>${ev.now ? '<i class="cn-live">●</i>' : ''}</div>` }) }).addTo(map)
@@ -64,7 +68,34 @@ export default function ClutchNight() {
     return () => { if (map) { map.remove(); mapRef.current = null } }
   }, [])
 
-  const around = NIGHT.map(e => ({ e, km: hav(pos[0], pos[1], e.lat, e.lng) })).sort((a, b) => (b.e.hot ? 1 : 0) - (a.e.hot ? 1 : 0) || a.km - b.km)
+  // déplacement : ton point bouge + la carte suit (comme ton GPS en vrai)
+  useEffect(() => {
+    if (!ready || !userRef.current) return
+    userRef.current.setLatLng(pos)
+    mapRef.current.panTo(pos, { animate: true, duration: 0.6 })
+  }, [pos, ready])
+
+  // auto-balade
+  useEffect(() => {
+    if (!walking) return
+    const iv = setInterval(() => {
+      setPos(([la, ln]) => {
+        headingRef.current += (Math.random() - 0.5) * 0.8
+        if (hav(la, ln, 46.5205, 6.6300) > 1.5) headingRef.current = Math.atan2(6.6300 - ln, 46.5205 - la)
+        const step = 0.0008
+        return [la + Math.cos(headingRef.current) * step, ln + Math.sin(headingRef.current) * step]
+      })
+    }, 1400)
+    return () => clearInterval(iv)
+  }, [walking])
+
+  // dynamisme : le nombre de gens qui sortent pulse
+  useEffect(() => {
+    const iv = setInterval(() => setLiveCount(c => Math.max(14, Math.min(60, c + Math.round((Math.random() - 0.5) * 4)))), 2200)
+    return () => clearInterval(iv)
+  }, [])
+
+  const around = useMemo(() => NIGHT.map(e => ({ e, km: hav(pos[0], pos[1], e.lat, e.lng) })).sort((a, b) => (b.e.hot ? 1 : 0) - (a.e.hot ? 1 : 0) || a.km - b.km), [pos])
 
   return (
     <div style={{ minHeight: '100vh', background: 'radial-gradient(1200px 600px at 50% -10%, #241734, #0A0612 60%)', color: C.ink, fontFamily: 'ui-sans-serif,system-ui,-apple-system,sans-serif' }}>
@@ -100,6 +131,16 @@ export default function ClutchNight() {
         <div style={{ textAlign: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 27, fontWeight: 900, letterSpacing: '-.5px', background: `linear-gradient(90deg,${C.pink},${C.purple})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>🌙 Clutch Night</div>
           <div style={{ fontSize: 13, color: C.dim, marginTop: 2 }}>Ça bouge ce soir à Lausanne. Sors.</div>
+        </div>
+
+        {/* Mode d'emploi */}
+        <div style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: C.dim, lineHeight: 1.65 }}>
+          <b style={{ color: C.ink }}>Comment ça marche : </b>Clutch Night te montre, sur une carte, <b style={{ color: C.pink }}>les sorties qui bougent ce soir</b> autour de toi. Les lieux chauds <b style={{ color: C.purple }}>brillent</b>, le badge <b style={{ color: '#34D399' }}>● LIVE</b> = ça se passe maintenant. Appuie sur <b style={{ color: C.ink }}>« Je me balade »</b> : ton point se déplace et les distances se mettent à jour. Le but : te donner envie de sortir, là, maintenant.
+        </div>
+        {/* Contrôles dynamiques */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <button onClick={() => setWalking(w => !w)} style={{ fontSize: 12.5, fontWeight: 800, padding: '8px 15px', borderRadius: 11, cursor: 'pointer', border: 'none', background: walking ? C.pink : `linear-gradient(135deg,${C.purple},${C.pink})`, color: '#fff' }}>{walking ? '⏸ Stop' : '▶ Je me balade'}</button>
+          <span style={{ fontSize: 12.5, color: C.dim }}>🔥 <b style={{ color: C.pink }}>{liveCount}</b> personnes sortent en ce moment</span>
         </div>
 
         <div style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', border: `1px solid ${C.border}`, boxShadow: `0 8px 40px rgba(155,124,240,.25)` }}>

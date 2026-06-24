@@ -219,7 +219,7 @@ export default function Vision2() {
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 18px 80px' }}>
         {/* Barre de liens vers les autres pages internes */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
-          {[['/vision2', '📖 Vision 2', true], ['/vision', '🗺 Vision (carte)', false], ['/eventsmap', '🗺️ Carte events', false], ['/clutchlive', '⚡ Clutch Live', false], ['/cockpit', '🛰️ Cockpit', false], ['/sim', '🧪 Simulateur', false], ['/animation', '✨ Animations', false], ['/hq', '🔒 QG', false]].map(([href, label, here]: any) => (
+          {[['/vision2', '📖 Vision 2', true], ['/onboarding', '🚀 Onboarding', false], ['/clutchlive', '⚡ Clutch Live', false], ['/clutchnight', '🌙 Night', false], ['/eventsmap', '🗺️ Carte events', false], ['/cockpit', '🛰️ Cockpit', false], ['/sim', '🧪 Simulateur', false], ['/vision', '🗺 Vision', false], ['/animation', '✨ Animations', false], ['/hq', '🔒 QG', false]].map(([href, label, here]: any) => (
             <a key={href} href={href} style={{ fontSize: 11.5, fontWeight: here ? 800 : 600, textDecoration: 'none', color: here ? '#fff' : C.mid, background: here ? C.gold : C.card, border: `1px solid ${here ? C.gold : C.border}`, borderRadius: 9, padding: '5px 11px', whiteSpace: 'nowrap' }}>{label}{here ? ' · ici' : ''}</a>
           ))}
         </div>

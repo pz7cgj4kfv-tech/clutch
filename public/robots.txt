@@ -1,0 +1,4 @@
+# Clutch — pré-lancement : on ne veut PAS être référencé sur Google/Bing.
+# (à rouvrir au lancement public)
+User-agent: *
+Disallow: /

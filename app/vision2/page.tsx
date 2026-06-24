@@ -155,6 +155,12 @@ export default function Vision2() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.ink, fontFamily: 'ui-sans-serif,system-ui,-apple-system,sans-serif' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 18px 80px' }}>
+        {/* Barre de liens vers les autres pages internes */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
+          {[['/vision2', '📖 Vision 2', true], ['/vision', '🗺 Vision (carte)', false], ['/sim', '🧪 Simulateur', false], ['/animation', '✨ Animations', false], ['/hq', '🔒 QG', false]].map(([href, label, here]: any) => (
+            <a key={href} href={href} style={{ fontSize: 11.5, fontWeight: here ? 800 : 600, textDecoration: 'none', color: here ? '#fff' : C.mid, background: here ? C.gold : C.card, border: `1px solid ${here ? C.gold : C.border}`, borderRadius: 9, padding: '5px 11px', whiteSpace: 'nowrap' }}>{label}{here ? ' · ici' : ''}</a>
+          ))}
+        </div>
         <div style={{ fontSize: 25, fontWeight: 900, color: C.gold, letterSpacing: '-.5px', marginBottom: 4 }}>📖 Vision 2 — tes idées, en entier</div>
         <P>Ici, <B>rien n'est compressé</B>. Chaque idée est gardée brute (juste mieux syntaxée), avec tout son contexte. Clique un titre pour le déplier. La carte rapide reste sur <B>/vision</B> ; ici, c'est la version profonde. On enrichit cette page, on ne la raccourcit jamais.</P>
 

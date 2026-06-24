@@ -183,6 +183,15 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
     </>)
   },
   {
+    id: 'accessibilite', icon: '♿', title: 'Accessibilité & handicap (à développer plus tard)', tag: 'PLUS TARD',
+    body: () => (<>
+      <P>Idée de David, importante : <B>faciliter la vie des personnes en situation de handicap</B> — fauteuil roulant, mobilité réduite, etc. Pas pour maintenant, mais à garder dans la vision et à développer plus tard.</P>
+      <Quote>« Accessibilité handicapée — faciliter la vie de quelqu'un qui aura une chaise roulante. C'est hyper important. »</Quote>
+      <P><B>Deux dimensions</B> (mon ajout) : (1) <B>l'accessibilité des lieux de rencontre</B> — indiquer et filtrer les lieux et événements accessibles PMR (de plain-pied / ascenseur, toilettes adaptées) ; un besoin déclaré (optionnel) dans le profil ; les lieux partenaires taggés « accessible ». (2) <B>l'accessibilité de l'app elle-même</B> — contraste, grandes polices, compatibilité lecteurs d'écran, navigation simple.</P>
+      <Fix>Pourquoi ça compte (et nous différencie) : Clutch fait se rencontrer EN VRAI → l'accès physique des lieux est un vrai sujet que les apps de rencontre ignorent. C'est cohérent avec nos valeurs (sécurité, confort, inclusion). Décision produit + design avec Mel le moment venu.</Fix>
+    </>)
+  },
+  {
     id: 'principe', icon: '📐', title: 'Le principe : on ne compresse JAMAIS tes idées', tag: 'RÈGLE',
     body: () => (<>
       <P>Cette page existe parce que je compressais tes explications de dix minutes en une carte de deux lignes, et qu'on y perdait toute la richesse. Plus jamais.</P>

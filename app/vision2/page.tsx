@@ -119,6 +119,40 @@ const IDEAS: { id: string; icon: string; title: string; tag?: string; body: () =
     </>)
   },
   {
+    id: 'clutchlive', icon: '⚡', title: 'Clutch Live : la ville s\'allume autour de toi', tag: 'TON IDÉE 🔥',
+    body: () => (<>
+      <P>L'idée énorme. <B>Tu te balades dans la ville, à pied ou en voiture, comme dans l'écran d'une Tesla — tu vois les bâtiments défiler — et les opportunités s'allument autour de toi en temps réel.</B></P>
+      <Quote>« Tu pourrais carrément te balader dans une grande ville, et tu as les événements : ah là-bas à gauche, maintenant il y a un concert de jazz ! Ah waouh, ici un film qui commence dans deux heures, autour de toi. »</Quote>
+      <P>Tu peux <B>zoomer / dézoomer</B> et l'affichage s'adapte au nombre d'événements. Pour chaque event, la <B>distance depuis toi</B> en plusieurs modes : <B>à pied, transports publics, voiture</B>. Et ça doit <B>donner envie de sortir</B>.</P>
+      <P><B>Clutch Live vs Clutch Night (tu les confondais — au clair) :</B> <B>Clutch Live</B> = cette carte vivante ; de jour elle fait jour, de nuit elle fait nuit, avec l'animation sociale autour de toi (les gens + les events qui ont lieu MAINTENANT). <B>Clutch Night</B> = le mode sorties uniquement, fond noir + petites étoiles, fait pour donner envie de sortir le soir.</P>
+      <P><B>Bâtiments façon Tesla</B> (vue stylisée quand on se déplace) = une évolution visuelle pour plus tard. La simu <B>/clutchlive</B> donne déjà le ressenti : point qui bouge, events qui s'allument, distances live, jour/nuit.</P>
+    </>)
+  },
+  {
+    id: 'gens-flou', icon: '🫧', title: 'Les gens en densité floue + ton GPS qui bouge', tag: 'TON IDÉE',
+    body: () => (<>
+      <P>Tu veux voir <B>les événements ET les gens en même temps</B>, au choix. MAIS — point crucial que tu as posé toi-même — <B>on ne montre JAMAIS où sont les gens exactement</B>. Juste un <B>point flou qui dit combien il y en a</B> dans le coin.</P>
+      <Quote>« Les gens, on ne fait pas qu'on sache exactement où ils sont. Tu as un point flou qui dit combien il y en a. Ça peut être le mec à côté de toi qui utilise aussi. »</Quote>
+      <P>C'est exactement notre règle anti-triangulation (un malveillant ne doit jamais pouvoir localiser quelqu'un). On <B>pulse</B> ces zones de densité. Et ton <B>propre point GPS se déplace avec toi</B> : quand tu bouges (à pied, en train, vite), ton épingle bouge en temps réel et les distances se recalculent.</P>
+      <Fix><B>Ta question :</B> « quand tu pointes ton épingle et que tu es en déplacement, qu'est-ce qui se passe ? » → ton point suit ton GPS réel. À gérer : la fréquence de mise à jour (batterie) et le lissage (ne pas sauter). Dans /clutchlive, le bouton « Je me balade » imite ce déplacement.</Fix>
+    </>)
+  },
+  {
+    id: 'presence-compte', icon: '⏳', title: 'Présence : compte à rebours + dispo jusqu\'à 14h', tag: 'À INTÉGRER',
+    body: () => (<>
+      <P>Intégrer l'idée du <B>compte à rebours de présence</B> : la personne reste affichée en ligne encore un certain temps (≈ 2h), avec le décompte visible. « Le compte à rebours, ce n'était pas mal. »</P>
+      <P><B>Ta règle sur les bords de créneau :</B> si quelqu'un dit dispo jusqu'à 14h le lendemain, peut-il encore avoir un RDV à 14h ? <B>Ta réponse : oui</B> — il peut accepter un clutch à 14h, pour une durée de ~2h (ou 1h en Quick Lock). On fait confiance aux gens pour gérer leur planning ; l'intersection des créneaux est une aide, pas une barrière stricte (cohérent avec la marge déjà décidée).</P>
+    </>)
+  },
+  {
+    id: 'cockpit-ia', icon: '🛰️', title: 'Un cockpit IA : centre de contrôle de la dynamique', tag: 'TON IDÉE',
+    body: () => (<>
+      <P>Ton idée pour piloter l'app une fois lancée : <B>un vrai centre de contrôle de la dynamique, peut-être sur un ordinateur dédié, branché en permanence.</B></P>
+      <Quote>« Il faut qu'on fasse un centre de contrôle de la dynamique de l'application, peut-être sur un ordinateur dédié. J'en ai un, je pourrais faire ça, il est branché dessus. »</Quote>
+      <P>Concrètement : un <B>tableau de bord temps réel</B> (un « /cockpit » admin) qui affiche, ville par ville — gens en ligne, densité par zone, niveau du thermostat, clutchs/heure, taux de réponse, lapins, events actifs — et qui te laisse <B>tourner les boutons</B> (poids, seuils) en voyant l'effet. Sur un écran dédié allumé en permanence = ta <B>salle de contrôle</B>. Lié à « Intégrer l'IA en temps réel » (couche 2 : l'IA propose, tu valides depuis le cockpit). Vrai chantier, à construire après le simulateur.</P>
+    </>)
+  },
+  {
     id: 'notifs', icon: '📲', title: 'Des notifications personnalisées qui donnent envie de cliquer',
     body: () => (<>
       <P>Tes mots : <B>il faut penser à faire des pop-up ou des notifications personnalisées. Tu reçois la notif, elle te donne envie de cliquer, tu dis oui, et tu ne vas même pas sur l'appli.</B> C'est cohérent avec le Graal : le produit vit dans la notif. À soigner : pertinence et fraîcheur, jamais du bruit.</P>

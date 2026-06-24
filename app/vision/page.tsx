@@ -3853,30 +3853,23 @@ export default function VisionPage() {
             <span style={{fontSize:15,fontWeight:900,color:C.gold,flexShrink:0}}>🔒 Vision 2026</span>
             <span style={{fontSize:10,color:C.dim}}>bible produit interne</span>
           </div>
-          {/* Niveau 1 : les 5 dossiers de direction */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:6}}>
-            {GROUPS.map(g=>{
-              const on=activeGroup===g.id
-              return (
-                <button key={g.id} onClick={()=>{setActiveGroup(g.id); if(!g.ids.includes(tab)) setTab(g.ids[0])}}
-                  style={{padding:'5px 13px',borderRadius:10,border:`1px solid ${on?C.gold:C.border}`,background:on?C.gold:C.card,color:on?'#fff':C.mid,fontSize:12,fontWeight:on?800:600,cursor:'pointer',whiteSpace:'nowrap',boxShadow:on?`0 2px 8px ${C.gold}40`:'none'}}>
-                  {g.icon} {g.label}
-                </button>
-              )
-            })}
-          </div>
-          {/* Niveau 2 : onglets du dossier actif */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-            {GROUPS.find(g=>g.id===activeGroup)?.ids.map(id=>{
-              const s=secOf(id); if(!s) return null
-              const on=tab===id
-              return (
-                <button key={id} onClick={()=>setTab(id)}
-                  style={{padding:'3px 10px',borderRadius:16,border:`1px solid ${on?C.gold+'70':C.border}`,background:on?`${C.gold}18`:'transparent',color:on?C.gold:C.mid,fontSize:10.5,fontWeight:on?800:500,cursor:'pointer',whiteSpace:'nowrap'}}>
-                  {s.icon} {s.label}
-                </button>
-              )
-            })}
+          {/* TOUS les onglets visibles, rangés par dossier (rien n'est caché) */}
+          <div style={{display:'flex',flexDirection:'column',gap:7,maxHeight:'40vh',overflowY:'auto'}}>
+            {GROUPS.map(g=>(
+              <div key={g.id} style={{display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:800,color:C.gold,background:`${C.gold}12`,border:`1px solid ${C.gold}35`,borderRadius:8,padding:'3px 9px',whiteSpace:'nowrap',flexShrink:0}}>{g.icon} {g.label}</span>
+                {g.ids.map(id=>{
+                  const s=secOf(id); if(!s) return null
+                  const on=tab===id
+                  return (
+                    <button key={id} onClick={()=>setTab(id)}
+                      style={{padding:'3px 10px',borderRadius:16,border:`1px solid ${on?C.gold+'90':C.border}`,background:on?`${C.gold}1e`:C.card,color:on?C.gold:C.mid,fontSize:10.5,fontWeight:on?800:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      {s.icon} {s.label}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>

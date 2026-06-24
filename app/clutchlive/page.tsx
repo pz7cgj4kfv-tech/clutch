@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const C = {
   bg: '#FAF6F0', card: '#FFFFFF', border: 'rgba(42,16,32,0.14)', ink: '#1a0810',
-  gold: '#A06808', mid: 'rgba(26,8,16,0.78)', dim: 'rgba(26,8,16,0.45)', pink: '#EB6BAF',
+  gold: '#532943', mid: 'rgba(26,8,16,0.78)', dim: 'rgba(26,8,16,0.45)', pink: '#EB6BAF',
 }
 const LINKS: [string, string][] = [
   ['/clutchlive', '⚡ Clutch Live'], ['/eventsmap', '🗺️ Carte events'], ['/vision2', '📖 Vision 2'],

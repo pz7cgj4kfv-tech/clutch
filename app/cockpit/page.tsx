@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const C = {
   bg: '#0A0F1E', panel: '#121A2E', panel2: '#1A2440', border: '#26314F',
-  ink: '#E8EEFA', dim: '#8493B5', gold: '#F5B83D', green: '#34D399', amber: '#FBBF24',
+  ink: '#E8EEFA', dim: '#8493B5', gold: '#EB6BAF', green: '#34D399', amber: '#FBBF24',
   red: '#F87171', blue: '#5B9DFF', pink: '#EB6BAF', purple: '#9B7CF0',
 }
 const LINKS: [string, string][] = [

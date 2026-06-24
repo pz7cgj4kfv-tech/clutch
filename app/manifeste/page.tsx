@@ -72,6 +72,17 @@ export default function Manifeste() {
           </div>
         </div>
 
+        {/* LA GRANDE IDÉE — le temps humain disponible */}
+        <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderLeft: `4px solid ${M.plum}`, borderRadius: 16, padding: '18px 20px', marginBottom: 26 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: M.plum, letterSpacing: '.08em', marginBottom: 10 }}>🕰️ LA GRANDE IDÉE — LE TEMPS HUMAIN DISPONIBLE</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 14.5, color: M.ink, lineHeight: 1.5 }}>
+            <div><span style={{ color: M.pink, fontWeight: 900 }}>“</span>Clutch n'est pas une app de rencontre. C'est un <b>système d'exploitation des opportunités sociales en temps réel</b> — un OS <b>anti-inertie</b>.</div>
+            <div><span style={{ color: M.pink, fontWeight: 900 }}>“</span>Le carburant, ce n'est pas la photo : c'est la <b>disponibilité</b>. « Je suis libre, là, maintenant. »</div>
+            <div><span style={{ color: M.pink, fontWeight: 900 }}>“</span>On ne vend pas des profils. On <b>révèle le temps humain disponible autour de toi</b> — et on le transforme en vraie rencontre.</div>
+            <div><span style={{ color: M.pink, fontWeight: 900 }}>“</span>Clutch met en relation les gens selon leur <b>disponibilité réelle</b> : qui est libre, maintenant, près de toi — et prêt à se voir.</div>
+          </div>
+        </div>
+
         {/* SECTIONS */}
         {SECTIONS.map((s, i) => (
           <div key={i} style={{ marginBottom: 22 }}>

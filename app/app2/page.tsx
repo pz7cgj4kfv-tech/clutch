@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x188'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 132   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x189'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 133   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9641,18 +9641,27 @@ export default function App2() {
         showToast(lang==='fr'?'🔄 Un créneau qui se chevauchait a été remplacé — 1 seul endroit à la fois':'🔄 An overlapping slot was replaced — one place at a time', C.orange)
       }
       const remaining = list.filter(s => !overlapping.find(o=>o.id===s.id))
-      // B4 — créneaux PROCHES dans le temps mais LOIN en distance : on AVERTIT (pas de blocage — info, R2).
-      //   Trajet urbain estimé ≈ 2 min/km (≈30 km/h, parking inclus). Si l'écart < trajet nécessaire → alerte douce.
+      // B4 — faisabilité de TRAJET entre 2 créneaux proches (formule validée GPT round 2) : on AVERTIT, jamais bloquer.
+      //   Trajet urbain estimé = distance_oiseau × 1.35 (détour réseau routier) ÷ 30 km/h (ville+feux+parking+marche).
+      //   gap < trajet → 🔴 infaisable · gap < trajet + 15 min → 🟠 serré. (Pas d'API GPS : on détecte l'absurde, pas on guide.)
       if (remaining.length && meetupPos[0] && meetupPos[1]) {
         for (const s of remaining) {
           if (!s.lat || !s.lng) continue
           const sStart = new Date(s.start_at).getTime(), sEnd = new Date(s.end_at).getTime()
-          const gapMin = sStart >= endMs ? (sStart-endMs)/60000 : startMs >= sEnd ? (startMs-sEnd)/60000 : 0
+          const gapMin = sStart >= endMs ? (sStart-endMs)/60000 : startMs >= sEnd ? (startMs-sEnd)/60000 : Infinity
+          if (!isFinite(gapMin)) continue
           const km = haversineKm(meetupPos[0], meetupPos[1], s.lat, s.lng)
-          if (km > 4 && gapMin < km*2) {
+          if (km <= 2) continue
+          const needMin = (km * 1.35) / 30 * 60
+          if (gapMin < needMin) {
             showToast(lang==='fr'
-              ? `⚠️ Ce créneau est à ~${Math.round(km)} km d'un autre, avec peu de temps entre les deux — auras-tu le temps de t'y rendre ?`
-              : `⚠️ This slot is ~${Math.round(km)} km from another with little time between — will you make it there in time?`, C.orange)
+              ? `🔴 Trajet infaisable : ~${Math.round(km)} km ≈ ${Math.round(needMin)} min de route, mais ${Math.round(gapMin)} min entre les 2 créneaux. Revois l'horaire.`
+              : `🔴 Unfeasible trip: ~${Math.round(km)} km ≈ ${Math.round(needMin)} min by road, but ${Math.round(gapMin)} min between the 2 slots. Adjust the time.`, C.orange)
+            break
+          } else if (gapMin < needMin + 15) {
+            showToast(lang==='fr'
+              ? `🟠 Trajet serré : ~${Math.round(needMin)} min de route pour ${Math.round(gapMin)} min dispo. Ça passe juste.`
+              : `🟠 Tight trip: ~${Math.round(needMin)} min by road for ${Math.round(gapMin)} min available. Cutting it close.`, C.orange)
             break
           }
         }

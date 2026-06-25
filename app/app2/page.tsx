@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x173'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 111   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x174'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 112   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8433,6 +8433,7 @@ export default function App2() {
   const [profiles,setProfiles] = useState<Profile[]>([])
   const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
+  const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)
@@ -8857,6 +8858,9 @@ export default function App2() {
       .select('*,sender:profiles!clutches_sender_id_fkey(*),receiver:profiles!clutches_receiver_id_fkey(*)')
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order('created_at',{ascending:false}).limit(30)
+    // Forteresse : mes créneaux occupés (RDV confirmés) → sert à marquer « ⏸ en pause » les pendings qui chevauchent
+    supabase.from('occupancies').select('start_at,end_at,source_id').eq('user_id', user.id)
+      .then(({data:occ})=>setMyOccupancies(occ||[]))
     if (data) {
       // Respecter les terminaisons locales — résiste aux données stale de la DB
       data.forEach((c:any) => { if (completedIds.current.has(c.id)) c.status = 'completed' })
@@ -10496,15 +10500,18 @@ export default function App2() {
                 // Si effacé (mock ou réel), filtrer les IDs cachés localement
                 const displayHist = (isMock && mockCleared) ? [] : hist.filter((c:any)=>!hiddenHistIds.has(c.id))
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
+                // Forteresse : un pending est « en pause » s'il chevauche un de mes RDV confirmés (occupancy).
+                // Calculé (jamais stocké) → si j'annule le RDV, l'occupancy disparaît et le pending « revit » tout seul.
+                const isPausedClutch=(c:any)=>{ if(c.status!=='pending')return false; const s=new Date(c.counter_time||c.proposed_time).getTime(); if(!s)return false; const e=s+(c.duration_minutes||120)*60000; return myOccupancies.some((o:any)=>o.source_id!==c.id && new Date(o.start_at).getTime()<e && s<new Date(o.end_at).getTime()) }
                 // ── Boîte de réception ACTION-FIRST (struct validée GPT+Claude) :
-                //    0 = 🔥 à répondre (reçu pending / feedback) · 1 = 📍 RDV (Verrou) · 2 = ⏳ envoyé en attente
-                const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(!rec&&c.status==='pending')return 2; return 3 }
+                //    0=🔥 à répondre · 1=📍 RDV · 2=⏸ en pause (chevauche un RDV) · 3=⏳ envoyé en attente · 4=autres
+                const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(c.status==='pending'&&isPausedClutch(c))return 2; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(!rec&&c.status==='pending')return 3; return 4 }
                 actifs.sort((a:any,b:any)=>groupRank(a)-groupRank(b))
-                const aRepondre = actifs.filter((c:any)=>c.id===inlineFeedbackId||(c.receiver_id===user.id&&c.status==='pending')).length
+                const aRepondre = actifs.filter((c:any)=>c.id===inlineFeedbackId||(c.receiver_id===user.id&&c.status==='pending'&&!isPausedClutch(c))).length
                 // Libellés de section (boîte de réception par ACTION) — bilingue
                 const SEC_LABELS:Record<number,string> = lang==='en'
-                  ? {0:'🔥 To answer',1:'📍 Upcoming meetups',2:'⏳ Waiting',3:'🗂️ Other'}
-                  : {0:'🔥 Action requise',1:'📍 Prochains rendez-vous',2:'⏳ En attente',3:'🗂️ Autres'}
+                  ? {0:'🔥 To answer',1:'📍 Upcoming meetups',2:'⏸ On hold (you have a meetup then)',3:'⏳ Waiting',4:'🗂️ Other'}
+                  : {0:'🔥 Action requise',1:'📍 Prochains rendez-vous',2:'⏸ En pause (RDV à cette heure)',3:'⏳ En attente',4:'🗂️ Autres'}
                 // Intercale un marqueur d'en-tête {__hdr:g} quand le groupe change (actifs déjà trié par groupRank)
                 const actifsWithHdrs:any[] = []
                 { let _pg=-1; actifs.forEach((c:any)=>{ const g=groupRank(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
@@ -10580,17 +10587,19 @@ export default function App2() {
                       const isAccepted = effectiveStatus==='confirmed'||effectiveStatus==='accepted'||effectiveStatus==='checked_in'
                       const isNewRec = !isAccepted && isRec && c.status==='pending'
                       const isSent = !isAccepted && !isRec && c.status==='pending'
+                      const paused = isPausedClutch(c) // forteresse : chevauche un RDV → en pause (calmé visuellement)
                       const hasUnread = (unreadChats[c.id]||0) > 0
                       // Couleurs par état
-                      const cardBorder = isAccepted ? `2px solid ${C.green}66`
+                      const cardBorder = paused ? `1px solid ${C.border}`
+                        : isAccepted ? `2px solid ${C.green}66`
                         : isNewRec ? `2px solid ${C.salmon}88`
                         : isSent ? `1px solid ${C.orange}55`
                         : `1px solid ${C.border}`
                       // Cartes BLANCHES (design Mel). L'identité Verrou vient du bandeau photo prune + bordure verte,
                       // PAS d'un dégradé sur toute la carte (illisible = « effet verre » que David rejette).
                       const cardBg = C.bgCard
-                      const sc = isAccepted ? C.green : isNewRec ? C.salmon : C.orange
-                      const sl = isAccepted ? 'Verrou' : isNewRec ? (countdown?`← ${countdown}`:'← Received') : (countdown?`→ ${countdown}`:'→ Sent')
+                      const sc = paused ? C.whiteMid : isAccepted ? C.green : isNewRec ? C.salmon : C.orange
+                      const sl = paused ? (lang==='en'?'⏸ on hold':'⏸ en pause') : isAccepted ? 'Verrou' : isNewRec ? (countdown?`← ${countdown}`:'← Received') : (countdown?`→ ${countdown}`:'→ Sent')
                       // ── INLINE FEEDBACK : remplace toute la carte ──
                       if (inlineFeedbackId === c.id) {
                         const outcomes = [

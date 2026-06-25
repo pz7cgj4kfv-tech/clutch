@@ -14,7 +14,7 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x16D'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const V = '0x16E'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
 const BUILD = 107   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
@@ -10444,6 +10444,11 @@ export default function App2() {
                 // Si effacé (mock ou réel), filtrer les IDs cachés localement
                 const displayHist = (isMock && mockCleared) ? [] : hist.filter((c:any)=>!hiddenHistIds.has(c.id))
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
+                // ── Boîte de réception ACTION-FIRST (struct validée GPT+Claude) :
+                //    0 = 🔥 à répondre (reçu pending / feedback) · 1 = 📍 RDV (Verrou) · 2 = ⏳ envoyé en attente
+                const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(!rec&&c.status==='pending')return 2; return 3 }
+                actifs.sort((a:any,b:any)=>groupRank(a)-groupRank(b))
+                const aRepondre = actifs.filter((c:any)=>c.id===inlineFeedbackId||(c.receiver_id===user.id&&c.status==='pending')).length
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -10473,7 +10478,10 @@ export default function App2() {
                       <div>
                         {/* Titre « Mes Clutchs » retiré (déjà dans la nav du bas) — on garde le compte (David : libérer le haut) */}
                         <div style={{fontSize:12.5,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <span style={{fontWeight:700,color:C.white}}>{pending} {lang==='en'?'active':'actif'} · {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
+                          {aRepondre>0
+                            ? <span style={{fontWeight:800,color:'#fff',background:C.salmon,borderRadius:20,padding:'2px 10px',fontSize:11}}>🔴 {aRepondre} {lang==='en'?'to answer':'à répondre'}</span>
+                            : <span style={{fontWeight:700,color:C.white}}>{actifs.length} {lang==='en'?'active':'actif'}</span>}
+                          <span style={{color:C.whiteMid}}>· {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
                               <span style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0,display:'inline-block'}}/>

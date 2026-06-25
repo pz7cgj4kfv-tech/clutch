@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x186'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 130   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x187'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 131   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2836,7 +2836,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   const loadEvents = async () => {
     const { data } = await supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
-    setDbEvents(data || [])
+    let rows = data || []
+    // B8 — cohérence Démo/Réel : en Réel, on masque AUSSI les events créés par des bots (sinon on voyait
+    // leurs events sans voir les gens — incohérent). Les events de partenaires/vrais users restent.
+    if (!demoOn() && rows.length) {
+      try {
+        const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot', true)
+        const botIds = new Set((bots||[]).map((b:any)=>b.id))
+        rows = rows.filter((e:any)=> !botIds.has(e.created_by))
+      } catch {}
+    }
+    setDbEvents(rows)
     setEvLoading(false)
   }
   useEffect(() => {
@@ -9623,7 +9633,7 @@ export default function App2() {
     // (un blocage dur empêcherait de re-régler son créneau actuel). Les autres créneaux sont préservés.
     try {
       const startMs = from.getTime(), endMs = until.getTime()
-      const { data: act } = await supabase.from('availabilities').select('id,start_at,end_at').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at', { ascending: true })
+      const { data: act } = await supabase.from('availabilities').select('id,start_at,end_at,lat,lng').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at', { ascending: true })
       const list:any[] = act || []
       const overlapping = list.filter(s => new Date(s.start_at).getTime() < endMs && startMs < new Date(s.end_at).getTime())
       if (overlapping.length) {
@@ -9631,6 +9641,22 @@ export default function App2() {
         showToast(lang==='fr'?'🔄 Un créneau qui se chevauchait a été remplacé — 1 seul endroit à la fois':'🔄 An overlapping slot was replaced — one place at a time', C.orange)
       }
       const remaining = list.filter(s => !overlapping.find(o=>o.id===s.id))
+      // B4 — créneaux PROCHES dans le temps mais LOIN en distance : on AVERTIT (pas de blocage — info, R2).
+      //   Trajet urbain estimé ≈ 2 min/km (≈30 km/h, parking inclus). Si l'écart < trajet nécessaire → alerte douce.
+      if (remaining.length && meetupPos[0] && meetupPos[1]) {
+        for (const s of remaining) {
+          if (!s.lat || !s.lng) continue
+          const sStart = new Date(s.start_at).getTime(), sEnd = new Date(s.end_at).getTime()
+          const gapMin = sStart >= endMs ? (sStart-endMs)/60000 : startMs >= sEnd ? (startMs-sEnd)/60000 : 0
+          const km = haversineKm(meetupPos[0], meetupPos[1], s.lat, s.lng)
+          if (km > 4 && gapMin < km*2) {
+            showToast(lang==='fr'
+              ? `⚠️ Ce créneau est à ~${Math.round(km)} km d'un autre, avec peu de temps entre les deux — auras-tu le temps de t'y rendre ?`
+              : `⚠️ This slot is ~${Math.round(km)} km from another with little time between — will you make it there in time?`, C.orange)
+            break
+          }
+        }
+      }
       if (remaining.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', remaining[0].id) // plafond 3 → vire le plus ancien
       await supabase.from('availabilities').insert({ user_id:user.id, start_at:from.toISOString(), end_at:until.toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true })
     } catch {}

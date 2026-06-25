@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x178'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 116   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x179'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 117   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8467,6 +8467,7 @@ export default function App2() {
   const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
+  const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)
@@ -8894,6 +8895,9 @@ export default function App2() {
     // Forteresse : mes créneaux occupés (RDV confirmés) → sert à marquer « ⏸ en pause » les pendings qui chevauchent
     supabase.from('occupancies').select('start_at,end_at,source_id').eq('user_id', user.id)
       .then(({data:occ})=>setMyOccupancies(occ||[]))
+    // Multi-créneaux : mes créneaux de dispo actifs (pour le compteur 📍 N/3)
+    supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id', user.id).eq('active', true).order('start_at',{ascending:true})
+      .then(({data:av})=>setMyAvail(av||[]))
     if (data) {
       // Respecter les terminaisons locales — résiste aux données stale de la DB
       data.forEach((c:any) => { if (completedIds.current.has(c.id)) c.status = 'completed' })
@@ -9502,6 +9506,20 @@ export default function App2() {
       showToast(`Erreur DB : ${error.message}`, C.red)
       return
     }
+
+    // Multi-créneaux : persiste AUSSI ce créneau dans `availabilities` (additif, best-effort,
+    // ne bloque jamais la dispo). Accumule jusqu'à 3 ; sur chevauchement (EXCLUDE) → remplace.
+    try {
+      const startISO = from.toISOString(), endISO = until.toISOString()
+      const { data: act } = await supabase.from('availabilities').select('id').eq('user_id', user.id).eq('active', true).order('start_at', { ascending: true })
+      if (act && act.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', (act[0] as any).id) // plafond 3 → vire le plus ancien
+      const row = { user_id:user.id, start_at:startISO, end_at:endISO, place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true }
+      const ins = await supabase.from('availabilities').insert(row)
+      if (ins.error) { // chevauche un créneau existant → remplacement propre
+        await supabase.from('availabilities').update({ active:false }).eq('user_id', user.id).eq('active', true)
+        await supabase.from('availabilities').insert(row)
+      }
+    } catch {}
 
     // 0 lignes mises à jour → le profil n'existe pas encore → upsert
     if (!updated || updated.length === 0) {
@@ -10113,6 +10131,12 @@ export default function App2() {
                         <button onClick={rdvBlocked ? ()=>showToast('RDV en cours — reviens 2h après ton RDV',C.orange) : ()=>setFlow('carte')} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${rdvBlocked?C.border:C.orange}`,background:rdvBlocked?'rgba(83,41,67,.1)':C.orange,color:rdvBlocked?`${C.salmon}88`:'#fff',fontSize:11,fontWeight:800,cursor:rdvBlocked?'not-allowed':'pointer',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',opacity:rdvBlocked?.5:1}}>
                           {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : (availableRef ? `✦ Actif` : '+ Créneau'))}
                         </button>
+                        {myAvail.length>0 && (
+                          <span title={lang==='en'?'Your active availability slots (max 3)':'Tes créneaux de disponibilité actifs (max 3)'}
+                            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'6px 9px',borderRadius:20,border:`1px solid ${C.green}55`,background:`${C.green}1a`,color:C.green,fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>
+                            📍 {myAvail.length}/3
+                          </span>
+                        )}
                       </div>
                     </div>
 

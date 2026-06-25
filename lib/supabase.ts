@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+// ⚠️ Repli = vraies valeurs PUBLIQUES (URL + clé PUBLISHABLE, déjà dans le bundle web + page /hq, protégées par RLS,
+// donc AUCUN secret exposé). Sans ça, les builds LOCAUX (→ app iOS via Capacitor) tombaient sur un placeholder
+// inexistant → « Load failed » au login natif. La clé service_role (secrète) n'est JAMAIS ici.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fnucdicfcjoxbozpfdau.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_TXWkldkILlJ5G9OTOfiCLg_NYZLVMTZ'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 

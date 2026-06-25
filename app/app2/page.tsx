@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x172'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 110   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x173'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 111   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10957,7 +10957,20 @@ export default function App2() {
                                 //   WITH CHECK (auth.uid() = sender_id OR auth.uid() = receiver_id);
                                 if(!isMock) {
                                   const {error} = await supabase.from('clutches').update({status:'confirmed'}).eq('id',c.id)
-                                  if (error) showToast('⚠️ Verrou error: '+error.message, C.red)
+                                  if (error) {
+                                    // Forteresse anti-conflit : tu as déjà un RDV qui chevauche cette heure (occ_no_overlap)
+                                    const conflit = (error as any).code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')
+                                    if (conflit) {
+                                      // rollback de l'optimiste : on retire l'animation + le statut local
+                                      setShowVerrou(false)
+                                      setLocalConfirmed(prev=>{ const s=new Set(prev); s.delete(c.id); return s })
+                                      setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'pending'}:cl))
+                                      try { localStorage.removeItem(`clutch_locked_at_${c.id}`); localStorage.removeItem(`verrou_shown_${c.id}`) } catch {}
+                                      showToast(lang==='en'?'⏱️ You already have a meetup at that time':'⏱️ Tu as déjà un rendez-vous à cette heure', C.salmon)
+                                    } else {
+                                      showToast('⚠️ Verrou error: '+error.message, C.red)
+                                    }
+                                  }
                                   loadClutches()
                                 }
                               }} style={{flex:1,padding:'9px',background:`${C.green}20`,border:`1px solid ${C.green}55`,borderRadius:10,color:C.green,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🔒 {lang==='en'?'Lock in':'Verrouiller'}</button>

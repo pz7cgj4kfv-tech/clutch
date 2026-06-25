@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x182'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 126   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x183'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 127   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5220,7 +5220,13 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     setBusy('all')
     const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot', true).limit(3)
     if (!bs?.length) { setBusy(null); showToast('Aucun bot — génère-en d\'abord', C.orange); return }
-    let n=0
+    // B6 — la table clutches a une unicité par paire active : si un bot a DÉJÀ un clutch avec moi
+    // (resté d'un test), l'insert échoue silencieusement. On NETTOIE d'abord la paire, puis on insère.
+    const botIds = bs.map((b:any)=>b.id)
+    const ACT = ['pending','accepted','confirmed','checked_in']
+    await supabase.from('clutches').update({status:'cancelled'}).in('sender_id', botIds).eq('receiver_id', user.id).in('status', ACT)
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id', user.id).in('receiver_id', botIds).in('status', ACT)
+    let n=0; let lastErr=''
     for (const b of bs) {
       const { error } = await supabase.from('clutches').insert({
         sender_id: b.id, receiver_id: user.id,
@@ -5229,10 +5235,10 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         expires_at:new Date(Date.now()+2*3600*1000).toISOString(),
         status:'pending', message:`Un café ? — ${b.name}`,
       })
-      if (!error) n++
+      if (!error) n++; else lastErr = error.message||''
     }
     setBusy(null)
-    showToast(n>0?`✓ ${n} clutchs reçus — va dans l'onglet Clutchs 📨`:'❌ Échec — policy clutches_bot_admin ?', n>0?C.green:C.red)
+    showToast(n>0?`✓ ${n} clutchs reçus — va dans l'onglet Clutchs 📨`:`❌ Échec — ${lastErr||'policy clutches_bot_admin ?'}`, n>0?C.green:C.red)
   }
   // RESET COMPLET : efface MES interactions avec les bots (clutchs + lapins) + les remet propres (dé-Driver, déverrouille)
   const clearBotInteractions = async () => {
@@ -10847,7 +10853,26 @@ export default function App2() {
                                 <GenderSvg gk={genderKey(other?.gender)} size={13}/>{' '}
                                 <span style={{textDecoration:'underline',textDecorationColor:`${C.salmon}55`}}>{other?.name||'?'}</span>
                               </div>}
-                              {!isAccepted && <div style={{fontSize:11,color:C.whiteMid,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.venue||'–'} · {c.proposed_time?new Date(c.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):'–'}</div>}
+                              {!isAccepted && (()=>{
+                                // B5 — détails LISIBLES de tout clutch (envoyé compris) : lieu (lien Maps) + heure claire avec le jour.
+                                // Avant : une ligne tronquée (« Chemin de la Ramière, Prév… ») → impossible de vérifier où/quand.
+                                const venueShort = c.venue?.split('·')[0].trim() || '–'
+                                const venueAddr = c.venue?.includes('·') ? c.venue.split('·').slice(1).join('·').trim() : null
+                                const mapsUrl = venueAddr ? `https://maps.google.com/?q=${encodeURIComponent(venueAddr)}` : (c.venue_lat&&c.venue_lng?`https://maps.google.com/?q=${c.venue_lat},${c.venue_lng}`:null)
+                                const dt = c.proposed_time ? new Date(c.proposed_time) : null
+                                const now = new Date()
+                                const sameDay = dt && dt.toDateString()===now.toDateString()
+                                const tmrw = dt && new Date(now.getTime()+86400000).toDateString()===dt.toDateString()
+                                const timeStr = dt ? (sameDay?'':tmrw?(lang==='en'?'tmrw ':'dem. '):dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})+' ')+dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '–'
+                                return (
+                                  <div style={{fontSize:11,color:C.whiteMid,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                    {mapsUrl
+                                      ? <a href={mapsUrl} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:C.salmon,textDecoration:'none',fontWeight:700}}>📍 {venueShort}</a>
+                                      : <span style={{fontWeight:700,color:C.salmon}}>📍 {venueShort}</span>}
+                                    <span style={{color:C.white,fontWeight:800,background:'rgba(255,255,255,.06)',borderRadius:8,padding:'1px 7px'}}>🕐 {timeStr}</span>
+                                  </div>
+                                )
+                              })()}
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
                               {/* Countdown seul, sans doublon avec le badge top-right */}
@@ -11450,16 +11475,18 @@ export default function App2() {
                 </div>
                 <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12}}>{lang==='en'?'When and where you\'re open to spontaneous meetups (next 18h).':'Quand et où tu es ouvert·e aux rencontres spontanées (dans les 18h).'}</div>
                 {myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
-                {myAvail.map((s:any)=>{
+                {[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>{
                   const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
                   return (
-                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 12px',borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,background:C.bgCard}}>
+                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,background:C.bgCard}}>
                       <span style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
                         <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.place||'—'}</div>
                       </div>
-                      <button onClick={()=>removeSlot(s.id)} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.salmon,fontSize:11,fontWeight:700,padding:'6px 11px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{lang==='en'?'Remove':'Retirer'}</button>
+                      {/* B/D1 — Modifier : on retire ce créneau puis on rouvre le réglage (le créneau étant retiré, pas de fausse alerte de chevauchement B3). */}
+                      <button onClick={async()=>{ await removeSlot(s.id); setShowSlots(false); setFlow('carte') }} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.white,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✏️ {lang==='en'?'Edit':'Modifier'}</button>
+                      <button onClick={()=>removeSlot(s.id)} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.salmon,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{lang==='en'?'Remove':'Retirer'}</button>
                     </div>
                   )
                 })}

@@ -81,7 +81,19 @@ Réponse : **`0`.**
 Personne n'est à deux endroits à la fois. Pas en théorie. Pas dans un test. **Dans les données réelles de production.** La forteresse, née d'une angoisse — *« il y a une infinité de possibilités, tout seul je n'y arriverai pas »* — tient, prouvée, en une table et une contrainte.
 
 ### La doc qui se raconte
-Né le besoin de *« raconter l'histoire de Clutch comme un historien, sans perdre une miette »* : ce Codex. Trois documents long-format, mis à jour sur un seul mot — **« Codex »**.
+Né le besoin de *« raconter l'histoire de Clutch comme un historien, sans perdre une miette »* : ce Codex. Trois documents long-format, mis à jour sur un seul mot — **« Codex »** (et David l'érige en règle permanente : à ce mot, la doc se met à jour, méticuleuse, sans qu'il ait à se répéter).
+
+---
+
+## Chapitre V — Vers TestFlight (26 juin 2026)
+
+Tout est en prod, prouvé. Question de David : *« qu'est-ce qu'il reste avant de déployer sur TestFlight ? »*
+
+Un moment d'honnêteté : Claude cite une note **périmée** (« compte Apple en attente ») — mais un build est déjà sur TestFlight, donc le compte est forcément actif. David le repère. Leçon re-gravée : *une mémoire reflète ce qui était vrai quand elle a été écrite ; vérifier avant d'affirmer.* La note est corrigée.
+
+Le vrai reste : un **rebuild natif** (l'app TestFlight est une coque Capacitor séparée du web) + les **screenshots de Mel**. Le protocole de test se précise : mode **Démo** pour tester seul avec des bots, mode **Réel** pour tester en vrai ; les cooldowns se vident d'un `delete from clutch_pairs` (table protégée, jamais touchée par le client). Le build natif est préparé (`cap sync`, version bumpée), prêt à archiver.
+
+Et une dernière chose, pour ne plus jamais rien perdre : ce Codex doit devenir assez bon pour qu'un inconnu comprenne le code, reprenne les algorithmes, saisisse la forteresse, et lise l'histoire de Clutch. C'est ce que tu es en train de lire.
 
 ---
 

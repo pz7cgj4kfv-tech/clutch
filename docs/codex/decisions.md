@@ -44,6 +44,16 @@
 - ✅ **Zéro risque** : si une tâche parallèle peut créer un bug, la faire en série.
 - ✅ Tout traduit **FR + EN**.
 
+## 🧪 Protocole de test & TestFlight
+- ✅ **Compte Apple Developer ACTIF** (build déjà sur TestFlight = preuve). Ne plus reposer la question.
+- ✅ **Tester avec/sans bots sans incohérence** : switch Démo (bots visibles, étiquetés 🤖) / Réel (bots+mock cachés). Resets BotLab nettoient les bots ; occupations se nettoient via triggers ; cooldowns → `delete from public.clutch_pairs;` (table protégée RLS, jamais touchée par le client = sain).
+- ✅ **Build natif préparé** : `npm run build` + `npx cap sync ios`, `CURRENT_PROJECT_VERSION` 103→104. Reste : Xcode → Archive → Upload.
+- 🟡 **Screenshots App Store** iPhone 6.9″ ×5 (Mel).
+- 🟡 **Page profil — explications user (didactique)** : expliquer les PRINCIPES (« tes refus restent privés », « on t'aide à rencontrer ») mais JAMAIS un cas individuel (anti-sonde). = avant lancement public, pas bloquant TestFlight.
+
+## 📕 Rituel « Codex » (permanent)
+À ce mot, mise à jour méticuleuse de docs/codex/ (histoire append-only · décisions · code) + page /codex, sans que David se répète. Standard : un non-codeur comprend le code ; on peut reprendre les algos de filtre/sélection ; on comprend la forteresse ; on comprend l'histoire. « Codex complet » = version géante.
+
 ## ⏳ Décisions ouvertes / Phase 2
 - ⏳ Logging d'impressions (pour le score de sous-exposition + le boost).
 - ⏳ Vérif téléphone / anti-multi-compte (infra, pas MVP).

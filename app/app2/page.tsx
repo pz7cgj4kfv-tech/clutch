@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x184'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 128   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x185'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 129   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8572,6 +8572,7 @@ export default function App2() {
   const [pendingFeedbacks,setPendingFeedbacks] = useState(0) // Soft gate counter
   const [announcedDelays,setAnnouncedDelays] = useState<Record<string,number>>({}) // clutchId → minutes annoncées
   const [checkinDone,setCheckinDone] = useState<Set<string>>(new Set()) // IDs où J'y suis déjà tapé
+  const [radarMin,setRadarMin] = useState(false) // D3 : RDV en cours réduit en pastille flottante (libère l'écran pour voir les events)
   // completedIds persisté dans localStorage — survit aux rechargements
   const completedIds = useRef<Set<string>>((() => {
     try { const s = localStorage.getItem('clutch_completedIds'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
@@ -10710,7 +10711,7 @@ export default function App2() {
                       }} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>{t('clutchs.clear')}</button>}
                     </div>
                   </div>
-                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId ? 180 : 14}}>
+                  <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId && !radarMin ? 180 : 14}}>
                     {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
                     {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
@@ -11396,8 +11397,31 @@ export default function App2() {
           {flow==='app' && activeVerrou && !showVerrou && (
             <QuickSOS user={user} supabase={supabase} lang={lang} showToast={showToast}/>
           )}
-          {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV. Masqué si feedback inline actif */}
-          {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && (
+          {/* D3 — RDV en cours RÉDUIT : pastille flottante (coin bas-droit) qui n'obstrue pas l'écran.
+              Toucher = ré-agrandir le radar. L'utilisateur peut voir/parcourir les events librement. */}
+          {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && radarMin && (()=>{
+            const rdvMs = activeVerrou.proposed_time ? new Date(activeVerrou.proposed_time).getTime() : 0
+            const minLeft = rdvMs ? Math.round((rdvMs-Date.now())/60000) : null
+            const lbl = minLeft==null ? 'RDV' : minLeft>60 ? `${Math.floor(minLeft/60)}h${String(minLeft%60).padStart(2,'0')}` : minLeft>0 ? `${minLeft}min` : (lang==='en'?'now':'maint.')
+            return (
+              <button onClick={()=>setRadarMin(false)}
+                style={{position:'fixed',right:12,bottom:'calc(84px + var(--sab))',zIndex:2600,display:'flex',alignItems:'center',gap:8,
+                  background:C.green,border:'none',borderRadius:24,padding:'9px 14px',cursor:'pointer',fontFamily:'inherit',
+                  boxShadow:'0 6px 20px rgba(0,0,0,.35)',animation:'badgeUrgent 2.4s ease-in-out infinite'}}>
+                <span style={{fontSize:15}}>🔒</span>
+                <span style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>{lang==='en'?'Meetup':'RDV'} · {lbl}</span>
+                <span style={{fontSize:11,color:'#fff',opacity:.85}}>↑</span>
+              </button>
+            )
+          })()}
+          {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV. Masqué si feedback inline actif OU réduit (D3) */}
+          {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && !radarMin && (
+            <>
+            {/* Bouton RÉDUIRE (D3) — au-dessus du radar, pour libérer l'écran sans annuler le RDV */}
+            <button onClick={()=>setRadarMin(true)} title={lang==='en'?'Minimize':'Réduire'}
+              style={{position:'fixed',right:14,bottom:'calc(192px + var(--sab))',zIndex:2700,width:34,height:34,borderRadius:17,
+                background:'rgba(20,10,16,.82)',border:`1px solid ${C.border}`,color:'#fff',fontSize:16,fontWeight:900,cursor:'pointer',
+                fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(0,0,0,.3)'}}>↓</button>
             <ProximityRadar
               verrou={{...activeVerrou}}
               userId={user.id}
@@ -11450,6 +11474,7 @@ export default function App2() {
                 setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===activeVerrou.id?{...cl,status:'completed'}:cl))
               }}
             />
+            </>
           )}
 
           {/* Modals */}

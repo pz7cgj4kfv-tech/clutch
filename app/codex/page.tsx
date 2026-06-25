@@ -2,211 +2,266 @@
 import { useState, useEffect } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CODEX CLUTCH — la "Bible" : l'Histoire (roman), l'Architecture, les Algorithmes,
-// le Lexique du code, les Paramètres réglables, et le Journal brut.
-// Page isolée, protégée par mot de passe. N'affecte JAMAIS l'app (aucun import app2).
-// Vivant : on l'enrichit à chaque grande étape. Demandé par David le 25.06.
+// CODEX CLUTCH — documentation technique DENSE (niveau chercheur/ingénieur).
+// Objectif David : « documente comme un fou, dans le détail, petite police ».
+// Page isolée, protégée par mot de passe. Aucun import de l'app → zéro impact runtime.
+// Vivant : enrichi à chaque étape. Source de vérité longue : docs/ + mémoire projet.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PWD = 'clutch2026!'
 const C = {
-  bg: '#2A0F22', card: '#3a1830', cardSoft: 'rgba(255,255,255,.04)',
-  salmon: '#FFBF9E', orange: '#E27C00', text: '#F5E8DE', mid: 'rgba(245,232,222,.62)',
-  green: '#77BC1F', border: 'rgba(255,191,158,.15)', revel: '#E27C00', todo: '#77BC1F',
+  bg:'#241019', panel:'#160a11', card:'#30141f', soft:'rgba(255,255,255,.035)',
+  salmon:'#FFBF9E', orange:'#E27C00', green:'#77BC1F', red:'#e87b7b',
+  text:'#ece0d7', mid:'rgba(236,224,215,.58)', dim:'rgba(236,224,215,.36)',
+  border:'rgba(255,191,158,.13)', code:'#0f0710',
 }
 
-function Lock({ onUnlock }: { onUnlock: () => void }) {
-  const [val, setVal] = useState(''); const [err, setErr] = useState(false)
-  const check = () => { if (val === PWD) { try { localStorage.setItem('codex_ok', '1') } catch {} onUnlock() } else { setErr(true); setVal(''); setTimeout(() => setErr(false), 900) } }
-  return (
-    <div style={{ minHeight:'100vh', background:C.bg, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'-apple-system,sans-serif' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:30, fontWeight:900, letterSpacing:'-.05em', marginBottom:8 }}><span style={{color:C.salmon}}>CLU</span><span style={{color:C.orange}}>TCH</span> <span style={{fontSize:15,color:'rgba(255,191,158,.4)'}}>CODEX</span></div>
-        <div style={{ color:C.mid, fontSize:12, marginBottom:28 }}>La Bible du code, des algorithmes et de l'histoire</div>
-        <input autoFocus type="password" value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&check()} placeholder="mot de passe"
-          style={{ background: err?'#450a0a':'#3D1A33', border:`1px solid ${err?'#ef4444':C.border}`, borderRadius:12, padding:'12px 20px', fontSize:16, color:C.text, outline:'none', textAlign:'center', width:220, fontFamily:'inherit' }} />
-        <div style={{ marginTop:16 }}><button onClick={check} style={{ background:C.orange, color:'#fff', border:'none', borderRadius:10, padding:'10px 30px', fontSize:14, fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>Entrer</button></div>
-      </div>
-    </div>
-  )
+function Lock({ onUnlock }:{ onUnlock:()=>void }) {
+  const [v,setV]=useState(''); const [e,setE]=useState(false)
+  const go=()=>{ if(v===PWD){ try{localStorage.setItem('codex_ok','1')}catch{} onUnlock() } else { setE(true); setV(''); setTimeout(()=>setE(false),900) } }
+  return (<div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'-apple-system,sans-serif'}}>
+    <div style={{textAlign:'center'}}>
+      <div style={{fontSize:28,fontWeight:900,letterSpacing:'-.05em'}}><span style={{color:C.salmon}}>CLU</span><span style={{color:C.orange}}>TCH</span> <span style={{fontSize:13,color:'rgba(255,191,158,.4)'}}>CODEX</span></div>
+      <div style={{color:C.mid,fontSize:11.5,margin:'6px 0 24px'}}>Documentation technique — accès restreint</div>
+      <input autoFocus type="password" value={v} onChange={x=>setV(x.target.value)} onKeyDown={x=>x.key==='Enter'&&go()} placeholder="mot de passe"
+        style={{background:e?'#450a0a':'#3D1A33',border:`1px solid ${e?'#ef4444':C.border}`,borderRadius:10,padding:'11px 18px',fontSize:15,color:C.text,outline:'none',textAlign:'center',width:210,fontFamily:'inherit'}}/>
+      <div style={{marginTop:14}}><button onClick={go} style={{background:C.orange,color:'#fff',border:'none',borderRadius:9,padding:'9px 28px',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Entrer</button></div>
+    </div></div>)
 }
 
-// ── Petits composants de mise en page ──
-const H = ({children}:{children:any}) => <h2 style={{fontSize:19,fontWeight:900,color:C.salmon,margin:'26px 0 10px',letterSpacing:'-.01em'}}>{children}</h2>
-const P = ({children,style}:{children:any,style?:any}) => <p style={{fontSize:14.5,lineHeight:1.72,color:C.text,margin:'0 0 12px',...style}}>{children}</p>
-const Revel = ({children}:{children:any}) => <div style={{background:'linear-gradient(135deg,rgba(226,124,0,.16),rgba(226,124,0,.05))',border:`1px solid ${C.revel}55`,borderLeft:`3px solid ${C.revel}`,borderRadius:12,padding:'13px 16px',margin:'14px 0',fontSize:14.5,lineHeight:1.65,color:C.text}}><span style={{fontWeight:900,color:C.orange}}>💡 Révélation — </span>{children}</div>
-const Todo = ({children}:{children:any}) => <div style={{background:'rgba(119,188,31,.08)',border:`1px dashed ${C.todo}77`,borderRadius:12,padding:'11px 15px',margin:'10px 0',fontSize:13.5,lineHeight:1.6,color:C.text}}><span style={{fontWeight:900,color:C.green}}>⏳ À implémenter — </span>{children}</div>
-const Code = ({children}:{children:any}) => <pre style={{background:'#1c0a16',border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.salmon,overflowX:'auto',margin:'10px 0',fontFamily:'ui-monospace,Menlo,monospace',lineHeight:1.5}}>{children}</pre>
-const Def = ({mot,children}:{mot:string,children:any}) => <div style={{margin:'0 0 14px',padding:'12px 15px',background:C.cardSoft,borderRadius:12,border:`1px solid ${C.border}`}}><div style={{fontWeight:900,color:C.orange,fontSize:14.5,marginBottom:3}}>{mot}</div><div style={{fontSize:13.5,lineHeight:1.6,color:C.text}}>{children}</div></div>
+// ── primitives denses ──
+const H=({c}:{c:any})=><div style={{fontSize:15,fontWeight:900,color:C.salmon,margin:'20px 0 7px',letterSpacing:'-.01em'}}>{c}</div>
+const Sub=({c}:{c:any})=><div style={{fontSize:12.5,fontWeight:800,color:C.orange,margin:'13px 0 4px'}}>{c}</div>
+const P=({c,s}:{c:any,s?:any})=><div style={{fontSize:12.3,lineHeight:1.62,color:C.text,margin:'0 0 8px',...s}}>{c}</div>
+const Note=({c}:{c:any})=><div style={{fontSize:11.5,lineHeight:1.55,color:C.mid,margin:'0 0 8px'}}>{c}</div>
+const Code=({c}:{c:any})=><pre style={{background:C.code,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',fontSize:11,color:C.salmon,overflowX:'auto',margin:'7px 0',fontFamily:'ui-monospace,Menlo,monospace',lineHeight:1.5,whiteSpace:'pre'}}>{c}</pre>
+const Rev=({c}:{c:any})=><div style={{background:'rgba(226,124,0,.1)',borderLeft:`3px solid ${C.orange}`,borderRadius:'0 8px 8px 0',padding:'8px 12px',margin:'9px 0',fontSize:12,lineHeight:1.55,color:C.text}}><b style={{color:C.orange}}>▸ </b>{c}</div>
+const Todo=({c}:{c:any})=><div style={{background:'rgba(119,188,31,.07)',border:`1px dashed ${C.green}66`,borderRadius:8,padding:'8px 12px',margin:'7px 0',fontSize:11.8,lineHeight:1.55,color:C.text}}><b style={{color:C.green}}>⏳ </b>{c}</div>
+const KV=({k,v,d}:{k:any,v:any,d?:any})=>(<div style={{display:'flex',gap:9,padding:'6px 10px',borderBottom:`1px solid ${C.border}`,alignItems:'baseline',fontSize:11.8}}>
+  <div style={{flex:'0 0 34%',fontWeight:700,color:C.text}}>{k}</div><div style={{flex:'0 0 20%',fontWeight:900,color:C.orange,fontFamily:'ui-monospace,monospace'}}>{v}</div><div style={{flex:1,color:C.mid,fontSize:11}}>{d}</div></div>)
+const Tag=({c,col}:{c:any,col?:any})=><span style={{fontSize:10,fontWeight:800,padding:'1px 7px',borderRadius:20,background:`${col||C.green}22`,color:col||C.green,marginLeft:6}}>{c}</span>
 
-// ════════════════════════ CONTENU DES ONGLETS ════════════════════════
+// ════════════════════════════ ONGLETS ════════════════════════════
 
-function Histoire() {
-  return (<div>
-    <H>L'histoire de la Forteresse</H>
-    <P><i style={{color:C.mid}}>Comment, en une nuit, Clutch a dompté son problème le plus profond.</i></P>
-    <P>Tout commence par une angoisse de David, dictée à voix haute : <b>« Si je verrouille un Clutch, et qu'une autre personne m'en envoie un au même moment, qu'est-ce qui se passe ? Il y a une infinité de possibilités, ça devient pénible. Tout seul je n'y arriverai pas. »</b></P>
-    <P>Le problème réel, derrière les mots : <b>un être humain ne peut pas être à deux endroits en même temps.</b> Et une app de rencontre spontanée, où chacun envoie et reçoit des invitations qui se chevauchent dans le temps, fait exploser le nombre de cas à gérer. Les coder un par un, à la main, = la garantie d'en oublier et de tout casser.</P>
-    <Revel>David a eu l'intuition juste en évoquant <b>Coq</b> (un outil de preuve mathématique suggéré par son ami Dom) : il fallait <b>formaliser</b> les états et <b>prouver</b> qu'un état impossible ne peut jamais arriver. Coq lui-même était trop lourd — mais l'idée était la bonne.</Revel>
-    <P>La traduction « start-up » de cette intuition tient en trois briques : une <b>machine à états</b> (la liste finie de ce qu'un Clutch peut être), des <b>invariants</b> (des règles qui doivent TOUJOURS être vraies), et un <b>fuzzer</b> (un robot qui joue des milliers de scénarios au hasard pour trouver les failles à notre place).</P>
-    <Revel>Le déclic : on a <b>arrêté de raisonner en « Clutchs »</b> pour raisonner en <b>« engagements temporels »</b>. Un Clutch verrouillé et un événement accepté occupent tous les deux un créneau — c'est le <b>même moteur</b>. À partir de là, l'infini s'est effondré en une table et une règle.</Revel>
-    <P>On a challengé l'architecture chez GPT (un panel de 3 experts qui se contredisent). Il a apporté la pièce maîtresse : faire de l'occupation du temps un <b>objet de premier rang dans la base de données</b>, avec une contrainte Postgres (<code>EXCLUDE</code>) qui rend le chevauchement <b>impossible par construction</b> — pas par du code qu'on espère, mais par une loi physique de la base.</P>
-    <Revel>Le fuzzer a prouvé sa valeur deux fois. D'abord en validant <b>800 000 actions aléatoires → 0 faille</b>. Puis, quand on a ajouté le « buffer de 1h avant le RDV », il a <b>attrapé un vrai bug</b> qu'on s'apprêtait à livrer (la vérification regardait la mauvaise plage horaire). Le robot pense pour nous.</Revel>
-    <P>En une nuit : un moteur pur testé, une migration appliquée en production, le bouton Verrouiller qui gère les conflits en douceur, et les invitations qui se mettent « en pause » puis « revivent » toutes seules. <b>La fondation que David croyait infinie tient en une table, une contrainte et ~230 lignes testées.</b></P>
-    <P style={{color:C.mid,fontSize:13,marginTop:18}}>→ Détail technique dans l'onglet Architecture. Décisions horodatées dans le Journal.</P>
-  </div>)
-}
+function Histoire(){return(<div>
+  <H c="Histoire de la Forteresse anti-conflit"/>
+  <Note c="25–26 juin 2026. Comment Clutch a rendu mathématiquement impossible qu'un humain soit à deux endroits à la fois."/>
+  <P c={<>Origine — angoisse de David, dictée : « si je verrouille un Clutch et qu'une autre personne m'en envoie un au même moment, qu'est-ce qui se passe ? Il y a une <i>infinité</i> de possibilités, tout seul je n'y arriverai pas. » Le problème réel : une app de rencontre où chacun envoie/reçoit des invitations qui se chevauchent dans le temps → explosion combinatoire des cas. Les coder à la main = garantie d'en oublier.</>}/>
+  <Rev c={<>Intuition de David (via son ami Dom) : <b>Coq</b> — formaliser les états et <i>prouver</i> qu'un état impossible ne survient jamais. Coq = trop lourd pour 1 dev. Traduction « startup » retenue : <b>machine à états + invariants + fuzzer</b> (le robot qui cherche les failles à notre place).</>}/>
+  <Rev c={<>Le pivot conceptuel : arrêter de raisonner en « Clutchs », raisonner en <b>engagements temporels</b>. Un Clutch verrouillé et un event accepté occupent un créneau → <b>même moteur</b>. L'infini s'effondre en 1 table + 1 contrainte.</>}/>
+  <Rev c={<>Challenge GPT (panel 3 experts) → apport décisif : faire de l'occupation du temps un <b>objet de 1ʳᵉ classe en base</b> avec une contrainte <code>EXCLUDE USING gist</code> qui rend le chevauchement <i>impossible par construction</i>. La base tranche, pas le JS (contournable).</>}/>
+  <Rev c={<>Le fuzzer a prouvé sa valeur 2×: (a) 800 000 actions aléatoires → 0 faille ; (b) en ajoutant le buffer de 1h, il a <b>attrapé un vrai bug</b> qu'on allait livrer (garde sur plage brute ≠ plage occupée). Détail onglet Fuzzer.</>}/>
+  <P c={<>Livré en ~24h : moteur pur testé, 2 migrations en prod (clutchs + events), conflits gérés en douceur côté UI, invitations « en pause » qui revivent seules. Fondation crue infinie → <b>1 table, 1 contrainte, ~245 lignes testées</b>.</>}/>
+</div>)}
 
-function Architecture() {
-  return (<div>
-    <H>L'architecture, expliquée simplement</H>
-    <P><i style={{color:C.mid}}>Lisible par quelqu'un qui ne code pas (Mel), assez précise pour une autre IA.</i></P>
-    <H>① Le principe</H>
-    <P>On ne stocke pas « qui aime qui ». On gère <b>du temps</b>. Chaque rendez-vous confirmé crée une <b>occupation</b> : « cette personne est prise de telle heure à telle heure ». Deux occupations qui se chevauchent pour la même personne = interdit.</P>
-    <H>② Les deux dimensions (ne jamais mélanger)</H>
-    <P>• <b>L'engagement</b> : où en est le Clutch ? (en attente → verrouillé → terminé, ou refusé / expiré / annulé). <br/>• <b>La présence</b> : la personne est-elle physiquement arrivée ? (le « J'y suis »). C'est une <b>autre</b> dimension, séparée — sinon le nombre d'états explose.</P>
-    <H>③ La table des occupations</H>
-    <P>Une table <code>occupancies</code> : pour chaque rendez-vous confirmé, une ligne par participant (« user X, de 19h à 22h »). Elle est <b>dérivée</b> automatiquement : on ne l'écrit jamais à la main. Quand un Clutch se verrouille, un déclencheur (trigger) la remplit ; quand il s'annule, elle se vide. Sinon, on aurait des « occupations fantômes » qui bloqueraient quelqu'un à vie.</P>
-    <H>④ La loi physique : la contrainte EXCLUDE</H>
-    <P>Une seule ligne de configuration Postgres rend <b>impossible</b> l'insertion de deux occupations qui se croisent pour la même personne. Si deux personnes confirment au même millième de seconde, <b>une réussit, une échoue</b> — jamais les deux. C'est la base de données qui tranche, pas le téléphone (qu'on pourrait pirater).</P>
-    <Code>{`occupancies : user_id | start_at | end_at | source (clutch/event)
-   ↑ contrainte EXCLUDE : pas 2 plages qui se chevauchent par user`}</Code>
-    <H>⑤ « En pause » et « revival »</H>
-    <P>Une invitation reçue qui tombe sur une heure déjà prise n'est pas supprimée : elle passe <b>« en pause »</b> (calmée, sortie des actions urgentes). Ce n'est jamais stocké — c'est <b>calculé</b>. Donc si on annule le rendez-vous qui bloquait, l'invitation <b>revit toute seule</b>, sans qu'on ait rien réécrit.</P>
-    <H>⑥ Sans serveur</H>
-    <P>Clutch n'a pas de serveur à lui (site statique). Tout passe par Supabase (la base de données), appelée directement depuis l'app. La forteresse vit donc <b>dans la base</b> — exactement là où il faut, pour qu'elle soit incontournable.</P>
-    <Todo><b>Phase 2 — Événements.</b> Les events n'ont pas encore d'horaire exploitable par la machine (juste un texte). À faire : leur donner un vrai <code>starts_at</code> + durée, puis les brancher sur le même moteur d'occupation (migration prête : <code>20260626_events_occupancy.sql</code>).</Todo>
-  </div>)
-}
+function Schema(){return(<div>
+  <H c="Schéma réel (production, vérifié par diagnostic SQL)"/>
+  <Note c="⚠️ Le fichier supabase-schema.sql du repo est PÉRIMÉ. Vérité = la base live (interrogée le 25.06 via information_schema)."/>
+  <Sub c="Table clutches — 35 colonnes (extrait pertinent)"/>
+  <Code c={`id uuid · sender_id uuid · receiver_id uuid
+venue text · venue_lat/lng double · venue_safety text
+proposed_time timestamptz       -- heure proposée du RDV
+counter_time  timestamptz       -- si contre-proposition (prioritaire)
+duration_minutes int            -- NULL=normal(→120) · 60 si is_quick_date
+is_quick_date boolean · is_contact_rdv boolean
+status text  CHECK ∈ {pending, accepted, confirmed, checked_in,
+                      declined, expired, cancelled, completed}
+checked_in_sender/receiver bool · sender_arrived/receiver_arrived bool
+expires_at timestamptz (def now()+2h) · created_at · updated_at`}/>
+  <Note c={<>Répartition réelle des status (25.06) : cancelled 217 · expired 52 · completed 40 · declined 4 · pending 2 · confirmed 1 · (accepted/checked_in 0).</>}/>
+  <Rev c={<><b>Vocabulaire « Verrou » incohérent</b> dans la base : les bots écrivaient <code>accepted</code>, le bouton humain <code>confirmed</code>, et <code>checked_in</code> existe aussi. Les 3 = « RDV confirmé qui occupe ». La forteresse les traite identiquement.</>}/>
+  <Sub c="Tables events / event_participants"/>
+  <Code c={`events: id, title, venue, date_label(texte), spots, status, created_by
+  + AJOUTÉ 26.06 : starts_at timestamptz, duration_minutes int
+event_participants: (event_id, user_id) PK, joined_at   -- pas de status`}/>
+  <Note c={<>Avant le 26.06 les events n'avaient qu'un <code>date_label</code> texte (« Ce soir · 19:00 ») → inexploitable. L'app calcule désormais un vrai <code>starts_at</code> depuis « Aujourd'hui/Demain » + heure HH:MM.</>}/>
+  <Sub c="Table occupancies (créée 25.06) — le cœur"/>
+  <Code c={`occupancies(
+  id uuid pk, user_id uuid,
+  start_at timestamptz, end_at timestamptz,
+  source_type text,   -- 'clutch' | 'event'
+  source_id uuid,
+  CHECK(start_at < end_at))
+index (user_id) · RLS: select WHERE user_id = auth.uid()  (anti-sonde)`}/>
+</div>)}
 
-function Algorithmes() {
-  return (<div>
-    <H>Les algorithmes de Clutch</H>
-    <P><i style={{color:C.mid}}>On a plusieurs « cerveaux ». Voici lesquels, et la solution trouvée pour chacun.</i></P>
+function Archi(){return(<div>
+  <H c="Architecture base de données (SQL réel)"/>
+  <Sub c="① La loi physique : contrainte d'exclusion"/>
+  <Code c={`CREATE EXTENSION IF NOT EXISTS btree_gist;
+ALTER TABLE occupancies ADD CONSTRAINT occ_no_overlap
+  EXCLUDE USING gist (
+    user_id WITH =,
+    tstzrange(start_at, end_at, '[)') WITH &&  );`}/>
+  <P c={<>Pour un même <code>user_id</code>, deux plages temporelles qui se chevauchent (<code>&&</code>) sont <b>refusées à l'insertion</b>. Intervalle <b>demi-ouvert <code>[)</code></b> : deux RDV bout-à-bout (18–20h puis 20–22h) ne se chevauchent PAS (réaliste). Concurrence : 2 confirmations simultanées → 1 réussit, 1 échoue (atomique, transactionnel).</>}/>
+  <Sub c="② Occupation = projection DÉRIVÉE (trigger, jamais saisie main)"/>
+  <P c={<>Règle de correction : si on écrivait l'occupation à la main, un event supprimé sans nettoyage → « occupation fantôme » bloquant l'user à vie. Donc trigger uniquement.</>}/>
+  <Code c={`-- sync_clutch_occupancy() — AFTER INSERT/UPDATE/DELETE on clutches
+occupe ⇔ status ∈ {accepted, confirmed, checked_in}
+v_start := coalesce(counter_time, proposed_time)
+start_at := v_start - interval '60 min'     -- BUFFER prépa
+end_at   := v_start + coalesce(duration_minutes,120)·min
+DELETE occ du clutch ; si occupe → INSERT (sender) + (receiver)`}/>
+  <Code c={`-- sync_event_occupancy() — AFTER INSERT/DELETE on event_participants
+start_at := events.starts_at - 60min
+end_at   := events.starts_at + coalesce(duration_minutes,180)·min
+INSERT 1 occ pour le user qui rejoint  (NULL starts_at → rien)
+-- resync_event_participants() — si starts_at change, recalcule tous`}/>
+  <P c={<>Trigger en <code>SECURITY DEFINER</code> (écrit les occupancies des 2 users malgré la RLS). Une insertion qui violerait <code>occ_no_overlap</code> fait échouer la transaction déclenchante → le verrou/inscription est refusé en base. Côté UI : message doux (cf. onglet Fichiers, points de branchement).</>}/>
+  <Sub c="③ Sans serveur"/>
+  <P c={<>Clutch = site statique (Next.js <code>output:'export'</code>), zéro backend propre. Tout via Supabase (Postgres) appelé depuis le client. La forteresse vit donc <b>dans la base</b> — incontournable, non contournable par un client modifié.</>}/>
+</div>)}
 
-    <H>1. L'anti-conflit (la Forteresse) — <span style={{color:C.green}}>fait</span></H>
-    <P><b>Problème :</b> empêcher qu'une personne soit à deux endroits à la fois.<br/><b>Solution :</b> 7 <b>invariants</b> (règles toujours vraies), garantis par la base de données. Le plus important : aucune occupation qui se chevauche par personne. La fenêtre bloquée d'un RDV = <b>[heure − 1h de prépa, heure + durée]</b>.</P>
-    <P style={{fontWeight:800,color:C.salmon,marginTop:8}}>Les 7 invariants :</P>
-    <P style={{fontSize:13.5}}>1. Pas de chevauchement (Clutch + event) · 2. On ne se clutche pas soi-même · 3. Pas 2 conversations actives entre les mêmes 2 personnes · 4. Un event accepté occupe un créneau · 5. Un RDV terminé ne « re-vit » jamais · 6. Le début est toujours avant la fin · 7. Les transitions sont à sens unique (pas de marche arrière illogique).</P>
+function Moteur(){return(<div>
+  <H c="Moteur pur — machine à états & invariants"/>
+  <Note c="lib/clutch-states.ts (~245 l, 0 dépendance DB/UI). Logique rejouable hors-ligne par le fuzzer. Source de vérité de la logique."/>
+  <Sub c="Deux dimensions séparées"/>
+  <Code c={`RelState (engagement) : pending → locked → completed
+                       ↘ refused | expired | cancelled | no_show
+PresState (présence)  : none → arrived → both_arrived   (= le 'J'y suis')`}/>
+  <Sub c="Table des transitions autorisées (INV7 — monotonie)"/>
+  <Code c={`pending   → {locked, refused, expired, cancelled}
+locked    → {completed, no_show, cancelled}
+completed/refused/expired/cancelled/no_show → {}  (terminaux figés)`}/>
+  <Sub c="Plage d'occupation (source unique : clutchOccRange)"/>
+  <Code c={`clutchOccRange(c) = [ c.startAt - PREP_BUFFER_MIN·min , c.endAt ]
+// utilisée À LA FOIS pour créer l'occupation ET pour la garde au lock.
+// (les désaligner = la faille que le fuzzer a trouvée — voir onglet Fuzzer)`}/>
+  <Sub c="Les 7 invariants"/>
+  <P s={{fontSize:11.6,lineHeight:1.7}} c={<>
+    <b>INV1</b> — aucun chevauchement d'occupations actives par user (clutch + event confondus). <i>Garanti par EXCLUDE gist.</i><br/>
+    <b>INV2</b> — sender ≠ receiver. <i>CHECK.</i><br/>
+    <b>INV3</b> — pas 2 clutchs actifs (non terminaux) entre la même paire — clé canonique <code>pairKey(a,b)=min|max</code> (anti A→B & B→A simultané).<br/>
+    <b>INV4</b> — un event accepté occupe un créneau (même table occupancies).<br/>
+    <b>INV5</b> — un état terminal ne redevient jamais actif.<br/>
+    <b>INV6</b> — start_at &lt; end_at toujours.<br/>
+    <b>INV7</b> — transitions monotones (pas de <code>completed→locked</code>).</>}/>
+  <Sub c="« En pause » & revival (calculé, jamais stocké)"/>
+  <P c={<><code>isPaused(c)</code> = un pending dont <code>clutchOccRange</code> chevauche une de mes occupations actives. Le statut <b>reste pending</b> (aucune écriture). Si le RDV bloquant s'annule → l'occupation disparaît → le pending « revit » seul. Pas de transition non-monotone, pas de ping-pong d'état.</>}/>
+  <Sub c="Réducteur"/>
+  <Code c={`apply(world, action) → { world', ok, reason }   // pur, immuable (structuredClone)
+actions: create_clutch · lock · refuse · expire · cancel · complete
+         · no_show · counter_propose · accept_event · release_event · checkin
+lock: refuse si !canTransition || userOccupied(clutchOccRange)  // = la garde INV1`}/>
+</div>)}
 
-    <H>2. Le tri des présences (compatibilité) — <span style={{color:C.green}}>fait</span></H>
-    <P>Classe les profils visibles par <b>compatibilité</b> (centres d'intérêt communs), <b>proximité</b> et <b>fiabilité</b>. Pondéré, ajustable.</P>
+function Fuzzer(){return(<div>
+  <H c="Le fuzzer — preuve par 800 000 actions"/>
+  <Note c="scripts/fuzz-clutch-states.mts — zéro dépendance (Node 24 lit le .ts nativement)."/>
+  <Sub c="Méthodologie (property-based testing)"/>
+  <P c={<>PRNG déterministe <b>mulberry32</b> (graine = n° de run → reproductible, pas de <code>Math.random</code>). <b>20 000 séquences × 40 actions = 800 000 actions</b>. Univers réduit (4 users, 6 créneaux, durées variées) pour <i>maximiser</i> les collisions. Après CHAQUE action : on rejoue les invariants + on vérifie la monotonie (un terminal ne doit jamais redevenir actif). À la moindre violation → la séquence exacte est imprimée (graine + index) pour reproduction.</>}/>
+  <Sub c="Lancer"/>
+  <Code c={`npm run fuzz
+→ 8 tests ciblés (ex. « Verrou pendant un event accepté refusé »)
+→ 800 000 actions jouées · ~390k acceptées · ~410k refusées à juste titre
+→ ✅ 0 violation. La forteresse tient.`}/>
+  <Sub c="Le bug réel attrapé (26.06)"/>
+  <P c={<>En introduisant le buffer de 1h, le fuzzer a échoué au pas #13 d'une séquence : <code>INV1(u2: clutch:c2 ∩ event:c4)</code>.</>}/>
+  <Code c={`Cause : la GARDE au lock testait la plage BRUTE [start, end]
+        mais l'occupation créée était BUFFERISÉE [start-1h, end].
+→ un lock passait la garde puis créait une occupation
+  qui chevauchait un event existant.
+Fix : clutchOccRange() = source UNIQUE pour la garde ET l'occupation.
+→ re-fuzz : 800 000 actions, 0 violation.`}/>
+  <Rev c={<>Sans le fuzzer, ce bug partait en prod. Réponse concrète à « comment ne rien rater » : on ne pense pas à la main — le robot pense pour nous.</>}/>
+  <Sub c="Les 8 propriétés vérifiées"/>
+  <Note c="INV1 jamais violé · sender≠receiver · pas de paire active double · aucun overlap résiduel · terminal reste terminal · concurrence (2 locks → 1 succès) · pendings incompatibles en pause · idempotence de lock."/>
+</div>)}
 
-    <H>3. Le thermostat de densité — <span style={{color:C.green}}>fait</span></H>
-    <P>Quand il y a <b>beaucoup</b> de monde, le filtre devient plus sévère ; quand il y a <b>peu</b> de monde, plus souple. L'algo s'adapte à la foule.</P>
+function Lexique(){const D=({m,c}:{m:any,c:any})=><div style={{margin:'0 0 8px',padding:'8px 11px',background:C.soft,borderRadius:8,border:`1px solid ${C.border}`}}><span style={{fontWeight:900,color:C.orange,fontSize:12.3}}>{m}</span><span style={{fontSize:11.6,lineHeight:1.5,color:C.text}}> — {c}</span></div>
+  return(<div><H c="Lexique du code"/><Note c="Pour parler la même langue (utile à Mel et à toute IA reprenant le projet)."/>
+  <D m="Invariant" c="règle vraie À TOUT MOMENT. Si elle casse = bug grave. Ex. INV1."/>
+  <D m="Machine à états" c="liste FINIE des situations d'une chose + passages autorisés. Dompte l'explosion combinatoire."/>
+  <D m="Fuzzer / property-based testing" c="robot qui joue des milliers d'actions aléatoires et asserte des propriétés après chacune."/>
+  <D m="PRNG (mulberry32)" c="générateur pseudo-aléatoire à graine → mêmes tirages à chaque run = bug reproductible."/>
+  <D m="Timestamp / tstzrange" c="instant précis (timestamptz) ; tstzrange = intervalle de temps Postgres ([) = demi-ouvert)."/>
+  <D m="Occupation (occupancy)" c="plage [start,end] pendant laquelle un user est pris. Unité de base de la forteresse."/>
+  <D m="EXCLUDE USING gist" c="contrainte Postgres refusant 2 lignes dont des champs 'se chevauchent' (via index GiST + btree_gist)."/>
+  <D m="Trigger" c="code en base exécuté automatiquement à un changement de donnée (INSERT/UPDATE/DELETE)."/>
+  <D m="SECURITY DEFINER" c="fonction exécutée avec les droits de son créateur → peut écrire malgré la RLS de l'appelant."/>
+  <D m="RLS (Row Level Security)" c="règles 'qui voit/modifie quelle ligne'. Ici : chacun ne voit que SES occupations."/>
+  <D m="RPC" c="appel direct d'une fonction Postgres depuis le client (supabase.rpc) — pas de serveur intermédiaire."/>
+  <D m="Pending" c="clutch envoyé non accepté. N'occupe RIEN → ne bloque personne. Le blocage n'arrive qu'au verrouillage."/>
+  <D m="Buffer" c="marge. Ici 1h AVANT le RDV où l'on ne peut plus rien verrouiller (trajet/prépa)."/>
+  <D m="Projection dérivée" c="donnée recalculée depuis une source (occupancies dérivée des clutchs/events), jamais saisie main."/>
+  <D m="Monotonie (des transitions)" c="à sens unique : un état terminal ne revient jamais en arrière."/>
+  </div>)}
 
-    <H>4. L'algo auto-apprenant (cooldown & bienveillance) — <span style={{color:C.green}}>à concevoir</span></H>
-    <Todo><b>Cooldown après refus.</b> Si B refuse A, A ne peut plus re-clutcher B pendant <b>48h</b> (configurable). À chaque nouveau refus, le délai <b>double</b> (48h → 96h → …). Au-delà de 3 refus, l'algo <b>ne propose plus</b> A à B. Un clutch simplement <b>expiré</b> (pas vu) n'entraîne <b>pas</b> de cooldown.</Todo>
-    <Todo><b>Aider les laissés-pour-compte.</b> Détecter quelqu'un qui ne reçoit JAMAIS de clutch → boost de visibilité + coaching doux (« ajoute une photo », « commence par un événement de groupe »). Cœur de la « forteresse bienveillante ».</Todo>
+function Params(){const R=[['rdvDurationDefaultMin','120','RDV normal = 2h (duration_minutes NULL)'],['rdvDurationQuickMin','60','Quick Clutch = 1h'],['prepBufferMin','60','blocage dès 1h avant le RDV'],['clutchReplyWindowH','2','expiration d\'un clutch non répondu'],['refuseCooldownH','48','délai avant de re-clutcher après refus'],['refuseCooldownFactor','2','le cooldown double à chaque refus'],['refuseStopAfter','3','au-delà, l\'algo ne propose plus'],['eventDurationDefaultMin','180','durée event par défaut = 3h'],['maxHorizonH','18','fenêtre structurelle du produit']]
+  return(<div><H c="Paramètres réglables"/><Note c={<>Source unique : <code>lib/clutch-config.ts</code>. Règle permanente : aucun nombre magique dispersé ; on change ici, la logique suit.</>}/>
+  <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',margin:'8px 0'}}>{R.map((r,i)=><KV key={i} k={r[0]} v={r[1]} d={r[2]}/>)}</div>
+  <Todo c="À challenger GPT : doublement du cooldown, seuil d'arrêt (3), cas 'clutch expiré' répété."/></div>)}
 
-    <H>Comment on teste : le fuzzer</H>
-    <P>Un robot joue des dizaines de milliers de scénarios aléatoires et vérifie qu'aucun invariant ne casse, après chaque action. Si une faille apparaît, il crache la séquence exacte pour la reproduire. C'est notre filet de sécurité contre « l'infinité de cas ».</P>
-    <Code>{`npm run fuzz
-→ 800 000 actions jouées · 0 violation. La forteresse tient.`}</Code>
-  </div>)
-}
+function Decisions(){const L=[
+  ['25.06','Forteresse — fondation',<>Machine à états pure + fuzzer (800k/0). Migration <code>occupancies</code> + EXCLUDE en prod (shadow→enforce). Bouton Verrouiller : rollback optimiste + message doux sur conflit (app2 ~L10968).</>],
+  ['25.06','Durée RDV 1h→2h',<>Erreur rattrapée : <code>duration_minutes: isQuickDate?60:null</code> (app2 L1893) ⇒ quick=1h donc normal=2h. Leçon : vérifier la vraie valeur avant de trancher un défaut délégué.</>],
+  ['26.06','Buffer 1h avant',<>Occupation = [proposed−1h, proposed+durée]. Le fuzzer a attrapé un bug (garde brute vs occupée) → <code>clutchOccRange()</code> source unique. Appliqué en prod (trigger MAJ + resync).</>],
+  ['26.06','Events Phase 2',<>Migration <code>20260626_events_occupancy.sql</code> en prod. App : création écrit <code>starts_at</code> (L2945) ; rejoindre un event chevauchant → refus doux (L3171). EXCLUDE couvre clutch↔event et event↔event.</>],
+  ['25.06','Produit — refus',<>Expiration douce (pas de « rejeté » brutal). Refus ≠ expiré : refus → cooldown 48h ×2 escalade puis arrêt ; expiré (pas vu) → pas de cooldown. Occupé peut envoyer (pas verrouiller dans la fenêtre).</>],
+  ['25.06','Ouvert — notif refus',<>Notifie-t-on un refus ? Reco : non (flou protecteur, anti-sonde). À valider David.</>],
+]
+  return(<div><H c="Journal des décisions (horodaté, justifié)"/><Note c="Rien ne se perd. Détail long : docs/architecture-engagements.md + mémoire projet."/>
+  {L.map((l,i)=><div key={i} style={{borderLeft:`2px solid ${C.border}`,padding:'1px 0 13px 14px',position:'relative',marginLeft:3}}>
+    <div style={{position:'absolute',left:-5,top:3,width:8,height:8,borderRadius:'50%',background:C.orange}}/>
+    <div style={{fontSize:10,color:C.dim,fontWeight:700}}>{l[0]}</div>
+    <div style={{fontSize:12.8,fontWeight:900,color:C.salmon,margin:'1px 0 3px'}}>{l[1]}</div>
+    <div style={{fontSize:11.6,lineHeight:1.55,color:C.text}}>{l[2]}</div></div>)}
+  </div>)}
 
-function Lexique() {
-  return (<div>
-    <H>Le lexique du code</H>
-    <P><i style={{color:C.mid}}>Les mots qu'on emploie quand on parle programmation. Pour qu'on parle la même langue.</i></P>
-    <Def mot="Invariant">Une règle qui doit être vraie À TOUT MOMENT, quoi qu'il arrive. Ex. « personne n'est à deux endroits à la fois ». Si un invariant casse, c'est un bug grave.</Def>
-    <Def mot="Machine à états">La liste FINIE des situations possibles d'une chose, et des passages autorisés de l'une à l'autre. Un Clutch est : en attente → verrouillé → terminé (ou refusé/expiré/annulé).</Def>
-    <Def mot="Fuzzer">Un robot de test qui balance des milliers d'actions AU HASARD pour trouver les cas qu'un humain n'aurait pas imaginés. « Fuzz » = bruit aléatoire.</Def>
-    <Def mot="Timestamp">Un instant précis (date + heure), lisible par la machine. Ex. « 2026-06-25 20:00 ». Sert à calculer les chevauchements.</Def>
-    <Def mot="Occupation (occupancy)">Une plage de temps pendant laquelle une personne est « prise » par un RDV confirmé. C'est l'unité de base de la forteresse.</Def>
-    <Def mot="Contrainte EXCLUDE (gist)">Une loi posée dans la base de données qui REFUSE physiquement deux plages de temps qui se chevauchent pour la même personne. Imparable.</Def>
-    <Def mot="Trigger (déclencheur)">Un bout de code dans la base qui s'exécute TOUT SEUL quand une donnée change. Ex. « quand un Clutch se verrouille → crée son occupation ».</Def>
-    <Def mot="RPC (appel de fonction distante)">L'app demande à la base d'exécuter une fonction précise (ex. « verrouille ce Clutch »), de façon atomique et sûre, sans serveur intermédiaire.</Def>
-    <Def mot="Pending (en attente)">Un Clutch envoyé mais pas encore accepté. Important : il n'occupe AUCUN créneau → il ne bloque personne. Le blocage n'arrive qu'au verrouillage.</Def>
-    <Def mot="Buffer (tampon)">Une marge de sécurité. Ici : 1h AVANT le RDV pendant laquelle on ne peut plus rien verrouiller (le temps de s'y rendre).</Def>
-    <Def mot="Migration SQL">Un fichier qui modifie la structure de la base (ajoute une table, une règle…). On les numérote par date pour garder l'historique.</Def>
-    <Def mot="RLS (sécurité par ligne)">Des règles qui décident QUI a le droit de voir/modifier quelle ligne. Ex. « chacun ne voit que SES occupations » (anti-espionnage d'agenda).</Def>
-  </div>)
-}
+function Fichiers(){const F=[
+  ['lib/clutch-states.ts','~245 l','Moteur pur : états, transitions, 7 invariants, clutchOccRange, isPaused, reducer apply().'],
+  ['scripts/fuzz-clutch-states.mts','~190 l','Fuzzer : 8 tests ciblés + 800k actions aléatoires. npm run fuzz.'],
+  ['lib/clutch-config.ts','~40 l','Tous les paramètres réglables (durées, buffer, cooldown, horizon).'],
+  ['supabase/migrations/20260625_occupancies.sql','—','Table occupancies + EXCLUDE + trigger clutch + RLS (appliqué prod).'],
+  ['supabase/migrations/20260626_events_occupancy.sql','—','starts_at/durée events + triggers event (appliqué prod).'],
+  ['docs/architecture-engagements.md','—','Spec longue de la forteresse (source de vérité écrite).'],
+  ['app/app2/page.tsx','~11,7k l','Branchements : L2945 starts_at · L3171 join conflict · L10968 verrou conflict · L10505 isPausedClutch.'],
+]
+  return(<div><H c="Inventaire des fichiers"/><Note c="Où vit quoi. (Lignes approximatives.)"/>
+  {F.map((f,i)=><div key={i} style={{padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
+    <div style={{display:'flex',gap:8,alignItems:'baseline'}}><code style={{fontSize:11.5,color:C.orange,fontWeight:700}}>{f[0]}</code><span style={{fontSize:10,color:C.dim}}>{f[1]}</span></div>
+    <div style={{fontSize:11.3,color:C.mid,lineHeight:1.5,marginTop:2}}>{f[2]}</div></div>)}
+  </div>)}
 
-function Parametres() {
-  const rows = [
-    ['Durée RDV normal', '2h (120 min)', 'Combien de temps un Clutch bloque l\'agenda'],
-    ['Durée Quick Clutch', '1h (60 min)', 'Rencontre éclair'],
-    ['Buffer de prépa', '1h avant', 'On ne peut plus verrouiller dès 1h avant le RDV'],
-    ['Délai de réponse', '2h', 'Un clutch reçu non répondu expire'],
-    ['Cooldown après refus', '48h', 'Avant de pouvoir re-clutcher la même personne'],
-    ['Escalade du cooldown', '×2', 'Le délai double à chaque nouveau refus'],
-    ['Arrêt de proposition', '3 refus', 'Au-delà, l\'algo ne propose plus la personne'],
-    ['Horizon max', '18h', 'Tout se joue dans une fenêtre de 18h (ADN du produit)'],
-  ]
-  return (<div>
-    <H>Les paramètres réglables</H>
-    <P><i style={{color:C.mid}}>Tous changeables en UN endroit (<code>lib/clutch-config.ts</code>) sans casser la logique. Règle permanente de David.</i></P>
-    <div style={{border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',margin:'12px 0'}}>
-      {rows.map((r,i)=>(
-        <div key={i} style={{display:'flex',gap:10,padding:'11px 14px',background:i%2?C.cardSoft:'transparent',alignItems:'baseline'}}>
-          <div style={{flex:'0 0 38%',fontWeight:800,color:C.text,fontSize:13.5}}>{r[0]}</div>
-          <div style={{flex:'0 0 18%',fontWeight:900,color:C.orange,fontSize:13.5}}>{r[1]}</div>
-          <div style={{flex:1,color:C.mid,fontSize:12.5}}>{r[2]}</div>
-        </div>
-      ))}
-    </div>
-    <P style={{fontSize:13,color:C.mid}}>En pratique on découvrira que certaines valeurs sont trop courtes/longues. On les changera ici, et toute la logique suivra — c'est tout l'intérêt de l'architecture évolutive.</P>
-    <Todo><b>À challenger chez GPT :</b> le doublement du cooldown, le seuil d'arrêt (3 refus), et le cas « clutch expiré plusieurs fois de suite ».</Todo>
-  </div>)
-}
+function Roadmap(){return(<div><H c="À implémenter (roadmap technique)"/>
+  <Todo c={<><b>Algo auto-apprenant — cooldown refus.</b> B refuse A → A ne peut re-clutcher B pendant 48h (config). ×2 à chaque refus. &gt;3 refus → plus jamais proposé. Expiré ≠ refus. À challenger GPT avant de coder.</>}/>
+  <Todo c={<><b>Aide aux 0-clutch.</b> Détecter qui ne reçoit jamais de clutch → boost visibilité + coaching doux. Cœur de la « forteresse bienveillante ».</>}/>
+  <Todo c={<><b>Fichier .log brut</b> (append-only) de tout ce qui se passe, ré-injectable dans une IA pour condenser sans perte. En parallèle de la mémoire.</>}/>
+  <Todo c={<><b>Désactiver le Verrou sur carte « en pause »</b> — fait (garde + visuel). Reste : conflit aussi sur accept-bot & accept-contre-proposition.</>}/>
+  <Todo c={<><b>Refactor app2</b> (~11,7k l) — extraire composants/helpers. Sans casser : avec David, testé.</>}/>
+  <Todo c={<><b>Supabase « over quota »</b> — passer en payant avant lancement (grâce jusqu'au 24.07).</>}/>
+</div>)}
 
-function Journal() {
-  const log = [
-    ['25.06 — nuit', 'Naissance de la Forteresse', 'Machine à états pure + fuzzer (800k actions, 0 faille). Migration occupancies + contrainte EXCLUDE appliquée en prod (mode shadow puis enforce). Bouton Verrouiller : conflit géré en douceur. Invitations « en pause » + revival.'],
-    ['25.06', 'Durée RDV corrigée 1h→2h', 'Le fuzzer/David ont rattrapé : Quick=1h donc normal=2h (code app L1893). Leçon : vérifier la vraie valeur avant de trancher un défaut délégué.'],
-    ['25.06', 'Buffer prépa 1h avant', 'On bloque le Verrou dans [RDV−1h, RDV+2h]. Le fuzzer a attrapé un vrai bug (la garde regardait la plage brute, pas la plage occupée) → corrigé via une source unique de la plage.'],
-    ['25.06', 'Décisions produit', 'Expiration douce d\'un refus confirmée. Refus → cooldown 48h escaladant ×2, puis arrêt. Refus ≠ expiré. Une personne occupée PEUT envoyer des clutchs (mais pas en verrouiller dans la fenêtre bloquée).'],
-    ['25.06', 'Question ouverte', 'Notifie-t-on un refus ? Reco : non (flou protecteur, anti-sonde). À valider.'],
-  ]
-  return (<div>
-    <H>Le journal des décisions</H>
-    <P><i style={{color:C.mid}}>L'histoire brute, horodatée. Rien ne se perd. (Source détaillée : docs/ + mémoire du projet.)</i></P>
-    {log.map((l,i)=>(
-      <div key={i} style={{borderLeft:`2px solid ${C.border}`,padding:'2px 0 16px 16px',position:'relative',marginLeft:4}}>
-        <div style={{position:'absolute',left:-5,top:4,width:8,height:8,borderRadius:'50%',background:C.orange}}/>
-        <div style={{fontSize:11,color:C.mid,fontWeight:700,letterSpacing:'.03em'}}>{l[0]}</div>
-        <div style={{fontSize:15,fontWeight:900,color:C.salmon,margin:'2px 0 4px'}}>{l[1]}</div>
-        <div style={{fontSize:13.5,lineHeight:1.6,color:C.text}}>{l[2]}</div>
-      </div>
-    ))}
-    <Todo><b>Idée David :</b> un vrai fichier <code>.log</code> brut (append-only) de tout ce qui se passe, ré-injectable dans une IA pour condenser sans rien perdre. À mettre en place en parallèle de la mémoire.</Todo>
-  </div>)
-}
-
-const TABS = [
-  { key:'histoire', label:'📖 Histoire', el:<Histoire/> },
-  { key:'archi', label:'🏗️ Architecture', el:<Architecture/> },
-  { key:'algo', label:'🧮 Algorithmes', el:<Algorithmes/> },
-  { key:'lexique', label:'📕 Lexique', el:<Lexique/> },
-  { key:'params', label:'⚙️ Paramètres', el:<Parametres/> },
-  { key:'journal', label:'📜 Journal', el:<Journal/> },
+const TABS=[
+  {k:'histoire',l:'Histoire',e:<Histoire/>},
+  {k:'schema',l:'Schéma réel',e:<Schema/>},
+  {k:'archi',l:'Architecture SQL',e:<Archi/>},
+  {k:'moteur',l:'Moteur & invariants',e:<Moteur/>},
+  {k:'fuzzer',l:'Fuzzer',e:<Fuzzer/>},
+  {k:'lexique',l:'Lexique',e:<Lexique/>},
+  {k:'params',l:'Paramètres',e:<Params/>},
+  {k:'decisions',l:'Décisions',e:<Decisions/>},
+  {k:'fichiers',l:'Fichiers',e:<Fichiers/>},
+  {k:'roadmap',l:'Roadmap',e:<Roadmap/>},
 ]
 
-export default function CodexPage() {
-  const [ok, setOk] = useState(false)
-  const [tab, setTab] = useState('histoire')
-  useEffect(() => { try { if (localStorage.getItem('codex_ok')==='1') setOk(true) } catch {} }, [])
-  if (!ok) return <Lock onUnlock={()=>setOk(true)} />
-  const active = TABS.find(t=>t.key===tab) || TABS[0]
-  return (
-    <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'-apple-system,sans-serif' }}>
-      <div style={{ maxWidth:760, margin:'0 auto', padding:'28px 18px 80px' }}>
-        <div style={{ textAlign:'center', marginBottom:6 }}>
-          <span style={{ fontSize:26, fontWeight:900, letterSpacing:'-.05em' }}><span style={{color:C.salmon}}>CLU</span><span style={{color:C.orange}}>TCH</span></span>
-          <span style={{ fontSize:15, color:'rgba(255,191,158,.45)', fontWeight:700, marginLeft:8 }}>CODEX</span>
-        </div>
-        <div style={{ textAlign:'center', color:C.mid, fontSize:12.5, marginBottom:20 }}>La Bible — code · algorithmes · histoire · paramètres</div>
-        <div style={{ display:'flex', gap:7, flexWrap:'wrap', justifyContent:'center', marginBottom:8, position:'sticky', top:0, background:C.bg, padding:'8px 0', zIndex:2 }}>
-          {TABS.map(t=>(
-            <button key={t.key} onClick={()=>setTab(t.key)} style={{ padding:'7px 13px', borderRadius:20, border:`1px solid ${tab===t.key?C.orange:C.border}`, background:tab===t.key?'rgba(226,124,0,.16)':'transparent', color:tab===t.key?C.orange:C.mid, fontSize:12.5, fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>{t.label}</button>
-          ))}
-        </div>
-        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:'8px 20px 24px' }}>{active.el}</div>
-        <div style={{ textAlign:'center', color:'rgba(245,232,222,.3)', fontSize:11, marginTop:20 }}>Document vivant — enrichi à chaque grande étape. Aucune miette perdue.</div>
+export default function CodexPage(){
+  const [ok,setOk]=useState(false); const [tab,setTab]=useState('histoire')
+  useEffect(()=>{ try{ if(localStorage.getItem('codex_ok')==='1') setOk(true) }catch{} },[])
+  if(!ok) return <Lock onUnlock={()=>setOk(true)}/>
+  const A=TABS.find(t=>t.k===tab)||TABS[0]
+  return(<div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:'-apple-system,sans-serif'}}>
+    <div style={{maxWidth:720,margin:'0 auto',padding:'22px 16px 70px'}}>
+      <div style={{textAlign:'center',marginBottom:3}}>
+        <span style={{fontSize:22,fontWeight:900,letterSpacing:'-.05em'}}><span style={{color:C.salmon}}>CLU</span><span style={{color:C.orange}}>TCH</span></span>
+        <span style={{fontSize:13,color:'rgba(255,191,158,.45)',fontWeight:700,marginLeft:7}}>CODEX</span>
+        <Tag c="v1 · dense" col={C.orange}/>
       </div>
-    </div>
-  )
+      <div style={{textAlign:'center',color:C.dim,fontSize:11,marginBottom:14}}>Documentation technique — forteresse anti-conflit · moteur · algorithmes · décisions</div>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center',marginBottom:6,position:'sticky',top:0,background:C.bg,padding:'7px 0',zIndex:2}}>
+        {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'5px 11px',borderRadius:18,border:`1px solid ${tab===t.k?C.orange:C.border}`,background:tab===t.k?'rgba(226,124,0,.15)':'transparent',color:tab===t.k?C.orange:C.mid,fontSize:11.3,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{t.l}</button>)}
+      </div>
+      <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:14,padding:'4px 18px 22px'}}>{A.e}</div>
+      <div style={{textAlign:'center',color:C.dim,fontSize:10,marginTop:16}}>Document vivant — enrichi à chaque étape. Aucune miette perdue. Source longue : docs/ + mémoire projet.</div>
+    </div></div>)
 }

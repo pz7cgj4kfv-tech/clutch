@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x175'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 113   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x176'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 114   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2942,6 +2942,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         const { data: ins } = await supabase.from('events').insert({
           title: newEvTitle.trim(), emoji: newEvEmoji, lieu: newEvLieu.trim(),
           event_time: newEvTime.trim(), event_date: newEvDate, spots: newEvMax,
+          starts_at: target.toISOString(), // forteresse : vrai timestamp → l'event occupe un créneau (trigger occupancy)
           description: newEvDesc.trim() || 'Événement créé sur Clutch.',
           tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'pending',
           active: true, created_by: userId, creator: 'Toi',
@@ -3168,7 +3169,19 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setRegBlock('')
     setRegistering(true)
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
-    try { if (isRealEvent(ev.id) && userId) await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId }) } catch {}
+    if (isRealEvent(ev.id) && userId) {
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId })
+      if (error) {
+        // Forteresse : l'event chevauche un RDV déjà confirmé (occ_no_overlap) → on refuse en douceur
+        const conflit = (error as any).code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')
+        if (conflit) {
+          const m = EN?'⏱️ You already have a meetup at that time':'⏱️ Tu as déjà un rendez-vous à cette heure'
+          setRegBlock(m); showToast?.(m, C.salmon); setTimeout(()=>setRegBlock(''),5000)
+          setRegistering(false); return
+        }
+        // autre erreur (RLS, etc.) → on tolère comme avant (optimiste local)
+      }
+    }
     // J'ai réclamé une place → je quitte la liste d'attente (DB + local).
     try { if (isRealEvent(ev.id) && userId) await supabase.from('event_waitlist').delete().eq('event_id', ev.id).eq('user_id', userId) } catch {}
     setWaitlist((prev:Set<string>)=>{ const n=new Set(prev); n.delete(ev.id); return n })

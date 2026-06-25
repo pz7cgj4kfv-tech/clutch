@@ -12,10 +12,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
-import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
+import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
+import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x176'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 114   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x177'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 115   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2787,7 +2788,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast, availSlots=[] }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2800,6 +2801,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   userId?:string;
   isCertified?:boolean;
   showToast?:(m:string,c?:string)=>void;
+  availSlots?:{start:number;end:number}[];
 }) {
   const t = useT(lang)
   const EN = lang==='en'
@@ -3142,6 +3144,20 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (registered.has(ev.id)) return
     const EN = lang==='en'
     const isMine = (e:any)=> (userId && e.created_by===userId) || e.creator==='Toi'
+    // Taxonomie 26.06 : un event SPONTANÉ doit tomber dans un de mes créneaux + horizon 18h ;
+    // un PLANIFIÉ (partenaire) est libre. Fail-open si pas de starts_at OU pas de dispo → jamais de blocage parasite.
+    if ((ev as any).starts_at && availSlots.length) {
+      const evStart = new Date((ev as any).starts_at).getTime()
+      const evEnd = evStart + (eventDurH(ev) || 3) * 3600000
+      const gate = canRegisterEvent({ mode: eventMode((ev as any).type), eventStart: evStart, eventEnd: evEnd, now: Date.now(), availSlots })
+      if (!gate.ok) {
+        const m = gate.reason === 'beyond_horizon'
+          ? (EN ? '⏱️ Too far ahead — Clutch is for soon (within 18h)' : '⏱️ Trop loin — Clutch c\'est pour bientôt (dans les 18h)')
+          : (EN ? '⏱️ Outside your availability — get available then to join' : '⏱️ Hors de ta dispo — mets-toi dispo sur ce créneau pour rejoindre')
+        setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),6000)
+        return
+      }
+    }
     // « occupé » = inscrit, NON annulé. (a) plafond ne compte PAS mes propres events (organiser ≠ consommer une place)
     const myBusy = events.filter((e:any)=> registered.has(e.id) && e.status!=='cancelled')
     const myJoined = myBusy.filter((e:any)=> !isMine(e))
@@ -10475,6 +10491,9 @@ export default function App2() {
                 centerLng={(user as any)?.center_lng ?? null}
                 showToast={showToast}
                 isCertified={!!(user as any)?.is_certified}
+                availSlots={(user as any)?.is_available && (user as any)?.available_until
+                  ? [{ start: (user as any).available_from ? new Date((user as any).available_from).getTime() : Date.now(), end: new Date((user as any).available_until).getTime() }]
+                  : []}
                 onOpenProfile={(name,bio,photo)=>{
                   // Profil créateur enrichi (Anaïs = isCreator:true, allowClutch:false par défaut)
                   const isAnais = name.toLowerCase().includes('anaïs')||name.toLowerCase().includes('anais')

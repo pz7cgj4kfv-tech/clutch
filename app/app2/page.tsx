@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x179'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 117   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 118   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8468,6 +8468,9 @@ export default function App2() {
   const [clutches,setClutches] = useState<any[]>([])
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
+  const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
+  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id',user.id).eq('active',true).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
+  const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)
@@ -10132,10 +10135,10 @@ export default function App2() {
                           {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : (availableRef ? `✦ Actif` : '+ Créneau'))}
                         </button>
                         {myAvail.length>0 && (
-                          <span title={lang==='en'?'Your active availability slots (max 3)':'Tes créneaux de disponibilité actifs (max 3)'}
-                            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'6px 9px',borderRadius:20,border:`1px solid ${C.green}55`,background:`${C.green}1a`,color:C.green,fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>
+                          <button onClick={()=>setShowSlots(true)} title={lang==='en'?'Your active availability slots (max 3)':'Tes créneaux de disponibilité actifs (max 3)'}
+                            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'6px 9px',borderRadius:20,border:`1px solid ${C.green}55`,background:`${C.green}1a`,color:C.green,fontSize:11,fontWeight:800,whiteSpace:'nowrap',cursor:'pointer',fontFamily:'inherit'}}>
                             📍 {myAvail.length}/3
-                          </span>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -11377,6 +11380,35 @@ export default function App2() {
               userInterests={(user as any).interests||[]} lang={lang}/>
           })()}
           {showDelete&&user&&<DeleteModal userId={user.id} onDeleted={()=>{setShowDelete(false);setUser(null);setProfiles([]);setClutches([]);setScreen('login')}} onClose={()=>setShowDelete(false)} showToast={showToast} lang={lang}/>}
+          {/* Feuille « Mes créneaux » (multi-créneaux, max 3) */}
+          {showSlots && (
+            <div style={{position:'fixed',inset:0,zIndex:4050,background:'rgba(10,4,8,.6)',backdropFilter:'blur(6px)',display:'flex',flexDirection:'column',justifyContent:'flex-end'}} onClick={()=>setShowSlots(false)}>
+              <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderTopLeftRadius:22,borderTopRightRadius:22,padding:'18px 18px calc(24px + var(--sab))',borderTop:`1px solid ${C.border}`,maxHeight:'72vh',overflowY:'auto'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                  <div style={{fontSize:16,fontWeight:900,color:C.white}}>📍 {lang==='en'?'My slots':'Mes créneaux'} <span style={{color:C.whiteMid,fontWeight:700,fontSize:13}}>{myAvail.length}/3</span></div>
+                  <button onClick={()=>setShowSlots(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:24,cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>×</button>
+                </div>
+                <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12}}>{lang==='en'?'When and where you\'re open to spontaneous meetups (next 18h).':'Quand et où tu es ouvert·e aux rencontres spontanées (dans les 18h).'}</div>
+                {myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
+                {myAvail.map((s:any)=>{
+                  const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
+                  return (
+                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 12px',borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,background:C.bgCard}}>
+                      <span style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
+                        <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.place||'—'}</div>
+                      </div>
+                      <button onClick={()=>removeSlot(s.id)} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.salmon,fontSize:11,fontWeight:700,padding:'6px 11px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{lang==='en'?'Remove':'Retirer'}</button>
+                    </div>
+                  )
+                })}
+                {myAvail.length<3
+                  ? <button onClick={()=>{setShowSlots(false);setFlow('carte')}} style={{width:'100%',marginTop:6,padding:'13px',borderRadius:13,border:'none',background:C.orange,color:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>+ {lang==='en'?'Add a slot':'Ajouter un créneau'}</button>
+                  : <div style={{textAlign:'center',color:C.whiteMid,fontSize:12,marginTop:8}}>{lang==='en'?'Max 3 slots reached':'Maximum 3 créneaux atteint'}</div>}
+              </div>
+            </div>
+          )}
           {/* Overlay bloquant feedback — aucune interaction possible tant que feedback non donné */}
           {showFeedback&&feedbackClutch&&<div style={{position:'fixed',inset:0,zIndex:3999,background:'rgba(10,4,8,.92)',backdropFilter:'blur(4px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={e=>e.stopPropagation()}>
             <div style={{padding:'20px 20px 0',textAlign:'center',maxWidth:380}}>

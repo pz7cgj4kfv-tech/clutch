@@ -1549,6 +1549,8 @@ const TEST_PROFILE_PREFIXES = [
   'gpsbotma', // Max GPS Test (Morges)
 ]
 function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(p => id.startsWith(p)) }
+// 🤖 Mode Démo (bots/mock visibles) ON par défaut · '0' = Réel (app vide pour tester avec de vrais amis). Lisible partout.
+function demoOn(): boolean { try { return localStorage.getItem('clutch_demo_mode') !== '0' } catch { return true } }
 
 const BOT_ENRICHMENT: Record<string,{
   name:string; photo_url:string; bio:string; job:string; age:number;
@@ -2856,7 +2858,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     eventPhotoEmojis: e.event_photo_emojis || [],
     isGroupe: e.type==='user',   // events créés par un user/bot = events de groupe
     reviews: [],
-  })) : MOCK_EVENTS
+  })) : ((()=>{ try{ return localStorage.getItem('clutch_demo_mode')==='0' ? [] : MOCK_EVENTS }catch{ return MOCK_EVENTS } })())  // 🤖 mock events masqués en mode Réel (clutch_demo_mode='0')
 
   // Events de groupe : démo bots + events créés par l'user dans cette session
   const [userGroupEvents, setUserGroupEvents] = useState<any[]>(GROUP_EVENTS_DEMO)
@@ -5503,6 +5505,10 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [showMbti, setShowMbti] = useState(false) // test de personnalité 16 types
   const [mbtiType, setMbtiType] = useState<string>(()=>{ try{return localStorage.getItem('clutch_mbti')||''}catch{return ''} })
   const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
+  // 🤖 Mode DÉMO (bots visibles, étiquetés) ↔ RÉEL (app vide, pour tester avec de vrais amis). null = pas réglé → défaut selon admin.
+  const [demoMode, setDemoMode] = useState<boolean|null>(()=>{ try{const v=localStorage.getItem('clutch_demo_mode'); return v===null?null:v==='1'}catch{return null} })
+  // 🤖 Bots/mock affichés ? Démo (défaut) = oui · Réel = non (app vide pour tester avec de vrais amis). Cohérent avec demoOn().
+  const showBots = demoMode===null ? true : demoMode
   const [editField, setEditField] = useState<string|null>(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(user.name||'')
@@ -7172,6 +7178,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             )
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
+          {isAdmin && <MRow icon={showBots?'🤖':'🫥'} label={showBots?'Mode DÉMO (bots visibles)':'Mode RÉEL (app vide)'} sub={showBots?'Tape pour passer en RÉEL — app vide, pour tester avec de vrais amis':'Tape pour repasser en DÉMO — bots étiquetés, pour visualiser'} onTap={()=>{ const nv=!showBots; try{localStorage.setItem('clutch_demo_mode',nv?'1':'0')}catch{}; setDemoMode(nv); showToast(nv?'🤖 Mode Démo — bots visibles':'🫥 Mode Réel — app vide',nv?C.gold:C.whiteMid) }}/>}
           {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
               S'AFFICHENT sur ton tél (utile avec un seul téléphone). Espacées pour qu'iOS les montre toutes. */}
           <MRow icon="🔔" label="Tester les notifications" sub="M'envoie une push de test → le bandeau en haut affiche le résultat OneSignal (marche aussi sur le web pour diagnostiquer)" onTap={()=>{
@@ -9505,8 +9512,10 @@ export default function App2() {
       .map(c => c.sender_id===user?.id ? c.receiver_id : c.sender_id)
   )
   const filtered = (!availableRef ? [] : profiles).filter(p => {
-    // Toujours inclure les bots GPS de test (ignorent tous les filtres)
-    if ((p as any)._isGpsTestBot) return true
+    // 🤖 Mode RÉEL = on masque TOUS les bots (app vide pour tester avec de vrais amis)
+    if (!demoOn() && (isTestProfile((p as any).id) || (p as any).is_bot || (p as any).account_type==='bot' || (p as any)._isGpsTestBot)) return false
+    // Bots GPS de test (ignorent tous les filtres) — seulement en mode Démo
+    if ((p as any)._isGpsTestBot) return demoOn()
     // Masquer le partenaire de Verrou actif (on a déjà un RDV ensemble)
     if (activeVerrouPartnerId && (p as any).id === activeVerrouPartnerId) return false
     // Masquer les personnes déjà clutchées (clutch en attente ou actif) — évite le doublon
@@ -10435,7 +10444,7 @@ export default function App2() {
 
               {/* ── TAB : CLUTCHS — avec historique collapsible + fix effacer ── */}
               {tab==='clutchs' && (()=>{
-                const isMock = clutches.length === 0
+                const isMock = demoOn() && clutches.length === 0  // 🤖 mock clutchs seulement en mode Démo
                 const raw = isMock ? MOCK_CLUTCHES.map(c=>({...c,receiver_id:c.receiver_id==='me'?user.id:c.receiver_id,sender_id:c.sender_id==='me'?user.id:c.sender_id})) : clutches
                 // Actifs = pending + confirmed/accepted/checked_in non expirés + celui en feedback inline même si completed
                 const actifs = raw.filter((c:any)=>((['pending','confirmed','accepted','checked_in'].includes(c.status)&&new Date(c.expires_at||'9999')>new Date())||c.id===inlineFeedbackId))

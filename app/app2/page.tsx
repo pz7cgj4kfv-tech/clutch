@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x183'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 127   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x184'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 128   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3171,8 +3171,15 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     const isMine = (e:any)=> (userId && e.created_by===userId) || e.creator==='Toi'
     // Taxonomie 26.06 : un event SPONTANÉ doit tomber dans un de mes créneaux + horizon 18h ;
     // un PLANIFIÉ (partenaire) est libre. Fail-open si pas de starts_at OU pas de dispo → jamais de blocage parasite.
-    if ((ev as any).starts_at && availSlots.length) {
-      const evStart = new Date((ev as any).starts_at).getTime()
+    // B7 — si pas de starts_at (mock/demo), on le DÉRIVE de ev.time (aujourd'hui, ou demain si l'heure est passée)
+    // → le gate spontané s'applique à TOUS les events, pas seulement à ceux qui ont un vrai timestamp.
+    const evStart = (()=>{
+      if ((ev as any).starts_at) return new Date((ev as any).starts_at).getTime()
+      const m = parseEventMinutes(ev.time); if (m==null) return null
+      const d = new Date(); d.setHours(Math.floor(m/60), m%60, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate()+1)
+      return d.getTime()
+    })()
+    if (evStart && availSlots.length) {
       const evEnd = evStart + (eventDurH(ev) || 3) * 3600000
       const gate = canRegisterEvent({ mode: eventMode((ev as any).type), eventStart: evStart, eventEnd: evEnd, now: Date.now(), availSlots })
       if (!gate.ok) {
@@ -5307,6 +5314,10 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   // Le bot M'ENVOIE un Clutch (tester la réception + le contre-clutch)
   const meClutch = async (bot:any) => {
     setBusy(bot.id)
+    // B6 — nettoie la paire avant (unicité par paire active → sinon l'insert échoue silencieusement).
+    const ACT = ['pending','accepted','confirmed','checked_in']
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id', bot.id).eq('receiver_id', user.id).in('status', ACT)
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id', user.id).eq('receiver_id', bot.id).in('status', ACT)
     const { error } = await supabase.from('clutches').insert({
       sender_id: bot.id, receiver_id: user.id,
       venue: 'Café du Marché · Place de la Palud, Lausanne', venue_lat: 46.5210, venue_lng: 6.6340,
@@ -5315,7 +5326,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
       status: 'pending', message: `Un café ? — ${bot.name}`,
     })
     setBusy(null)
-    if (error) { showToast('❌ Échec — policy clutches_bot_admin ?', C.red); return }
+    if (error) { showToast('❌ Échec — '+(error.message||'policy clutches_bot_admin ?'), C.red); return }
     showToast(`✓ ${bot.name} t'a envoyé un Clutch — va dans l'app 📨`, C.green)
   }
   // Le bot CRÉE un événement (tester l'onglet Events rempli + badge 🔒). Nécessite la policy events_bot_admin.

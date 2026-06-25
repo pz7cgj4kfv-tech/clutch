@@ -50,6 +50,20 @@ export const CLUTCH_CONFIG = {
   coachingMaxPerWeek:        1,  // 1 nudge doux max / semaine, JAMAIS de push, jamais culpabilisant
   // Règle : event SPONTANÉ (host_type ≠ partner) → doit tomber dans une dispo active + horizon 18h.
   //         event PLANIFIÉ (partenaire) → libre de dispo, horizon 7j. Les DEUX créent une occupation.
+
+  // ── Visibilité / ranking (validé 2 rounds GPT 27.06) — Visibilité = Compat × Fiabilité × Besoin × Fatigue ──
+  //   ⚠️ Branchement LIVE = bloqué par l'upgrade Supabase (logging d'impressions = écritures). Logique pure + prouvée d'abord.
+  ranking: {
+    exposureFatigueK:  0.15, // amortissement par impression RÉCENTE (disjoncteur anti-superstar : + tu es montré, - tu pèses)
+    exposureNeedMax:   1.20, // boost « sous-exposé » plafonné à +20% (jamais une élite, jamais un quota)
+    coldStartNeutral:  0.5,  // un profil sans historique vaut « neutre » (ni bonus ni malus)
+    confidenceObsHalf: 8,    // nb d'observations pour atteindre 50% de confiance (cold start bayésien)
+  },
+  // ── Fiabilité COMPOSITE multi-familles (anti-gaming « 2 potes qui se notent ») ──
+  reliability: {
+    weights: { presence: 0.35, cancels: 0.25, crossFeedback: 0.20, seniority: 0.10, systemSignal: 0.10 },
+    crossFeedbackReciprocityPenalty: 0.6, // escompte jusqu'à -60% du feedback croisé s'il vient d'une boucle fermée
+  },
 } as const
 
 // Helpers dérivés (pour ne pas refaire le calcul partout)

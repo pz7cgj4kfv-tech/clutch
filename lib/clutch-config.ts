@@ -28,6 +28,14 @@ export const CLUTCH_CONFIG = {
 
   // ── Contrainte structurelle Clutch ──
   maxHorizonH:           18,  // Tout se joue dans une fenêtre de 18h max (ADN du produit).
+
+  // ── Disponibilité & taxonomie d'événements (décidé 26.06, validé GPT) ──
+  availabilityHorizonH:  18,  // Jusqu'où on peut poser un créneau de dispo (= horizon spontané, glissant).
+  maxActiveSlots:        3,   // Nombre de créneaux de dispo actifs simultanés (gratuit).
+  slotsCanOverlap:       false, // Les créneaux ne peuvent pas se chevaucher dans le temps (1 lieu à la fois).
+  eventPlannedHorizonDays: 7, // Un événement PLANIFIÉ (partenaire) peut être annoncé jusqu'à 7j avant.
+  // Règle : event SPONTANÉ (host_type ≠ partner) → doit tomber dans une dispo active + horizon 18h.
+  //         event PLANIFIÉ (partenaire) → libre de dispo, horizon 7j. Les DEUX créent une occupation.
 } as const
 
 // Helpers dérivés (pour ne pas refaire le calcul partout)

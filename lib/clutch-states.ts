@@ -244,3 +244,28 @@ export function checkInvariants(w: World): Violation[] {
   // Le fuzzer les re-vérifie en comparant les snapshots successifs.
   return v
 }
+
+// ── 7. Taxonomie d'événements & gating par disponibilité (décidé 26.06) ────────
+// Un event PARTENAIRE est « planifié » (libre de dispo, jusqu'à 7j) ; sinon « spontané »
+// (doit tomber dans une dispo active, dans les 18h). Les deux créent une occupation (géré ailleurs).
+export type EventMode = 'spontaneous' | 'planned'
+export function eventMode(hostType: string | null | undefined): EventMode {
+  return hostType === 'partner' ? 'planned' : 'spontaneous'
+}
+
+export interface Slot { start: number; end: number } // epoch ms
+// HORIZON par défaut : 18h pour le spontané, 7j pour le planifié (en minutes).
+export function canRegisterEvent(o: {
+  mode: EventMode; eventStart: number; eventEnd: number; now: number;
+  availSlots: Slot[]; horizonSpontaneousMin?: number; horizonPlannedMin?: number;
+}): { ok: boolean; reason?: string } {
+  const HSPON = (o.horizonSpontaneousMin ?? 18 * 60) * MIN
+  const HPLAN = (o.horizonPlannedMin ?? 7 * 24 * 60) * MIN
+  if (o.mode === 'planned') {
+    return o.eventStart > o.now + HPLAN ? { ok: false, reason: 'too_far' } : { ok: true }
+  }
+  // spontané : dans l'horizon 18h ET chevauche un créneau actif (overlap suffit — règle « marge volontaire »)
+  if (o.eventStart > o.now + HSPON) return { ok: false, reason: 'beyond_horizon' }
+  const covered = o.availSlots.some(s => s.start < o.eventEnd && o.eventStart < s.end)
+  return covered ? { ok: true } : { ok: false, reason: 'no_availability' }
+}

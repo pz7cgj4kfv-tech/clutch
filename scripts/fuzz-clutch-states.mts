@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   emptyWorld, apply, checkInvariants, isTerminal, isPaused,
+  canRegisterEvent, eventMode,
   type World, type Action, type RelState,
 } from '../lib/clutch-states.ts'
 
@@ -83,6 +84,19 @@ function targetedTests() {
     w = apply(w, { t: 'refuse', id: 'c1' }).world
     const r = apply(w, { t: 'lock', id: 'c1' })
     expect('lock sur refusé impossible (INV5/INV7)', r.ok === false && r.reason === 'bad_transition')
+  }
+
+  // (f) Taxonomie events : gating spontané/planifié (décidé 26.06)
+  {
+    const now = 12 * HOUR // midi → horizon 18h = 6h demain (30*HOUR)
+    const slot = [{ start: 14 * HOUR, end: 23 * HOUR }]
+    expect('spontané DANS dispo → OK', canRegisterEvent({ mode:'spontaneous', eventStart:15*HOUR, eventEnd:16*HOUR, now, availSlots:slot }).ok === true)
+    expect('spontané HORS dispo → refusé', canRegisterEvent({ mode:'spontaneous', eventStart:13*HOUR, eventEnd:13.5*HOUR, now, availSlots:slot }).reason === 'no_availability')
+    expect('spontané au-delà 18h → refusé', canRegisterEvent({ mode:'spontaneous', eventStart:32*HOUR, eventEnd:33*HOUR, now, availSlots:[{start:30*HOUR,end:36*HOUR}] }).reason === 'beyond_horizon')
+    expect('planifié libre de dispo → OK', canRegisterEvent({ mode:'planned', eventStart:now+3*24*HOUR, eventEnd:now+3*24*HOUR+2*HOUR, now, availSlots:[] }).ok === true)
+    expect('planifié au-delà 7j → refusé', canRegisterEvent({ mode:'planned', eventStart:now+10*24*HOUR, eventEnd:now+10*24*HOUR+HOUR, now, availSlots:[] }).reason === 'too_far')
+    expect('host partner → planned', eventMode('partner') === 'planned')
+    expect('host user → spontaneous', eventMode('user') === 'spontaneous')
   }
 }
 

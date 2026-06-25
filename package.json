@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "fuzz": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/fuzz-clutch-states.mts"
   },
   "dependencies": {
     "@capacitor/assets": "^3.0.5",

@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 122   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 123   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1136,7 +1136,7 @@ function Btn({children,variant='primary',loading,...props}:{children:React.React
 
 function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>void;onRegister:()=>void;showToast:(m:string,c?:string)=>void}) {
   const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [loading,setLoading]=useState(false); const [showPwd,setShowPwd]=useState(false)
-  const login=async()=>{ setLoading(true); const{data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password:pass}); if(error){showToast('Email ou mot de passe incorrect',C.red);setLoading(false);return} const{data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single(); setLoading(false); if(p)onSuccess(p) }
+  const login=async()=>{ if(loading)return; setLoading(true); try { const{data,error}=await supabase.auth.signInWithPassword({email:email.trim().toLowerCase(),password:pass}); if(error){showToast('Email ou mot de passe incorrect',C.red);setLoading(false);return} const{data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single(); setLoading(false); if(p){onSuccess(p)} else {showToast('Profil introuvable — recrée ton compte',C.red)} } catch(e:any){ setLoading(false); showToast('Connexion impossible : '+(e?.message||'réseau'),C.red) } }
   return (
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px'}}>
       <div style={{width:'100%',maxWidth:360}}>

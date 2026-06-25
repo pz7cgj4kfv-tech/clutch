@@ -13,10 +13,10 @@ import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
-import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
+import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 119   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 120   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2788,7 +2788,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast, availSlots=[] }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2802,9 +2802,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   isCertified?:boolean;
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
+  suggestGroupEvent?:boolean;
 }) {
   const t = useT(lang)
   const EN = lang==='en'
+  // Nudge bienveillant « event de groupe » : doux, dismissible, max 1×/semaine, jamais culpabilisant.
+  const [nudgeHidden,setNudgeHidden] = useState(()=>{ try{ const ts=localStorage.getItem('nudge_grpev_last'); return ts ? (Date.now()-Number(ts) < 7*86400000) : false }catch{ return false } })
+  const dismissNudge = ()=>{ try{ localStorage.setItem('nudge_grpev_last', String(Date.now())) }catch{} setNudgeHidden(true) }
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [evLoading, setEvLoading] = useState(true)
   const [cancelledNotice, setCancelledNotice] = useState<string|null>(null)
@@ -3398,6 +3402,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 </div>
               )})}
             </div>
+          </div>
+        )}
+        {suggestGroupEvent && !nudgeHidden && (
+          <div style={{background:`${C.green}10`,border:`1px solid ${C.green}44`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'flex-start',gap:9}}>
+            <span style={{fontSize:18,flexShrink:0}}>🌱</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{EN?'Want to meet more easily?':'Envie de rencontrer plus facilement ?'}</div>
+              <div style={{fontSize:11.5,color:C.whiteMid,marginTop:2,lineHeight:1.45}}>{EN?'A group event is often the easiest way for a first time. Have a look below 👇':'Un événement de groupe, c\'est souvent le plus simple pour une première fois. Jette un œil ci-dessous 👇'}</div>
+            </div>
+            <button onClick={dismissNudge} aria-label="Fermer" style={{background:'none',border:'none',color:C.whiteMid,fontSize:16,cursor:'pointer',padding:0,flexShrink:0}}>✕</button>
           </div>
         )}
         {cancelledNotice && (
@@ -10525,6 +10539,11 @@ export default function App2() {
                 availSlots={(user as any)?.is_available && (user as any)?.available_until
                   ? [{ start: (user as any).available_from ? new Date((user as any).available_from).getTime() : Date.now(), end: new Date((user as any).available_until).getTime() }]
                   : []}
+                suggestGroupEvent={(()=>{ try{
+                  const ageD=(user as any)?.created_at ? (Date.now()-new Date((user as any).created_at).getTime())/86400000 : 0
+                  const recv=(clutches as any[]).filter((c:any)=>c.receiver_id===user?.id).length
+                  return shouldNudgeGroupEvent({ accountAgeDays:ageD, activeRecently:true, clutchsReceived:recv, eventsJoined:registeredEvents.size, profileComplete:!!(user as any)?.photo_url })
+                }catch{ return false } })()}
                 onOpenProfile={(name,bio,photo)=>{
                   // Profil créateur enrichi (Anaïs = isCreator:true, allowClutch:false par défaut)
                   const isAnais = name.toLowerCase().includes('anaïs')||name.toLowerCase().includes('anais')

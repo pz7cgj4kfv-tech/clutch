@@ -30,12 +30,11 @@ export function canTransition(from: RelState, to: RelState): boolean {
 }
 
 // ── 2. Constantes produit ────────────────────────────────────────────────────
-// Durée d'occupation d'un Clutch : 2h par défaut (Clutch normal), 1h pour un Quick Clutch
-// (is_quick_date → duration_minutes=60). Décision David 25.06, alignée sur le code app.
-export const DEFAULT_DURATION_MIN = 120
-// Buffer de prépa AVANT le RDV : on ne peut plus verrouiller dans [RDV−1h, RDV+durée] (David 25.06).
-// → l'occupation commence 1h avant l'heure proposée.
-export const PREP_BUFFER_MIN = 60
+// ⚠️ Source canonique de ces valeurs = lib/clutch-config.ts (CLUTCH_CONFIG). On les duplique
+// ici en littéral car ce moteur est lu par le fuzzer Node (qui exige l'extension .ts à l'import,
+// que Next interdit) → pas d'import possible. Garder synchronisé avec clutch-config.ts.
+export const DEFAULT_DURATION_MIN = 120 // = CLUTCH_CONFIG.rdvDurationDefaultMin (2h)
+export const PREP_BUFFER_MIN = 60       // = CLUTCH_CONFIG.prepBufferMin (1h avant le RDV)
 const MIN = 60_000
 
 // ── 3. Modèle de données (pur) ───────────────────────────────────────────────

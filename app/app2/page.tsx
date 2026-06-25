@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x177'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 115   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x178'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 116   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2859,6 +2859,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     eventPhotos: e.event_photos || [],
     eventPhotoEmojis: e.event_photo_emojis || [],
     isGroupe: e.type==='user',   // events créés par un user/bot = events de groupe
+    type: e.type,                // pour le gate (eventMode : partner=planifié, sinon spontané)
+    starts_at: (e as any).starts_at || null, // vrai timestamp → gate + occupation
     reviews: [],
   })) : ((()=>{ try{ return localStorage.getItem('clutch_demo_mode')==='0' ? [] : MOCK_EVENTS }catch{ return MOCK_EVENTS } })())  // 🤖 mock events masqués en mode Réel (clutch_demo_mode='0')
 
@@ -5280,9 +5282,11 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   // Le bot CRÉE un événement (tester l'onglet Events rempli + badge 🔒). Nécessite la policy events_bot_admin.
   const createBotEvent = async (bot:any) => {
     setBusy(bot.id)
+    // Horaire COHÉRENT (vrai timestamp) → l'event entre dans la forteresse + le gate spontané est testable.
+    const st = new Date(); st.setHours(19,0,0,0); if (st.getTime() < Date.now()) st.setDate(st.getDate()+1)
     const { error } = await supabase.from('events').insert({
       title: `${bot.name} — Apéro découverte`, emoji:'🍷', lieu:'Café du Marché, Lausanne',
-      event_time:'19:00', event_date:'Ce soir', spots:6, taken:0,
+      event_time:'19:00', event_date:'Ce soir', starts_at: st.toISOString(), duration_minutes:180, spots:6, taken:0,
       description:'Événement de test créé par un bot.', tags:['groupe'], ev_gender:'X',
       type:'user', status:'pending', active:true, created_by: bot.id, creator: bot.name,
     })

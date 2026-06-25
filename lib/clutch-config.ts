@@ -35,6 +35,12 @@ export const CLUTCH_CONFIG = {
   maxActiveSlots:        3,   // Nombre de créneaux de dispo actifs simultanés (gratuit).
   slotsCanOverlap:       false, // Les créneaux ne peuvent pas se chevaucher dans le temps (1 lieu à la fois).
   eventPlannedHorizonDays: 7, // Un événement PLANIFIÉ (partenaire) peut être annoncé jusqu'à 7j avant.
+
+  // ── Aide aux sous-exposés (point 3, validé GPT 26.06) — JAMAIS « impopularité » ──
+  underExposedMinDaysActive: 14, // on n'aide qu'après 14j d'activité réelle (pas les nouveaux comptes)
+  boostMaxPct:               20, // boost de visibilité plafonné à +20% (ordre/fréquence SEULEMENT, dans le pool compatible)
+  boostDecayDays:            30, // dégressif sur 30 jours
+  coachingMaxPerWeek:        1,  // 1 nudge doux max / semaine, JAMAIS de push, jamais culpabilisant
   // Règle : event SPONTANÉ (host_type ≠ partner) → doit tomber dans une dispo active + horizon 18h.
   //         event PLANIFIÉ (partenaire) → libre de dispo, horizon 7j. Les DEUX créent une occupation.
 } as const

@@ -8,6 +8,7 @@
 import {
   emptyWorld, apply, checkInvariants, isTerminal, isPaused,
   canRegisterEvent, eventMode, clutchCooldownMs, canSendClutch,
+  shouldNudgeGroupEvent, underExposureScore,
   type World, type Action, type RelState,
 } from '../lib/clutch-states.ts'
 
@@ -110,6 +111,18 @@ function targetedTests() {
     expect('hard-block → envoi refusé', canSendClutch({ now, hardBlocked:true }).reason === 'blocked')
     expect('cooldown actif → envoi refusé', canSendClutch({ now, cooldownUntil: now+HOUR }).reason === 'cooldown')
     expect('cooldown passé → envoi OK', canSendClutch({ now, cooldownUntil: now-HOUR }).ok === true)
+  }
+
+  // (h) Aide aux sous-exposés (validé 26.06) — sous-exposition, jamais impopularité
+  {
+    const base = { accountAgeDays:20, activeRecently:true, clutchsReceived:0, eventsJoined:0, profileComplete:true }
+    expect('actif 14j+ & peu connecté → nudge event', shouldNudgeGroupEvent(base) === true)
+    expect('nouveau compte → pas de nudge', shouldNudgeGroupEvent({...base, accountAgeDays:3}) === false)
+    expect('déjà dans events → pas de nudge', shouldNudgeGroupEvent({...base, eventsJoined:2}) === false)
+    expect('inactif → pas de nudge', shouldNudgeGroupEvent({...base, activeRecently:false}) === false)
+    expect('pas d\'impressions → score 0 (on s\'abstient)', underExposureScore(base) === 0)
+    expect('peu vu → score élevé', underExposureScore({...base, impressions:10}) > 0.5)
+    expect('bien vu → score 0', underExposureScore({...base, impressions:80}) === 0)
   }
 }
 

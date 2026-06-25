@@ -286,3 +286,24 @@ export function canSendClutch(o: { now: number; hardBlocked?: boolean; cooldownU
   if (o.cooldownUntil && o.cooldownUntil > o.now) return { ok: false, reason: 'cooldown' }
   return { ok: true }
 }
+
+// ── 9. Aide aux SOUS-EXPOSÉS (forteresse bienveillante) — pur (validé GPT 26.06) ──
+// On détecte la SOUS-EXPOSITION (peu vu/proposé malgré activité), JAMAIS « l'impopularité ».
+// Dignité absolue : aucun score/message ne doit révéler qu'une personne est « aidée ».
+export interface ExposureStats {
+  accountAgeDays: number; activeRecently: boolean;
+  clutchsReceived: number; eventsJoined: number; profileComplete: boolean;
+  impressions?: number; // fois où le profil a été montré (tracking Phase 2 ; optionnel)
+}
+// Slice 1 (sans tracking) : qui orienter DOUCEMENT vers un événement de groupe (= la meilleure aide) ?
+export function shouldNudgeGroupEvent(s: ExposureStats, minDaysActive = 14): boolean {
+  if (s.accountAgeDays < minDaysActive || !s.activeRecently) return false // pas les nouveaux comptes
+  if (s.eventsJoined > 0) return false        // déjà dans la dynamique events
+  return s.clutchsReceived <= 1               // peu de connexions → un event de groupe est plus facile
+}
+// Slice 2 (avec impressions) : score de sous-exposition (0..1). Lié à « peu VU », jamais « peu AIMÉ ».
+export function underExposureScore(s: ExposureStats, seenFloor = 50): number {
+  if (s.impressions === undefined) return 0   // pas de tracking → on s'abstient
+  if (s.accountAgeDays < 14 || !s.activeRecently || !s.profileComplete) return 0
+  return s.impressions >= seenFloor ? 0 : (seenFloor - s.impressions) / seenFloor
+}

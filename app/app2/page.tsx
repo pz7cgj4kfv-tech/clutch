@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 121   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 122   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8503,7 +8503,7 @@ export default function App2() {
       setUser((prev:any)=> prev ? {...prev, is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place} : prev)
     } catch {}
   },[user?.id])
-  useEffect(()=>{ syncCurrentSlot() },[syncCurrentSlot])
+  useEffect(()=>{ syncCurrentSlot(); const id=setInterval(syncCurrentSlot, 60000); return ()=>clearInterval(id) },[syncCurrentSlot]) // + check chaque minute → un créneau s'active à son heure, app ouverte
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)

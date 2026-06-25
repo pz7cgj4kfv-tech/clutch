@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 120   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 121   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8485,6 +8485,25 @@ export default function App2() {
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
   const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id',user.id).eq('active',true).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
   const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
+  // Multi-créneaux (A) : « promotion » du créneau qui couvre MAINTENANT dans profiles, pour être visible
+  // pendant chacun de mes créneaux. PROMOTE-ONLY : ne rend JAMAIS indisponible (pire cas = ne fait rien).
+  // → le gate (is_available && available_until>now) reste lu tel quel, AUCUN site de gate modifié.
+  const syncCurrentSlot = useCallback(async()=>{
+    if(!user?.id) return
+    try {
+      const now=Date.now()
+      const {data:slots}=await supabase.from('availabilities').select('*').eq('user_id',user.id).eq('active',true)
+      if(!slots?.length) return
+      const cur=slots.find((s:any)=> new Date(s.start_at).getTime()<=now && now<new Date(s.end_at).getTime())
+      if(!cur) return
+      const u:any=user
+      const profActive = u.is_available && u.available_from && u.available_until && new Date(u.available_from).getTime()<=now && new Date(u.available_until).getTime()>now
+      if(profActive) return // profiles reflète déjà un créneau actif → on ne touche à rien
+      await supabase.from('profiles').update({ is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place||null }).eq('id',user.id)
+      setUser((prev:any)=> prev ? {...prev, is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place} : prev)
+    } catch {}
+  },[user?.id])
+  useEffect(()=>{ syncCurrentSlot() },[syncCurrentSlot])
   const [authDone,setAuthDone] = useState(false)
   const [authTarget,setAuthTarget] = useState<Screen>('login')
   const [toast,setToast]     = useState<{msg:string;color:string}|null>(null)

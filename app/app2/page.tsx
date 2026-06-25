@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x171'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 109   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x172'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 110   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5139,6 +5139,37 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     await supabase.from('profiles').update({ is_available:false }).eq('is_bot', true)
     setBusy(null); showToast('Tous les bots désactivés', C.orange); load()
   }
+  // ⚡ TOUT EN LIGNE : tous les bots dispo, sur ma position (Présences se remplit d'un coup)
+  const activateAll = async () => {
+    setBusy('all')
+    const fromISO = new Date().toISOString(), untilISO = new Date(Date.now()+6*3600*1000).toISOString()
+    const { data, error } = await supabase.from('profiles').update({
+      is_available:true, available_from:fromISO, available_until:untilISO,
+      center_lat:myLat, center_lng:myLng, available_radius_km:10,
+    }).eq('is_bot', true).select('id')
+    setBusy(null)
+    if (error || !data?.length) { showToast('❌ Échec — migration bots appliquée ? (génère des bots d\'abord)', C.red); return }
+    showToast(`✓ ${data.length} bots en ligne sur toi 📍 — va dans Présences`, C.green); load()
+  }
+  // 📥 REMPLIR MA BOÎTE : N bots m'envoient un clutch (la boîte de réception se peuple → tester l'organisation)
+  const fillMyInbox = async () => {
+    setBusy('all')
+    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot', true).limit(3)
+    if (!bs?.length) { setBusy(null); showToast('Aucun bot — génère-en d\'abord', C.orange); return }
+    let n=0
+    for (const b of bs) {
+      const { error } = await supabase.from('clutches').insert({
+        sender_id: b.id, receiver_id: user.id,
+        venue:'Café du Marché · Place de la Palud, Lausanne', venue_lat:46.5210, venue_lng:6.6340,
+        proposed_time:new Date(Date.now()+30*60*1000).toISOString(),
+        expires_at:new Date(Date.now()+2*3600*1000).toISOString(),
+        status:'pending', message:`Un café ? — ${b.name}`,
+      })
+      if (!error) n++
+    }
+    setBusy(null)
+    showToast(n>0?`✓ ${n} clutchs reçus — va dans l'onglet Clutchs 📨`:'❌ Échec — policy clutches_bot_admin ?', n>0?C.green:C.red)
+  }
   // RESET COMPLET : efface MES interactions avec les bots (clutchs + lapins) + les remet propres (dé-Driver, déverrouille)
   const clearBotInteractions = async () => {
     setBusy('all')
@@ -5298,6 +5329,8 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         </div>
         {/* Actions globales */}
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+          <Btn onClick={activateAll} bg={`${C.green}1a`} col={C.green}>⚡ Tout mettre en ligne (sur moi)</Btn>
+          <Btn onClick={fillMyInbox} bg={`${C.green}1a`} col={C.green}>📥 Remplir ma boîte de Clutchs</Btn>
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
           <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir (complet)</Btn>

@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x170'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 108   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x171'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 109   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3010,6 +3010,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (found) { setSelEv(found); onClearInitialEvent?.() }
   }, [initialEventId, dbEvents, userGroupEvents]) // eslint-disable-line react-hooks/exhaustive-deps
   const [evFilter, setEvFilter] = useState('all')
+  const [catFilter, setCatFilter] = useState<Set<string>>(new Set())  // catégories MULTI-select (David) : 0 cochée = toutes
   const [sortMode, setSortMode] = useState<'time'|'dist'|'pop'|'surprise'>('time')  // tri : au plus tôt / proche / populaires / 🎲 surprise (IA = au hasard les plus folles)
   const [surpriseSeed, setSurpriseSeed] = useState(0)  // re-tirage Surprise
   const [showRefine, setShowRefine] = useState(false)  // panneau « Affiner » (progressive disclosure)
@@ -3063,22 +3064,30 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
 
   // 🌙 Clutch Night = mode nuit DANS Événements (David : « ça transforme l'app en truc de night »)
   const isNightEv = (ev:any):boolean => { const m=parseEventMinutes(ev.time); const s=(((ev?.tags||[]).join(' '))+' '+(ev?.title||'')+' '+(ev?.lieu||'')).toLowerCase(); return (m!=null && (m>=19*60 || m<5*60)) || /club|soir|nuit|jazz|concert|\bdj\b|techno|f[eê]te|danse|\bbar\b|after|rooftop|apéro|apero/.test(s) }
+  // Catégories d'événements (MULTI-select) → matcher par tags. + Soirée/Lifestyle/Communauté (David 24.06)
+  const CAT_MATCH: Record<string,(ev:any)=>boolean> = {
+    sport:      ev => ['sport','running','escalade','vélo','ping-pong','roller','rando'].some(t=>(ev.tags||[]).includes(t)),
+    bienetre:   ev => ['bien-être','yoga','méditation','plein air'].some(t=>(ev.tags||[]).includes(t)),
+    culture:    ev => ['culture','art','théâtre','lecture','cinéma','histoire'].some(t=>(ev.tags||[]).includes(t)),
+    gastro:     ev => ['gastronomie','cuisine','brunch','vin'].some(t=>(ev.tags||[]).includes(t)),
+    musique:    ev => ['musique','jazz','indie','concert','dj','techno'].some(t=>(ev.tags||[]).includes(t)),
+    soiree:     ev => isNightEv(ev) || ['soirée','club','fête','after','rooftop','danse','bar','apéro','apero'].some(t=>(ev.tags||[]).includes(t)),
+    lifestyle:  ev => ['mode','lifestyle','photo','design','déco','bien-être'].some(t=>(ev.tags||[]).includes(t)),
+    communaute: ev => !!(ev as any).isGroupe || ['communauté','networking','rencontre','discussion','débutant'].some(t=>(ev.tags||[]).includes(t)),
+  }
   const filteredEvs = events.filter(ev => {
     if (nightMode && !isNightEv(ev)) return false   // mode nuit : seulement les sorties du soir/nuit
-    if (evFilter==='all') return true
+    // Catégories MULTI-select : si ≥1 cochée, l'event doit matcher au moins une (ET avec le filtre du haut)
+    if (catFilter.size>0 && !Array.from(catFilter).some(k=>CAT_MATCH[k]?.(ev))) return false
+    // Filtre du haut (scope / temps)
     if (evFilter==='mine') return registered.has(ev.id)
     if (evFilter==='groupe') return !!(ev as any).isGroupe
     if (evFilter==='soir') return ev.date === 'Ce soir'
     if (evFilter==='demain') return ev.date.toLowerCase().includes('demain')
-    if (evFilter==='sport') return ev.tags.includes('sport') || ev.tags.includes('running') || ev.tags.includes('escalade') || ev.tags.includes('vélo')
-    if (evFilter==='bienetre') return ev.tags.includes('bien-être') || ev.tags.includes('yoga') || ev.tags.includes('méditation')
-    if (evFilter==='culture') return ev.tags.includes('culture') || ev.tags.includes('art') || ev.tags.includes('théâtre') || ev.tags.includes('lecture')
-    if (evFilter==='gastro') return ev.tags.includes('gastronomie') || ev.tags.includes('cuisine') || ev.tags.includes('brunch')
-    if (evFilter==='musique') return ev.tags.includes('musique') || ev.tags.includes('jazz') || ev.tags.includes('indie')
     if (evFilter==='parents') return (ev as any).isParents === true
     if (evFilter==='evF') return (ev as any).evGender==='F'
     if (evFilter==='evX') return (ev as any).evGender==='X'
-    return true
+    return true   // 'all' (ou ancienne valeur catégorie) → passe ; les catégories sont gérées par catFilter
   })
 
   // Tri (panneau « Affiner ») : au plus tôt (défaut) · au plus proche · populaires
@@ -3254,11 +3263,12 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <button key={s.k} onClick={()=>{ setSortMode(s.k); if(isSurprise) setSurpriseSeed(x=>x+1) }} style={{flex:'1 1 0',minWidth:72,padding:'7px 4px',borderRadius:10,border:`1.5px solid ${on?(isSurprise?'#8E7CC3':C.pink):C.border}`,background:on?(isSurprise?'linear-gradient(120deg,#EB6BAF22,#8E7CC322,#77BC1F22)':`${C.pink}12`):'transparent',color:on?(isSurprise?'#7A5BB0':C.pink):C.whiteMid,fontSize:10.5,fontWeight:on?800:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s.e} {s.l}{isSurprise&&on?' ↻':''}</button>
               )})}
             </div>
-            <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Categories':'Catégories'}</div>
+            <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Categories':'Catégories'}{catFilter.size>0?` · ${catFilter.size}`:''} <span style={{fontWeight:500,textTransform:'none',letterSpacing:0}}>{EN?'(multi)':'(plusieurs possibles)'}</span></div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {([{k:'sport',e:'🏃',l:'Sport'},{k:'bienetre',e:'🧘',l:EN?'Wellness':'Bien-être'},{k:'culture',e:'🎭',l:'Culture'},{k:'gastro',e:'🍽',l:EN?'Food':'Gastro'},{k:'musique',e:'🎵',l:EN?'Music':'Musique'}] as const).map(c=>{ const on=evFilter===c.k; return (
-                <button key={c.k} onClick={()=>setEvFilter(on?'all':c.k)} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:11,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit'}}>{c.e} {c.l}</button>
+              {([{k:'sport',e:'🏃',l:'Sport'},{k:'bienetre',e:'🧘',l:EN?'Wellness':'Bien-être'},{k:'culture',e:'🎭',l:'Culture'},{k:'gastro',e:'🍽',l:EN?'Food':'Gastro'},{k:'musique',e:'🎵',l:EN?'Music':'Musique'},{k:'soiree',e:'🌃',l:EN?'Nightlife':'Soirée'},{k:'lifestyle',e:'✨',l:'Lifestyle'},{k:'communaute',e:'🫂',l:EN?'Community':'Communauté'}] as const).map(c=>{ const on=catFilter.has(c.k); return (
+                <button key={c.k} onClick={()=>setCatFilter(prev=>{ const n=new Set(prev); n.has(c.k)?n.delete(c.k):n.add(c.k); return n })} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:11,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit'}}>{on&&'✓ '}{c.e} {c.l}</button>
               )})}
+              {catFilter.size>0 && <button onClick={()=>setCatFilter(new Set())} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✕ {EN?'Clear':'Effacer'}</button>}
             </div>
           </div>
         )}

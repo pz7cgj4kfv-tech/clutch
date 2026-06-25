@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x181'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 125   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x182'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 126   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -493,11 +493,14 @@ type MainTab  = 'presences' | 'evenements' | 'clutchs' | 'contacts' | 'profil'
 function makeSlots(fromDate?: Date): string[] {
   const base = fromDate || new Date()
   const slots: string[] = []
-  const rem = 5 - (base.getMinutes() % 5)
+  // ⏱️ STEP = 5 min POUR LE TEST (choix David : créneaux fins pour tester). VERSION FINALE = 15 min (quarts d'heure).
+  // NB : le vrai souci d'UX = l'affichage en grille géante → à terme une MOLETTE/compact, pas une grille de 216 cases.
+  const STEP = 5
+  const rem = STEP - (base.getMinutes() % STEP)
   const start = new Date(base.getTime() + rem * 60_000)
   start.setSeconds(0, 0)
-  for (let i = 0; i <= 216; i++) {  // 18h à 5min = 216 slots
-    const t  = new Date(start.getTime() + i * 5 * 60_000)
+  for (let i = 0; i <= 216; i++) {  // 18h à 5min = 216 slots (test) ; final 15min = 72
+    const t  = new Date(start.getTime() + i * STEP * 60_000)
     const hh = String(t.getHours()).padStart(2, '0')
     const mm = String(t.getMinutes()).padStart(2, '0')
     slots.push(`${hh}:${mm}`)
@@ -8499,7 +8502,7 @@ export default function App2() {
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
-  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id',user.id).eq('active',true).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
+  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
   const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
   // Multi-créneaux (A) : « promotion » du créneau qui couvre MAINTENANT dans profiles, pour être visible
   // pendant chacun de mes créneaux. PROMOTE-ONLY : ne rend JAMAIS indisponible (pire cas = ne fait rien).
@@ -8947,8 +8950,8 @@ export default function App2() {
     // Forteresse : mes créneaux occupés (RDV confirmés) → sert à marquer « ⏸ en pause » les pendings qui chevauchent
     supabase.from('occupancies').select('start_at,end_at,source_id').eq('user_id', user.id)
       .then(({data:occ})=>setMyOccupancies(occ||[]))
-    // Multi-créneaux : mes créneaux de dispo actifs (pour le compteur 📍 N/3)
-    supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id', user.id).eq('active', true).order('start_at',{ascending:true})
+    // Multi-créneaux : mes créneaux de dispo actifs ET futurs (B1 : les passés dégagent). Pour le compteur 📍 N/3.
+    supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at',{ascending:true})
       .then(({data:av})=>setMyAvail(av||[]))
     if (data) {
       // Respecter les terminaisons locales — résiste aux données stale de la DB
@@ -9559,18 +9562,21 @@ export default function App2() {
       return
     }
 
-    // Multi-créneaux : persiste AUSSI ce créneau dans `availabilities` (additif, best-effort,
-    // ne bloque jamais la dispo). Accumule jusqu'à 3 ; sur chevauchement (EXCLUDE) → remplace.
+    // Multi-créneaux : persiste ce créneau dans `availabilities` (max 3, 1 endroit à la fois).
+    // B3 — chevauchement : on remplace SEULEMENT le(s) créneau(x) qui se chevauche(nt) + on INFORME
+    // (un blocage dur empêcherait de re-régler son créneau actuel). Les autres créneaux sont préservés.
     try {
-      const startISO = from.toISOString(), endISO = until.toISOString()
-      const { data: act } = await supabase.from('availabilities').select('id').eq('user_id', user.id).eq('active', true).order('start_at', { ascending: true })
-      if (act && act.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', (act[0] as any).id) // plafond 3 → vire le plus ancien
-      const row = { user_id:user.id, start_at:startISO, end_at:endISO, place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true }
-      const ins = await supabase.from('availabilities').insert(row)
-      if (ins.error) { // chevauche un créneau existant → remplacement propre
-        await supabase.from('availabilities').update({ active:false }).eq('user_id', user.id).eq('active', true)
-        await supabase.from('availabilities').insert(row)
+      const startMs = from.getTime(), endMs = until.getTime()
+      const { data: act } = await supabase.from('availabilities').select('id,start_at,end_at').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at', { ascending: true })
+      const list:any[] = act || []
+      const overlapping = list.filter(s => new Date(s.start_at).getTime() < endMs && startMs < new Date(s.end_at).getTime())
+      if (overlapping.length) {
+        await supabase.from('availabilities').update({ active:false }).in('id', overlapping.map(s=>s.id))
+        showToast(lang==='fr'?'🔄 Un créneau qui se chevauchait a été remplacé — 1 seul endroit à la fois':'🔄 An overlapping slot was replaced — one place at a time', C.orange)
       }
+      const remaining = list.filter(s => !overlapping.find(o=>o.id===s.id))
+      if (remaining.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', remaining[0].id) // plafond 3 → vire le plus ancien
+      await supabase.from('availabilities').insert({ user_id:user.id, start_at:from.toISOString(), end_at:until.toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true })
     } catch {}
 
     // 0 lignes mises à jour → le profil n'existe pas encore → upsert

@@ -49,6 +49,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_start timestamptz;
   s timestamptz;
   e timestamptz;
 begin
@@ -61,9 +62,10 @@ begin
   delete from public.occupancies where source_type = 'clutch' and source_id = new.id;
 
   if new.status in ('accepted', 'confirmed', 'checked_in') then
-    s := coalesce(new.counter_time, new.proposed_time);
-    e := s + (coalesce(new.duration_minutes, 120) || ' minutes')::interval;
-    if s is not null and e > s then
+    v_start := coalesce(new.counter_time, new.proposed_time);
+    s := v_start - interval '60 minutes';                                      -- buffer prépa : bloque dès 1h avant
+    e := v_start + (coalesce(new.duration_minutes, 120) || ' minutes')::interval;
+    if v_start is not null and e > s then
       insert into public.occupancies (user_id, start_at, end_at, source_type, source_id)
       values (new.sender_id,   s, e, 'clutch', new.id),
              (new.receiver_id, s, e, 'clutch', new.id);
@@ -82,7 +84,7 @@ create trigger trg_clutch_occupancy
 -- 4) Backfill des clutchs déjà verrouillés (re-exécutable sans doublon)
 insert into public.occupancies (user_id, start_at, end_at, source_type, source_id)
 select u.uid,
-       coalesce(c.counter_time, c.proposed_time),
+       coalesce(c.counter_time, c.proposed_time) - interval '60 minutes',
        coalesce(c.counter_time, c.proposed_time) + (coalesce(c.duration_minutes, 120) || ' minutes')::interval,
        'clutch', c.id
 from public.clutches c

@@ -14,8 +14,8 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x174'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 112   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x175'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 113   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10502,7 +10502,7 @@ export default function App2() {
                 const pending = actifs.filter((c:any)=>c.status==='pending').length
                 // Forteresse : un pending est « en pause » s'il chevauche un de mes RDV confirmés (occupancy).
                 // Calculé (jamais stocké) → si j'annule le RDV, l'occupancy disparaît et le pending « revit » tout seul.
-                const isPausedClutch=(c:any)=>{ if(c.status!=='pending')return false; const s=new Date(c.counter_time||c.proposed_time).getTime(); if(!s)return false; const e=s+(c.duration_minutes||120)*60000; return myOccupancies.some((o:any)=>o.source_id!==c.id && new Date(o.start_at).getTime()<e && s<new Date(o.end_at).getTime()) }
+                const isPausedClutch=(c:any)=>{ if(c.status!=='pending')return false; const base=new Date(c.counter_time||c.proposed_time).getTime(); if(!base)return false; const s=base-60*60000; const e=base+(c.duration_minutes||120)*60000; return myOccupancies.some((o:any)=>o.source_id!==c.id && new Date(o.start_at).getTime()<e && s<new Date(o.end_at).getTime()) }
                 // ── Boîte de réception ACTION-FIRST (struct validée GPT+Claude) :
                 //    0=🔥 à répondre · 1=📍 RDV · 2=⏸ en pause (chevauche un RDV) · 3=⏳ envoyé en attente · 4=autres
                 const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(c.status==='pending'&&isPausedClutch(c))return 2; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(!rec&&c.status==='pending')return 3; return 4 }
@@ -10951,6 +10951,8 @@ export default function App2() {
                               </button>
                               <div style={{display:'flex',gap:8}}>
                               <button onClick={async()=>{
+                                // Forteresse : « en pause » = chevauche un RDV déjà confirmé → on bloque AVANT (sinon la base refuse)
+                                if (paused) { showToast(lang==='en'?'⏸ On hold — you have a meetup at that time':'⏸ En pause — tu as un RDV à cette heure', C.salmon); return }
                                 // 1. Marque comme confirmé LOCALEMENT (persiste même si RLS bloque)
                                 setLocalConfirmed(prev=>new Set([...prev,c.id]))
                                 setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'confirmed'}:cl))
@@ -10982,7 +10984,7 @@ export default function App2() {
                                   }
                                   loadClutches()
                                 }
-                              }} style={{flex:1,padding:'9px',background:`${C.green}20`,border:`1px solid ${C.green}55`,borderRadius:10,color:C.green,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🔒 {lang==='en'?'Lock in':'Verrouiller'}</button>
+                              }} style={{flex:1,padding:'9px',background:paused?'rgba(83,41,67,.06)':`${C.green}20`,border:`1px solid ${paused?C.border:`${C.green}55`}`,borderRadius:10,color:paused?C.whiteMid:C.green,fontSize:12,fontWeight:800,cursor:paused?'default':'pointer',fontFamily:'inherit',opacity:paused?0.6:1}}>{paused?(lang==='en'?'⏸ On hold':'⏸ En pause'):`🔒 ${lang==='en'?'Lock in':'Verrouiller'}`}</button>
                               <button onClick={async()=>{
                                 // Optimistic update immédiat
                                 setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'declined'}:cl))

@@ -33,6 +33,9 @@ export function canTransition(from: RelState, to: RelState): boolean {
 // Durée d'occupation d'un Clutch : 2h par défaut (Clutch normal), 1h pour un Quick Clutch
 // (is_quick_date → duration_minutes=60). Décision David 25.06, alignée sur le code app.
 export const DEFAULT_DURATION_MIN = 120
+// Buffer de prépa AVANT le RDV : on ne peut plus verrouiller dans [RDV−1h, RDV+durée] (David 25.06).
+// → l'occupation commence 1h avant l'heure proposée.
+export const PREP_BUFFER_MIN = 60
 const MIN = 60_000
 
 // ── 3. Modèle de données (pur) ───────────────────────────────────────────────
@@ -67,12 +70,19 @@ export function emptyWorld(): World { return { clutches: [], events: [] } }
 // → terminal = occupation libérée automatiquement (rien à écrire). C'est ça la "revive".
 export interface Occupancy { user: string; startAt: number; endAt: number; source: string }
 
+// Plage qu'un Clutch OCCUPE réellement = [début − buffer prépa, fin]. Source de vérité unique,
+// utilisée AUSSI bien pour créer l'occupation que pour la GARDE au verrouillage (sinon faille).
+export function clutchOccRange(c: Clutch): [number, number] {
+  return [c.startAt - PREP_BUFFER_MIN * MIN, c.endAt]
+}
+
 export function activeOccupancies(w: World): Occupancy[] {
   const occ: Occupancy[] = []
   for (const c of w.clutches) {
     if (c.rel === 'locked') {
-      occ.push({ user: c.sender,   startAt: c.startAt, endAt: c.endAt, source: 'clutch:' + c.id })
-      occ.push({ user: c.receiver, startAt: c.startAt, endAt: c.endAt, source: 'clutch:' + c.id })
+      const [s, e] = clutchOccRange(c)
+      occ.push({ user: c.sender,   startAt: s, endAt: e, source: 'clutch:' + c.id })
+      occ.push({ user: c.receiver, startAt: s, endAt: e, source: 'clutch:' + c.id })
     }
   }
   for (const e of w.events) {
@@ -104,8 +114,9 @@ export function pairKey(a: string, b: string): string {
 export function isPaused(w: World, c: Clutch): boolean {
   if (c.rel !== 'pending') return false
   const src = 'clutch:' + c.id
-  return userOccupied(w, c.sender, c.startAt, c.endAt, src)
-      || userOccupied(w, c.receiver, c.startAt, c.endAt, src)
+  const [os, oe] = clutchOccRange(c) // « en pause » si, une fois verrouillé (buffer inclus), il chevaucherait un RDV
+  return userOccupied(w, c.sender, os, oe, src)
+      || userOccupied(w, c.receiver, os, oe, src)
 }
 
 // ── 5. Actions (transitions) ─────────────────────────────────────────────────
@@ -152,9 +163,12 @@ export function apply(w: World, a: Action): ApplyResult {
       if (!c) return { world: w, ok: false, reason: 'not_found' }
       if (!canTransition(c.rel, 'locked')) return { world: w, ok: false, reason: 'bad_transition' }
       // GARDE INV1 (= ce que la contrainte EXCLUDE gist fera côté Postgres) :
-      // les DEUX participants doivent être libres sur le créneau.
-      if (userOccupied(nw, c.sender, c.startAt, c.endAt) || userOccupied(nw, c.receiver, c.startAt, c.endAt))
-        return { world: w, ok: false, reason: 'conflict' }
+      // les DEUX participants doivent être libres sur la plage OCCUPÉE (buffer prépa inclus).
+      {
+        const [os, oe] = clutchOccRange(c)
+        if (userOccupied(nw, c.sender, os, oe) || userOccupied(nw, c.receiver, os, oe))
+          return { world: w, ok: false, reason: 'conflict' }
+      }
       c.rel = 'locked'
       return { world: nw, ok: true }
     }

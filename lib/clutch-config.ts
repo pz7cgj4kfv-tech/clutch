@@ -30,6 +30,13 @@ export const CLUTCH_CONFIG = {
   // ── Contrainte structurelle Clutch ──
   maxHorizonH:           18,  // Tout se joue dans une fenêtre de 18h max (ADN du produit).
 
+  // ── Plafond de clutchs REÇUS simultanés (anti-saturation, protection — décidé David 26.06) ──
+  maxReceivedClutchs:    5,   // Boîte de réception plafonnée à N clutchs actifs EN TOTAL (pas par créneau).
+                              //   → au-delà, le 6e expéditeur reçoit le MÊME message générique « non disponible »
+                              //     que pour un cooldown/blocage (anti-sonde : il ne peut pas déduire qu'elle est pleine).
+                              //   Réglable par utilisateur (col. profiles.max_received_clutchs ; cette valeur = défaut).
+                              //   File d'attente auto-promue (le 6e « passe » quand une place se libère) = V2 (cf. anti-sonde).
+
   // ── Disponibilité & taxonomie d'événements (décidé 26.06, validé GPT) ──
   availabilityHorizonH:  18,  // Jusqu'où on peut poser un créneau de dispo (= horizon spontané, glissant).
   maxActiveSlots:        3,   // Nombre de créneaux de dispo actifs simultanés (gratuit).

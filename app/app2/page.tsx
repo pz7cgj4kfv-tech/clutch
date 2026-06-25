@@ -14,9 +14,10 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
+import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x185'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 129   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x186'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 130   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1914,12 +1915,13 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
     setLoading(false)
     if(error){
       const m=(error.message||'').toLowerCase()
-      const reason = /blocked/.test(m)?'blocked' : /cooldown/.test(m)?'cooldown' : /pair_busy/.test(m)?'busy' : /self_clutch/.test(m)?'self' : ''
-      // Anti-sonde : blocked & cooldown → MÊME message générique (A ne doit jamais déduire un refus/blocage).
+      const reason = /blocked/.test(m)?'blocked' : /cooldown/.test(m)?'cooldown' : /inbox_full/.test(m)?'full' : /pair_busy/.test(m)?'busy' : /self_clutch/.test(m)?'self' : ''
+      // Anti-sonde : blocked, cooldown ET inbox_full → MÊME message générique
+      // (A ne doit JAMAIS déduire un refus, un blocage, NI que la boîte de B est pleine).
       const friendly =
         reason==='self' ? (lang==='fr'?'Impossible de te clutcher toi-même 😄':"You can't clutch yourself 😄")
         : reason==='busy' ? (lang==='fr'?'Tu as déjà un Clutch en cours avec cette personne ✦':'You already have an active Clutch with this person ✦')
-        : (reason==='blocked'||reason==='cooldown') ? (lang==='fr'?'Cette proposition n\'est pas disponible pour le moment.':"This invitation isn't available right now.")
+        : (reason==='blocked'||reason==='cooldown'||reason==='full') ? (lang==='fr'?'Cette proposition n\'est pas disponible pour le moment.':"This invitation isn't available right now.")
         : 'Erreur: '+error.message
       showToast(friendly, reason ? C.orange : C.red)
       return
@@ -5757,6 +5759,22 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     showToast(m==='open'?'🟢 Mode Ouverte':m==='selective'?'🟡 Mode Sélective':'🔴 Mode Pause', C.whiteMid)
   }
 
+  // C/D4 — plafond de clutchs REÇUS simultanés (file d'attente, anti-saturation). Défaut = config (5).
+  // Persisté en DB (col. profiles.max_received_clutchs, appliquée par le gardien create_clutch) + localStorage de secours.
+  const capKey = `clutch_maxrecv_${user.id}`
+  const [maxRecv, setMaxRecv] = useState<number>(()=>{
+    const fromDb = (user as any).max_received_clutchs
+    if (Number.isFinite(fromDb) && fromDb>0) return fromDb
+    try { const v=parseInt(localStorage.getItem(capKey)||''); if(Number.isFinite(v)&&v>0) return v } catch {}
+    return CLUTCH_CONFIG.maxReceivedClutchs
+  })
+  const saveMaxRecv = async (n:number) => {
+    const v=Math.max(1,Math.min(20,n)); setMaxRecv(v)
+    try{ localStorage.setItem(capKey,String(v)) }catch{}
+    try{ await supabase.from('profiles').update({ max_received_clutchs:v }).eq('id',user.id) }catch{}
+    showToast(lang==='fr'?`📥 File d'attente : ${v} max`:`📥 Inbox cap: ${v} max`, C.whiteMid)
+  }
+
   // ── NOTIFICATIONS — préférences (demande David). Volume + catégories importantes.
   // ⚠️ La livraison push (app fermée) dépend de OneSignal natif + déclencheurs serveur — ces prefs pilotent
   // ce qu'on ENVOIE quand c'est branché. Les « sécurité » sont forcées ON (RDV/arrivée = vital).
@@ -6545,6 +6563,26 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             {recepMode===m&&<div style={{width:18,height:18,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#000',fontWeight:900}}>✓</div>}
           </div>
         ))}
+      </div>
+
+      {/* C/D4 — file d'attente : plafond de clutchs reçus simultanés (anti-saturation) */}
+      {SH(lang==='en'?'Inbox limit':'File d\'attente — Clutchs reçus')}
+      <div style={{background:C.bgCard,borderRadius:14,padding:'14px',border:`1px solid ${C.border}`,marginBottom:8}}>
+        <div style={{fontSize:11,color:C.whiteMid,marginBottom:14,lineHeight:1.5}}>
+          {lang==='en'
+            ? 'Max number of pending Clutchs in your inbox at once. Beyond that, new ones don\'t get through — you stay in control of your pace.'
+            : 'Nombre maximum de Clutchs en attente dans ta boîte EN MÊME TEMPS. Au-delà, les nouveaux ne passent pas — tu gardes la main sur ton rythme.'}
+        </div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:22}}>
+          <button onClick={()=>saveMaxRecv(maxRecv-1)} disabled={maxRecv<=1}
+            style={{width:42,height:42,borderRadius:21,border:`1.5px solid ${C.border}`,background:C.bg,color:maxRecv<=1?C.whiteMid:C.white,fontSize:22,fontWeight:900,cursor:maxRecv<=1?'default':'pointer',fontFamily:'inherit',opacity:maxRecv<=1?.4:1}}>−</button>
+          <div style={{minWidth:52,textAlign:'center'}}>
+            <div style={{fontSize:30,fontWeight:900,color:C.orange,lineHeight:1}}>{maxRecv}</div>
+            <div style={{fontSize:10,color:C.whiteMid,marginTop:2}}>{lang==='en'?'max':'max'}</div>
+          </div>
+          <button onClick={()=>saveMaxRecv(maxRecv+1)} disabled={maxRecv>=20}
+            style={{width:42,height:42,borderRadius:21,border:`1.5px solid ${C.border}`,background:C.bg,color:maxRecv>=20?C.whiteMid:C.white,fontSize:22,fontWeight:900,cursor:maxRecv>=20?'default':'pointer',fontFamily:'inherit',opacity:maxRecv>=20?.4:1}}>+</button>
+        </div>
       </div>
 
       {SH('Activité du moment')}

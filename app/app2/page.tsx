@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x187'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 131   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x188'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 132   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10269,7 +10269,9 @@ export default function App2() {
                           💼
                         </button>
                         <button onClick={rdvBlocked ? ()=>showToast('RDV en cours — reviens 2h après ton RDV',C.orange) : ()=>setFlow('carte')} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${rdvBlocked?C.border:C.orange}`,background:rdvBlocked?'rgba(83,41,67,.1)':C.orange,color:rdvBlocked?`${C.salmon}88`:'#fff',fontSize:11,fontWeight:800,cursor:rdvBlocked?'not-allowed':'pointer',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',opacity:rdvBlocked?.5:1}}>
-                          {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : (availableRef ? `✦ Actif` : '+ Créneau'))}
+                          {/* D2 — toujours une ACTION claire (« + Créneau »), jamais un statut ambigu (« ✦ Actif ») :
+                              l'état « actif » est déjà montré par le point vert + l'heure + le badge 📍N/3 à côté. */}
+                          {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : '+ Créneau')}
                         </button>
                         {myAvail.length>0 && (
                           <button onClick={()=>setShowSlots(true)} title={lang==='en'?'Your active availability slots (max 3)':'Tes créneaux de disponibilité actifs (max 3)'}

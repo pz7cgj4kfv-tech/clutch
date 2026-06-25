@@ -10449,6 +10449,13 @@ export default function App2() {
                 const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(!rec&&c.status==='pending')return 2; return 3 }
                 actifs.sort((a:any,b:any)=>groupRank(a)-groupRank(b))
                 const aRepondre = actifs.filter((c:any)=>c.id===inlineFeedbackId||(c.receiver_id===user.id&&c.status==='pending')).length
+                // Libellés de section (boîte de réception par ACTION) — bilingue
+                const SEC_LABELS:Record<number,string> = lang==='en'
+                  ? {0:'🔥 To answer',1:'📍 Upcoming meetups',2:'⏳ Waiting',3:'🗂️ Other'}
+                  : {0:'🔥 Action requise',1:'📍 Prochains rendez-vous',2:'⏳ En attente',3:'🗂️ Autres'}
+                // Intercale un marqueur d'en-tête {__hdr:g} quand le groupe change (actifs déjà trié par groupRank)
+                const actifsWithHdrs:any[] = []
+                { let _pg=-1; actifs.forEach((c:any)=>{ const g=groupRank(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -10508,7 +10515,8 @@ export default function App2() {
                     {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
                     {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
-                    {actifs.map((c:any)=>{
+                    {actifsWithHdrs.map((c:any)=>{
+                      if(c.__hdr!==undefined) return (<div key={'sec'+c.__hdr} style={{fontSize:11,fontWeight:800,color:C.salmon,letterSpacing:'.04em',margin:'12px 2px 4px'}}>{SEC_LABELS[c.__hdr]}</div>)
                       const isRec=c.receiver_id===user.id
                       const other=isRec?c.sender:c.receiver
                       const msLeft = c.expires_at ? new Date(c.expires_at).getTime()-Date.now() : 0

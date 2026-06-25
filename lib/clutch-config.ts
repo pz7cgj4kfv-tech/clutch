@@ -20,11 +20,12 @@ export const CLUTCH_CONFIG = {
   // ── Fenêtre de réponse ──
   clutchReplyWindowH:    2,   // Un clutch reçu non répondu EXPIRE tout seul après 2h (expires_at).
 
-  // ── Cooldown après un REFUS (anti-harcèlement, auto-apprenant) ──
-  refuseCooldownH:       48,  // Après un refus, on ne peut PAS re-clutcher la personne pendant 48h.
-  refuseCooldownFactor:  2,   // À chaque nouveau refus, le cooldown est MULTIPLIÉ par 2 (48h→96h→…).
-  refuseStopAfter:       3,   // Au-delà de N refus, l'algo ne propose PLUS cette personne du tout.
-  expiredNeedsCooldown:  false, // Un clutch EXPIRÉ (pas vu) ≠ refus → pas de cooldown. (à challenger GPT)
+  // ── Cooldown après un REFUS (anti-harcèlement) — modèle PALIERS (validé GPT 26.06) ──
+  refuseCooldownTiersH:  [48, 168, 720, 4320], // 1er refus=48h · 2e=7j · 3e=30j · 4e+=180j (paliers humains, PAS doublement)
+  refuseWindowDays:      90,  // Les refus comptent dans cette fenêtre glissante (3 le même jour ≠ 3 sur 6 mois).
+  refuseDeprioritizeAfter: 3, // Après N refus dans la fenêtre → l'algo PROPOSE MOINS ces 2 personnes (jamais ne bloque tout seul).
+  expiredNeedsCooldown:  false, // Un clutch EXPIRÉ (pas vu) ≠ refus → pas de cooldown (V1).
+  // ⚠️ Le blocage TOTAL (invisibilité mutuelle) = DÉCISION de l'utilisateur, jamais automatique. Réversible (liste « masqués »).
 
   // ── Contrainte structurelle Clutch ──
   maxHorizonH:           18,  // Tout se joue dans une fenêtre de 18h max (ADN du produit).
@@ -42,6 +43,9 @@ export const CLUTCH_CONFIG = {
 export const MS_PER_MIN = 60_000
 export const rdvDurationMin = (isQuick: boolean) =>
   isQuick ? CLUTCH_CONFIG.rdvDurationQuickMin : CLUTCH_CONFIG.rdvDurationDefaultMin
-// Cooldown effectif après le n-ième refus (n commence à 1) : 48h, 96h, 192h…
-export const refuseCooldownH = (refusalCount: number) =>
-  CLUTCH_CONFIG.refuseCooldownH * Math.pow(CLUTCH_CONFIG.refuseCooldownFactor, Math.max(0, refusalCount - 1))
+// Cooldown effectif (heures) après le n-ième refus dans la fenêtre : paliers 48h·7j·30j·180j (plafonné).
+export const refuseCooldownH = (refusalCount: number) => {
+  const t = CLUTCH_CONFIG.refuseCooldownTiersH
+  if (refusalCount <= 0) return 0
+  return t[Math.min(refusalCount, t.length) - 1]
+}

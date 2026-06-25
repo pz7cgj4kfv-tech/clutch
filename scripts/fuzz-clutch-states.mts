@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   emptyWorld, apply, checkInvariants, isTerminal, isPaused,
-  canRegisterEvent, eventMode,
+  canRegisterEvent, eventMode, clutchCooldownMs, canSendClutch,
   type World, type Action, type RelState,
 } from '../lib/clutch-states.ts'
 
@@ -97,6 +97,19 @@ function targetedTests() {
     expect('planifié au-delà 7j → refusé', canRegisterEvent({ mode:'planned', eventStart:now+10*24*HOUR, eventEnd:now+10*24*HOUR+HOUR, now, availSlots:[] }).reason === 'too_far')
     expect('host partner → planned', eventMode('partner') === 'planned')
     expect('host user → spontaneous', eventMode('user') === 'spontaneous')
+  }
+
+  // (g) Cooldown de refus — paliers (validé 26.06)
+  {
+    expect('0 refus → pas de cooldown', clutchCooldownMs(0) === 0)
+    expect('1er refus → 48h', clutchCooldownMs(1) === 48*HOUR)
+    expect('2e refus → 7j', clutchCooldownMs(2) === 168*HOUR)
+    expect('3e refus → 30j', clutchCooldownMs(3) === 720*HOUR)
+    expect('4e+ refus → 180j (plafonné)', clutchCooldownMs(9) === 4320*HOUR)
+    const now = 100*HOUR
+    expect('hard-block → envoi refusé', canSendClutch({ now, hardBlocked:true }).reason === 'blocked')
+    expect('cooldown actif → envoi refusé', canSendClutch({ now, cooldownUntil: now+HOUR }).reason === 'cooldown')
+    expect('cooldown passé → envoi OK', canSendClutch({ now, cooldownUntil: now-HOUR }).ok === true)
   }
 }
 

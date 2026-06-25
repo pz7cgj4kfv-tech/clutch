@@ -269,3 +269,20 @@ export function canRegisterEvent(o: {
   const covered = o.availSlots.some(s => s.start < o.eventEnd && o.eventStart < s.end)
   return covered ? { ok: true } : { ok: false, reason: 'no_availability' }
 }
+
+// ── 8. Cooldown de refus (anti-harcèlement) — logique pure (paliers, validé GPT 26.06) ──
+// PAS de blocage auto : après N refus l'algo DÉ-PRIORISE (ranking, ailleurs) ; le blocage total = décision user.
+const COOLDOWN_TIERS_H = [48, 168, 720, 4320] // 48h · 7j · 30j · 180j
+// Le palier dépend du nombre de refus DANS LA FENÊTRE glissante (3 le même jour ≠ 3 sur 6 mois).
+export function clutchCooldownMs(refusalsInWindow: number, tiersH: number[] = COOLDOWN_TIERS_H): number {
+  if (refusalsInWindow <= 0) return 0
+  const idx = Math.min(refusalsInWindow, tiersH.length) - 1
+  return tiersH[idx] * 60 * MIN
+}
+// Peut-on envoyer un clutch A→B ? (pur ; côté serveur = la RPC create_clutch). Le cooldown bloque
+// temporairement ; hardBlocked = décision volontaire de B (réversible). La dé-priorisation ne bloque PAS.
+export function canSendClutch(o: { now: number; hardBlocked?: boolean; cooldownUntil?: number | null }): { ok: boolean; reason?: string } {
+  if (o.hardBlocked) return { ok: false, reason: 'blocked' }
+  if (o.cooldownUntil && o.cooldownUntil > o.now) return { ok: false, reason: 'cooldown' }
+  return { ok: true }
+}

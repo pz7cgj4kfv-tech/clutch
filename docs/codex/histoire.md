@@ -56,4 +56,33 @@ Challenge GPT. **Révélation** : on n'aide pas « les impopulaires » (métriqu
 
 ---
 
+---
+
+## Chapitre IV — Phase 2 : le branchement, la bienveillance, et la PREUVE (26 juin 2026)
+
+### Le gardien prend vie
+Le `create_clutch()` théorique devient réel : tout envoi de Clutch passe désormais par cette unique fonction Postgres. Le sender devient `auth.uid()` (côté serveur = plus sûr). Surprise heureuse au passage : le système de **blocage existait déjà** (table `blocks` + UI). Plutôt que de le réinventer, on **unifie** — `create_clutch()` respecte `blocks` (les deux sens = invisibilité mutuelle). Anti-sonde : un refus, un blocage et un cooldown produisent **le même** message générique. La personne refusée ne le sait jamais.
+
+### La correction de David sur le cooldown
+*« On ne veut PAS que l'algo ne propose plus JAMAIS de lui-même. »* L'algo ne coupe jamais seul : après des refus, il **dé-priorise** ; le blocage total reste une **décision de l'utilisateur**, réversible. Plus humain.
+
+### La forteresse bienveillante — le reframe
+Le point le plus délicat éthiquement. **Révélation GPT** : on n'aide pas « les impopulaires » (métrique toxique qui hiérarchise les gens) mais les **sous-exposés**. La meilleure aide n'est pas un boost d'algorithme : c'est **orienter doucement vers les événements de groupe**. Premier geste codé : un nudge tendre dans l'onglet Événements (« envie de rencontrer plus facilement ? »), jamais culpabilisant, jamais de push, fermable. Dignité absolue.
+
+### Le multi-créneaux, sans toucher au gate
+David veut être dispo à 3 endroits/heures. Le piège : le gate (`is_available && available_until>now`) est vérifié à **6 endroits** — les modifier = la « faille » interdite par la règle dure. La solution élégante : **une seule fonction** `syncCurrentSlot()` qui *promeut* le créneau couvrant l'heure actuelle dans `profiles`. Le gate lit `profiles` comme avant → **aucun site de gate touché**. Et elle est **promote-only** : elle ne peut jamais rendre indisponible. Régression impossible.
+
+### 💡 La révélation finale : la PREUVE
+David n'a pas le temps de tout tester. Réponse : trois filets. Le fuzzer (logique, 800k/0). Un smoke test de l'UI (lancé localement par Claude — aucun crash). Et **un test de 30 secondes** que David lance dans sa vraie base :
+> *« combien de chevauchements interdits existent dans ta production ? »*
+
+Réponse : **`0`.**
+
+Personne n'est à deux endroits à la fois. Pas en théorie. Pas dans un test. **Dans les données réelles de production.** La forteresse, née d'une angoisse — *« il y a une infinité de possibilités, tout seul je n'y arriverai pas »* — tient, prouvée, en une table et une contrainte.
+
+### La doc qui se raconte
+Né le besoin de *« raconter l'histoire de Clutch comme un historien, sans perdre une miette »* : ce Codex. Trois documents long-format, mis à jour sur un seul mot — **« Codex »**.
+
+---
+
 *(Suite au prochain « Codex ».)*

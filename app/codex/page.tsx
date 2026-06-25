@@ -193,6 +193,7 @@ function Params(){const R=[['rdvDurationDefaultMin','120','RDV normal = 2h (dura
   <Todo c="À challenger GPT : doublement du cooldown, seuil d'arrêt (3), cas 'clutch expiré' répété."/></div>)}
 
 function Decisions(){const L=[
+  ['26.06','Phase 2 — branchement + bienveillance + PREUVE',<>Gardien <code>create_clutch()</code> branché (envoi via RPC, anti-sonde) + unifié au blocage existant (<code>blocks</code>). Nudge « event de groupe » (sous-exposés). Multi-créneaux visibles via <code>syncCurrentSlot()</code> (promote-only, 0 site de gate touché). <b>Vérif prod : 0 chevauchement interdit ✅</b>. Cooldown : pas de blocage auto (correction David) → dé-priorisation + blocage volontaire réversible. Coûts opé : ~$25/mois + $99/an.</>],
   ['26.06','Taxonomie events + multi-créneaux',<>Validé (challenge GPT, tri Claude) : axe principal <code>spontané | planifié</code> — PAS le type de compte. Spontané (host≠partner) = dans une dispo active + horizon 18h glissant ; planifié (partenaire) = libre de dispo + 7j ; les DEUX créent une occupation. Multi-créneaux : max 3 actifs, gratuit, non-chevauchants. Fondation posée : config + logique pure testée (7 tests) + migration <code>availabilities</code>. UI 3 créneaux + gate = prochaine passe (EventsTab ne reçoit pas encore la dispo).</>],
   ['25.06','Forteresse — fondation',<>Machine à états pure + fuzzer (800k/0). Migration <code>occupancies</code> + EXCLUDE en prod (shadow→enforce). Bouton Verrouiller : rollback optimiste + message doux sur conflit (app2 ~L10968).</>],
   ['25.06','Durée RDV 1h→2h',<>Erreur rattrapée : <code>duration_minutes: isQuickDate?60:null</code> (app2 L1893) ⇒ quick=1h donc normal=2h. Leçon : vérifier la vraie valeur avant de trancher un défaut délégué.</>],
@@ -225,13 +226,12 @@ function Fichiers(){const F=[
   </div>)}
 
 function Roadmap(){return(<div><H c="À implémenter (roadmap technique)"/>
-  <Todo c={<><b>Multi-créneaux + gate spontané (UI).</b> Fondation faite (config, <code>canRegisterEvent</code> testé, migration <code>availabilities</code>). Reste : appliquer la migration, câbler la dispo dans <code>EventsTab</code> (props absentes), picker 3 créneaux, gater l'inscription aux events spontanés, cohérence temporelle des bots.</>}/>
-  <Todo c={<><b>Algo auto-apprenant — cooldown refus.</b> B refuse A → A ne peut re-clutcher B pendant 48h (config). ×2 à chaque refus. &gt;3 refus → plus jamais proposé. Expiré ≠ refus. À challenger GPT avant de coder.</>}/>
-  <Todo c={<><b>Aide aux 0-clutch.</b> Détecter qui ne reçoit jamais de clutch → boost visibilité + coaching doux. Cœur de la « forteresse bienveillante ».</>}/>
-  <Todo c={<><b>Fichier .log brut</b> (append-only) de tout ce qui se passe, ré-injectable dans une IA pour condenser sans perte. En parallèle de la mémoire.</>}/>
-  <Todo c={<><b>Désactiver le Verrou sur carte « en pause »</b> — fait (garde + visuel). Reste : conflit aussi sur accept-bot & accept-contre-proposition.</>}/>
-  <Todo c={<><b>Refactor app2</b> (~11,7k l) — extraire composants/helpers. Sans casser : avec David, testé.</>}/>
-  <Todo c={<><b>Supabase « over quota »</b> — passer en payant avant lancement (grâce jusqu'au 24.07).</>}/>
+  <P s={{fontSize:11.5}} c={<span style={{color:'#77BC1F'}}>✅ Faits : forteresse · taxonomie+gate · cooldown+gardien · blocage · multi-créneaux (persist+feuille+visibilité) · nudge bienveillant · Codex. Prod vérifiée : 0 chevauchement.</span>}/>
+  <Todo c={<><b>🔑 Boost sous-exposés (slice 2)</b> — BLOQUÉ par l'upgrade Supabase. Besoin : logging léger des impressions (écritures) → puis <code>underExposureScore</code> + boost ranking plafonné +20%. À faire après le passage en Pro.</>}/>
+  <Todo c={<><b>Supabase « over quota »</b> — passer en Pro ($25/mois) avant le 24.07. Débloque le boost.</>}/>
+  <Todo c={<><b>Polish</b> : message gentil aussi sur accept-bot / contre-proposition (cosmétique — la base bloque déjà tout chevauchement). · promotion créneau au focus de l'app.</>}/>
+  <Todo c={<><b>Fichier .log brut</b> (append-only) ré-injectable dans une IA, en parallèle de la mémoire.</>}/>
+  <Todo c={<><b>Refactor app2</b> (~11,8k l) — extraire composants/helpers. Avec David, testé.</>}/>
 </div>)}
 
 const TABS=[

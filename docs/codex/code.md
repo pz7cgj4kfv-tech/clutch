@@ -24,7 +24,18 @@
 - **Gardien `create_clutch()`** (SECURITY DEFINER) : self · blocage (table `blocks`, 2 sens) · cooldown (clutch_pairs) · doublon pending. Le frontend ne décide jamais.
 - **Cooldown** : paliers `clutch_cooldown_interval(n)` = 48h/7j/30j/180j, fenêtre 90j (trigger `register_clutch_refusal`).
 - **Gate event spontané** : `canRegisterEvent` (dans une dispo + 18h) ; partenaire = libre + 7j.
-- **Aide sous-exposés** : `shouldNudgeGroupEvent` (slice 1) · `underExposureScore` (slice 2, besoin impressions).
+- **Aide sous-exposés** : `shouldNudgeGroupEvent` (slice 1, nudge branché) · `underExposureScore` (slice 2, besoin impressions).
+- **Envoi de clutch** : passe par `supabase.rpc('create_clutch', …)` (le gardien). Erreurs serveur → messages anti-sonde.
+- **Multi-créneaux (A/C)** : `syncCurrentSlot()` (app2) promeut le créneau courant dans `profiles` (promote-only, check chaque minute) → visible pendant chaque créneau sans toucher au gate.
+
+## Vérifier la forteresse EN PROD (30 s, aucun clic dans l'app)
+```sql
+select count(*) as chevauchements_interdits
+from public.occupancies a join public.occupancies b
+  on a.user_id=b.user_id and a.id<b.id
+ and tstzrange(a.start_at,a.end_at,'[)') && tstzrange(b.start_at,b.end_at,'[)');
+-- attendu : 0  (vérifié le 26.06 → 0 ✅)
+```
 
 ## Comment tester le moteur
 ```

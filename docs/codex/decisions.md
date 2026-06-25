@@ -17,7 +17,7 @@
 ## 🗓️ Disponibilité & événements
 - ✅ **Axe `spontané | planned`**, PAS le type de compte. Spontané = dans une dispo + 18h ; planifié (partenaire) = libre + 7j ; les 2 occupent l'agenda.
 - ✅ **18h = horizon glissant** depuis maintenant (midi → 6h demain).
-- 🟡 **Multi-créneaux** : max 3 actifs, gratuit, non-chevauchants. (persist + feuille faits ; visibilité Présences multi-slot = à venir.)
+- ✅ **Multi-créneaux** : max 3 actifs, gratuit, non-chevauchants. Persist + feuille « Mes créneaux » + compteur 📍 N/3. **Visibilité multi-slot = `syncCurrentSlot()` (promote-only, aucun site de gate touché, check chaque minute).**
 - ⏳ **Horizon de déclaration des créneaux** (18h strict vs ~36h) — résolu par David : on re-déclare au fil de l'eau (18h suffit).
 - ⏳ **Créneaux chevauchants dans le temps ?** reco : non.
 
@@ -32,7 +32,11 @@
 - ✅ **Détecter la SOUS-EXPOSITION, pas l'impopularité** (peu vu/proposé malgré activité, après 14j).
 - ✅ **Boost** : pool compatible uniquement, +20% plafonné, dégressif 30j. Jamais une femme = quota pour un homme.
 - ✅ **Coaching** non culpabilisant, 1×/sem, jamais de push. **Meilleure aide = orienter vers events de groupe.**
-- 🟡 **Slice 1 (nudge event)** = fondation testée, UI à brancher. **Slice 2 (boost ranking)** = besoin logging impressions.
+- ✅ **Slice 1 (nudge event)** = bannière douce branchée (onglet Événements, cap 1×/sem localStorage). **🔑 Slice 2 (boost ranking)** = bloquée par l'upgrade Supabase (logging impressions = écritures, pas en over-quota).
+
+## 💰 Coûts une fois opérationnel (estimés)
+- Supabase Pro **$25/mois** (>~500 users) · Apple Developer **$99/an** · Google Play **$25 une fois** · OneSignal **gratuit** (<10k) · GitHub Pages **gratuit** · domaine optionnel ~$12/an.
+- ⏳ Supabase **over quota** : grâce jusqu'au **24 juillet 2026** → upgrade avant.
 
 ## 📐 Règles permanentes (méthode)
 - ✅ Tout seuil = **paramètre configurable** (`lib/clutch-config.ts`), jamais de nombre magique.

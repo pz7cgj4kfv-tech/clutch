@@ -64,6 +64,14 @@ export const CLUTCH_CONFIG = {
     weights: { presence: 0.35, cancels: 0.25, crossFeedback: 0.20, seniority: 0.10, systemSignal: 0.10 },
     crossFeedbackReciprocityPenalty: 0.6, // escompte jusqu'à -60% du feedback croisé s'il vient d'une boucle fermée
   },
+  // ── Notifications (le prochain grand levier — « la notif EST le produit ») ──
+  //   On ne notifie QUE l'actionnable. Le SILENCE se mérite (seuil ↑ par notif récente). Sécurité = passe outre.
+  notifications: {
+    relevanceBase:      0.45, // seuil de pertinence de base pour notifier (0..1)
+    relevancePerRecent: 0.12, // +0.12 au seuil PAR notif récente (anti-spam auto : le silence se mérite)
+    recentWindowMin:    90,   // fenêtre « récente » pour compter les envois (min)
+    highPriorityBypass: 0.85, // priorité ≥ ce seuil → passe outre silence + actionnable (sécurité/RDV imminent/SOS)
+  },
 } as const
 
 // Helpers dérivés (pour ne pas refaire le calcul partout)

@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 123   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x180'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 124   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1135,8 +1135,20 @@ function Btn({children,variant='primary',loading,...props}:{children:React.React
 }
 
 function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>void;onRegister:()=>void;showToast:(m:string,c?:string)=>void}) {
-  const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [loading,setLoading]=useState(false); const [showPwd,setShowPwd]=useState(false)
-  const login=async()=>{ if(loading)return; setLoading(true); try { const{data,error}=await supabase.auth.signInWithPassword({email:email.trim().toLowerCase(),password:pass}); if(error){showToast('Email ou mot de passe incorrect',C.red);setLoading(false);return} const{data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single(); setLoading(false); if(p){onSuccess(p)} else {showToast('Profil introuvable — recrée ton compte',C.red)} } catch(e:any){ setLoading(false); showToast('Connexion impossible : '+(e?.message||'réseau'),C.red) } }
+  const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [loading,setLoading]=useState(false); const [showPwd,setShowPwd]=useState(false); const [status,setStatus]=useState('')
+  const login=async()=>{
+    if(loading)return
+    setStatus('Connexion…'); setLoading(true)
+    try {
+      const em=email.trim().toLowerCase()
+      if(!em||!pass){ setLoading(false); setStatus('❌ Entre ton email et ton mot de passe'); return }
+      const{data,error}=await supabase.auth.signInWithPassword({email:em,password:pass})
+      if(error){ setLoading(false); setStatus('❌ '+(error.message||'Email ou mot de passe incorrect')); return }
+      const{data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single()
+      setLoading(false)
+      if(p){ setStatus('✓ Connecté'); onSuccess(p) } else { setStatus('❌ Profil introuvable — recrée ton compte') }
+    } catch(e:any){ setLoading(false); setStatus('❌ '+(e?.message||'Pas de connexion réseau')) }
+  }
   return (
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px'}}>
       <div style={{width:'100%',maxWidth:360}}>
@@ -1144,15 +1156,19 @@ function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>vo
           <div style={{fontSize:36,fontWeight:900,letterSpacing:'-.05em',color:C.pink,marginBottom:6}}>CLU<span style={{color:C.green}}>TCH</span></div>
           <div style={{fontSize:12,color:C.whiteMid,letterSpacing:'.15em',textTransform:'uppercase'}}>Welcome</div>
         </div>
-        <Input label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com" onKeyDown={e=>e.key==='Enter'&&login()}/>
+        {/* Vrai <form> : submit fiable sur WebView iOS (le onClick seul ne déclenchait rien) + enregistrement mot de passe (autoComplete) */}
+        <form onSubmit={e=>{e.preventDefault();login()}}>
+        <Input label="Email" type="email" name="email" autoComplete="username" inputMode="email" autoCapitalize="none" autoCorrect="off" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com"/>
         <div style={{marginBottom:14}}>
           <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Password</div>
           <div style={{position:'relative'}}>
-            <input type={showPwd?'text':'password'} value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&login()} style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'13px 44px 13px 14px',fontSize:15,color:C.white,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
+            <input type={showPwd?'text':'password'} name="password" autoComplete="current-password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:12,padding:'13px 44px 13px 14px',fontSize:15,color:C.white,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
             <button type="button" onClick={()=>setShowPwd(v=>!v)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'rgba(255,255,255,.4)',padding:4,lineHeight:1}}>{showPwd?'🙈':'👁'}</button>
           </div>
         </div>
-        <div style={{marginBottom:14}}><Btn loading={loading} onClick={login}>Sign in</Btn></div>
+        <div style={{marginBottom:8}}><Btn type="submit" loading={loading}>Sign in</Btn></div>
+        {status && <div style={{textAlign:'center',fontSize:12.5,marginBottom:10,fontWeight:700,color:status.startsWith('❌')?C.red:status.startsWith('✓')?C.green:C.salmon}}>{status}</div>}
+        </form>
         <Btn variant="secondary" onClick={onRegister}>Create account</Btn>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:C.whiteMid}}><a href="/" style={{color:C.salmon}}>← Clutch home</a></div>
         <div style={{textAlign:'center',marginTop:14,fontSize:10,color:'rgba(250,250,250,0.35)',lineHeight:1.6}}>

@@ -30,7 +30,9 @@ export function canTransition(from: RelState, to: RelState): boolean {
 }
 
 // ── 2. Constantes produit ────────────────────────────────────────────────────
-export const DEFAULT_DURATION_MIN = 60 // V1 : un Clutch occupe 1h fixe (décision David 25.06)
+// Durée d'occupation d'un Clutch : 2h par défaut (Clutch normal), 1h pour un Quick Clutch
+// (is_quick_date → duration_minutes=60). Décision David 25.06, alignée sur le code app.
+export const DEFAULT_DURATION_MIN = 120
 const MIN = 60_000
 
 // ── 3. Modèle de données (pur) ───────────────────────────────────────────────

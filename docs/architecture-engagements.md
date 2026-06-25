@@ -75,10 +75,11 @@ Deux personnes cliquent « Verrouiller » à 20 ms d'écart : **1 réussit, 1 é
 
 ---
 
-## 3. Durée d'un Clutch (décision David 25.06)
+## 3. Durée d'un Clutch (décision David 25.06, alignée sur le code réel)
 
-- **V1 : 1h fixe** à partir de l'heure proposée → `end_at = start_at + 1h`.
-- Le plus simple, invisible, juste dans ~90 % des cas. Raffinage (durée par type) = plus tard, au test terrain.
+- **Clutch normal : 2h** (`duration_minutes` NULL → défaut **120**). Cohérent avec l'`expires_at` 2h et l'auto-terminaison.
+- **Quick Clutch : 1h** (`is_quick_date=true` → `duration_minutes=60`, déjà posé par l'app, cf. app2 ~L1893).
+- Donc : `end_at = start_at + coalesce(duration_minutes, 120) min`. Une soirée/event posera sa propre durée plus longue.
 - Sans cette durée, `tstzrange` est indéfini → c'était un trou de la reco GPT, comblé ici.
 
 ---

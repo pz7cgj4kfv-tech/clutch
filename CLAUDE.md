@@ -181,8 +181,8 @@ Appeler `map.invalidateSize()` dans un `requestAnimationFrame` après montage.
 - ✅ Info.plist permissions en français
 - ✅ App icon 1024×1024
 - ✅ Cron auto-expiry
-- ⏳ Apple Developer account — en attente activation (email attendu)
-  → Quand reçu : Xcode → Signing & Capabilities → "Try Again" → Build Archive → Upload TestFlight
+- ✅ Apple Developer account ACTIF (build 23 déjà uploadé sur TestFlight = preuve). NE PLUS reposer la question.
+  → Nouveau build : Xcode → bump version → Build Archive → Upload TestFlight
 - ⏳ Screenshots App Store iPhone 6.9" × 5 (Mel doit fournir)
 
 ---

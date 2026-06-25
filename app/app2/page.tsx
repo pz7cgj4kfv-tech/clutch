@@ -15,8 +15,8 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 
-const V = '0x17a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 118   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x17b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 119   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1880,29 +1880,29 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
     }
     const pt=new Date(); const [h,m]=H[hi].split(':').map(Number); pt.setHours(h,m,0,0)
     const venueLabel=venueAddress?`${venueInput.trim()} · ${venueAddress}`:venueInput.trim()
-    const {data:inserted,error}=await supabase.from('clutches').insert({
-      sender_id:from.id, receiver_id:to.id,
-      venue:venueLabel,
-      venue_lat:venueLat||null,
-      venue_lng:venueLng||null,
-      venue_safety:'neutral',
-      message:msg||(lang==='fr'?`Dispo pour ${venueInput.trim()} à ${H[hi]} ?`:`Free for ${venueInput.trim()} at ${H[hi]}?`),
-      proposed_time:pt.toISOString(),
-      expires_at:new Date(Date.now()+2*3600*1000).toISOString(),
-      status:'pending',
-      is_quick_date:isQuickDate,
-      duration_minutes:isQuickDate?60:null
-    }).select('id').single()
+    // Gardien unique : create_clutch() vérifie côté serveur self / hard-block (2 sens) / cooldown / doublon pending.
+    const {data:newClutchId,error}=await supabase.rpc('create_clutch',{
+      p_receiver: to.id,
+      p_venue: venueLabel,
+      p_proposed_time: pt.toISOString(),
+      p_message: msg||(lang==='fr'?`Dispo pour ${venueInput.trim()} à ${H[hi]} ?`:`Free for ${venueInput.trim()} at ${H[hi]}?`),
+      p_duration_minutes: isQuickDate?60:null,
+      p_is_quick: isQuickDate,
+      p_venue_lat: venueLat||null,
+      p_venue_lng: venueLng||null,
+    })
+    const inserted = newClutchId ? { id: newClutchId as string } : null
     setLoading(false)
     if(error){
-      const dup = error.code==='23505' || /clutch_pair_unique|duplicate/i.test(error.message||'')
-      const self = error.code==='23514' || /no_self_clutch/i.test(error.message||'')
-      const friendly = dup
-        ? (lang==='fr'?'Tu as déjà un Clutch en cours avec cette personne ✦':'You already have an active Clutch with this person ✦')
-        : self
-        ? (lang==='fr'?'Impossible de te clutcher toi-même 😄':'You can\'t clutch yourself 😄')
+      const m=(error.message||'').toLowerCase()
+      const reason = /blocked/.test(m)?'blocked' : /cooldown/.test(m)?'cooldown' : /pair_busy/.test(m)?'busy' : /self_clutch/.test(m)?'self' : ''
+      // Anti-sonde : blocked & cooldown → MÊME message générique (A ne doit jamais déduire un refus/blocage).
+      const friendly =
+        reason==='self' ? (lang==='fr'?'Impossible de te clutcher toi-même 😄':"You can't clutch yourself 😄")
+        : reason==='busy' ? (lang==='fr'?'Tu as déjà un Clutch en cours avec cette personne ✦':'You already have an active Clutch with this person ✦')
+        : (reason==='blocked'||reason==='cooldown') ? (lang==='fr'?'Cette proposition n\'est pas disponible pour le moment.':"This invitation isn't available right now.")
         : 'Erreur: '+error.message
-      showToast(friendly, dup||self ? C.orange : C.red)
+      showToast(friendly, reason ? C.orange : C.red)
       return
     }
     // 🔔 Push au DESTINATAIRE (David : « il faut que ça s'affiche sur le tél quand il se passe un truc »).

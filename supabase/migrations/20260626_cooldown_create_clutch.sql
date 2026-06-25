@@ -60,9 +60,12 @@ declare me uuid := auth.uid(); pair record; new_id uuid;
 begin
   if me is null then raise exception 'not_authenticated'; end if;
   if me = p_receiver then raise exception 'self_clutch'; end if;
+  -- Blocage : on respecte la table `blocks` existante (les 2 sens = invisibilité mutuelle).
+  if exists (select 1 from public.blocks where (blocker_id=me and blocked_id=p_receiver) or (blocker_id=p_receiver and blocked_id=me)) then
+    raise exception 'blocked';
+  end if;
+  -- Cooldown de refus (table pairwise)
   select * into pair from public.clutch_pairs where actor_id = me and target_id = p_receiver;
-  if pair.hard_blocked then raise exception 'blocked'; end if;
-  if exists (select 1 from public.clutch_pairs where actor_id=p_receiver and target_id=me and hard_blocked) then raise exception 'blocked'; end if;
   if pair.cooldown_until is not null and pair.cooldown_until > now() then raise exception 'cooldown'; end if;
   if exists (select 1 from public.clutches where status in ('pending','accepted','confirmed','checked_in')
              and ((sender_id=me and receiver_id=p_receiver) or (sender_id=p_receiver and receiver_id=me))) then

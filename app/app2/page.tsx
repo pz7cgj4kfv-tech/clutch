@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b5'  // Versionnage HEXADÉCIMAL. ~287e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 177   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b6'  // Versionnage HEXADÉCIMAL. ~288e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 178   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12196,8 +12196,9 @@ export default function App2() {
               </button>
             )
           })()}
-          {/* Radar de proximité — overlay bottom, TOUTES pages, s'active <30min avant RDV. Masqué si feedback inline actif OU réduit (D3) */}
-          {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && !radarMin && (
+          {/* Radar de proximité — overlay bottom. Ne s'affiche QUE dans la fenêtre RDV (rdvBlocked = 1h avant → 2h après),
+              pas 8h avant (sinon il cache les présences — bug David). Hors fenêtre : juste la bannière de rappel en haut. */}
+          {flow==='app' && activeVerrou && rdvBlocked && !showVerrou && !inlineFeedbackId && !radarMin && (
             <>
             {/* Bouton RÉDUIRE (D3) — au-dessus du radar, pour libérer l'écran sans annuler le RDV */}
             <button onClick={()=>setRadarMin(true)} title={lang==='en'?'Minimize':'Réduire'}

@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x199'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 149   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 150   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1574,6 +1574,9 @@ function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(
 function demoOn(): boolean { try { return localStorage.getItem('clutch_demo_mode') !== '0' } catch { return true } }
 const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864']
 function isAdminId(id?: string | null): boolean { return !!id && ADMIN_IDS.includes(id) }
+// 🧪 « Labo propre » (cockpit) : coupe TOUT le décor codé en dur (mock events + group events démo) pour avoir
+// un terrain de test net = uniquement la vraie base que l'opérateur pilote. Réglé par le cockpit.
+function labClean(): boolean { try { return localStorage.getItem('clutch_lab_clean') === '1' } catch { return false } }
 
 // ── VÉNÉRITUDE (brain-dump David) — le « thermostat d'engueulade » : 0=Doux … 3=Trash.
 // Le curseur (Profil > Geek) règle le TON des messages système, surtout quand tu crées un illogisme
@@ -2971,10 +2974,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     type: e.type,                // pour le gate (eventMode : partner=planifié, sinon spontané)
     starts_at: (e as any).starts_at || null, // vrai timestamp → gate + occupation
     reviews: [],
-  })) : ((()=>{ try{ return localStorage.getItem('clutch_demo_mode')==='0' ? [] : MOCK_EVENTS }catch{ return MOCK_EVENTS } })())  // 🤖 mock events masqués en mode Réel (clutch_demo_mode='0')
+  })) : (((demoOn() && !labClean()) ? MOCK_EVENTS : []))  // 🤖 mock events masqués en Réel ET en Labo propre
 
-  // Events de groupe : démo bots + events créés par l'user dans cette session
-  const [userGroupEvents, setUserGroupEvents] = useState<any[]>(GROUP_EVENTS_DEMO)
+  // Events de groupe : démo bots (masqués en Réel ET en Labo propre) + events créés dans cette session
+  const [userGroupEvents, setUserGroupEvents] = useState<any[]>((demoOn() && !labClean()) ? GROUP_EVENTS_DEMO : [])
   const [groupJoined, setGroupJoined] = useState<Set<string>>(new Set())
   // Events annulés/masqués localement — filtre DUR (survit au refresh DB & aux blocages RLS). David : « il part et revient ».
   const [cancelledLocal, setCancelledLocal] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_cancelled_events');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
@@ -12206,6 +12209,10 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
             )})}
         </>)}
         {tab==='express' && (<>
+          <button onClick={()=>{ try{ localStorage.setItem('clutch_lab_clean', labClean()?'0':'1') }catch{}; window.location.reload() }}
+            style={{width:'100%',padding:'10px',marginBottom:8,borderRadius:9,border:`1.5px solid ${labClean()?C.green:C.border}`,background:labClean()?`${C.green}1a`:C.bgCard,color:labClean()?C.green:C.white,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+            🧪 Labo propre : {labClean()?'ON ✓ (décor bidon coupé)':'OFF — appuie pour couper le décor bidon'}
+          </button>
           {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
           {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
           {Btn('acc','🤝 Les bots acceptent mes clutchs (→ Verrou)',botsAccept)}

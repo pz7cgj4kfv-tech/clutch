@@ -12634,10 +12634,31 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const rows=((pend as any[])||[])
     if(!rows.length){ showToast('Aucun clutch en attente envoyé à un bot',C.orange); setBusy(null); return }
     // Réaliste : ils n'acceptent PAS tous (2 sur 3 acceptent, 1 sur 3 refuse).
-    let acc=0, dec=0
-    for(let i=0;i<rows.length;i++){ const accept = (i%3!==2); await supabase.from('clutches').update({status: accept?'accepted':'declined'}).eq('id',rows[i].id); accept?acc++:dec++ }
+    // 🏰 Forteresse : un accept dont l'occupation CHEVAUCHE un RDV déjà confirmé est REJETÉ par la contrainte EXCLUDE
+    //   (occ_no_overlap) → on compte les bloqués. C'est le comportement « vraie personne » : 2 RDV en même temps = impossible.
+    let acc=0, dec=0, blocked=0
+    for(let i=0;i<rows.length;i++){
+      const accept = (i%3!==2)
+      if(!accept){ await supabase.from('clutches').update({status:'declined'}).eq('id',rows[i].id); dec++; continue }
+      const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',rows[i].id)
+      if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')) blocked++  // forteresse a bloqué → reste pending
+      else if(error) blocked++
+      else acc++
+    }
     try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-    showToast(`✓ ${acc} accepté(s) → Verrou 🔒 · ${dec} refusé(s)`, C.green)
+    showToast(`✓ ${acc} Verrou 🔒 · ${dec} refusé · ${blocked} bloqué(s) par la forteresse (chevauchent ton RDV)`, blocked>0?C.orange:C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // 🏰 TEST forteresse : UN SEUL bot accepte (le 1er pending) → ton RDV se crée → tes AUTRES pendings qui
+  //   chevauchent passent « ⏸ en pause ». Reproduit exactement « j'ai clutché plein de monde, un valide ».
+  const botAcceptOne=async()=>{ setBusy('acc1'); try{
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
+    const { data: pend } = await supabase.from('clutches').select('id,receiver_id').eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
+    const row=((pend as any[])||[])[0]
+    if(!row){ showToast('Aucun clutch en attente envoyé à un bot — clutche d\'abord',C.orange); setBusy(null); return }
+    const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',row.id)
+    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
+    if(error) showToast('❌ '+error.message, C.red)
+    else showToast('✓ 1 bot a accepté → Verrou 🔒. Tes autres clutchs qui chevauchent passent « en pause ».', C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // RESET COMPLET et HONNÊTE : annule les clutchs + met TOUS les bots hors-ligne + masque LEURS events.
   const resetBots=async()=>{ setBusy('reset'); try{
@@ -12772,6 +12793,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
           {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
           {Btn('acc','🤝 Les bots acceptent mes clutchs (→ Verrou)',botsAccept)}
+          {Btn('acc1','🏰 UN bot accepte (teste la forteresse → autres en pause)',botAcceptOne)}
           {Btn('reset','🧹 Reset bots',resetBots)}
         </>)}
         {tab==='acteur' && (<>

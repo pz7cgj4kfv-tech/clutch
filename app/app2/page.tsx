@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1ae'  // Versionnage HEXADÉCIMAL. ~280e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 170   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1af'  // Versionnage HEXADÉCIMAL. ~281e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 171   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -330,6 +330,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.f1': 'Tout Rh +', 'sub.at.f2': 'Mode incognito', 'sub.at.f3': 'Rayon élargi 50km', 'sub.at.f4': 'Stats avancées', 'sub.at.f5': 'Badge Élite sur le profil', 'sub.at.f6': 'Support prioritaire',
     'sub.women': 'Femmes — toujours gratuites, toujours prioritaires ♀',
     'ev.filter.all': 'Tout', 'ev.filter.partenaires':'Communauté', 'ev.filter.mine': 'Mes events', 'ev.filter.soir': 'Ce soir', 'ev.filter.demain': 'Demain',
+    'ev.filter.matin': 'Ce matin', 'ev.filter.aprem': 'Cet après-midi', 'ev.filter.nuit': 'Cette nuit',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Bien-être', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Gastronomie', 'ev.filter.musique': 'Musique', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Entre femmes', 'ev.filter.evX': 'Mixte', 'ev.filter.groupe': 'Groupe',
@@ -434,6 +435,7 @@ const TR: Record<Lang, Record<string,string>> = {
     'sub.at.f1': 'Everything in Rh +', 'sub.at.f2': 'Incognito mode', 'sub.at.f3': 'Extended radius 50km', 'sub.at.f4': 'Advanced stats', 'sub.at.f5': 'Elite badge on profile', 'sub.at.f6': 'Priority support',
     'sub.women': 'Women — always free, always prioritized ♀',
     'ev.filter.all': 'All', 'ev.filter.partenaires':'Community', 'ev.filter.mine': 'My events', 'ev.filter.soir': 'Tonight', 'ev.filter.demain': 'Tomorrow',
+    'ev.filter.matin': 'This morning', 'ev.filter.aprem': 'This afternoon', 'ev.filter.nuit': 'Tonight (late)',
     'ev.filter.sport': 'Sport', 'ev.filter.bienetre': 'Wellness', 'ev.filter.culture': 'Culture',
     'ev.filter.gastro': 'Food & Drink', 'ev.filter.musique': 'Music', 'ev.filter.parents': 'Parents',
     'ev.filter.evF': 'Women only', 'ev.filter.evX': 'Mixed', 'ev.filter.groupe': 'Group',
@@ -2873,10 +2875,14 @@ const PARTNERS_ALL = [
 
 // Barre de filtres VOLONTAIREMENT courte (audit David 21.06 : « beaucoup trop de boutons en haut »).
 // 5 essentiels seulement. Les catégories (sport/culture/musique…) reviendront en filtre secondaire si besoin.
+// Filtres par MOMENT DE LA JOURNÉE — même vocabulaire que les boutons de dispo (David : « la même chose partout »).
 const EV_FILTERS = [
   {id:'all',         trKey:'ev.filter.all',         icon:'✦'},
+  {id:'matin',       trKey:'ev.filter.matin',       icon:'☀️'},
+  {id:'aprem',       trKey:'ev.filter.aprem',       icon:'🌤️'},
   {id:'soir',        trKey:'ev.filter.soir',        icon:'🌙'},
-  {id:'demain',      trKey:'ev.filter.demain',      icon:'☀️'},
+  {id:'nuit',        trKey:'ev.filter.nuit',        icon:'🌌'},
+  {id:'demain',      trKey:'ev.filter.demain',      icon:'→'},
   // 'mine' (Mes events) retiré des filtres → remplacé par une pastille VERTE dans l'en-tête (apparaît si inscrit). Demande David.
   {id:'partenaires', trKey:'ev.filter.partenaires', icon:'🫂'},
 ]
@@ -3293,8 +3299,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     // Filtre du haut (scope / temps)
     if (evFilter==='mine') return registered.has(ev.id)
     if (evFilter==='groupe') return !!(ev as any).isGroupe
-    if (evFilter==='soir') return ev.date === 'Ce soir'
-    if (evFilter==='demain') return ev.date.toLowerCase().includes('demain')
+    // ── Filtres MOMENT DE LA JOURNÉE (cohérents avec les boutons de dispo) ──
+    if (evFilter==='demain') return (ev.date||'').toLowerCase().includes('demain')
+    if (evFilter==='matin'||evFilter==='aprem'||evFilter==='soir'||evFilter==='nuit') {
+      if ((ev.date||'').toLowerCase().includes('demain')) return false   // « demain » a son propre filtre
+      const m = parseEventMinutes(ev.time); if (m==null) return false
+      const part = m>=6*60 && m<12*60 ? 'matin' : m>=12*60 && m<18*60 ? 'aprem' : m>=18*60 ? 'soir' : 'nuit' // 0-6h = nuit
+      return part === evFilter
+    }
     if (evFilter==='parents') return (ev as any).isParents === true
     if (evFilter==='evF') return (ev as any).evGender==='F'
     if (evFilter==='evX') return (ev as any).evGender==='X'
@@ -3454,6 +3466,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setRegistered((prev:Set<string>)=>new Set([...prev,ev.id]))
     setRegistering(false)
     loadEvents()
+    try { window.dispatchEvent(new Event('clutch:refresh')) } catch {} // refresh la boîte Clutchs (events réels en base)
     const isRequest = regState==='requested' || regState==='waitlisted'
     // Compteur optimiste : +1 SEULEMENT si accepté direct (mode open). Une DEMANDE ne prend pas encore de place.
     if (!isRequest) {

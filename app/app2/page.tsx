@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a8'  // Versionnage HEXADÉCIMAL. ~274e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 164   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a9'  // Versionnage HEXADÉCIMAL. ~275e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 165   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5420,27 +5420,37 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   // 📥 REMPLIR MA BOÎTE : N bots m'envoient un clutch (la boîte de réception se peuple → tester l'organisation)
   const fillMyInbox = async () => {
     setBusy('all')
-    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot', true).limit(3)
+    // Besoin de 4 bots pour couvrir tous les groupes de la hiérarchie. À défaut, on fait avec ce qu'on a.
+    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot', true).limit(5)
     if (!bs?.length) { setBusy(null); showToast('Aucun bot — génère-en d\'abord', C.orange); return }
-    // B6 — la table clutches a une unicité par paire active : si un bot a DÉJÀ un clutch avec moi
-    // (resté d'un test), l'insert échoue silencieusement. On NETTOIE d'abord la paire, puis on insère.
+    // B6 — unicité par paire active : on NETTOIE d'abord la paire (sens 2), puis on remplit chaque groupe.
     const botIds = bs.map((b:any)=>b.id)
     const ACT = ['pending','accepted','confirmed','checked_in']
     await supabase.from('clutches').update({status:'cancelled'}).in('sender_id', botIds).eq('receiver_id', user.id).in('status', ACT)
     await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id', user.id).in('receiver_id', botIds).in('status', ACT)
+    const venue = 'Café du Marché · Place de la Palud, Lausanne', vlat = 46.5210, vlng = 6.6340
+    const exp = (h:number)=>new Date(Date.now()+h*3600*1000).toISOString()
+    const at  = (h:number)=>new Date(Date.now()+h*3600*1000).toISOString()
+    // Plan : on remplit CHAQUE section de la boîte action-first pour voir « ce que ça donne quand c'est plein ».
+    const plan:any[] = []
+    const b = (i:number)=>bs[i % bs.length]
+    // 🔥 Action requise — 2 clutchs REÇUS en attente (à répondre)
+    plan.push({ sender_id:b(0).id, receiver_id:user.id, status:'pending', proposed_time:at(0.5), expires_at:exp(2), message:`Un café ? — ${b(0).name}` })
+    plan.push({ sender_id:b(1).id, receiver_id:user.id, status:'pending', proposed_time:at(1.2), expires_at:exp(3), message:`Un verre au Flon ? — ${b(1).name}` })
+    // 📍 Prochain RDV — 1 clutch CONFIRMÉ (Verrou)
+    plan.push({ sender_id:b(2).id, receiver_id:user.id, status:'accepted', proposed_time:at(2), expires_at:exp(5), message:`On se voit ! — ${b(2).name}` })
+    // ⏳ En attente — 1 clutch ENVOYÉ par moi, en attente de réponse
+    plan.push({ sender_id:user.id, receiver_id:b(3 % bs.length).id, status:'pending', proposed_time:at(1.5), expires_at:exp(3), message:`Dispo pour un café ?` })
+    // ⏸ En pause — 1 clutch REÇU qui CHEVAUCHE le RDV confirmé ci-dessus (~2h) → la forteresse le met en pause
+    plan.push({ sender_id:b(4 % bs.length).id, receiver_id:user.id, status:'pending', proposed_time:at(2.1), expires_at:exp(4), message:`Même heure, on tente ? — ${b(4 % bs.length).name}` })
     let n=0; let lastErr=''
-    for (const b of bs) {
-      const { error } = await supabase.from('clutches').insert({
-        sender_id: b.id, receiver_id: user.id,
-        venue:'Café du Marché · Place de la Palud, Lausanne', venue_lat:46.5210, venue_lng:6.6340,
-        proposed_time:new Date(Date.now()+30*60*1000).toISOString(),
-        expires_at:new Date(Date.now()+2*3600*1000).toISOString(),
-        status:'pending', message:`Un café ? — ${b.name}`,
-      })
+    for (const p of plan) {
+      const { error } = await supabase.from('clutches').insert({ ...p, venue, venue_lat:vlat, venue_lng:vlng })
       if (!error) n++; else lastErr = error.message||''
     }
     setBusy(null)
-    showToast(n>0?`✓ ${n} clutchs reçus — va dans l'onglet Clutchs 📨`:`❌ Échec — ${lastErr||'policy clutches_bot_admin ?'}`, n>0?C.green:C.red)
+    window.dispatchEvent(new Event('clutch:refresh'))
+    showToast(n>0?`✓ Boîte remplie (${n} cas) — onglet Clutchs 📨 : à répondre · RDV · en attente · en pause`:`❌ Échec — ${lastErr||'policy clutches_bot_admin ?'}`, n>0?C.green:C.red)
   }
   // RESET COMPLET : efface MES interactions avec les bots (clutchs + lapins) + les remet propres (dé-Driver, déverrouille)
   const clearBotInteractions = async () => {
@@ -5608,7 +5618,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
         {/* Actions globales */}
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           <Btn onClick={activateAll} bg={`${C.green}1a`} col={C.green}>⚡ Tout mettre en ligne (sur moi)</Btn>
-          <Btn onClick={fillMyInbox} bg={`${C.green}1a`} col={C.green}>📥 Remplir ma boîte de Clutchs</Btn>
+          <Btn onClick={fillMyInbox} bg={`${C.green}1a`} col={C.green}>📥 Remplir la boîte (tous les cas)</Btn>
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
           <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir (complet)</Btn>
@@ -11298,12 +11308,24 @@ export default function App2() {
                                 const sameDay = dt && dt.toDateString()===now.toDateString()
                                 const tmrw = dt && new Date(now.getTime()+86400000).toDateString()===dt.toDateString()
                                 const timeStr = dt ? (sameDay?'':tmrw?(lang==='en'?'tmrw ':'dem. '):dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})+' ')+dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '–'
+                                // 📏 DISTANCE DEPUIS MA ZONE (décision produit 27.06 : on ne force pas le lieu dans le rayon
+                                // de l'envoyeur ; à la place on INFORME la receveuse pour qu'elle décide). Affiché côté reçu seulement.
+                                // « hors de ta zone » si > son rayon de dispo → simple repère, jamais bloquant.
+                                const myLat=(user as any)?.center_lat, myLng=(user as any)?.center_lng, myRad=(user as any)?.available_radius_km
+                                const zoneKm = (isRec && myLat && myLng && c.venue_lat && c.venue_lng) ? haversineKm(myLat,myLng,c.venue_lat,c.venue_lng) : null
+                                const outside = zoneKm!=null && myRad && zoneKm > myRad
                                 return (
                                   <div style={{fontSize:11,color:C.whiteMid,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                                     {mapsUrl
                                       ? <a href={mapsUrl} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:C.salmon,textDecoration:'none',fontWeight:700}}>📍 {venueShort}</a>
                                       : <span style={{fontWeight:700,color:C.salmon}}>📍 {venueShort}</span>}
                                     <span style={{color:C.white,fontWeight:800,background:'rgba(255,255,255,.06)',borderRadius:8,padding:'1px 7px'}}>🕐 {timeStr}</span>
+                                    {zoneKm!=null && (
+                                      <span title={outside?(lang==='en'?'Outside your usual area':'Hors de ta zone habituelle'):(lang==='en'?'From your area':'Depuis ta zone')}
+                                        style={{fontWeight:700,color:outside?C.orange:C.whiteMid,background:outside?`${C.orange}1a`:'rgba(255,255,255,.06)',borderRadius:8,padding:'1px 7px'}}>
+                                        {outside?'⚠️ ':'📏 '}{zoneKm<1?`${Math.round(zoneKm*1000)} m`:`${zoneKm.toFixed(zoneKm<10?1:0)} km`}{outside?(lang==='en'?' away':' de toi'):''}
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               })()}

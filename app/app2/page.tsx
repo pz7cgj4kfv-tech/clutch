@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1ba'  // Versionnage HEXADÉCIMAL. ~292e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 182   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1bb'  // Versionnage HEXADÉCIMAL. ~293e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 183   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9061,13 +9061,25 @@ export default function App2() {
       const now=Date.now()
       const {data:slots}=await supabase.from('availabilities').select('*').eq('user_id',user.id).eq('active',true)
       if(!slots?.length) return
-      const cur=slots.find((s:any)=> new Date(s.start_at).getTime()<=now && now<new Date(s.end_at).getTime())
+      const activeNow = slots.filter((s:any)=> new Date(s.start_at).getTime()<=now && now<new Date(s.end_at).getTime())
+      const cur=activeNow[0]
       if(!cur) return
+      // 🎭 PHASE 4 — matching PAR CRÉNEAU : les modes du/des créneau(x) actif(s) MAINTENANT deviennent mes modes
+      //   actifs (union si plusieurs se chevauchent). Le filtre présences lit profiles.available_modes → devient
+      //   automatiquement « par créneau ». Promote-only (jamais vider).
+      const unionModes = [...new Set(activeNow.flatMap((s:any)=> Array.isArray(s.modes)?s.modes:[]))] as string[]
       const u:any=user
       const profActive = u.is_available && u.available_from && u.available_until && new Date(u.available_from).getTime()<=now && new Date(u.available_until).getTime()>now
-      if(profActive) return // profiles reflète déjà un créneau actif → on ne touche à rien
-      await supabase.from('profiles').update({ is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place||null }).eq('id',user.id)
-      setUser((prev:any)=> prev ? {...prev, is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place} : prev)
+      const modesDiffer = unionModes.length>0 && JSON.stringify([...unionModes].sort())!==JSON.stringify([...(Array.isArray(u.available_modes)?u.available_modes:[])].sort())
+      if(profActive){
+        // Déjà visible : on ne touche qu'aux modes s'ils ont changé de créneau (ex : Morges pro → Lausanne romance).
+        if(modesDiffer){ await supabase.from('profiles').update({ available_modes: unionModes }).eq('id',user.id); setUser((prev:any)=> prev ? {...prev, available_modes: unionModes} : prev) }
+        return
+      }
+      const patch:any = { is_available:true, available_from:cur.start_at, available_until:cur.end_at, center_lat:cur.lat, center_lng:cur.lng, available_radius_km:cur.radius_km||5, available_city:cur.place||null }
+      if(unionModes.length) patch.available_modes = unionModes
+      await supabase.from('profiles').update(patch).eq('id',user.id)
+      setUser((prev:any)=> prev ? {...prev, ...patch} : prev)
     } catch {}
   },[user?.id])
   useEffect(()=>{ syncCurrentSlot(); const id=setInterval(syncCurrentSlot, 60000); return ()=>clearInterval(id) },[syncCurrentSlot]) // + check chaque minute → un créneau s'active à son heure, app ouverte
@@ -9234,6 +9246,9 @@ export default function App2() {
       setInitSlots(fresh)
       setFromTime(fresh[0] || '18:00')
       setUntilTime(fresh[4] || fresh[0] || '20:00')
+      // 🎭 Phase 3 — préremplissage depuis mes défauts : modes (available_modes) + mood (default_moods[0]).
+      const dm = (user as any)?.available_modes; if(Array.isArray(dm)&&dm.length) setSeekModes(dm)
+      const dmood = (user as any)?.default_moods; if(Array.isArray(dmood)&&dmood.length) setSeekMood(dmood[0]); else setSeekMood(null)
     }
   }, [flow])
 
@@ -10229,6 +10244,7 @@ export default function App2() {
       center_lng:meetupPos[1],
       available_radius_km:Math.round(rayon),
       available_modes: seekModes.length ? seekModes : null,
+      ...(seekMood ? { default_moods: [seekMood] } : {}), // mémorise le dernier mood → préremplissage (col migrée)
       pref_age_min: parseInt(ageMin) || 18,
       pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
       ...(intentMsg ? {bio:intentMsg} : {}),

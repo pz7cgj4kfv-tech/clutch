@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x18d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 137   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x18e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 138   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9708,12 +9708,12 @@ export default function App2() {
           const needMin = (km * 1.35) / 30 * 60
           if (gapMin < needMin) {
             const rk=Math.round(km), rn=Math.round(needMin), rg=Math.round(gapMin)
-            showToast(lang==='fr' ? vibe(veneritude,{
+            showToast(lang==='fr' ? vibe(getVeneritude(),{
               soft:  `🔴 Trajet infaisable : ~${rk} km ≈ ${rn} min de route pour ${rg} min entre tes 2 créneaux. Revois l'horaire.`,
               taquin:`🔴 Hum… ${rk} km en ${rg} min ? Même en trottinette c'est chaud 😏 Décale un créneau.`,
               drole: `🔴 ${rk} km en ${rg} min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.`,
               trash: `🔴 ${rk} km en ${rg} min ?! T'es en Formule 1 ou t'as bu ? IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥`,
-            }) : vibe(veneritude,{
+            }) : vibe(getVeneritude(),{
               soft:  `🔴 Unfeasible trip: ~${rk} km ≈ ${rn} min by road for ${rg} min between your 2 slots. Adjust the time.`,
               taquin:`🔴 Uh… ${rk} km in ${rg} min? Even on a scooter that's a stretch 😏 Shift a slot.`,
               drole: `🔴 ${rk} km in ${rg} min? You'd need teleportation, we don't have it (yet) 🚀 Move a slot.`,

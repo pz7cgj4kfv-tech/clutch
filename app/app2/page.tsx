@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b2'  // Versionnage HEXADÉCIMAL. ~284e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 174   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b3'  // Versionnage HEXADÉCIMAL. ~285e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 175   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3757,7 +3757,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const cPhoto = (ev as any).creatorPhoto
           const cat = eventCat(ev)  // 🎨 catégorie + couleur (prototype système couleurs)
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${registered.has(ev.id)?C.green:C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
             {/* Photo — DUOTONE par catégorie (photo désaturée + voile de la couleur du type). Prototype système couleurs. */}
             <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
               {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0',filter:'saturate(.5) contrast(1.03)'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
@@ -3766,7 +3766,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.66) 0%,rgba(0,0,0,.12) 48%,transparent 74%)',borderRadius:'16px 16px 0 0'}}/>
               {/* Pastille catégorie colorée */}
               <span style={{position:'absolute',top:7,left:7,fontSize:8,fontWeight:900,letterSpacing:'.02em',color:'#fff',background:cat.c,borderRadius:6,padding:'2px 7px',boxShadow:'0 1px 4px rgba(0,0,0,.35)',display:'inline-flex',alignItems:'center',gap:3}}>{ev.certified&&<span>✓</span>}{cat.l.toUpperCase()}</span>
-              {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:C.green,color:'#fff',borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ Inscrit·e</span>}
+              {/* Statut « inscrit » → vit dans Clutchs (centrale). Dans le catalogue : marqueur DISCRET (palette Mel), plus de gros vert partout. */}
+              {registered.has(ev.id)&&<span style={{position:'absolute',top:7,right:7,fontSize:8,background:'rgba(255,255,255,.9)',color:C.plum,border:`1px solid ${C.salmon}`,borderRadius:5,padding:'1px 6px',fontWeight:800}}>✓ {lang==='en'?'In':'Inscrit·e'}</span>}
               {/* Titre sur la photo (décalé à droite de l'avatar) */}
               <div style={{position:'absolute',bottom:8,left:cPhoto?56:10,right:9}}>
                 <div style={{fontSize:13.5,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.75)',lineHeight:1.15,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{ev.title}</div>
@@ -9011,7 +9012,10 @@ export default function App2() {
   const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
   const [eventEng,setEventEng] = useState<any[]>([]) // 🎟️ mes engagements EVENT (= des clutchs) injectés dans la boîte Clutchs
-  const [registeredEventObjs,setRegisteredEventObjs] = useState<any[]>([]) // objets des events inscrits (toutes sources) remontés par EventsTab
+  // objets des events inscrits (toutes sources) remontés par EventsTab. PERSISTÉS → la boîte Clutchs les a
+  // même au rechargement direct (avant que l'onglet Événements ne soit monté).
+  const [registeredEventObjs,setRegisteredEventObjs] = useState<any[]>(()=>{ try{ const s=localStorage.getItem('clutch_registered_objs'); return s?JSON.parse(s):[] }catch{return []} })
+  const setRegisteredEventObjsP = useCallback((objs:any[])=>{ setRegisteredEventObjs(objs); try{ localStorage.setItem('clutch_registered_objs', JSON.stringify(objs)) }catch{} }, [])
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
@@ -11271,7 +11275,7 @@ export default function App2() {
                 onPenalty={applyPenalty}
                 userId={user?.id}
                 userAge={(user as any)?.age ?? null}
-                onRegisteredObjs={setRegisteredEventObjs}
+                onRegisteredObjs={setRegisteredEventObjsP}
                 centerLat={(user as any)?.center_lat ?? null}
                 centerLng={(user as any)?.center_lng ?? null}
                 showToast={showToast}

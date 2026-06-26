@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b8'  // Versionnage HEXADÉCIMAL. ~290e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 180   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b9'  // Versionnage HEXADÉCIMAL. ~291e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 181   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1914,12 +1914,18 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
   // ── Slots horaires : intersection fenêtre sender ∩ receiver, moins le RDV en cours ──
   const allSlots = useMemo(() => makeSlots(), [])
   const slots = useMemo(() => {
-    const sFrom  = fromTime||'00:00', sUntil = untilTime||'23:30'
+    const sFrom  = fromTime||'00:00'
     const toFrom = (to as any).available_from ? new Date((to as any).available_from).toTimeString().slice(0,5) : '00:00'
-    const intFrom = sFrom > toFrom ? sFrom : toFrom
-    // Gestion minuit : si sUntil < sFrom, la fenêtre passe minuit (ex: 23:00–01:30)
-    const crossMidnight = sUntil < sFrom
-    const filtered = allSlots.filter(s => crossMidnight ? (s >= intFrom || s <= sUntil) : (s >= intFrom && s <= sUntil))
+    // 🔑 BORNE HAUTE = la fenêtre de la RECEVEUSE (quand ELLE est dispo), PAS plafonnée par MON créneau (souvent
+    //    plus court). C'est MOI qui propose et m'engage à être là — cf. règle « le sender peut proposer hors de son
+    //    créneau, on fait confiance aux gens pour gérer leur planning ». Sinon je ne pouvais proposer que jusqu'à 19h
+    //    alors qu'elle est dispo jusqu'à 23h (bug David).
+    const toUntil = (to as any).available_until ? new Date((to as any).available_until).toTimeString().slice(0,5) : (untilTime||'23:30')
+    const intFrom = sFrom > toFrom ? sFrom : toFrom   // pas avant que LES DEUX soient ouverts
+    const intUntil = toUntil
+    // Gestion minuit : si la borne haute < borne basse, la fenêtre passe minuit (ex: 23:00–01:30)
+    const crossMidnight = intUntil < intFrom
+    const filtered = allSlots.filter(s => crossMidnight ? (s >= intFrom || s <= intUntil) : (s >= intFrom && s <= intUntil))
     const base = filtered.length >= 2 ? filtered : allSlots.filter(s => s >= intFrom).slice(0,8)
     // Exclure les créneaux qui tombent dans la fenêtre RDV active de l'envoyeur
     if (!excludeWindow) return base
@@ -12722,7 +12728,10 @@ function TestCockpit({ userId, isAdmin, showToast, meLat, meLng }: { userId:stri
     // COHÉRENCE : éteindre la personne éteint AUSSI ses events (sinon ils restent en ligne tout seuls = incohérent).
     if(!on) await supabase.from('events').update({ active:false }).eq('created_by',aId)
     refreshAll()
-    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne MAINTENANT→${aTo}h · dans ta zone`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
+    // Feedback visible (David) : on RÉDUIT le cockpit après « Mettre dispo » → tu vois tout de suite la personne
+    // apparaître dans tes présences.
+    if(on && !error) setOpen(false)
+    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne MAINTENANT→${aTo}h · dans ta zone · va voir tes Présences`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── ROSTER : un interrupteur par personne (allume = dispo MAINTENANT 5h Lausanne · éteint = + ses events) ──
   const isLive=(b:any)=> !!(b.is_available && b.available_until && new Date(b.available_until).getTime()>Date.now())

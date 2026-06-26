@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b0'  // Versionnage HEXADÉCIMAL. ~282e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 172   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b1'  // Versionnage HEXADÉCIMAL. ~283e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 173   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12504,7 +12504,14 @@ export default function App2() {
                 setTimeout(()=>setShowVerrou(true),100)
               } else {
                 hap('success')
-                supabase.from('clutches').update({status:'accepted'}).eq('id',incomingClutch.id).then(()=>{
+                supabase.from('clutches').update({status:'accepted'}).eq('id',incomingClutch.id).then(({error}:any)=>{
+                  // 🏰 Forteresse : si J'AI déjà un RDV qui chevauche cette heure, la contrainte EXCLUDE rejette
+                  //   → on NE montre PAS le Verrou (sinon l'app ment). Message clair, le clutch reste en attente.
+                  if (error) {
+                    const conflit = error.code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')
+                    showToast(conflit ? (lang==='en'?'⏱️ You already have a meetup at that time':'⏱️ Tu as déjà un rendez-vous à cette heure') : ('⚠️ '+error.message), conflit?C.salmon:C.red)
+                    return
+                  }
                   // 🔔 Prévenir l'EXPÉDITEUR que son Clutch est accepté (étape clé du parcours).
                   const sid = (incomingClutch as any).sender_id || incomingClutch.sender?.id
                   const myFirst = ((user as any)?.name||'').split(' ')[0] || (lang==='en'?'Someone':'Quelqu\'un')

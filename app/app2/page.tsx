@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x192'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 142   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x193'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 143   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12062,6 +12062,12 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
       await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT) }
     showToast('✓ Bots reset',C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // 🤝 Les bots ACCEPTENT les clutchs que JE leur ai envoyés → me débloque le Verrou/RDV (sinon ils restent en attente).
+  const botsAccept=async()=>{ setBusy('acc'); try{
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
+    const { data, error } = await supabase.from('clutches').update({status:'accepted'}).eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').select('id')
+    showToast(error?('❌ '+error.message):(data?.length?`✓ ${data.length} accepté(s) → va voir ton Verrou 🔒`:'Aucun clutch en attente envoyé à un bot'), error?C.red:(data?.length?C.green:C.orange))
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
     const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
     if(error) setDiag(/function|does not exist|schema/i.test(error.message)?'__nomig__':('❌ '+error.message))
@@ -12089,6 +12095,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
         {tab==='scen' && (<>
           {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
           {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
+          {Btn('acc','🤝 Les bots acceptent mes clutchs (→ Verrou)',botsAccept)}
           {Btn('reset','🧹 Reset bots',resetBots)}
         </>)}
         {tab==='diag' && (<>

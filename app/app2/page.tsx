@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x194'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 144   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x195'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 145   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12106,6 +12106,18 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const { error } = await supabase.from('events').insert({ title:eTitle.trim(), emoji:'🎟️', lieu:p.n, event_time:`${String(eH).padStart(2,'0')}:00`, event_date:'Aujourd\'hui', starts_at:tISO(eH), duration_minutes:180, spots:eSpots, taken:0, description:'(cockpit)', tags:['test'], ev_gender:'X', type:ePlanned?'partner':'user', status:'pending', active:true, created_by:userId, creator:'Cockpit' })
     showToast(error?('❌ '+error.message):`✓ Event « ${eTitle.trim()} » · ${p.n} ${eH}h · ${ePlanned?'planifié':'spontané'}`, error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── ÉVÉNEMENTS : bibliothèque de CAS (le « Coq » — chaque possibilité du gate = 1 bouton auto-configuré) ──
+  const firstBot=()=> bots.find(b=>b.is_bot)?.id || userId
+  const mkDispo=async(sMin:number,eMin:number,placeIdx=0)=>{ const p=COCK_PLACES[placeIdx]
+    await supabase.from('availabilities').update({active:false}).eq('user_id',userId).eq('active',true)
+    await supabase.from('availabilities').insert({ user_id:userId, start_at:new Date(Date.now()+sMin*60e3).toISOString(), end_at:new Date(Date.now()+eMin*60e3).toISOString(), place:p.n, lat:p.lat, lng:p.lng, radius_km:10, active:true })
+    await supabase.from('profiles').update({ is_available:true, available_from:new Date(Date.now()+sMin*60e3).toISOString(), available_until:new Date(Date.now()+eMin*60e3).toISOString(), center_lat:p.lat, center_lng:p.lng, available_radius_km:10 }).eq('id',userId)
+  }
+  const mkEvent=async(o:{offsetMin:number;planned?:boolean;placeIdx?:number;full?:boolean;title:string})=>{ const p=COCK_PLACES[o.placeIdx??0]; const st=new Date(Date.now()+o.offsetMin*60e3)
+    await supabase.from('events').insert({ title:o.title, emoji:'🎟️', lieu:p.n, event_time:`${String(st.getHours()).padStart(2,'0')}:00`, event_date:'Test', starts_at:st.toISOString(), duration_minutes:180, spots:o.full?6:8, taken:o.full?6:0, description:'(cockpit)', tags:['test'], ev_gender:'X', type:o.planned?'partner':'user', status:'pending', active:true, created_by:firstBot(), creator:'Cockpit' })
+  }
+  const evCase=(k:string,setup:()=>Promise<void>,expected:string)=>async()=>{ setBusy(k); try{ await setup(); showToast(`✓ Cas prêt → onglet Événements · ATTENDU : ${expected}`, C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const clearTestEvents=async()=>{ setBusy('clrev'); try{ await supabase.from('events').update({active:false}).eq('creator','Cockpit'); showToast('✓ Events de test masqués',C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── DIAGNOSTIC ──
   const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
     const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
@@ -12165,13 +12177,15 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('send','☕ Envoyer le clutch',sendClutch)}
         </>)}
         {tab==='event' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Crée un événement à l'heure que tu veux.</div>
-          {Lbl('TITRE')}<input value={eTitle} onChange={e=>setETitle(e.target.value)} style={cockSel as any}/>
-          {Lbl('LIEU')}{PlaceSel(ePlace,setEPlace)}
-          {Lbl('HEURE')}<div style={{display:'flex',gap:6}}>{HourSel(eH,setEH)}</div>
-          {Lbl(`PLACES · ${eSpots}`)}<input type="range" min={2} max={40} value={eSpots} onChange={e=>setESpots(+e.target.value)} style={{width:'100%',accentColor:C.orange}}/>
-          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.white,margin:'8px 0'}}><input type="checkbox" checked={ePlanned} onChange={e=>setEPlanned(e.target.checked)} style={{accentColor:C.orange}}/>Planifié (partenaire, hors dispo)</label>
-          {Btn('mkev','🎟️ Créer l\'event',createEvent)}
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>TOUS les cas d'event en 1 clic. Chacun fabrique la situation (heure/dispo gérées toutes seules) → va dans Événements, tente l'inscription, compare à l'ATTENDU.</div>
+          {Btn('e1','✅ Spontané DANS ma dispo', evCase('e1', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:120,placeIdx:0,title:'Spontané · dans dispo'}) }, 'inscriptible'))}
+          {Btn('e2','❌ Spontané HORS dispo (horaire)', evCase('e2', async()=>{ await mkDispo(0,60,0); await mkEvent({offsetMin:180,placeIdx:0,title:'Spontané · hors dispo'}) }, 'bloqué : hors de ta dispo'))}
+          {Btn('e3','❌ Spontané trop loin (>18h)', evCase('e3', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:20*60,placeIdx:0,title:'Spontané · +20h'}) }, 'bloqué : trop loin'))}
+          {Btn('e4','✅ Planifié (partenaire) dans 3j', evCase('e4', async()=>{ await mkEvent({offsetMin:3*24*60,planned:true,title:'Planifié · +3j'}) }, 'inscriptible (libre de dispo)'))}
+          {Btn('e5','❌ Planifié trop loin (>7j)', evCase('e5', async()=>{ await mkEvent({offsetMin:8*24*60,planned:true,title:'Planifié · +8j'}) }, 'bloqué : trop loin'))}
+          {Btn('e6','⛔ Event COMPLET (liste d\'attente)', evCase('e6', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:120,full:true,title:'Complet'}) }, 'complet / liste d\'attente'))}
+          <div style={{height:4}}/>
+          {Btn('clrev','🧹 Masquer les events de test',clearTestEvents)}
         </>)}
         {tab==='diag' && (<>
           <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Simule un envoi A→B (ne crée rien) et révèle la VRAIE raison vs le message anti-sonde.</div>

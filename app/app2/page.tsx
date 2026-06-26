@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x18f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 139   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x190'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 140   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1572,6 +1572,8 @@ const TEST_PROFILE_PREFIXES = [
 function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(p => id.startsWith(p)) }
 // 🤖 Mode Démo (bots/mock visibles) ON par défaut · '0' = Réel (app vide pour tester avec de vrais amis). Lisible partout.
 function demoOn(): boolean { try { return localStorage.getItem('clutch_demo_mode') !== '0' } catch { return true } }
+const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864']
+function isAdminId(id?: string | null): boolean { return !!id && ADMIN_IDS.includes(id) }
 
 // ── VÉNÉRITUDE (brain-dump David) — le « thermostat d'engueulade » : 0=Doux … 3=Trash.
 // Le curseur (Profil > Geek) règle le TON des messages système, surtout quand tu crées un illogisme
@@ -11584,6 +11586,8 @@ export default function App2() {
           {flow==='app' && activeVerrou && !showVerrou && (
             <QuickSOS user={user} supabase={supabase} lang={lang} showToast={showToast}/>
           )}
+          {/* 🎮 Cockpit de test flottant — admin only, par-dessus l'app, déplaçable. À retirer avant lancement. */}
+          {flow==='app' && user && isAdminId(user.id) && <TestCockpit userId={user.id} isAdmin={true} showToast={showToast}/>}
           {/* D3 — RDV en cours RÉDUIT : pastille flottante (coin bas-droit) qui n'obstrue pas l'écran.
               Toucher = ré-agrandir le radar. L'utilisateur peut voir/parcourir les events librement. */}
           {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && radarMin && (()=>{
@@ -11971,6 +11975,97 @@ export default function App2() {
         </div>
       )}
     </>
+  )
+}
+
+// ── 🎮 COCKPIT DE TEST (admin-only) — fenêtre FLOTTANTE déplaçable PAR-DESSUS l'app, avec onglets.
+// Intégré (pas de page à part) pour ne JAMAIS switcher d'écran (demande David : optimiser son temps de test).
+// Autonome (ses propres requêtes Supabase). À RETIRER avant le lancement public (1 composant, admin-gated).
+const cockSel: React.CSSProperties = { width:'100%', padding:'8px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bgCard, color:C.white, fontSize:12, fontFamily:'inherit', marginBottom:4 }
+function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void }) {
+  const [open,setOpen] = useState(false)
+  const [tab,setTab] = useState<'scen'|'diag'>('scen')
+  const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 150 })
+  const dragRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
+  const [busy,setBusy] = useState<string|null>(null)
+  const [bots,setBots] = useState<any[]>([])
+  const [fromId,setFromId] = useState(''); const [toId,setToId] = useState('')
+  const [diag,setDiag] = useState<string|null>(null)
+  useEffect(()=>{ if(!open) return; (async()=>{
+    const { data } = await supabase.from('profiles').select('id,name,is_bot').eq('is_bot',true).order('name')
+    setBots([{id:userId,name:'Moi',is_bot:false}, ...((data as any[])||[])])
+    if(!fromId && data && (data as any[])[0]) setFromId((data as any[])[0].id)
+    if(!toId) setToId(userId)
+  })() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!isAdmin) return null
+  const onDown=(e:React.PointerEvent)=>{ dragRef.current={ox:pos.x,oy:pos.y,sx:e.clientX,sy:e.clientY,moved:false}; try{(e.target as HTMLElement).setPointerCapture(e.pointerId)}catch{} }
+  const onMove=(e:React.PointerEvent)=>{ const d=dragRef.current; if(!d) return; if(Math.abs(e.clientX-d.sx)+Math.abs(e.clientY-d.sy)>4) d.moved=true; setPos({x:Math.max(4,d.ox+(e.clientX-d.sx)),y:Math.max(40,d.oy+(e.clientY-d.sy))}) }
+  const onUp=()=>{ dragRef.current=null }
+  const ACT=['pending','accepted','confirmed','checked_in']
+  const botsOnline=async()=>{ setBusy('on'); try{
+    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
+    const { data, error } = await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+6*3600e3).toISOString(), center_lat:lat, center_lng:lng, available_radius_km:10 }).eq('is_bot',true).select('id')
+    showToast(error?('❌ '+error.message):`✓ ${data?.length||0} bots en ligne sur toi 📍`, error?C.red:C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const fillInbox=async()=>{ setBusy('fill'); try{
+    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot',true).limit(5)
+    const ids=((bs as any[])||[]).map(b=>b.id)
+    if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).eq('receiver_id',userId).in('status',ACT)
+      await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).in('receiver_id',ids).in('status',ACT) }
+    let n=0; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Café du Marché · Place de la Palud, Lausanne', venue_lat:46.521, venue_lng:6.634, proposed_time:new Date(Date.now()+30*60e3).toISOString(), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++ }
+    showToast(n?`✓ ${n} clutchs reçus 📨`:'❌ aucun (déjà pleins ?)', n?C.green:C.orange)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const resetBots=async()=>{ setBusy('reset'); try{
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
+    if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).in('status',ACT)
+      await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT) }
+    showToast('✓ Bots reset',C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
+    const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
+    if(error) setDiag(/function|does not exist|schema/i.test(error.message)?'__nomig__':('❌ '+error.message))
+    else setDiag(String(data))
+  }catch(e:any){ setDiag('❌ '+e.message) } setBusy(null) }
+  const REASON:Record<string,string>={ ok:'✅ passerait', self_clutch:'soi-même', blocked:'bloqué (2 sens)', cooldown:'cooldown actif', pair_busy:'déjà un clutch actif', inbox_full:'boîte pleine', forbidden:'pas admin' }
+  const Btn=(k:string,label:string,fn:()=>void)=>(<button onClick={fn} disabled={!!busy} style={{width:'100%',padding:'10px',marginBottom:6,borderRadius:9,border:`1px solid ${C.border}`,background:busy===k?C.orange:C.bgCard,color:C.white,fontSize:12,fontWeight:700,cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy&&busy!==k?.45:1}}>{busy===k?'…':label}</button>)
+  if(!open) return (
+    <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={()=>{ const m=dragRef.current?.moved; onUp(); if(!m) setOpen(true) }}
+      style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:44,height:44,borderRadius:22,background:C.bgCard,border:`1.5px solid ${C.orange}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'grab',boxShadow:'0 6px 20px rgba(0,0,0,.45)',touchAction:'none'}}>🎮</div>
+  )
+  return (
+    <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:288,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
+      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:C.bgCard,cursor:'grab',borderBottom:`1px solid ${C.border}`}}>
+        <span style={{fontSize:14}}>🎮</span>
+        <span style={{fontSize:12.5,fontWeight:800,color:C.white,flex:1}}>Cockpit QA <span style={{fontSize:9,color:C.whiteMid}}>· glisse-moi</span></span>
+        <button onClick={()=>setOpen(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:18,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>×</button>
+      </div>
+      <div style={{display:'flex'}}>
+        {([['scen','⚡ Scénarios'],['diag','🩺 Diagnostic']] as const).map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k as any)} style={{flex:1,padding:'8px',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,color:tab===k?C.orange:C.whiteMid,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{l}</button>
+        ))}
+      </div>
+      <div style={{padding:'12px',maxHeight:'46vh',overflowY:'auto'}}>
+        {tab==='scen' && (<>
+          {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
+          {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
+          {Btn('reset','🧹 Reset bots',resetBots)}
+        </>)}
+        {tab==='diag' && (<>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Simule un envoi A→B (ne crée rien) et révèle la VRAIE raison vs le message anti-sonde.</div>
+          <select value={fromId} onChange={e=>setFromId(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>
+          <div style={{textAlign:'center',color:C.whiteMid,fontSize:11,margin:'2px 0'}}>↓ envoie à ↓</div>
+          <select value={toId} onChange={e=>setToId(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>
+          {Btn('diag','🩺 Tester l\'envoi',runDiag)}
+          {diag==='__nomig__' && <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ Migration <code>qa_test_clutch</code> pas encore posée — on la pose ensemble (2 min) et cet onglet s'allume.</div>}
+          {diag && diag!=='__nomig__' && (<div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:10,color:C.whiteMid}}>Raison réelle (admin) :</div>
+            <div style={{fontSize:13,fontWeight:800,color:diag==='ok'?C.green:C.orange,marginBottom:6}}>{REASON[diag]||diag}</div>
+            {['blocked','cooldown','inbox_full','pair_busy'].includes(diag) && (<><div style={{fontSize:10,color:C.whiteMid}}>Vu par l'expéditeur :</div><div style={{fontSize:12,color:C.salmon}}>« Cette proposition n'est pas disponible. » <span style={{color:C.green,fontWeight:700}}>✓ anti-sonde OK</span></div></>)}
+          </div>)}
+        </>)}
+      </div>
+    </div>
   )
 }
 

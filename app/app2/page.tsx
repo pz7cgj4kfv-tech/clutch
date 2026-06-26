@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1bc'  // Versionnage HEXADÉCIMAL. ~294e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 184   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1bd'  // Versionnage HEXADÉCIMAL. ~295e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 185   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8306,6 +8306,10 @@ function QuickSOS({ user, supabase: sb, lang, showToast }:{ user:any; supabase:a
 function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, onRetardAck, supabase: sb }:{ verrou:any; userId:string; lang:Lang; onClick:()=>void; onCheckin?:()=>void; onTerminer?:()=>void; onRetardAck?:()=>void; supabase?:any }) {
   const [showConv, setShowConv] = useState(false)
   const [checkinHint,setCheckinHint] = useState('')  // indice « trop loin / pas l'heure » au tap sur J'y suis bloqué
+  // 🆕 PLAN B GPS (David, test terrain) : le GPS peut ne PAS accrocher (intérieur, immeuble, mauvais signal) → on ne
+  //   doit JAMAIS rester bloqué. Après 15s sans confirmation GPS, on autorise la confirmation MANUELLE.
+  const [graceElapsed,setGraceElapsed] = useState(false)
+  useEffect(()=>{ const t=setTimeout(()=>setGraceElapsed(true), 15000); return ()=>clearTimeout(t) }, [])
   const [now,setNow] = useState(new Date())
   const [myPos,setMyPos] = useState<{lat:number,lng:number,ts:number}|null>(null)
   const [otherPos,setOtherPos] = useState<{lat:number,lng:number}|null>(null)
@@ -8425,10 +8429,11 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
   // J'y suis : 25m David (test précis), 100m autres
   const DAVID_ID = 'bad38f3e-87df-40e0-a2d2-75c03b58d72b'
   const gpsThreshold = userId === DAVID_ID ? 0.025 : 0.100
-  const canCheckin = !myArrived && (
-    (myDistKm !== null && myDistKm < gpsThreshold) ||
-    (myDistKm === null && past)
-  )
+  const gpsConfirmed = myDistKm !== null && myDistKm < gpsThreshold
+  // PLAN B : jamais bloqué. GPS confirme (idéal) · OU GPS absent + heure passée · OU l'autre est déjà arrivé
+  //   (preuve mutuelle, on est ensemble) · OU 15s écoulées sans accroche GPS → confirmation manuelle.
+  const checkinFallback = (!gpsConfirmed && !myArrived) && (otherArrived || graceElapsed || (myDistKm === null && past))
+  const canCheckin = !myArrived && (gpsConfirmed || checkinFallback)
   const col = bothArrived ? C.green : otherArrived ? C.orange : past ? C.orange : C.salmon
 
   const distLabel = (km: number | null) => {
@@ -8688,16 +8693,18 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                 <button onClick={e=>{
                     e.stopPropagation()
                     if(canCheckin){ hap('success'); onCheckin?.() }
-                    else { hap('warning'); setCheckinHint(myDistKm!==null ? (lang==='en'?`Too far — ${Math.round(myDistKm*1000)}m from the spot`:`Trop loin — ${Math.round(myDistKm*1000)}m du lieu`) : (lang==='en'?'Waiting for GPS / not time yet':'GPS en attente / pas encore l\'heure')); setTimeout(()=>setCheckinHint(''),2800) }
+                    else { hap('warning'); setCheckinHint(myDistKm!==null && myDistKm>=gpsThreshold ? (lang==='en'?`Too far — ${Math.round(myDistKm*1000)}m from the spot`:`Trop loin — ${Math.round(myDistKm*1000)}m du lieu`) : (lang==='en'?'Searching GPS… you can confirm manually in a few sec':'Recherche GPS… tu pourras confirmer à la main dans quelques sec')); setTimeout(()=>setCheckinHint(''),3200) }
                   }}
                   style={{padding:'7px 12px',borderRadius:10,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:900,
                     cursor:'pointer',
                     background:canCheckin?'#77BC1F':'#E3E3E3',
                     color:canCheckin?'#fff':'#B2B2B2',
                     animation:canCheckin?'jySuisPulse 1.5s ease-in-out infinite':undefined}}>
-                  ✓ {"J'y suis !"}
+                  ✓ {gpsConfirmed ? "J'y suis !" : checkinFallback ? (lang==='en'?"I'm here (manual)":"J'y suis (manuel)") : "J'y suis !"}
                 </button>
-                {checkinHint && <div style={{fontSize:10,color:C.orange,fontWeight:700,marginTop:2,maxWidth:140}}>{checkinHint}</div>}
+                {/* Plan B visible : GPS faible → on dit clairement qu'on peut confirmer à la main */}
+                {checkinFallback && <div style={{fontSize:9.5,color:C.whiteMid,fontWeight:600,marginTop:2,maxWidth:150,lineHeight:1.3}}>{lang==='en'?'Weak GPS — confirm manually':'GPS faible — confirme à la main'}</div>}
+                {checkinHint && <div style={{fontSize:10,color:C.orange,fontWeight:700,marginTop:2,maxWidth:150}}>{checkinHint}</div>}
                 </>
               ) : (
                 <div style={{fontSize:13,color:'#77BC1F',fontWeight:900}}>✓ Arrivé·e</div>

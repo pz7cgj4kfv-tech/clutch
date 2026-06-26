@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x18c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 136   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x18d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 137   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1572,6 +1572,21 @@ const TEST_PROFILE_PREFIXES = [
 function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(p => id.startsWith(p)) }
 // 🤖 Mode Démo (bots/mock visibles) ON par défaut · '0' = Réel (app vide pour tester avec de vrais amis). Lisible partout.
 function demoOn(): boolean { try { return localStorage.getItem('clutch_demo_mode') !== '0' } catch { return true } }
+
+// ── VÉNÉRITUDE (brain-dump David) — le « thermostat d'engueulade » : 0=Doux … 3=Trash.
+// Le curseur (Profil > Geek) règle le TON des messages système, surtout quand tu crées un illogisme
+// (chevauchement absurde, trajet à la vitesse de la lumière…). À 0 : neutre/doux. Vers la droite : ça chauffe 🔥.
+const VENERITUDE = [
+  { key:'doux',   label:'Doux',   emoji:'😌', flames:1, color:'#7FC8A9' },
+  { key:'taquin', label:'Taquin', emoji:'😏', flames:2, color:'#E0A100' },
+  { key:'drole',  label:'Drôle',  emoji:'😂', flames:3, color:'#E27C00' },
+  { key:'trash',  label:'Trash',  emoji:'🔥', flames:4, color:'#E8317A' },
+] as const
+// Choisit la variante selon le niveau (0..3). v = { soft, taquin, drole, trash }.
+function vibe(level: number, v: { soft: string; taquin: string; drole: string; trash: string }): string {
+  return [v.soft, v.taquin, v.drole, v.trash][Math.max(0, Math.min(3, level | 0))]
+}
+function getVeneritude(): number { try { return Math.max(0, Math.min(3, parseInt(localStorage.getItem('clutch_veneritude') || '0') || 0)) } catch { return 0 } }
 
 const BOT_ENRICHMENT: Record<string,{
   name:string; photo_url:string; bio:string; job:string; age:number;
@@ -7092,10 +7107,52 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     setGeekPrefs(p=>({...p,[k]:v}))
     try{ window.dispatchEvent(new Event('clutch-fab-prefs')) }catch{}
   }
+  // 🔥 VÉNÉRITUDE — le thermostat d'engueulade (brain-dump David). 0=Doux … 3=Trash.
+  const [veneritude,setVeneritude] = useState<number>(()=>getVeneritude())
+  const saveVeneritude = (n:number) => {
+    const v=Math.max(0,Math.min(3,n)); setVeneritude(v)
+    try{ localStorage.setItem('clutch_veneritude', String(v)) }catch{}
+    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(v>=3?[8,30,8]:8)
+  }
   const PageGeek = () => (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.55,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px'}}>
         🧪 Ici tu fabriques <strong style={{color:C.white}}>ton</strong> Clutch. Tu n'utilises jamais un bouton flottant ? Masque-le. Tu pourras toujours le rallumer ici.
+      </div>
+
+      {/* 🔥 Curseur VÉNÉRITUDE — le ton des messages quand tu crées un illogisme */}
+      <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,padding:'14px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+          <span style={{fontSize:16}}>🔥</span>
+          <div style={{fontSize:14,fontWeight:800,color:C.white}}>Vénéritude</div>
+          <span style={{marginLeft:'auto',fontSize:12,fontWeight:800,color:VENERITUDE[veneritude].color}}>{VENERITUDE[veneritude].emoji} {VENERITUDE[veneritude].label}</span>
+        </div>
+        <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.5,marginBottom:12}}>
+          Le ton que Clutch prend quand tu fais une connerie (créneaux absurdes, trajet à la vitesse de la lumière…). À gauche = doux. À droite, ça t'allume.
+        </div>
+        <div style={{display:'flex',gap:6,marginBottom:12}}>
+          {VENERITUDE.map((v,i)=>(
+            <button key={v.key} onClick={()=>saveVeneritude(i)}
+              style={{flex:1,padding:'9px 4px',borderRadius:10,border:`1.5px solid ${veneritude===i?v.color:C.border}`,background:veneritude===i?`${v.color}22`:C.bg,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+              <span style={{fontSize:17,filter:veneritude===i?'none':'grayscale(.6)',opacity:veneritude===i?1:.65}}>{v.emoji}</span>
+              <span style={{fontSize:10,fontWeight:veneritude===i?800:500,color:veneritude===i?v.color:C.whiteMid}}>{v.label}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:4,marginBottom:12,justifyContent:'center'}}>
+          {[0,1,2,3].map(i=>(
+            <span key={i} style={{fontSize:18,opacity:i<=veneritude?1:.22,filter:i<=veneritude?'none':'grayscale(1)',transform:i<=veneritude?`scale(${1+veneritude*0.05})`:'scale(1)',transition:'.2s'}}>🔥</span>
+          ))}
+        </div>
+        <div style={{background:C.bg,border:`1px dashed ${VENERITUDE[veneritude].color}66`,borderRadius:10,padding:'10px 12px'}}>
+          <div style={{fontSize:9,fontWeight:800,letterSpacing:'.08em',color:C.whiteMid,marginBottom:4}}>APERÇU — TON CRÉNEAU EST INFAISABLE :</div>
+          <div style={{fontSize:12,color:C.white,lineHeight:1.45}}>{vibe(veneritude,{
+            soft:  "🔴 Trajet infaisable : 18 km ≈ 49 min de route pour 10 min entre tes 2 créneaux. Revois l'horaire.",
+            taquin:"🔴 Hum… 18 km en 10 min ? Même en trottinette c'est chaud 😏 Décale un peu.",
+            drole: "🔴 18 km en 10 min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.",
+            trash: "🔴 18 km en 10 min ?! T'es en Formule 1 ou t'as bu ? Physiquement IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥",
+          })}</div>
+        </div>
       </div>
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
         {([
@@ -9650,9 +9707,18 @@ export default function App2() {
           if (km <= 2) continue
           const needMin = (km * 1.35) / 30 * 60
           if (gapMin < needMin) {
-            showToast(lang==='fr'
-              ? `🔴 Trajet infaisable : ~${Math.round(km)} km ≈ ${Math.round(needMin)} min de route, mais ${Math.round(gapMin)} min entre les 2 créneaux. Revois l'horaire.`
-              : `🔴 Unfeasible trip: ~${Math.round(km)} km ≈ ${Math.round(needMin)} min by road, but ${Math.round(gapMin)} min between the 2 slots. Adjust the time.`, C.orange)
+            const rk=Math.round(km), rn=Math.round(needMin), rg=Math.round(gapMin)
+            showToast(lang==='fr' ? vibe(veneritude,{
+              soft:  `🔴 Trajet infaisable : ~${rk} km ≈ ${rn} min de route pour ${rg} min entre tes 2 créneaux. Revois l'horaire.`,
+              taquin:`🔴 Hum… ${rk} km en ${rg} min ? Même en trottinette c'est chaud 😏 Décale un créneau.`,
+              drole: `🔴 ${rk} km en ${rg} min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.`,
+              trash: `🔴 ${rk} km en ${rg} min ?! T'es en Formule 1 ou t'as bu ? IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥`,
+            }) : vibe(veneritude,{
+              soft:  `🔴 Unfeasible trip: ~${rk} km ≈ ${rn} min by road for ${rg} min between your 2 slots. Adjust the time.`,
+              taquin:`🔴 Uh… ${rk} km in ${rg} min? Even on a scooter that's a stretch 😏 Shift a slot.`,
+              drole: `🔴 ${rk} km in ${rg} min? You'd need teleportation, we don't have it (yet) 🚀 Move a slot.`,
+              trash: `🔴 ${rk} km in ${rg} min?! Are you in an F1 car? Physically IMPOSSIBLE, champ. Fix your schedule 🧠🔥`,
+            }), C.orange)
             break
           } else if (gapMin < needMin + 15) {
             showToast(lang==='fr'

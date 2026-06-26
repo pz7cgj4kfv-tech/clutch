@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x191'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 141   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x192'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 142   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7252,6 +7252,25 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       </div>
       <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.5,padding:'0 4px'}}>
         💡 Astuce : sur un bouton flottant, un <strong style={{color:C.salmon}}>appui long (2 s)</strong> le fixe en bas ; ré-appuie longtemps pour le relâcher. Et ils <strong style={{color:C.salmon}}>rebondissent</strong> l'un sur l'autre comme au billard 🎱.
+      </div>
+
+      {/* 🔮 À VENIR — idées captées (brain-dump David), pas encore actives. Profil = réceptacle des features complexes. */}
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:C.salmon,margin:'8px 4px 2px'}}>🔮 À VENIR</div>
+      <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+        {([
+          {e:'🧘', t:'Coach psy par la voix', d:'Tu dictes une situation, Clutch t\'aide à y voir clair — bienveillant mais confrontant. Et qui ne te garde PAS scotché au tél.'},
+          {e:'📚', t:'Environnements (ta voix à toi)', d:'L\'app prend une couleur selon ce que tu aimes : littéraire, philo, psychologie…'},
+          {e:'🌙', t:'Mood cycle (optionnel, femmes)', d:'Adapter l\'app à ton cycle si tu le souhaites — opt-in, chiffré, jamais visible par personne. (audit légal en cours)'},
+        ]).map((row,idx)=>(
+          <div key={row.t} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 14px',borderTop:idx>0?`1px solid ${C.border}`:'none',opacity:.85}}>
+            <span style={{fontSize:18,flexShrink:0}}>{row.e}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13.5,fontWeight:700,color:C.white}}>{row.t}</div>
+              <div style={{fontSize:11,color:C.whiteMid,marginTop:2,lineHeight:1.4}}>{row.d}</div>
+            </div>
+            <span style={{fontSize:9,fontWeight:800,color:C.salmon,background:`${C.salmon}1a`,border:`1px solid ${C.salmon}44`,borderRadius:20,padding:'3px 8px',flexShrink:0,whiteSpace:'nowrap'}}>bientôt</span>
+          </div>
+        ))}
       </div>
     </div>
   )

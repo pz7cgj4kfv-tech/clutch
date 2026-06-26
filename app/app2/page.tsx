@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 155   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a0'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 156   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9361,9 +9361,13 @@ export default function App2() {
     // Refresh immédiat quand l'app revient au premier plan
     const onVisible = () => { if (document.visibilityState === 'visible') { loadProfiles(); loadClutches() } }
     document.addEventListener('visibilitychange', onVisible)
+    // 🎮 Cockpit : refresh immédiat après une action du cockpit (sinon il faut attendre le poll 5s)
+    const onCockpit = () => { loadProfiles(); loadClutches() }
+    window.addEventListener('clutch:refresh', onCockpit)
 
     return () => {
       supabase.removeChannel(profilesChannel)
+      window.removeEventListener('clutch:refresh', onCockpit)
       clearInterval(t)
       clearInterval(tc)
       document.removeEventListener('visibilitychange', onVisible)
@@ -12149,8 +12153,9 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const ids=((bs as any[])||[]).map(b=>b.id)
     if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).eq('receiver_id',userId).in('status',ACT)
       await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).in('receiver_id',ids).in('status',ACT) }
-    let n=0; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++ }
-    showToast(n?`✓ ${n} clutchs reçus 📨`:'❌ aucun (déjà pleins ?)', n?C.green:C.orange)
+    let n=0, lastErr=''; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++; else lastErr=error.message||'' }
+    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
+    showToast(n?`✓ ${n} clutchs reçus 📨 — onglet Clutchs`:`❌ Échec : ${lastErr||'aucun bot'}`, n?C.green:C.red)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const botsAccept=async()=>{ setBusy('acc'); try{
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
@@ -12160,6 +12165,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     // Réaliste : ils n'acceptent PAS tous (2 sur 3 acceptent, 1 sur 3 refuse).
     let acc=0, dec=0
     for(let i=0;i<rows.length;i++){ const accept = (i%3!==2); await supabase.from('clutches').update({status: accept?'accepted':'declined'}).eq('id',rows[i].id); accept?acc++:dec++ }
+    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
     showToast(`✓ ${acc} accepté(s) → Verrou 🔒 · ${dec} refusé(s)`, C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // RESET COMPLET et HONNÊTE : annule les clutchs + met TOUS les bots hors-ligne + masque LEURS events.
@@ -12195,6 +12201,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cFrom).eq('receiver_id',cTo).in('status',ACT)
     await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cTo).eq('receiver_id',cFrom).in('status',ACT)
     const { error } = await supabase.from('clutches').insert({ sender_id:cFrom, receiver_id:cTo, venue:p.n, venue_lat:p.lat, venue_lng:p.lng, proposed_time:tISO(cH,cM), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', is_quick_date:cQuick, duration_minutes:cQuick?60:120, message:`(cockpit) ${p.n} à ${String(cH).padStart(2,'0')}h${String(cM).padStart(2,'0')}` })
+    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
     showToast(error?('❌ '+error.message):`✓ ${nameOf(cFrom)} → ${nameOf(cTo)} · ${p.n} ${String(cH).padStart(2,'0')}:${String(cM).padStart(2,'0')}`, error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── EVENT : création paramétrée (heure, places, spontané/planifié) ──

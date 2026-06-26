@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x197'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 147   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x198'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 148   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12029,10 +12029,10 @@ const COCK_PLACES = [
   { n:'Sion',     lat:46.2333, lng:7.3600 },
   { n:'Vevey',    lat:46.4628, lng:6.8419 },
 ]
-type CockTab = 'express'|'acteur'|'clutch'|'event'|'diag'
+type CockTab = 'world'|'express'|'acteur'|'clutch'|'event'|'diag'
 function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void }) {
   const [open,setOpen] = useState(false)
-  const [tab,setTab] = useState<CockTab>('express')
+  const [tab,setTab] = useState<CockTab>('world')
   const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 120 })
   const dragRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
   const [busy,setBusy] = useState<string|null>(null)
@@ -12046,13 +12046,18 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   // Diag
   const [fromId,setFromId]=useState(''); const [toId,setToId]=useState(''); const [diag,setDiag]=useState<string|null>(null)
   const [cRes,setCRes]=useState<string|null>(null) // résultat des CAS clutch (auto-vérifiés via qa_test_clutch)
-  useEffect(()=>{ if(!open) return; (async()=>{
-    const { data } = await supabase.from('profiles').select('id,name,is_bot').eq('is_bot',true).order('name')
-    const list=[{id:userId,name:'Moi',is_bot:false}, ...((data as any[])||[])]
-    setBots(list)
-    const firstBot=(data as any[])?.[0]?.id||''
+  const [evBots,setEvBots]=useState<Set<string>>(new Set()) // bots qui ont un event actif (pour le roster)
+  const loadWorld=async()=>{
+    const { data } = await supabase.from('profiles').select('id,name,is_bot,is_available,available_from,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
+    const arr=(data as any[])||[]; const ids=arr.map(b=>b.id)
+    const evset=new Set<string>()
+    if(ids.length){ const { data: evs } = await supabase.from('events').select('created_by').eq('active',true).in('created_by',ids); ((evs as any[])||[]).forEach(e=>evset.add(e.created_by)) }
+    setEvBots(evset)
+    setBots([{id:userId,name:'Moi',is_bot:false}, ...arr])
+    const firstBot=arr[0]?.id||''
     setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId)
-  })() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
+  useEffect(()=>{ if(open) loadWorld() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!isAdmin) return null
   const onDown=(e:React.PointerEvent)=>{ dragRef.current={ox:pos.x,oy:pos.y,sx:e.clientX,sy:e.clientY,moved:false}; try{(e.target as HTMLElement).setPointerCapture(e.pointerId)}catch{} }
   const onMove=(e:React.PointerEvent)=>{ const d=dragRef.current; if(!d) return; if(Math.abs(e.clientX-d.sx)+Math.abs(e.clientY-d.sy)>4) d.moved=true; setPos({x:Math.max(4,d.ox+(e.clientX-d.sx)),y:Math.max(40,d.oy+(e.clientY-d.sy))}) }
@@ -12099,6 +12104,13 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     // COHÉRENCE : éteindre la personne éteint AUSSI ses events (sinon ils restent en ligne tout seuls = incohérent).
     if(!on) await supabase.from('events').update({ active:false }).eq('created_by',aId)
     showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne ${aFrom}h→${aTo}h · ${p.n} · ${aRad}km`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── ROSTER : un interrupteur par personne (allume = dispo MAINTENANT 5h Lausanne · éteint = + ses events) ──
+  const isLive=(b:any)=> !!(b.is_available && b.available_until && new Date(b.available_until).getTime()>Date.now())
+  const toggleActor=async(b:any)=>{ setBusy('t'+b.id); try{
+    if(isLive(b)){ await supabase.from('profiles').update({ is_available:false }).eq('id',b.id); await supabase.from('events').update({ active:false }).eq('created_by',b.id) }
+    else { const p=COCK_PLACES[0]; await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+5*3600e3).toISOString(), center_lat:p.lat, center_lng:p.lng, available_radius_km:10 }).eq('id',b.id) }
+    await loadWorld()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── CLUTCH : envoi paramétré (de→vers, lieu, heure, Quick) ──
   const sendClutch=async()=>{ if(!cFrom||!cTo||cFrom===cTo){ showToast('Choisis 2 personnes différentes',C.orange); return } setBusy('send'); try{
@@ -12157,7 +12169,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={()=>{ const m=dragRef.current?.moved; onUp(); if(!m) setOpen(true) }}
       style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:44,height:44,borderRadius:22,background:C.bgCard,border:`1.5px solid ${C.orange}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'grab',boxShadow:'0 6px 20px rgba(0,0,0,.45)',touchAction:'none'}}>🎮</div>
   )
-  const TABS:[CockTab,string][] = [['express','⚡'],['acteur','🎭'],['clutch','☕'],['event','🎟️'],['diag','🩺']]
+  const TABS:[CockTab,string][] = [['world','👥'],['express','⚡'],['acteur','🎭'],['clutch','☕'],['event','🎟️'],['diag','🩺']]
   return (
     <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:300,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
       <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:C.bgCard,cursor:'grab',borderBottom:`1px solid ${C.border}`}}>
@@ -12171,6 +12183,27 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
         ))}
       </div>
       <div style={{padding:'12px',maxHeight:'52vh',overflowY:'auto'}}>
+        {tab==='world' && (<>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div style={{fontSize:10,color:C.whiteMid}}>Toutes les personnes · 🟢 = en ligne</div>
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={loadWorld} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>↻</button>
+              <button onClick={resetBots} disabled={!!busy} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.salmon,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout éteindre</button>
+            </div>
+          </div>
+          {bots.filter(b=>b.is_bot).length===0 && <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',padding:'14px 0'}}>Aucun bot — génère-en dans le BotLab.</div>}
+          {bots.filter(b=>b.is_bot).map(b=>{ const live=isLive(b); const place=b.center_lat?COCK_PLACES.find(p=>Math.abs(p.lat-b.center_lat)<0.05)?.n:null
+            return (
+              <div key={b.id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 10px',borderRadius:10,border:`1px solid ${C.border}`,marginBottom:6,background:C.bgCard}}>
+                <span style={{width:9,height:9,borderRadius:'50%',background:live?C.green:C.whiteMid,flexShrink:0,boxShadow:live?`0 0 6px ${C.green}`:'none'}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.name}{evBots.has(b.id)&&' 🎟️'}</div>
+                  <div style={{fontSize:9.5,color:C.whiteMid}}>{live?`en ligne${place?' · '+place:''}`:'hors-ligne'}</div>
+                </div>
+                <button onClick={()=>toggleActor(b)} disabled={!!busy} style={{flexShrink:0,width:50,padding:'6px 0',borderRadius:8,border:`1px solid ${live?C.salmon:C.green}55`,background:busy===('t'+b.id)?C.orange:(live?`${C.salmon}1a`:`${C.green}1a`),color:live?C.salmon:C.green,fontSize:12,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:'inherit'}}>{busy===('t'+b.id)?'…':(live?'🔴':'🟢')}</button>
+              </div>
+            )})}
+        </>)}
         {tab==='express' && (<>
           {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
           {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}

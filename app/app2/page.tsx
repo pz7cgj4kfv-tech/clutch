@@ -14,10 +14,14 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
+import { onRegister as eventOnRegister } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
+// 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
+// (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
+const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a1'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 157   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a2'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 158   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3327,7 +3331,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setRegistering(true)
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
     if (isRealEvent(ev.id) && userId) {
-      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId })
+      // Modèle events — on pose l'ÉTAT d'inscription. Flag OFF → mode 'open' → 'accepted' (= comportement actuel).
+      const effMode = (((ev as any).mode==='curated') && EVENTS_CURATED_LIVE) ? 'curated' : 'open'
+      const places = (ev.spots||0), taken = (ev.taken||0)
+      const evState = eventOnRegister({ mode: effMode as any, placesLeft: Math.max(0, places-taken), waitlistCount: 0, places }).state
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId, state: evState })
       if (error) {
         // Forteresse : l'event chevauche un RDV déjà confirmé (occ_no_overlap) → on refuse en douceur
         const conflit = (error as any).code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')

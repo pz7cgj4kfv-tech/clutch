@@ -64,6 +64,17 @@ export const CLUTCH_CONFIG = {
     weights: { presence: 0.35, cancels: 0.25, crossFeedback: 0.20, seniority: 0.10, systemSignal: 0.10 },
     crossFeedbackReciprocityPenalty: 0.6, // escompte jusqu'à -60% du feedback croisé s'il vient d'une boucle fermée
   },
+  // ── Événements : modèle d'inscription (validé GPT + David 27.06) — moteur pur dans lib/events-engine.ts ──
+  events: {
+    responseDeadlineSpontaneousMin: 60,   // spontané : 1h pour répondre (ou début−30min, le + court)
+    responseDeadlinePlannedMin:     360,  // planifié : 6h
+    spontaneousLeadMin:             30,
+    waitlistMultiplier:             2,    // liste d'attente max = max(places×2, plancher)
+    waitlistMin:                    10,
+    promoteWindowMin:               20,   // place libérée → 20 min pour accepter, sinon suivant
+    maxActiveRequests:              5,    // GÉNÉREUX au lancement (réseau froid) → resserrer plus tard
+    maxAcceptedFuture:              5,
+  },
   // ── Notifications (le prochain grand levier — « la notif EST le produit ») ──
   //   On ne notifie QUE l'actionnable. Le SILENCE se mérite (seuil ↑ par notif récente). Sécurité = passe outre.
   notifications: {

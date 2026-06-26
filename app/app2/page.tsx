@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 151   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 152   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1577,6 +1577,24 @@ function isAdminId(id?: string | null): boolean { return !!id && ADMIN_IDS.inclu
 // 🧪 « Labo propre » (cockpit) : coupe TOUT le décor codé en dur (mock events + group events démo) pour avoir
 // un terrain de test net = uniquement la vraie base que l'opérateur pilote. Réglé par le cockpit.
 function labClean(): boolean { try { return localStorage.getItem('clutch_lab_clean') === '1' } catch { return false } }
+
+// 💡 ROADMAP interne (brain-dump David, ne rien oublier) — affichée dans Profil>Geek (admin). « ébauches dans l'app ».
+const CLUTCH_ROADMAP: { e:string; t:string; s:'idée'|'à venir'|'prouvé'|'fait'; d:string }[] = [
+  { e:'🌙', t:'Shirley — avis entre copines', s:'idée', d:'Voir si une copine a déjà rencontré ce profil. Éthique à trancher (pas de jugement public).' },
+  { e:'🗺️', t:'Carte à formes libres', s:'idée', d:'Dessiner tes zones au doigt, exclure le lac, multi-régions.' },
+  { e:'🧘', t:'Coach psy par la voix', s:'à venir', d:'Dicter une situation, être aidé — confrontant, sans te scotcher au tél.' },
+  { e:'🩸', t:'Mood cycle (option femmes)', s:'à venir', d:'Adapter l\'app au cycle si tu veux. Audit légal santé d\'abord.' },
+  { e:'🎭', t:'Environnements / voix', s:'à venir', d:'L\'app prend une couleur selon tes goûts (littéraire, philo, psy). Tesla déjà amorcé.' },
+  { e:'🏆', t:'Page Graal / Vision', s:'à venir', d:'« L\'app qui te demande de la quitter » + stratégie de lancement.' },
+  { e:'📣', t:'Page Slogans', s:'à venir', d:'Rassembler tous les slogans.' },
+  { e:'🚀', t:'Stratégie de lancement', s:'idée', d:'Raz-de-marée, événement QR code, local vs Suisse.' },
+  { e:'🧠', t:'Algo de visibilité (largeur×fiabilité)', s:'prouvé', d:'Moteur prouvé. À brancher → upgrade Supabase (logging impressions).' },
+  { e:'🔔', t:'Machine à états des notifs', s:'prouvé', d:'Moteur prouvé. À brancher → OneSignal + déclencheurs.' },
+  { e:'🤖', t:'Phrases par IA (vénéritude/persona)', s:'à venir', d:'Génération à la volée, de plus en plus créative. Pools aléatoires déjà en place.' },
+  { e:'🎮', t:'Cockpit — cas Présences', s:'à venir', d:'Bot expiré / hors rayon / mauvais genre : doit ou non apparaître.' },
+  { e:'🔥', t:'Curseur Vénéritude + voix Tesla', s:'fait', d:'Profil > Geek. Phrases aléatoires.' },
+  { e:'🏰', t:'Forteresse anti-conflit', s:'fait', d:'1 personne ≠ 2 endroits. Prouvée (800k tests, 0 faille).' },
+]
 
 // ── VÉNÉRITUDE (brain-dump David) — le « thermostat d'engueulade » : 0=Doux … 3=Trash.
 // Le curseur (Profil > Geek) règle le TON des messages système, surtout quand tu crées un illogisme
@@ -7275,6 +7293,25 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           </div>
         ))}
       </div>
+
+      {/* 💡 IDÉES & ROADMAP (admin) — toutes les idées du brain-dump, dans l'app, rien d'oublié */}
+      {isAdminId(user?.id) && (<>
+        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:C.orange,margin:'14px 4px 2px'}}>💡 IDÉES & ROADMAP <span style={{color:C.whiteMid,fontWeight:600}}>· interne</span></div>
+        <div style={{fontSize:10,color:C.whiteMid,margin:'0 4px 6px'}}>Tout ce qu'on a imaginé ensemble — rien d'oublié.</div>
+        <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+          {CLUTCH_ROADMAP.map((r,i)=>{ const col = r.s==='fait'?C.green : r.s==='prouvé'?C.orange : r.s==='à venir'?C.salmon : C.whiteMid
+            return (
+              <div key={r.t} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'11px 12px',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <span style={{fontSize:16,flexShrink:0}}>{r.e}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:C.white}}>{r.t}</div>
+                  <div style={{fontSize:10.5,color:C.whiteMid,marginTop:2,lineHeight:1.4}}>{r.d}</div>
+                </div>
+                <span style={{fontSize:8.5,fontWeight:800,color:col,background:`${col}1a`,border:`1px solid ${col}55`,borderRadius:20,padding:'2px 7px',flexShrink:0,whiteSpace:'nowrap'}}>{r.s}</span>
+              </div>
+            )})}
+        </div>
+      </>)}
     </div>
   )
 

@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b4'  // Versionnage HEXADÉCIMAL. ~286e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 176   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b5'  // Versionnage HEXADÉCIMAL. ~287e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 177   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1513,14 +1513,24 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
                 {isProfil&&availInfo&&(
                   <div onClick={e=>{e.stopPropagation();setShowAvailTooltip(v=>!v)}} style={{position:'absolute',top:-2,right:-2,width:13,height:13,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(0,0,0,.22)',border:'2px solid #fff',zIndex:3,boxShadow:availInfo.isAvail?'0 0 7px rgba(34,197,94,.8)':'none',cursor:'pointer'}}/>
                 )}
-                {/* Badge — différencié par type */}
+                {/* Badge — différencié par COULEUR (type) + CHIFFRE quand il y a un compte (David : pastilles de couleurs).
+                    🔴 rose = clutch reçu à répondre/demande event · 🔴 rouge = retard à valider · 🔵 bleu = message ·
+                    🟢 vert = verrou/contact · 🟠 orange = activité (des gens dispo). */}
                 {badge && (()=>{
+                  const cnt = (badge as any).count
+                  // Pastille avec CHIFFRE (≥1) : petite bulle. Couleur selon le type.
+                  const bubble = (bg:string, glow:string) => (
+                    <div style={{position:'absolute',top:-4,right:-5,minWidth:16,height:16,padding:'0 4px',borderRadius:8,background:bg,border:'2px solid #fff',zIndex:3,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 0 7px ${glow}`}}>
+                      <span style={{fontSize:9,fontWeight:900,color:'#fff',lineHeight:1}}>{cnt>9?'9+':cnt}</span>
+                    </div>
+                  )
                   if(badge.type==='retard') return <div style={{...dotBase,background:'#EF4444',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(239,68,68,.9)'}}/>
-                  if(badge.type==='clutch-new'||badge.type==='urgent') return <div style={{...dotBase,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
-                  if(badge.type==='message') return <div style={{...dotBase,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
+                  if(badge.type==='clutch-new'||badge.type==='urgent') return cnt>0 ? bubble('#FF1493','rgba(255,20,147,.9)') : <div style={{...dotBase,background:'#FF1493',animation:'badgeUrgent 1s ease-in-out infinite',boxShadow:'0 0 8px rgba(255,20,147,.9)'}}/>
+                  if(badge.type==='message') return cnt>0 ? bubble('#00B0FF','rgba(0,176,255,.85)') : <div style={{...dotBase,background:'#00B0FF',animation:'badgePulse 2s ease-in-out infinite',boxShadow:'0 0 7px rgba(0,176,255,.85)'}}/>
                   if(badge.type==='verrou') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 6px rgba(34,197,94,.6)'}}/>
-                  if(badge.type==='contact-msg') return <div style={{...dotBase,background:'#EB6BAF',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(235,107,175,.85)'}}/>
+                  if(badge.type==='contact-msg') return cnt>0 ? bubble('#EB6BAF','rgba(235,107,175,.85)') : <div style={{...dotBase,background:'#EB6BAF',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 7px rgba(235,107,175,.85)'}}/>
                   if(badge.type==='contact-new') return <div style={{...dotBase,background:'#22C55E',animation:'badgePulse 1.5s ease-in-out infinite',boxShadow:'0 0 8px rgba(34,197,94,.8)'}}/>
+                  if(badge.type==='activity') return <div style={{...dotBase,width:9,height:9,background:'#FF9500',boxShadow:'0 0 6px rgba(255,149,0,.8)'}}/>
                   return null
                 })()}
               </div>
@@ -11030,8 +11040,9 @@ export default function App2() {
 
                     {/* Section LIVE déplacée en overlay plein écran */}
 
-                    {/* Mode occupé — Verrou actif = profils masqués */}
-                    {activeVerrou ? (
+                    {/* Mode occupé — profils masqués SEULEMENT dans la fenêtre RDV (1h avant → 2h après), PAS
+                        dès qu'on a un Verrou (David : un Verrou à 22h ne doit pas me cacher les présences à 14h). */}
+                    {rdvBlocked ? (
                       <div style={{textAlign:'center',padding:'50px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
                         <div style={{fontSize:44}}>🔒</div>
                         <div style={{fontSize:17,fontWeight:900,color:C.white}}>
@@ -12089,12 +12100,11 @@ export default function App2() {
                 const now = new Date()
 
                 // Clutchs : reçus en attente (rouge 🔴) + msgs non lus
-                // ── CLUTCHS — badge événementiel (s'efface quand onglet ouvert) ──
-                // Nouveaux clutchs reçus arrivés APRÈS la dernière visite de l'onglet
+                // ── CLUTCHS — badge d'ACTION (David : « un truc à confirmer / en cours »). STANDING : reste tant
+                //    qu'il y a quelque chose à FAIRE (pas effacé juste en ouvrant l'onglet ; s'efface quand on a répondu).
                 const pendingRec = allC.filter((c:any)=>
                   c.receiver_id===user.id && c.status==='pending' &&
-                  new Date(c.expires_at||'9999')>now &&
-                  new Date(c.created_at||0).getTime() > seenClutchsAt
+                  new Date(c.expires_at||'9999')>now
                 ).length
                 // Verroux confirmés arrivés après dernière visite
                 const newVerrou = allC.filter((c:any)=>

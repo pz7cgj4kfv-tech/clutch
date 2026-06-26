@@ -14,15 +14,15 @@ import type { Profile } from '@/lib/supabase'
 import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmation des actions importantes)
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
-import { onRegister as eventOnRegister } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
+import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, sweepExpired as evSweepExpired } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1ac'  // Versionnage HEXADÉCIMAL. ~278e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 168   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ad'  // Versionnage HEXADÉCIMAL. ~279e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 169   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9441,6 +9441,37 @@ export default function App2() {
           .in('event_id', myEvIds).in('state', ['requested','waitlisted'])
         incoming = (data||[]).filter((i:any)=>i.user_id!==user.id)
       }
+      // ⏳ EXPIRATION (délai de réponse, events-engine prouvé) : une DEMANDE non traitée à temps → 'expired'
+      // (dignité/anti-sonde : JAMAIS 'declined'). Spontané (≤18h) = min(1h, début−30min) ; planifié = 6h.
+      // Balayage CÔTÉ CLIENT (comme l'auto-expiry des clutchs) ; un cron serveur fera le backstop.
+      const nowMs = Date.now()
+      const deadlineFor = (ev:any, requestedAt:string|null) => {
+        const start = ev?.starts_at ? new Date(ev.starts_at).getTime() : nowMs + 3*3600000
+        const spontaneous = (start - nowMs) <= 18*3600000
+        return evDeadlineMs({ spontaneous, eventStart: start, now: new Date(requestedAt || nowMs).getTime() })
+      }
+      const toExpire:{event_id:string;user_id:string}[] = []
+      for (const p of (parts||[])) {
+        if ((p.state!=='requested'&&p.state!=='waitlisted') || myEvMap.has(p.event_id)) continue
+        const ev = evById.get(p.event_id); if(!ev) continue
+        const dl = deadlineFor(ev, p.requested_at)
+        if (evSweepExpired({ state:p.state, createdAt:new Date(p.requested_at||nowMs).getTime(), deadlineMs:dl, now:nowMs })==='expired') {
+          p.state='expired'; toExpire.push({event_id:p.event_id, user_id:user.id})
+        }
+      }
+      incoming = incoming.filter((i:any)=>{
+        const ev = evById.get(i.event_id); if(!ev) return true
+        const dl = deadlineFor(ev, i.requested_at)
+        if (evSweepExpired({ state:i.state, createdAt:new Date(i.requested_at||nowMs).getTime(), deadlineMs:dl, now:nowMs })==='expired') {
+          toExpire.push({event_id:i.event_id, user_id:i.user_id}); return false
+        }
+        return true
+      })
+      // Persiste (guard sur l'état courant → n'écrase pas une réponse concurrente de l'orga)
+      for (const x of toExpire) {
+        await supabase.from('event_participants').update({ state:'expired', responded_at:new Date().toISOString() })
+          .eq('event_id', x.event_id).eq('user_id', x.user_id).in('state', ['requested','waitlisted'])
+      }
       // Profils des demandeurs
       const reqIds = [...new Set(incoming.map((i:any)=>i.user_id))]
       let profMap = new Map<string,any>()
@@ -9456,9 +9487,10 @@ export default function App2() {
         const reqs = incomingByEv.get(ev.id)||[]
         items.push({ __event:true, id:`evorg-${ev.id}`, kind:'organizer', ev, reqs, pendingCount:reqs.length })
       }
-      // MES participations aux events des AUTRES (acceptée → 📍 · en attente → ⏳)
+      // MES participations aux events des AUTRES (acceptée → 📍 · en attente → ⏳ · expirée → on n'affiche plus)
       for (const p of (parts||[])) {
         if (myEvMap.has(p.event_id)) continue // mon propre event → déjà en carte organisateur
+        if (p.state==='expired') continue      // demande expirée (balayée ci-dessus) → sort de la boîte
         const ev = evById.get(p.event_id); if(!ev) continue
         items.push({ __event:true, id:`evpart-${p.event_id}`, kind:'participant', ev, state:p.state, requestedAt:p.requested_at })
       }
@@ -11335,6 +11367,14 @@ export default function App2() {
                         const accepted=!isOrg&&c.state==='accepted'
                         const accent=isOrg&&c.pendingCount>0?C.salmon:accepted?C.green:C.orange
                         const openEv=()=>{ setOpenEventId(ev.id); setTab('evenements') }
+                        // ⏳ Compte à rebours du délai de réponse de l'orga (ma demande en attente).
+                        let reqCountdown:string|null=null
+                        if (!isOrg && (c.state==='requested'||c.state==='waitlisted') && c.requestedAt) {
+                          const startMs = ev.starts_at ? new Date(ev.starts_at).getTime() : Date.now()+3*3600000
+                          const dl = evDeadlineMs({ spontaneous:(startMs-Date.now())<=18*3600000, eventStart:startMs, now:new Date(c.requestedAt).getTime() })
+                          const left = new Date(c.requestedAt).getTime()+dl-Date.now()
+                          if (left>0) reqCountdown = left>=3600000?`${Math.floor(left/3600000)}h${Math.floor((left%3600000)/60000)}m`:`${Math.max(1,Math.floor(left/60000))}min`
+                        }
                         return (
                           <div key={c.id} style={{background:C.bgCard,borderRadius:14,border:`${isOrg&&c.pendingCount>0?2:1}px solid ${accent}${isOrg&&c.pendingCount>0?'88':accepted?'66':'44'}`,padding:'11px 13px',marginBottom:8,boxShadow:'0 1px 3px rgba(83,41,67,.06)'}}>
                             <div onClick={openEv} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
@@ -11343,6 +11383,7 @@ export default function App2() {
                                 <div style={{fontSize:14,fontWeight:900,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ev.title||(lang==='en'?'Event':'Événement')}</div>
                                 <div style={{fontSize:11,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                                   <span style={{fontWeight:700,color:accent}}>{isOrg?(lang==='en'?'🎟️ You host':'🎟️ Tu organises'):accepted?(lang==='en'?'✓ You\'re in':'✓ Tu es validé·e'):(lang==='en'?'⏳ Awaiting host':'⏳ En attente de l\'orga')}</span>
+                                  {reqCountdown&&<span style={{fontWeight:700,color:C.whiteMid}}>· {lang==='en'?`${reqCountdown} left`:`réponse sous ${reqCountdown}`}</span>}
                                   {ev.lieu&&<span>📍 {String(ev.lieu).split('·')[0].trim()}</span>}
                                   <span style={{color:C.white,fontWeight:800,background:'rgba(255,255,255,.06)',borderRadius:8,padding:'1px 7px'}}>🕐 {evWhen}</span>
                                   {ev.spots!=null&&<span>· {ev.taken||0}/{ev.spots}</span>}

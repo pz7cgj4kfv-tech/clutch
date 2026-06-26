@@ -287,8 +287,8 @@ export default function Landing() {
         <div className="ticker-inner">
           {[...Array(2)].map((_, i) => (
             <span key={i}>
-              {['MATCH RÉEL', 'PAS DE GHOSTING', 'RDV EN 18H', 'LAUSANNE FIRST', 'ZÉRO BULLSHIT', '100% GRATUIT ♀', 'SCORE FIABILITÉ', 'BOUTON SOS', 'PROFILS VÉRIFIÉS', 'MATCH RÉEL'].map(t => (
-                <span key={t} className="ticker-item">{t}<span>✦</span></span>
+              {['MATCH RÉEL', 'PAS DE GHOSTING', 'RDV EN 18H', 'LAUSANNE FIRST', 'ZÉRO BULLSHIT', '100% GRATUIT ♀', 'SCORE FIABILITÉ', 'BOUTON SOS', 'PROFILS VÉRIFIÉS', 'MATCH RÉEL'].map((t, j) => (
+                <span key={`${i}-${j}`} className="ticker-item">{t}<span>✦</span></span>
               ))}
             </span>
           ))}

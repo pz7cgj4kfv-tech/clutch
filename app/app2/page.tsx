@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b9'  // Versionnage HEXADÉCIMAL. ~291e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 181   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ba'  // Versionnage HEXADÉCIMAL. ~292e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 182   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -529,6 +529,16 @@ function slotDayPart(hhmm: string): 'matin'|'aprem'|'soir'|'nuit' {
 const DAYPART_META: Record<string,{fr:string;en:string;emoji:string}> = {
   matin:{fr:'Ce matin',en:'Morning',emoji:'☀️'}, aprem:{fr:'Aprèm',en:'Afternoon',emoji:'🌤️'},
   soir:{fr:'Ce soir',en:'Tonight',emoji:'🌙'}, nuit:{fr:'Cette nuit',en:'Late',emoji:'🌌'},
+}
+// 🎭 MOODS (contexte du créneau, soft — V1 : 6 max, décidé avec GPT). e=emoji, fr/en=label.
+const MOOD_OPTS: {k:string;e:string;fr:string;en:string}[] = [
+  {k:'cafe',e:'☕',fr:'Café',en:'Coffee'}, {k:'balade',e:'🚶',fr:'Balade',en:'Walk'}, {k:'apero',e:'🍷',fr:'Apéro',en:'Drinks'},
+  {k:'diner',e:'🍽️',fr:'Dîner',en:'Dinner'}, {k:'sport',e:'🏃',fr:'Sport',en:'Sport'}, {k:'culture',e:'🎭',fr:'Culture',en:'Culture'},
+]
+const moodMeta = (k?:string|null) => MOOD_OPTS.find(m=>m.k===k) || null
+// Libellé court d'un mode (pour les badges de créneau).
+const MODE_LABEL: Record<string,{fr:string;en:string}> = {
+  romantic:{fr:'Romance',en:'Romance'}, friend:{fr:'Amitié',en:'Friends'}, pro:{fr:'Pro',en:'Pro'}, parent:{fr:'Famille',en:'Family'},
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -9038,7 +9048,9 @@ export default function App2() {
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
-  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place,radius_km,lat,lng').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
+  const reloadAvail = useCallback(async()=>{ if(!user?.id) return
+    // select('*') → récupère modes/mood SI les colonnes existent (sinon ignorées), sans casser avant la migration.
+    const {data}=await supabase.from('availabilities').select('*').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
   const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
   // Multi-créneaux (A) : « promotion » du créneau qui couvre MAINTENANT dans profiles, pour être visible
   // pendant chacun de mes créneaux. PROMOTE-ONLY : ne rend JAMAIS indisponible (pire cas = ne fait rien).
@@ -9174,6 +9186,7 @@ export default function App2() {
   const mapRecenterRef  = useRef<(()=>void)|null>(null)
   // Page 2 — Quel type de rencontre (multi-select)
   const [seekModes,setSeekModes]   = useState<string[]>(['romantic','friend'])  // multi
+  const [seekMood,setSeekMood]     = useState<string|null>(null)  // 🎭 mood DU CRÉNEAU (contexte soft, 1 seul)
   const [seekGender,setSeekGender] = useState<'F'|'M'|'X'|'all'>('all')
   const [ageMin,setAgeMin] = useState('18')
   const [ageMax,setAgeMax] = useState('45')
@@ -10263,7 +10276,13 @@ export default function App2() {
         }
       }
       if (list.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', list[0].id) // plafond 3 → vire le plus ancien
-      await supabase.from('availabilities').insert({ user_id:user.id, start_at:from.toISOString(), end_at:until.toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true })
+      // 🎭 modes + mood PORTÉS PAR LE CRÉNEAU (décision 28.06). Insert de BASE d'abord (marche toujours), puis un
+      //    update SÉPARÉ pour modes/mood (échoue en silence si les colonnes ne sont pas encore migrées → zéro régression).
+      const { data: avIns } = await supabase.from('availabilities').insert({ user_id:user.id, start_at:from.toISOString(), end_at:until.toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true }).select('id').single()
+      if (avIns?.id && (seekModes.length || seekMood)) {
+        const { error: eMM } = await supabase.from('availabilities').update({ ...(seekModes.length?{modes:seekModes}:{}), ...(seekMood?{mood:seekMood}:{}) }).eq('id', avIns.id)
+        if (eMM) console.warn('[créneau] modes/mood non sauvés (migration availabilities modes/mood à appliquer ?) :', eMM.message)
+      }
     } catch {}
 
     // 0 lignes mises à jour → le profil n'existe pas encore → upsert
@@ -10757,6 +10776,22 @@ export default function App2() {
                     })}
                   </div>
                   {seekModes.length===0&&<div style={{fontSize:9,color:C.orange,marginTop:4}}>⚠️ {lang==='en'?'Select at least one mode to be visible':'Sélectionne au moins un mode pour être visible'}</div>}
+                </div>
+
+                {/* 🎭 MOOD — contexte du créneau (1 seul, optionnel). « Pour quoi ? » Soft : n'exclut jamais, précise la forme. */}
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>Mood <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'what for? (optional)':'pour quoi ? (optionnel)'}</span></div>
+                  <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+                    {MOOD_OPTS.map(m=>{ const on=seekMood===m.k
+                      return <button key={m.k} onClick={()=>setSeekMood(on?null:m.k)}
+                        style={{flex:'1 0 28%',minWidth:0,padding:'9px 6px',borderRadius:13,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
+                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18)',transition:'all .15s'}}>
+                        <span style={{fontSize:19,lineHeight:1}}>{m.e}</span>
+                        <span style={{fontSize:10,fontWeight:on?900:600,color:on?C.pink:C.whiteMid}}>{lang==='en'?m.en:m.fr}</span>
+                      </button>
+                    })}
+                  </div>
                 </div>
 
                 {/* 2. GENRE RECHERCHÉ */}
@@ -12320,6 +12355,15 @@ export default function App2() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
                         <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{s.radius_km!=null?` · ${Math.round(s.radius_km)} km`:''}</div>
+                        {/* 🎭 Badges mode + mood DU CRÉNEAU (décision 28.06 : chaque créneau porte son intention) */}
+                        {(Array.isArray(s.modes)&&s.modes.length>0)||s.mood ? (
+                          <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+                            {(Array.isArray(s.modes)?s.modes:[]).map((mk:string)=>(
+                              <span key={mk} style={{fontSize:9,fontWeight:800,color:C.pink,background:`${C.pink}14`,borderRadius:6,padding:'1px 6px'}}>{(MODE_LABEL[mk]?(lang==='en'?MODE_LABEL[mk].en:MODE_LABEL[mk].fr):mk)}</span>
+                            ))}
+                            {s.mood && moodMeta(s.mood) && <span style={{fontSize:9,fontWeight:800,color:C.whiteMid,background:'rgba(255,255,255,.06)',borderRadius:6,padding:'1px 6px'}}>{moodMeta(s.mood)!.e} {lang==='en'?moodMeta(s.mood)!.en:moodMeta(s.mood)!.fr}</span>}
+                          </div>
+                        ) : null}
                       </div>
                       {/* B/D1 — Modifier : on retire ce créneau puis on rouvre le réglage (le créneau étant retiré, pas de fausse alerte de chevauchement B3). */}
                       <button onClick={async()=>{ await removeSlot(s.id); setShowSlots(false); setFlow('carte') }} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.white,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✏️ {lang==='en'?'Edit':'Modifier'}</button>

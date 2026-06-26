@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a0'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 156   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a1'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 157   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12120,8 +12120,12 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const evset=new Set<string>()
     if(ids.length){ const { data: evs } = await supabase.from('events').select('created_by').eq('active',true).in('created_by',ids); ((evs as any[])||[]).forEach(e=>evset.add(e.created_by)) }
     setEvBots(evset)
-    setBots([{id:userId,name:'Moi',is_bot:false}, ...arr])
-    const firstBot=arr[0]?.id||''
+    // Bug 1 — dédoublonnage VISUEL : un seul bot par prénom (on enlève les « X TEST » en double). Ne touche pas la donnée.
+    const norm=(n:string)=> (n||'').replace(/\s*test\s*$/i,'').trim().toLowerCase()
+    const seen=new Set<string>(); const uniq:any[]=[]
+    for(const b of arr){ const k=norm(b.name); if(k && seen.has(k)) continue; seen.add(k); uniq.push({...b, name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
+    setBots([{id:userId,name:'Moi',is_bot:false}, ...uniq])
+    const firstBot=uniq[0]?.id||''
     setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId); setCbId(p=>p||firstBot)
   }
   useEffect(()=>{ if(open) loadWorld() },[open]) // eslint-disable-line react-hooks/exhaustive-deps

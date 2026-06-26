@@ -15,14 +15,14 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { onRegister as eventOnRegister } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
-import { classifySlot } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient, jamais bloquant)
+import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a7'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 163   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a8'  // Versionnage HEXADÉCIMAL. ~274e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 164   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -8995,6 +8995,10 @@ export default function App2() {
   const [fromTime,setFromTime] = useState(() => initSlots[0] || '18:00')
   const [untilTime,setUntilTime] = useState(() => initSlots[4] || '20:00')
   const [rayon,setRayon]       = useState(10)  // défaut 10km : couvre Lausanne + Morges/Renens/Pully (maximise les présences). Slider jusqu'à 100km.
+  // 🕐 Moment de la journée choisi par bouton (ce soir / cette nuit / demain aprem…). Porte les EPOCHS exacts
+  // (jour inclus) → handleOuvrirFenetre les utilise tels quels, sans l'ambiguïté « HH:MM aujourd'hui ».
+  // null = l'user a réglé à la molette → on retombe sur le calcul HH:MM classique.
+  const [presetWin,setPresetWin] = useState<{from:number;until:number}|null>(null)
 
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)
@@ -9871,12 +9875,18 @@ export default function App2() {
     // attendu quand l'user le fait volontairement → on procède + on prévient par toast. Fenêtre = depuis le DÉBUT choisi (roues limitées à +18h, décision David).
     const alreadyAvail = user?.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date()
     if (alreadyAvail) showToast?.('Nouveau créneau — l\'ancien est remplacé', C.orange)
-    const [h,m] = untilTime.split(':').map(Number)
-    const until = new Date(); until.setHours(h,m,0,0)
-    if (until <= new Date()) until.setDate(until.getDate() + 1)
-    // available_from : heure de début du créneau (pas de correction lendemain — la fenêtre peut déjà avoir commencé)
-    const [fh,fm] = fromTime.split(':').map(Number)
-    const from = new Date(); from.setHours(fh,fm,0,0)
+    let from: Date, until: Date
+    if (presetWin) {
+      // 🕐 Bouton « moment de la journée » : on a les EPOCHS exacts (jour inclus), aucune ambiguïté de lendemain.
+      from = new Date(presetWin.from); until = new Date(presetWin.until)
+    } else {
+      const [h,m] = untilTime.split(':').map(Number)
+      until = new Date(); until.setHours(h,m,0,0)
+      if (until <= new Date()) until.setDate(until.getDate() + 1)
+      // available_from : heure de début du créneau (pas de correction lendemain — la fenêtre peut déjà avoir commencé)
+      const [fh,fm] = fromTime.split(':').map(Number)
+      from = new Date(); from.setHours(fh,fm,0,0)
+    }
     // Si from > until (ex: from=02:30 mais on est à 03:00 donc until=04:00 aujourd'hui), on laisse from tel quel
     const city = nearestCity(meetupPos[0], meetupPos[1])
 
@@ -10287,16 +10297,47 @@ export default function App2() {
                   )
                 })()}
 
+                {/* 🕐 Boutons « moment de la journée » — calculés depuis maintenant, bornés à 18h.
+                    Tap = je suis dispo de MAINTENANT jusqu'à la fin de ce moment (ex : « ce soir » → jusqu'à minuit).
+                    Porte les epochs exacts (jour inclus) → pas d'ambiguïté de lendemain. */}
+                {(()=>{
+                  const parts = dayParts(Date.now())
+                  if (!parts.length) return null
+                  const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
+                  return (
+                    <div style={{display:'flex',gap:6,padding:'2px 12px 6px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}
+                      onTouchStart={e=>e.stopPropagation()} onTouchEnd={e=>e.stopPropagation()}>
+                      {parts.map(p=>{
+                        const active = !!presetWin && presetWin.until===p.end
+                        return (
+                          <button key={p.key+p.dayOffset} onClick={()=>{
+                            // dispo = de maintenant jusqu'à la fin du moment choisi
+                            const from = Date.now()
+                            setPresetWin({from, until:p.end})
+                            setFromTime(hhmm(from)); setUntilTime(hhmm(p.end))   // reflet visuel sur les molettes
+                            if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
+                          }} style={{
+                            flexShrink:0,padding:'7px 13px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
+                            fontSize:12,fontWeight:active?900:700,whiteSpace:'nowrap',
+                            background:active?C.green:C.bg, color:active?'#fff':C.whiteMid,
+                            border:`1.5px solid ${active?C.green:C.border}`,transition:'all .12s',
+                          }}>{lang==='en' ? p.en : p.fr}</button>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
                 {/* 2 roues temps */}
                 <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}>
                   <JogWheel slots={initSlots} value={fromTime} onChange={v => {
+                    setPresetWin(null)   // réglage manuel → on quitte le mode bouton
                     setFromTime(v)
                     const [h,m]=v.split(':').map(Number); const b=new Date(); b.setHours(h,m,0,0)
                     const ns=makeSlots(new Date(b.getTime()+5*60_000)).slice(0,216)
                     if (!ns.includes(untilTime)) setUntilTime(ns[1]||ns[0])
                   }}/>
                   <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
-                  <JogWheel slots={untilSlots} value={untilTime} onChange={setUntilTime}/>
+                  <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setUntilTime(v) }}/>
                 </div>
 
                 {/* CTA bas */}

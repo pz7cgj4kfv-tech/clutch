@@ -84,3 +84,59 @@ export function classifySlot(o: {
   if (marginMin >= -20) return { severity: 2, marginMin, requiresCancel: true }   // léger dépassement → risqué
   return { severity: 3, marginMin, requiresCancel: true }                         // gros dépassement → faut annuler
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOMENTS DE LA JOURNÉE (David 27.06) — boutons « ce matin / cet après-midi / ce soir /
+// cette nuit / demain matin / demain après-midi » au lieu de bricoler la molette.
+// Calculés DEPUIS maintenant, bornés à l'horizon 18h. Ex : à minuit on peut aller jusqu'à
+// « demain après-midi » (fin 18h = 18h pile, dans l'horizon) mais PAS « demain soir » (hors 18h).
+//
+// PIÈGE évité : la molette publie « HH:MM aujourd'hui » → incapable de dire « 14h DEMAIN ».
+// Ici on renvoie des EPOCHS exacts (jour inclus) → le publish utilise ces bornes telles quelles,
+// plus aucune ambiguïté de lendemain. Pur → testé (heures locales, comme makeSlots).
+//   nuit 0-6 · matin 6-12 · après-midi 12-18 · soir 18-24.
+//   La nuit « appartient » au soir précédent pour l'étiquette (à 22h, « cette nuit » = 0-6 du lendemain).
+// ─────────────────────────────────────────────────────────────────────────────
+export type DayPartKey = 'nuit' | 'matin' | 'aprem' | 'soir'
+export interface DayPart {
+  key: DayPartKey; dayOffset: number; start: number; end: number; // epoch ms (clampés)
+  fr: string; en: string;
+}
+const DAYPART_DEFS: { key: DayPartKey; from: number; to: number }[] = [
+  { key: 'nuit',  from: 0,  to: 6  },
+  { key: 'matin', from: 6,  to: 12 },
+  { key: 'aprem', from: 12, to: 18 },
+  { key: 'soir',  from: 18, to: 24 },
+]
+const DAYPART_LABELS: Record<DayPartKey, [string, string, string, string]> = {
+  //                       fr aujourd'hui     fr demain            en today            en tomorrow
+  nuit:  ['cette nuit',       'demain nuit',       'tonight (late)',  'tomorrow night'],
+  matin: ['ce matin',         'demain matin',      'this morning',    'tomorrow morning'],
+  aprem: ['cet après-midi',   'demain après-midi', 'this afternoon',  'tomorrow afternoon'],
+  soir:  ['ce soir',          'demain soir',       'tonight',         'tomorrow evening'],
+}
+// Minuit local du jour de `now`, décalé de `offset` jours.
+function localMidnight(now: number, offset: number): number {
+  const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset); return d.getTime()
+}
+export function dayParts(now: number, horizonH = 18, minMinutes = 20): DayPart[] {
+  const horizonEnd = now + horizonH * 3_600_000
+  const out: DayPart[] = []
+  for (let off = 0; off <= 2; off++) {
+    const mid = localMidnight(now, off)
+    for (const def of DAYPART_DEFS) {
+      const start = mid + def.from * 3_600_000
+      const end   = mid + def.to   * 3_600_000
+      if (end <= now || start >= horizonEnd) continue          // déjà passé ou hors horizon
+      const cStart = Math.max(start, now), cEnd = Math.min(end, horizonEnd)
+      if (cEnd - cStart < minMinutes * 60_000) continue        // sliver inutile
+      // Étiquette : la nuit (0-6) se rattache au soir précédent → labelOffset = off - 1.
+      let labelOff = def.key === 'nuit' ? off - 1 : off
+      if (labelOff < 0) labelOff = 0                            // on est DEDANS (ex : 3h du matin) → « cette nuit »
+      const idx = labelOff === 0 ? 0 : 1
+      out.push({ key: def.key, dayOffset: off, start: cStart, end: cEnd,
+        fr: DAYPART_LABELS[def.key][idx], en: DAYPART_LABELS[def.key][idx + 2] })
+    }
+  }
+  return out.sort((a, b) => a.start - b.start)
+}

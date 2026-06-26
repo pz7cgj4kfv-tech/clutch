@@ -1,5 +1,5 @@
 // Preuve du moteur de faisabilité. Lancer : node scripts/test-feasibility.mts
-import { subtract, intersect, freeWindows, candidateSlots, classifySlot, travelMs } from '../lib/feasibility.ts'
+import { subtract, intersect, freeWindows, candidateSlots, classifySlot, travelMs, dayParts } from '../lib/feasibility.ts'
 
 let ok = 0, ko = 0
 const C = (n: string, c: boolean) => { if (c) { ok++; console.log('  ✓', n) } else { ko++; console.log('  ✗ ÉCHEC :', n) } }
@@ -44,6 +44,30 @@ C('pas d\'engagement après → severity 0', classifySlot({start:h(20),durationM
 
 console.log('── Trajet ──')
 C('10 km ≈ 27 min', Math.abs(travelMs(10)/60000 - 27) < 1)
+
+console.log('── 🕐 Moments de la journée (boutons David), horizon 18h ──')
+// Heure locale fixée via un Date local pour rester indépendant du fuseau du runner.
+const at = (dayOffsetFromToday: number, hh: number, mm = 0) => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+dayOffsetFromToday); d.setHours(hh,mm,0,0); return d.getTime() }
+const keys = (now: number) => dayParts(now).map(p => p.key + (p.dayOffset ? '+1' : ''))
+const frs  = (now: number) => dayParts(now).map(p => p.fr)
+// À MIDI : on doit voir cet après-midi, ce soir, cette nuit (0-6 demain), demain matin (6-12 = 12h pile, dans 18h).
+const noon = keys(at(0,12))
+C('midi → cet après-midi en 1er', dayParts(at(0,12))[0].key==='aprem' && dayParts(at(0,12))[0].dayOffset===0)
+C('midi → contient ce soir', noon.includes('soir'))
+C('midi → contient cette nuit (nuit+1)', noon.includes('nuit+1'))
+C('midi → cette nuit va jusqu\'à 6h (bord d\'horizon 18h)', dayParts(at(0,12)).some(p=>p.key==='nuit' && Math.abs(p.end-at(1,6))<1000))
+C('midi → PAS demain matin (start 6h = horizon pile, 0 marge)', !noon.includes('matin+1'))
+C('midi → PAS demain après-midi (hors 18h)', !noon.includes('aprem+1'))
+// À MINUIT (cas explicite de David) : jusqu'à demain après-midi (fin 18h pile) mais PAS demain soir.
+const midnight = frs(at(1,0)) // minuit = début de "demain" calendaire ; on prend offset+1 à 0h
+const mnKeys = keys(at(1,0))
+C('minuit → atteint demain après-midi (aprem, fin 18h = horizon)', mnKeys.includes('aprem+1') || mnKeys.includes('aprem'))
+C('minuit → PAS le soir hors horizon (18-24 hors 18h)', !mnKeys.includes('soir+1'))
+// À 22h : "cette nuit" doit exister (0-6 du lendemain, étiquetée cette nuit, pas demain).
+C('22h → « cette nuit » présent', frs(at(0,22)).includes('cette nuit'))
+C('22h → « ce soir » encore là (clampé 22-24)', frs(at(0,22)).includes('ce soir'))
+// Bornes : aucune fenêtre ne dépasse l'horizon, aucune ne commence avant now.
+C('aucune fenêtre hors [now, now+18h]', dayParts(at(0,15)).every(p => p.start>=at(0,15)-1000 && p.end<=at(0,15)+18*3600000+1000))
 
 console.log(`\n── Résultat : ${ok} OK, ${ko} échec(s) ──`)
 if (ko > 0) process.exit(1)

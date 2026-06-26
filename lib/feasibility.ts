@@ -52,35 +52,35 @@ export function freeWindows(avail: Interval[], occupancies: Interval[], bufferMi
   return subtract(avail, expanded)
 }
 
-// Créneaux candidats pour un Clutch entre 2 personnes à un lieu donné.
-// nextEngagement = mon prochain engagement APRÈS le clutch (event/RDV) + le trajet (lieu_clutch → lieu_engagement).
+// Créneaux candidats = fenêtres où LES DEUX sont dispo (mutuel). C'est la SEULE contrainte dure
+// (l'autre doit être dispo). Mes propres engagements ne sont PAS un mur ici (cf. classifySlot, gradient doux).
 export function candidateSlots(o: {
-  myFree: Interval[]; theirFree: Interval[];
-  now: number; minDurationMin: number;
-  nextEngagement?: { start: number; travelToMs: number } | null;
+  myFree: Interval[]; theirFree: Interval[]; now: number; minDurationMin: number;
 }): { start: number; maxDurationMin: number }[] {
   const mutual = intersect(o.myFree, o.theirFree)
   const minMs = o.minDurationMin * MIN
   const res: { start: number; maxDurationMin: number }[] = []
   for (const iv of mutual) {
     const startMin = Math.max(iv.start, o.now)
-    let hardEnd = iv.end
-    if (o.nextEngagement) hardEnd = Math.min(hardEnd, o.nextEngagement.start - o.nextEngagement.travelToMs)
-    if (hardEnd - startMin < minMs) continue // même la durée minimale ne tient pas → pas proposable
-    res.push({ start: startMin, maxDurationMin: Math.floor((hardEnd - startMin) / MIN) })
+    if (iv.end - startMin < minMs) continue
+    res.push({ start: startMin, maxDurationMin: Math.floor((iv.end - startMin) / MIN) })
   }
   return res
 }
 
-// Classer un créneau PRÉCIS choisi (heure + durée) : impossible / tendu / ok.
+// Classer un créneau choisi vs MON prochain engagement (event/RDV) + trajet. GRADIENT, PAS un mur :
+// on ne bloque jamais — on PRÉVIENT proportionnellement (David). L'user peut toujours décider (annuler son
+// truc, prendre le malus de fiabilité) si un meilleur plan apparaît.
+//   severity 0 = ok (aucun message) · 1 = tendu (doux) · 2 = risqué (faut courir) · 3 = il faudra annuler.
+//   requiresCancel = j'arriverais EN RETARD à mon engagement → décision (annuler / être en retard / renoncer).
 export function classifySlot(o: {
-  start: number; durationMin: number;
-  nextStart?: number | null; travelToNextMs?: number;
-}): 'impossible' | 'tense' | 'ok' {
-  if (o.nextStart == null) return 'ok'
+  start: number; durationMin: number; nextStart?: number | null; travelToNextMs?: number;
+}): { severity: 0 | 1 | 2 | 3; marginMin: number; requiresCancel: boolean } {
+  if (o.nextStart == null) return { severity: 0, marginMin: Infinity, requiresCancel: false }
   const arrival = o.start + o.durationMin * MIN + (o.travelToNextMs || 0)
-  const margin = o.nextStart - arrival
-  if (margin < 0) return 'impossible'
-  if (margin < 5 * MIN) return 'tense'
-  return 'ok'
+  const marginMin = Math.round((o.nextStart - arrival) / MIN)
+  if (marginMin >= 15) return { severity: 0, marginMin, requiresCancel: false }   // large
+  if (marginMin >= 0)  return { severity: 1, marginMin, requiresCancel: false }   // tendu mais ça passe
+  if (marginMin >= -20) return { severity: 2, marginMin, requiresCancel: true }   // léger dépassement → risqué
+  return { severity: 3, marginMin, requiresCancel: true }                         // gros dépassement → faut annuler
 }

@@ -20,24 +20,27 @@ const free = freeWindows([{start:h(12),end:h(22)}],[{start:h(19),end:h(21)}],60)
 // occupation 19-21 + buffer 1h → 18-22 retiré → libre = 12-18
 C('libre = 12h-18h (RDV 19-21 + buffer)', JSON.stringify(free)===JSON.stringify([{start:h(12),end:h(18)}]))
 
-console.log('── 🔑 Cas David : event 19h Lausanne, moi à Morges (trajet 20min) ──')
-// Je suis dispo 16-22, elle 13-22. Mon engagement = event 19h. Lieu clutch = Morges → trajet 20min vers Lausanne.
+console.log('── Créneaux candidats = fenêtres MUTUELLES (dur : l\'autre doit être dispo) ──')
 const myFree = freeWindows([{start:h(16),end:h(22)}],[],60)
 const theirFree = [{start:h(13),end:h(22)}]
-const slots = candidateSlots({ myFree, theirFree, now:h(15), minDurationMin:30, nextEngagement:{ start:h(19), travelToMs:m(20) } })
-// dernier départ = 19h − 20min = 18h40. Donc créneau 16-18h40, durée max au début (16h) = 160min.
-C('un créneau proposé', slots.length===1)
-C('le créneau commence à 16h (now)', slots[0].start===h(16))
-C('durée max = jusqu\'à 18h40 (160 min)', slots[0].maxDurationMin===160)
+const slots = candidateSlots({ myFree, theirFree, now:h(15), minDurationMin:30 })
+C('un créneau mutuel proposé', slots.length===1)
+C('commence à 16h (now)', slots[0].start===h(16))
+C('aucun croisement → aucun créneau', candidateSlots({ myFree:[{start:h(12),end:h(14)}], theirFree:[{start:h(18),end:h(23)}], now:h(11), minDurationMin:30 }).length===0)
 
-console.log('── Classement d\'un créneau précis ──')
-// Clutch 18h40 Morges, 1h, puis event 19h Lausanne (trajet 20min) → arrivée 20h40 >> 19h → IMPOSSIBLE
-C('18h40 + 1h + trajet → impossible (event 19h)', classifySlot({start:h(18)+m(40),durationMin:60,nextStart:h(19),travelToNextMs:m(20)})==='impossible')
-// Clutch 17h, 1h, trajet 20min → arrivée 18h20, event 19h → marge 40min → ok
-C('17h + 1h + trajet → ok (marge 40min)', classifySlot({start:h(17),durationMin:60,nextStart:h(19),travelToNextMs:m(20)})==='ok')
-// Clutch 17h40, 1h, trajet 20min → arrivée 19h00 pile → marge 0 < 5min → tendu
-C('arrivée pile à l\'heure → tendu', classifySlot({start:h(17)+m(40),durationMin:60,nextStart:h(19),travelToNextMs:m(20)})==='tense')
-C('pas d\'engagement après → toujours ok', classifySlot({start:h(20),durationMin:120,nextStart:null})==='ok')
+console.log('── 🔑 GRADIENT (David) : jamais bloqué, on prévient selon la sévérité ──')
+// Cas : event 19h Lausanne, je clutche à Morges (trajet 20min vers Lausanne après).
+// 18h40 + 1h → arrivée 20h00, event 19h → retard 60min → severity 3, faut annuler.
+const s3 = classifySlot({start:h(18)+m(40),durationMin:60,nextStart:h(19),travelToNextMs:m(20)})
+C('gros dépassement → severity 3 + requiresCancel', s3.severity===3 && s3.requiresCancel===true)
+// 17h40 + 1h → arrivée 19h00 pile → marge 0 → tendu (severity 1)
+C('arrivée pile → severity 1 (tendu)', classifySlot({start:h(17)+m(40),durationMin:60,nextStart:h(19),travelToNextMs:m(20)}).severity===1)
+// 17h + 1h → arrivée 18h20 → marge 40min → ok (severity 0)
+C('large marge → severity 0 (ok)', classifySlot({start:h(17),durationMin:60,nextStart:h(19),travelToNextMs:m(20)}).severity===0)
+// 18h25 + 1h → arrivée 19h45 → retard 45min... attends : marge = 19h-19h45 = -45 → severity 3. Prenons -10 :
+// 18h10 +1h → arrivée 19h30 → marge -30 → severity 3 ; 18h00+1h → arrivée 19h20 → -20 → severity 2 (risqué)
+C('léger dépassement (−20min) → severity 2 (risqué)', classifySlot({start:h(18),durationMin:60,nextStart:h(19),travelToNextMs:m(20)}).severity===2)
+C('pas d\'engagement après → severity 0', classifySlot({start:h(20),durationMin:120,nextStart:null}).severity===0)
 
 console.log('── Trajet ──')
 C('10 km ≈ 27 min', Math.abs(travelMs(10)/60000 - 27) < 1)

@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 154   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 155   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12108,6 +12108,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   // Diag
   const [fromId,setFromId]=useState(''); const [toId,setToId]=useState(''); const [diag,setDiag]=useState<string|null>(null)
   const [cRes,setCRes]=useState<string|null>(null) // résultat des CAS clutch (auto-vérifiés via qa_test_clutch)
+  const [cbId,setCbId]=useState('') // personne testée dans l'onglet Clutch (choisie par l'opérateur)
   const [evBots,setEvBots]=useState<Set<string>>(new Set()) // bots qui ont un event actif (pour le roster)
   const loadWorld=async()=>{
     const { data } = await supabase.from('profiles').select('id,name,is_bot,is_available,available_from,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
@@ -12117,7 +12118,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     setEvBots(evset)
     setBots([{id:userId,name:'Moi',is_bot:false}, ...arr])
     const firstBot=arr[0]?.id||''
-    setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId)
+    setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId); setCbId(p=>p||firstBot)
   }
   useEffect(()=>{ if(open) loadWorld() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!isAdmin) return null
@@ -12131,8 +12132,17 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   const botsOnline=async()=>{ setBusy('on'); try{
     const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
-    const { data, error } = await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+6*3600e3).toISOString(), center_lat:lat, center_lng:lng, available_radius_km:10 }).eq('is_bot',true).select('id')
-    showToast(error?('❌ '+error.message):`✓ ${data?.length||0} bots en ligne sur toi 📍`, error?C.red:C.green)
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const rows=((bs as any[])||[])
+    // Créneaux VARIÉS par bot (réaliste : tous live maintenant, mais fenêtres de durées différentes + rayons variés).
+    let n=0
+    for(let i=0;i<rows.length;i++){
+      const durH = 2 + (i%5)               // 2 à 6h de fenêtre selon le bot
+      const rad = 5 + (i%4)*5              // 5/10/15/20 km
+      const { error } = await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+durH*3600e3).toISOString(), center_lat:lat, center_lng:lng, available_radius_km:rad }).eq('id',rows[i].id)
+      if(!error) n++
+    }
+    showToast(`✓ ${n} bots en ligne sur toi 📍 (créneaux variés)`, C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const fillInbox=async()=>{ setBusy('fill'); try{
     const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot',true).limit(5)
@@ -12144,8 +12154,13 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const botsAccept=async()=>{ setBusy('acc'); try{
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    const { data, error } = await supabase.from('clutches').update({status:'accepted'}).eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').select('id')
-    showToast(error?('❌ '+error.message):(data?.length?`✓ ${data.length} accepté(s) → ton Verrou 🔒`:'Aucun clutch en attente envoyé à un bot'), error?C.red:(data?.length?C.green:C.orange))
+    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).in('receiver_id',ids).eq('status','pending')
+    const rows=((pend as any[])||[])
+    if(!rows.length){ showToast('Aucun clutch en attente envoyé à un bot',C.orange); setBusy(null); return }
+    // Réaliste : ils n'acceptent PAS tous (2 sur 3 acceptent, 1 sur 3 refuse).
+    let acc=0, dec=0
+    for(let i=0;i<rows.length;i++){ const accept = (i%3!==2); await supabase.from('clutches').update({status: accept?'accepted':'declined'}).eq('id',rows[i].id); accept?acc++:dec++ }
+    showToast(`✓ ${acc} accepté(s) → Verrou 🔒 · ${dec} refusé(s)`, C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // RESET COMPLET et HONNÊTE : annule les clutchs + met TOUS les bots hors-ligne + masque LEURS events.
   const resetBots=async()=>{ setBusy('reset'); try{
@@ -12293,12 +12308,14 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('avoff','🔴 Désactiver (elle + ses events)',()=>setActorOnline(false))}
         </>)}
         {tab==='clutch' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>« Si j'envoie un Clutch, est-ce que ça passe — et sinon, pourquoi ? » Clique un cas, je te donne la réponse (rien n'est envoyé). Personne testée : <b style={{color:C.white}}>{nameOf(firstBot())}</b>.</div>
-          {Btn('c_ok','✅ Cas normal (doit passer)', runCase('c_ok', async()=>{ const b=firstBot(); await cleanPair(b); return {s:userId,r:b} }))}
-          {Btn('c_busy','❌ Déjà un clutch en cours', runCase('c_busy', async()=>{ const b=firstBot(); await cleanPair(b); await insClutch(userId,b); return {s:userId,r:b} }))}
-          {Btn('c_block','❌ Personne bloquée', runCase('c_block', async()=>{ const b=firstBot(); await cleanPair(b); try{ await supabase.from('blocks').insert({blocker_id:userId,blocked_id:b}) }catch{}; return {s:userId,r:b} }))}
-          {Btn('c_cd','❌ Cooldown (après un refus)', runCase('c_cd', async()=>{ const b=firstBot(); await cleanPair(b); const ins=await insClutch(b,userId); const id=(ins as any)?.data?.[0]?.id; const got=await supabase.from('clutches').select('id').eq('sender_id',b).eq('receiver_id',userId).eq('status','pending').order('created_at',{ascending:false}).limit(1); const cid=id||(got.data as any)?.[0]?.id; if(cid) await supabase.from('clutches').update({status:'declined'}).eq('id',cid); return {s:b,r:userId} }))}
-          {Btn('c_full','❌ Boîte pleine (plafond)', runCase('c_full', async()=>{ const b=firstBot(), b2=secondBot(); await supabase.from('profiles').update({max_received_clutchs:1}).eq('id',b); await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b2).eq('receiver_id',b).in('status',ACT); await insClutch(b2,b); return {s:userId,r:b} }))}
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:4,lineHeight:1.4}}>« Si j'envoie un Clutch à cette personne, est-ce que ça passe — et sinon, pourquoi ? » (rien n'est envoyé)</div>
+          {ActorSel(cbId||firstBot(), setCbId)}
+          <div style={{height:4}}/>
+          {Btn('c_ok','✅ Cas normal (doit passer)', runCase('c_ok', async()=>{ const b=cbId||firstBot(); await cleanPair(b); return {s:userId,r:b} }))}
+          {Btn('c_busy','❌ Déjà un clutch en cours', runCase('c_busy', async()=>{ const b=cbId||firstBot(); await cleanPair(b); await insClutch(userId,b); return {s:userId,r:b} }))}
+          {Btn('c_block','❌ Personne bloquée', runCase('c_block', async()=>{ const b=cbId||firstBot(); await cleanPair(b); try{ await supabase.from('blocks').insert({blocker_id:userId,blocked_id:b}) }catch{}; return {s:userId,r:b} }))}
+          {Btn('c_cd','❌ Cooldown (après un refus)', runCase('c_cd', async()=>{ const b=cbId||firstBot(); await cleanPair(b); const ins=await insClutch(b,userId); const id=(ins as any)?.data?.[0]?.id; const got=await supabase.from('clutches').select('id').eq('sender_id',b).eq('receiver_id',userId).eq('status','pending').order('created_at',{ascending:false}).limit(1); const cid=id||(got.data as any)?.[0]?.id; if(cid) await supabase.from('clutches').update({status:'declined'}).eq('id',cid); return {s:b,r:userId} }))}
+          {Btn('c_full','❌ Boîte pleine (plafond)', runCase('c_full', async()=>{ const b=cbId||firstBot(), b2=secondBot(); await supabase.from('profiles').update({max_received_clutchs:1}).eq('id',b); await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b2).eq('receiver_id',b).in('status',ACT); await insClutch(b2,b); return {s:userId,r:b} }))}
           {cRes && (cRes.startsWith('__err__')
             ? <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ {cRes.slice(7)}</div>
             : <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>

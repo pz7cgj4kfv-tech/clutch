@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x190'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 140   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x191'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 141   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1599,17 +1599,52 @@ const PERSONAS = [
   { key:'psy',   label:'Coach',  emoji:'🧠', tag:'confrontant bienveillant' },
 ] as const
 function getPersona(): string { try { return localStorage.getItem('clutch_persona') || 'off' } catch { return 'off' } }
-// Signature contextuelle. Pour l'instant un seul contexte branché : 'infeasible_trip'.
-function personaQuip(key: string, ctx: string, lang: 'fr'|'en'): string {
+// Tirage aléatoire (les phrases ne doivent JAMAIS être les mêmes — exigence David ; à terme : génération IA).
+function pick<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)] }
+
+// ROAST « trajet infaisable » — POOLS par niveau de vénéritude. det=true → variante stable (pour l'aperçu).
+function roastInfeasible(level: number, lang: 'fr'|'en', rk: number, rn: number, rg: number, det = false): string {
+  const L = Math.max(0, Math.min(3, level))
+  const fr = [
+    [ `🔴 Trajet infaisable : ~${rk} km ≈ ${rn} min de route pour ${rg} min entre tes 2 créneaux. Revois l'horaire.`,
+      `🔴 ~${rk} km à couvrir en ${rg} min, c'est trop court (~${rn} min nécessaires). Ajuste un créneau.` ],
+    [ `🔴 Hum… ${rk} km en ${rg} min ? Même en trottinette c'est chaud 😏 Décale un créneau.`,
+      `🔴 ${rk} km, ${rg} min… t'as un jetpack ? Sinon revois l'horaire 😏` ],
+    [ `🔴 ${rk} km en ${rg} min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.`,
+      `🔴 ${rk} km en ${rg} min : à ce rythme t'es une comète 🌠 Décale, terrien.` ],
+    [ `🔴 ${rk} km en ${rg} min ?! T'es en Formule 1 ou t'as bu ? IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥`,
+      `🔴 Sérieux ? ${rk} km en ${rg} min. La physique a appelé, elle est vénère. Corrige ça 🔥` ],
+  ]
+  const en = [
+    [ `🔴 Unfeasible trip: ~${rk} km ≈ ${rn} min by road for ${rg} min between your 2 slots. Adjust the time.`,
+      `🔴 ~${rk} km in ${rg} min is too tight (~${rn} min needed). Tweak a slot.` ],
+    [ `🔴 Uh… ${rk} km in ${rg} min? Even on a scooter that's a stretch 😏 Shift a slot.`,
+      `🔴 ${rk} km, ${rg} min… got a jetpack? Otherwise fix the time 😏` ],
+    [ `🔴 ${rk} km in ${rg} min? You'd need teleportation, we don't have it (yet) 🚀 Move a slot.`,
+      `🔴 ${rk} km in ${rg} min: at that pace you're a comet 🌠 Reschedule, earthling.` ],
+    [ `🔴 ${rk} km in ${rg} min?! Are you in an F1 car? Physically IMPOSSIBLE, champ. Fix it 🧠🔥`,
+      `🔴 Seriously? ${rk} km in ${rg} min. Physics called, it's mad. Fix that 🔥` ],
+  ]
+  const pool = (lang === 'fr' ? fr : en)[L]
+  return det ? pool[0] : pick(pool)
+}
+
+// PERSONA quips — POOLS (pick aléatoire). À terme : génération IA selon contexte/niveau/personnage.
+function personaQuip(key: string, ctx: string, lang: 'fr'|'en', det = false): string {
   if (key === 'off' || !key) return ''
-  const Q: Record<string, Record<string, { fr: string; en: string }>> = {
+  const Q: Record<string, Record<string, { fr: string[]; en: string[] }>> = {
     infeasible_trip: {
-      tesla: { fr: '⚡ Tesla : même mes bobines ne te téléporteront pas — le temps n\'est pas si élastique.', en: '⚡ Tesla: not even my coils will teleport you — time isn\'t that elastic.' },
-      philo: { fr: '🦉 « Vouloir être en deux lieux à la fois, c\'est n\'être nulle part. »', en: '🦉 "To wish to be in two places at once is to be nowhere."' },
-      psy:   { fr: '🧠 Tu t\'imposes l\'impossible — qu\'est-ce que tu fuis ? Choisis UN lieu, respire.', en: '🧠 You\'re setting yourself up to fail — what are you avoiding? Pick ONE place, breathe.' },
+      tesla: { fr: [ '⚡ Tesla : même mes bobines ne te téléporteront pas — le temps n\'est pas si élastique.', '⚡ Tesla : j\'ai dompté la foudre, pas l\'espace-temps. Décale.' ],
+               en: [ '⚡ Tesla: not even my coils will teleport you — time isn\'t that elastic.', '⚡ Tesla: I tamed lightning, not space-time. Reschedule.' ] },
+      philo: { fr: [ '🦉 « Vouloir être en deux lieux à la fois, c\'est n\'être nulle part. »', '🦉 « La hâte est mère de l\'erreur. » Honore un seul lieu.' ],
+               en: [ '🦉 "To wish to be in two places at once is to be nowhere."', '🦉 "Haste is the mother of error." Honor one place.' ] },
+      psy:   { fr: [ '🧠 Tu t\'imposes l\'impossible — qu\'est-ce que tu fuis ? Choisis UN lieu, respire.', '🧠 Vouloir tout, c\'est se disperser. Un plan, pleinement. Le reste attendra.' ],
+               en: [ '🧠 You\'re setting yourself up to fail — what are you avoiding? Pick ONE place, breathe.', '🧠 Wanting it all scatters you. One plan, fully. The rest can wait.' ] },
     },
   }
-  return Q[ctx]?.[key]?.[lang] || ''
+  const pool = Q[ctx]?.[key]?.[lang]
+  if (!pool || !pool.length) return ''
+  return det ? pool[0] : pick(pool)
 }
 
 const BOT_ENRICHMENT: Record<string,{
@@ -7173,12 +7208,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
         </div>
         <div style={{background:C.bg,border:`1px dashed ${VENERITUDE[veneritude].color}66`,borderRadius:10,padding:'10px 12px'}}>
           <div style={{fontSize:9,fontWeight:800,letterSpacing:'.08em',color:C.whiteMid,marginBottom:4}}>APERÇU — TON CRÉNEAU EST INFAISABLE :</div>
-          <div style={{fontSize:12,color:C.white,lineHeight:1.45}}>{vibe(veneritude,{
-            soft:  "🔴 Trajet infaisable : 18 km ≈ 49 min de route pour 10 min entre tes 2 créneaux. Revois l'horaire.",
-            taquin:"🔴 Hum… 18 km en 10 min ? Même en trottinette c'est chaud 😏 Décale un peu.",
-            drole: "🔴 18 km en 10 min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.",
-            trash: "🔴 18 km en 10 min ?! T'es en Formule 1 ou t'as bu ? Physiquement IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥",
-          })}{persona!=='off' && <span style={{display:'block',marginTop:6,color:C.salmon,fontStyle:'italic'}}>{personaQuip(persona,'infeasible_trip','fr')}</span>}</div>
+          <div style={{fontSize:12,color:C.white,lineHeight:1.45}}>{roastInfeasible(veneritude,'fr',18,49,10,true)}{persona!=='off' && <span style={{display:'block',marginTop:6,color:C.salmon,fontStyle:'italic'}}>{personaQuip(persona,'infeasible_trip','fr',true)}</span>}</div>
         </div>
       </div>
 
@@ -9758,17 +9788,8 @@ export default function App2() {
           const needMin = (km * 1.35) / 30 * 60
           if (gapMin < needMin) {
             const rk=Math.round(km), rn=Math.round(needMin), rg=Math.round(gapMin)
-            const _main = lang==='fr' ? vibe(getVeneritude(),{
-              soft:  `🔴 Trajet infaisable : ~${rk} km ≈ ${rn} min de route pour ${rg} min entre tes 2 créneaux. Revois l'horaire.`,
-              taquin:`🔴 Hum… ${rk} km en ${rg} min ? Même en trottinette c'est chaud 😏 Décale un créneau.`,
-              drole: `🔴 ${rk} km en ${rg} min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.`,
-              trash: `🔴 ${rk} km en ${rg} min ?! T'es en Formule 1 ou t'as bu ? IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥`,
-            }) : vibe(getVeneritude(),{
-              soft:  `🔴 Unfeasible trip: ~${rk} km ≈ ${rn} min by road for ${rg} min between your 2 slots. Adjust the time.`,
-              taquin:`🔴 Uh… ${rk} km in ${rg} min? Even on a scooter that's a stretch 😏 Shift a slot.`,
-              drole: `🔴 ${rk} km in ${rg} min? You'd need teleportation, we don't have it (yet) 🚀 Move a slot.`,
-              trash: `🔴 ${rk} km in ${rg} min?! Are you in an F1 car? Physically IMPOSSIBLE, champ. Fix your schedule 🧠🔥`,
-            })
+            // Pools aléatoires (jamais 2× la même phrase) + signature persona aléatoire.
+            const _main = roastInfeasible(getVeneritude(), lang, rk, rn, rg)
             const _q = personaQuip(getPersona(),'infeasible_trip',lang)
             showToast(_q ? `${_main}  ${_q}` : _main, C.orange)
             break

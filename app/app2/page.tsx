@@ -20,8 +20,8 @@ import { onRegister as eventOnRegister } from '@/lib/events-engine'  // modèle 
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a3'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 159   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a4'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 160   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3296,9 +3296,18 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       const evEnd = evStart + (eventDurH(ev) || 3) * 3600000
       const gate = canRegisterEvent({ mode: eventMode((ev as any).type), eventStart: evStart, eventEnd: evEnd, now: Date.now(), availSlots })
       if (!gate.ok) {
+        const v = getVeneritude()
         const m = gate.reason === 'beyond_horizon'
-          ? (EN ? '⏱️ Too far ahead — Clutch is for soon (within 18h)' : '⏱️ Trop loin — Clutch c\'est pour bientôt (dans les 18h)')
-          : (EN ? '⏱️ Outside your availability — get available then to join' : '⏱️ Hors de ta dispo — mets-toi dispo sur ce créneau pour rejoindre')
+          ? (EN ? '⏱️ Too far ahead — Clutch is for soon (within 18h)' : vibe(v,{
+              soft:'⏱️ Trop loin — Clutch c\'est pour bientôt (dans les 18h)',
+              taquin:'⏱️ Hé, pas si vite — Clutch c\'est dans les 18h max 😏',
+              drole:'⏱️ Tu planifies à la NASA ? 🚀 Clutch c\'est pour bientôt (18h max)',
+              trash:'⏱️ 18h MAX. T\'as vu la taille du mot « spontané » ? Reviens sur Terre 🔥' }))
+          : (EN ? '⏱️ Outside your availability — get available then to join' : vibe(v,{
+              soft:'⏱️ Hors de ta dispo — mets-toi dispo sur ce créneau pour rejoindre',
+              taquin:'⏱️ C\'est hors de ta dispo 😏 ouvre un créneau pour rejoindre',
+              drole:'⏱️ Rejoindre un truc où t\'es même pas dispo ? 🤔 Ouvre un créneau d\'abord',
+              trash:'⏱️ T\'es PAS dispo à cette heure, génie. Ouvre un créneau d\'abord 🧠🔥' }))
         setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),6000)
         return
       }
@@ -3322,7 +3331,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         return aStart < bEnd && bStart < aEnd   // recouvrement
       })
       if (clash) {
-        const msg = EN?`Overlaps with "${clash.title}" (${clash.time}). Leave it first.`:`Chevauche « ${clash.title} » (${clash.time}). Désinscris-toi d'abord.`
+        const msg = EN?`Overlaps with "${clash.title}" (${clash.time}). Leave it first.`:vibe(getVeneritude(),{
+          soft:`Chevauche « ${clash.title} » (${clash.time}). Désinscris-toi d'abord.`,
+          taquin:`Ça tombe en même temps que « ${clash.title} » (${clash.time}) 😏 tu te clones ?`,
+          drole:`Tu peux pas être à « ${clash.title} » ET ici à ${clash.time} 🤷 choisis.`,
+          trash:`Tu chevauches « ${clash.title} » (${clash.time}). T\'es UNE personne, pas trois. Désinscris-toi 🔥`})
         setRegBlock(msg); showToast?.(msg, C.orange); setTimeout(()=>setRegBlock(''),5000)
         return
       }
@@ -3340,7 +3353,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         // Forteresse : l'event chevauche un RDV déjà confirmé (occ_no_overlap) → on refuse en douceur
         const conflit = (error as any).code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')
         if (conflit) {
-          const m = EN?'⏱️ You already have a meetup at that time':'⏱️ Tu as déjà un rendez-vous à cette heure'
+          const m = EN?'⏱️ You already have a meetup at that time':vibe(getVeneritude(),{
+            soft:'⏱️ Tu as déjà un rendez-vous à cette heure',
+            taquin:'⏱️ T\'as déjà un RDV pile à cette heure 😏',
+            drole:'⏱️ Déjà un RDV à cette heure — la téléportation, c\'est pas encore au point 🚀',
+            trash:'⏱️ T\'as DÉJÀ un RDV à cette heure. Un humain = un endroit. Tu le sais, non ? 🔥'})
           setRegBlock(m); showToast?.(m, C.salmon); setTimeout(()=>setRegBlock(''),5000)
           setRegistering(false); return
         }

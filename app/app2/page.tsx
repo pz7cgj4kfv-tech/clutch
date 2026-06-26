@@ -15,13 +15,14 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { onRegister as eventOnRegister } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
+import { classifySlot } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient, jamais bloquant)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a6'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 162   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1a7'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 163   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1839,6 +1840,7 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
   const t = useT(lang||'fr')
   const [msg,setMsg]=useState(''); const [loading,setLoading]=useState(false)
   const [isQuickDate,setIsQuickDate]=useState(false)
+  const [feasAck,setFeasAck]=useState(false) // faisabilité : l'user a vu l'avertissement « tendu/faut annuler » et confirme quand même
 
   // ── Slots horaires : intersection fenêtre sender ∩ receiver, moins le RDV en cours ──
   const allSlots = useMemo(() => makeSlots(), [])
@@ -1998,6 +2000,29 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
       return
     }
     const pt=new Date(); const [h,m]=H[hi].split(':').map(Number); pt.setHours(h,m,0,0)
+    // ── FAISABILITÉ (gradient, JAMAIS bloquant — David) : ce clutch te met-il en retard sur un de TES engagements ?
+    // On prévient proportionnellement (vénéritude), on montre l'heure du conflit, et on laisse décider (annuler = −fiabilité).
+    try {
+      const durMin = isQuickDate?60:120
+      const { data: occ } = await supabase.from('occupancies').select('start_at').eq('user_id', from.id).gt('start_at', pt.toISOString()).order('start_at',{ascending:true}).limit(1)
+      const nextStart = (occ as any)?.[0]?.start_at ? new Date((occ as any)[0].start_at).getTime() : null
+      const fz = classifySlot({ start: pt.getTime(), durationMin: durMin, nextStart, travelToNextMs: 20*60000 })
+      if (fz.severity >= 2 && !feasAck) {
+        const v = getVeneritude()
+        const nextHH = nextStart ? new Date(nextStart).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : ''
+        const warn = fz.severity===3
+          ? vibe(v,{ soft:`⚠️ Tu as un engagement à ${nextHH}. Là tu devrais l'annuler pour y aller. Re-touche pour envoyer quand même.`,
+                     taquin:`⚠️ ${nextHH} t'attend ailleurs 😏 faudra l'annuler. Re-touche si t'assumes.`,
+                     drole:`⚠️ Spider-Man ? T'as un truc à ${nextHH}. Faudra le lâcher (− fiabilité). Re-touche si tu veux 🕷️`,
+                     trash:`⚠️ T'as DÉJÀ un truc à ${nextHH}, génie. Là tu plantes l'autre (− fiabilité). Re-touche si t'assumes 🔥` })
+          : vibe(v,{ soft:`⏱️ Ça va être tendu avec ton engagement de ${nextHH}. Re-touche pour confirmer.`,
+                     taquin:`⏱️ Tendu avec ${nextHH} 😏 faut courir. Re-touche pour confirmer.`,
+                     drole:`⏱️ Faudra sprinter pour ${nextHH} 🏃 Re-touche pour confirmer.`,
+                     trash:`⏱️ Tu vas devoir COURIR pour ${nextHH}. Baskets prêtes ? Re-touche 🔥` })
+        showToast(warn, fz.severity===3?C.red:C.orange)
+        setFeasAck(true); setLoading(false); return
+      }
+    } catch {}
     const venueLabel=venueAddress?`${venueInput.trim()} · ${venueAddress}`:venueInput.trim()
     // Gardien unique : create_clutch() vérifie côté serveur self / hard-block (2 sens) / cooldown / doublon pending.
     const {data:newClutchId,error}=await supabase.rpc('create_clutch',{

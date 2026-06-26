@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 152   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 153   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7310,6 +7310,26 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
                 <span style={{fontSize:8.5,fontWeight:800,color:col,background:`${col}1a`,border:`1px solid ${col}55`,borderRadius:20,padding:'2px 7px',flexShrink:0,whiteSpace:'nowrap'}}>{r.s}</span>
               </div>
             )})}
+        </div>
+
+        {/* 🏆 LE GRAAL (ébauche) */}
+        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:C.orange,margin:'14px 4px 2px'}}>🏆 LE GRAAL</div>
+        <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,padding:'13px 14px'}}>
+          <div style={{fontSize:12.5,color:C.white,lineHeight:1.5,fontStyle:'italic'}}>« Tu n'ouvres presque pas l'app. Les notifs savent ce que tu cherches. Tu ouvres pour dire oui/non, tu as un RDV, tu quittes. »</div>
+          <div style={{fontSize:11,color:C.salmon,marginTop:8,fontWeight:700}}>→ Une application qui te demande de ne plus l'avoir — de façon infiniment subtile.</div>
+        </div>
+
+        {/* 📣 SLOGANS (ébauche, à enrichir) */}
+        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:C.orange,margin:'14px 4px 2px'}}>📣 SLOGANS</div>
+        <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+          {[
+            '« On ne peut pas plaire à tout le monde. Avec Clutch, si — et ceux qui se plaisent se trouvent. »',
+            '« L\'app qui te rend ta soirée. »',
+            '« Moins d\'écran. Plus de vrai. »',
+            '« Dis oui. Sors. »',
+          ].map((s,i)=>(
+            <div key={i} style={{fontSize:12,color:C.white,padding:'10px 12px',borderTop:i>0?`1px solid ${C.border}`:'none',lineHeight:1.4}}>{s}</div>
+          ))}
         </div>
       </>)}
     </div>

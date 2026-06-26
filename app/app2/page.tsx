@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1af'  // Versionnage HEXADÉCIMAL. ~281e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 171   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b0'  // Versionnage HEXADÉCIMAL. ~282e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 172   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -514,6 +514,20 @@ function makeSlots(fromDate?: Date): string[] {
     slots.push(`${hh}:${mm}`)
   }
   return slots
+}
+
+// Moment de la journée d'un créneau "HH:MM" (même vocabulaire partout : dispo, events, sélecteur d'heure).
+//   nuit 0-6 · matin 6-12 · aprem 12-18 · soir 18-24.
+function slotDayPart(hhmm: string): 'matin'|'aprem'|'soir'|'nuit' {
+  const h = parseInt((hhmm||'').split(':')[0]) || 0
+  if (h>=6 && h<12) return 'matin'
+  if (h>=12 && h<18) return 'aprem'
+  if (h>=18) return 'soir'
+  return 'nuit'
+}
+const DAYPART_META: Record<string,{fr:string;en:string;emoji:string}> = {
+  matin:{fr:'Ce matin',en:'Morning',emoji:'☀️'}, aprem:{fr:'Aprèm',en:'Afternoon',emoji:'🌤️'},
+  soir:{fr:'Ce soir',en:'Tonight',emoji:'🌙'}, nuit:{fr:'Cette nuit',en:'Late',emoji:'🌌'},
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -1902,6 +1916,10 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
   }, [allSlots, fromTime, untilTime, to, excludeWindow])
   const H = slots.length ? slots : allSlots.slice(2,10)
   const [hi,setHi]=useState(Math.min(2, H.length-1))
+  // 🕐 Sélecteur d'heure compact (David : « la grille est immense ») : on regroupe par MOMENT de la journée.
+  //   On affiche des chips (Ce matin/Aprèm/Ce soir/Cette nuit) → seuls les créneaux du moment choisi s'affichent.
+  const hPeriods = useMemo(()=>{ const seen:string[]=[]; for(const h of H){ const p=slotDayPart(h); if(!seen.includes(p))seen.push(p) } return seen }, [H])
+  const [selPeriod,setSelPeriod]=useState<string>(()=> slotDayPart(H[Math.min(2,H.length-1)] || '18:00'))
 
   // ── Nominatim OpenStreetMap — recherche de lieux ──
   const SUGGESTIONS=['Café Romand','Terrasse Ouchy','Pont Bessières','Parc de Milan','Place de la Riponne','Bar du Flon','Escaliers du Marché','Tour de Sauvabelin']
@@ -2180,8 +2198,22 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
           <div style={{fontSize:11,color:C.whiteMid,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>
             {lang==='fr'?'Heure du RDV':'Meeting time'}
           </div>
+          {/* Chips MOMENT (n'apparaissent que si la fenêtre couvre plusieurs moments) → réduit la grille géante */}
+          {hPeriods.length>1 && (
+            <div style={{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap'}}>
+              {hPeriods.map(p=>{
+                const meta=DAYPART_META[p]; const active=selPeriod===p
+                return (
+                  <button key={p} onClick={()=>{ setSelPeriod(p); const idx=H.findIndex(h=>slotDayPart(h)===p); if(idx>=0&&slotDayPart(H[hi])!==p) setHi(idx) }}
+                    style={{padding:'6px 12px',borderRadius:14,border:`1.5px solid ${active?C.orange:C.border}`,background:active?`${C.orange}1a`:'transparent',color:active?C.orange:C.whiteMid,fontSize:12,fontWeight:active?800:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                    {meta.emoji} {lang==='fr'?meta.fr:meta.en}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {H.map((h,i)=>(
+            {H.map((h,i)=> slotDayPart(h)!==selPeriod ? null : (
               <button key={h} onClick={()=>setHi(i)}
                 style={{padding:'8px 13px',borderRadius:10,border:`1.5px solid ${hi===i?C.orange:C.border}`,background:hi===i?`${C.orange}22`:C.whiteFaint,color:hi===i?C.orange:C.whiteMid,fontSize:13,fontWeight:hi===i?800:500,cursor:'pointer',fontFamily:'inherit'}}>
                 {h}

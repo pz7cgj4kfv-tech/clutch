@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1aa'  // Versionnage HEXADÉCIMAL. ~276e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 166   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ab'  // Versionnage HEXADÉCIMAL. ~277e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 167   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3403,13 +3403,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     }
     setRegBlock('')
     setRegistering(true)
+    // Modèle events (David : « l'event EST un clutch, l'orga accepte ou pas »). On fait CONFIANCE au mode de l'event :
+    //   'open' (partenaires, soirées publiques) → auto-accept jusqu'aux places, sinon liste d'attente.
+    //   'curated' (défaut user, petits groupes/domicile) → DEMANDE → l'orga tranche → état 'requested'.
+    let regState: string = 'accepted'
     // Persistance : rejoint pour de vrai si event réel (UUID Supabase) + user connecté
     if (isRealEvent(ev.id) && userId) {
-      // Modèle events — on pose l'ÉTAT d'inscription. Flag OFF → mode 'open' → 'accepted' (= comportement actuel).
-      const effMode = (((ev as any).mode==='curated') && EVENTS_CURATED_LIVE) ? 'curated' : 'open'
+      const effMode = ((ev as any).mode === 'open') ? 'open' : 'curated'
       const places = (ev.spots||0), taken = (ev.taken||0)
-      const evState = eventOnRegister({ mode: effMode as any, placesLeft: Math.max(0, places-taken), waitlistCount: 0, places }).state
-      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId, state: evState })
+      regState = eventOnRegister({ mode: effMode as any, placesLeft: Math.max(0, places-taken), waitlistCount: 0, places }).state
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: userId, state: regState })
       if (error) {
         // Forteresse : l'event chevauche un RDV déjà confirmé (occ_no_overlap) → on refuse en douceur
         const conflit = (error as any).code==='23P01' || /occ_no_overlap|exclusion|overlap/i.test(error.message||'')
@@ -3430,20 +3433,30 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setWaitlist((prev:Set<string>)=>{ const n=new Set(prev); n.delete(ev.id); return n })
     await new Promise(r=>setTimeout(r,400))
     setRegistered((prev:Set<string>)=>new Set([...prev,ev.id]))
-    // Compteur optimiste : +1 inscrit tout de suite (le trigger DB le confirme, loadEvents resynchronise)
-    setSelEv((s:any)=> s && s.id===ev.id ? {...s, taken:(s.taken||0)+1} : s)
-    setUserGroupEvents(prev=>prev.map((e:any)=>e.id===ev.id?{...e,taken:(e.taken||0)+1}:e))
     setRegistering(false)
     loadEvents()
-    // 🔔 Notifs event (David : « quelqu'un s'inscrit → l'orga est prévenu »). L'orga reçoit la push ;
-    // si l'event devient complet, une 2e push. (Pas de push à soi-même : on a déjà le ✓ in-app.)
+    const isRequest = regState==='requested' || regState==='waitlisted'
+    // Compteur optimiste : +1 SEULEMENT si accepté direct (mode open). Une DEMANDE ne prend pas encore de place.
+    if (!isRequest) {
+      setSelEv((s:any)=> s && s.id===ev.id ? {...s, taken:(s.taken||0)+1} : s)
+      setUserGroupEvents(prev=>prev.map((e:any)=>e.id===ev.id?{...e,taken:(e.taken||0)+1}:e))
+    }
+    // Feedback participant : demande (curated) vs validé direct (open).
+    showToast?.(isRequest
+      ? (lang==='en'?'⏳ Request sent — the host will confirm. Find it in your Clutchs.':'⏳ Demande envoyée — l\'orga doit confirmer. Retrouve-la dans tes Clutchs.')
+      : (lang==='en'?'✓ You\'re in! See it in your Clutchs.':'✓ Tu es inscrit·e ! Retrouve-le dans tes Clutchs.'),
+      isRequest?C.orange:C.green)
+    // 🔔 Notifs event (David : « quelqu'un s'inscrit → l'orga est prévenu »). L'orga reçoit la push.
     const newTaken = (ev.taken||0)+1
     const orga = (ev as any).created_by
     if (orga && orga !== userId) {
-      pushTo(orga, lang==='en'?'🎉 New sign-up':'🎉 Nouvelle inscription',
-        (lang==='en'?`Someone joined "${ev.title}"`:`Quelqu'un a rejoint « ${ev.title} »`)+` (${newTaken}/${ev.spots})`,
-        { type:'event_join', event_id: ev.id })
-      if (newTaken >= (ev.spots||0)) {
+      pushTo(orga,
+        isRequest ? (lang==='en'?'🔥 New join request':'🔥 Nouvelle demande') : (lang==='en'?'🎉 New sign-up':'🎉 Nouvelle inscription'),
+        isRequest
+          ? (lang==='en'?`Someone wants to join "${ev.title}" — accept or decline in your Clutchs`:`Quelqu'un veut rejoindre « ${ev.title} » — accepte ou refuse dans tes Clutchs`)
+          : (lang==='en'?`Someone joined "${ev.title}"`:`Quelqu'un a rejoint « ${ev.title} »`)+` (${newTaken}/${ev.spots})`,
+        { type: isRequest?'event_request':'event_join', event_id: ev.id })
+      if (!isRequest && newTaken >= (ev.spots||0)) {
         pushTo(orga, lang==='en'?'🔥 Event full':'🔥 Événement complet',
           lang==='en'?`"${ev.title}" is now full (${ev.spots}/${ev.spots})`:`« ${ev.title} » est complet (${ev.spots}/${ev.spots})`,
           { type:'event_full', event_id: ev.id })
@@ -9409,7 +9422,7 @@ export default function App2() {
   // Organisateur : accepter / refuser une demande d'inscription (modèle events-engine).
   // accept → state='accepted' (le trigger DB crée l'occupation forteresse pour l'invité ; si ça chevauche
   // un de SES RDV, la contrainte EXCLUDE rejette → on prévient sans casser). refuse → 'declined'.
-  const respondEventRequest = useCallback(async (eventId:string, requesterId:string, accept:boolean)=>{
+  const respondEventRequest = useCallback(async (eventId:string, requesterId:string, accept:boolean, evTitle?:string)=>{
     const { error } = await supabase.from('event_participants')
       .update({ state: accept?'accepted':'declined', responded_at:new Date().toISOString() })
       .eq('event_id', eventId).eq('user_id', requesterId)
@@ -9418,6 +9431,11 @@ export default function App2() {
       return
     }
     showToast(accept ? (lang==='fr'?'✓ Inscription acceptée':'✓ Accepted') : (lang==='fr'?'Demande refusée':'Declined'), accept?C.green:C.whiteMid)
+    // 🔔 Prévenir le PARTICIPANT (David : « à chaque truc dynamique, une notif »). Refus = 'expired' côté dignité :
+    // on reste neutre (« la place n'a pas pu être confirmée ») plutôt que « refusé » sec.
+    const t = evTitle || (lang==='fr'?'l\'événement':'the event')
+    if (accept) pushTo(requesterId, lang==='fr'?'✅ Inscription confirmée':'✅ You\'re in', lang==='fr'?`Tu es validé·e pour « ${t} » 🎉`:`You're confirmed for "${t}" 🎉`, { type:'event_accepted', event_id:eventId })
+    else        pushTo(requesterId, lang==='fr'?'Place non confirmée':'Spot not confirmed', lang==='fr'?`« ${t} » est complet pour cette fois.`:`"${t}" is full this time.`, { type:'event_declined', event_id:eventId })
     loadEventEng()
   }, [lang, showToast, loadEventEng])
 
@@ -11291,8 +11309,8 @@ export default function App2() {
                                   <div key={r.user_id} style={{display:'flex',alignItems:'center',gap:9}}>
                                     <div onClick={()=>{if(r.prof){setSelProfile(r.prof);setShowProfileSheet(true)}}} style={{cursor:'pointer',flexShrink:0}}><Av src={r.prof?.photo_url} name={r.prof?.name||'?'} size={30}/></div>
                                     <div style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.prof?.name||(lang==='en'?'Someone':'Quelqu\'un')}{r.state==='waitlisted'&&<span style={{fontSize:10,color:C.whiteMid,fontWeight:600}}> · {lang==='en'?'waitlist':'liste d\'attente'}</span>}</div>
-                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,false)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
-                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,true)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:'none',background:C.green,color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,false,ev.title)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,true,ev.title)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:'none',background:C.green,color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                                   </div>
                                 ))}
                               </div>

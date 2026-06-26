@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x18b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 135   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x18c'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 136   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9628,28 +9628,24 @@ export default function App2() {
       return
     }
 
-    // Multi-créneaux : persiste ce créneau dans `availabilities` (max 3, 1 endroit à la fois).
-    // B3 — chevauchement : on remplace SEULEMENT le(s) créneau(x) qui se chevauche(nt) + on INFORME
-    // (un blocage dur empêcherait de re-régler son créneau actuel). Les autres créneaux sont préservés.
+    // Multi-créneaux : persiste ce créneau dans `availabilities` (max 3 actifs).
+    // PIVOT 27.06 — les créneaux PEUVENT se CHEVAUCHER : la dispo = une INTENTION (« je suis ouvert à
+    // plusieurs plans ce soir »), PAS une localisation simultanée. La forteresse ne verrouille qu'au RDV
+    // CONFIRMÉ (occupancies) → être « dispo à 2 endroits » est SÛR. Donc on N'écrase plus : on accumule.
     try {
       const startMs = from.getTime(), endMs = until.getTime()
       const { data: act } = await supabase.from('availabilities').select('id,start_at,end_at,lat,lng').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at', { ascending: true })
       const list:any[] = act || []
       const overlapping = list.filter(s => new Date(s.start_at).getTime() < endMs && startMs < new Date(s.end_at).getTime())
-      if (overlapping.length) {
-        await supabase.from('availabilities').update({ active:false }).in('id', overlapping.map(s=>s.id))
-        showToast(lang==='fr'?'🔄 Un créneau qui se chevauchait a été remplacé — 1 seul endroit à la fois':'🔄 An overlapping slot was replaced — one place at a time', C.orange)
-      }
-      const remaining = list.filter(s => !overlapping.find(o=>o.id===s.id))
-      // B4 — faisabilité de TRAJET entre 2 créneaux proches (formule validée GPT round 2) : on AVERTIT, jamais bloquer.
-      //   Trajet urbain estimé = distance_oiseau × 1.35 (détour réseau routier) ÷ 30 km/h (ville+feux+parking+marche).
-      //   gap < trajet → 🔴 infaisable · gap < trajet + 15 min → 🟠 serré. (Pas d'API GPS : on détecte l'absurde, pas on guide.)
-      if (remaining.length && meetupPos[0] && meetupPos[1]) {
-        for (const s of remaining) {
+      if (overlapping.length) showToast(lang==='fr'?'✓ Tu es ouvert·e à plusieurs plans sur ce créneau — on te trie ça':'✓ You\'re open to several plans here — we\'ll sort it for you', C.green)
+      // B4 — faisabilité de TRAJET entre créneaux SÉQUENTIELS proches (les chevauchants = volontaires, ignorés).
+      //   Trajet urbain ≈ distance_oiseau × 1.35 ÷ 30 km/h. gap < trajet → 🔴 · gap < trajet+15min → 🟠. Jamais bloquer.
+      if (list.length && meetupPos[0] && meetupPos[1]) {
+        for (const s of list) {
           if (!s.lat || !s.lng) continue
           const sStart = new Date(s.start_at).getTime(), sEnd = new Date(s.end_at).getTime()
           const gapMin = sStart >= endMs ? (sStart-endMs)/60000 : startMs >= sEnd ? (startMs-sEnd)/60000 : Infinity
-          if (!isFinite(gapMin)) continue
+          if (!isFinite(gapMin)) continue   // chevauchant = aucun trajet à faire → on ignore (intention assumée)
           const km = haversineKm(meetupPos[0], meetupPos[1], s.lat, s.lng)
           if (km <= 2) continue
           const needMin = (km * 1.35) / 30 * 60
@@ -9666,7 +9662,7 @@ export default function App2() {
           }
         }
       }
-      if (remaining.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', remaining[0].id) // plafond 3 → vire le plus ancien
+      if (list.length >= 3) await supabase.from('availabilities').update({ active:false }).eq('id', list[0].id) // plafond 3 → vire le plus ancien
       await supabase.from('availabilities').insert({ user_id:user.id, start_at:from.toISOString(), end_at:until.toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true })
     } catch {}
 

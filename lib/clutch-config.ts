@@ -40,7 +40,7 @@ export const CLUTCH_CONFIG = {
   // ── Disponibilité & taxonomie d'événements (décidé 26.06, validé GPT) ──
   availabilityHorizonH:  18,  // Jusqu'où on peut poser un créneau de dispo (= horizon spontané, glissant).
   maxActiveSlots:        3,   // Nombre de créneaux de dispo actifs simultanés (gratuit).
-  slotsCanOverlap:       false, // Les créneaux ne peuvent pas se chevaucher dans le temps (1 lieu à la fois).
+  slotsCanOverlap:       true,  // PIVOT 27.06 : la dispo = INTENTION (ouvert à plusieurs plans) → chevauchement OK. La forteresse ne verrouille qu'au RDV CONFIRMÉ.
   eventPlannedHorizonDays: 7, // Un événement PLANIFIÉ (partenaire) peut être annoncé jusqu'à 7j avant.
 
   // ── Aide aux sous-exposés (point 3, validé GPT 26.06) — JAMAIS « impopularité » ──

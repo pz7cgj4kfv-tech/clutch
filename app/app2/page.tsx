@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b7'  // Versionnage HEXADÉCIMAL. ~289e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 179   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b8'  // Versionnage HEXADÉCIMAL. ~290e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 180   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4056,7 +4056,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             </div>
             {/* CTA fixe en bas — padding-bottom = tab bar (72) + safe area + marge */}
             <div style={{flexShrink:0,padding:'8px 20px calc(max(var(--sab),0px) + 88px)',borderTop:`1px solid ${C.border}`,background:C.bgSheet}}>
-              {(selEv.created_by ? (!!userId && selEv.created_by===userId) : selEv.creator==='Toi') ? (
+              {/* Robuste : MON event si created_by===moi OU creator==='Toi' (évite « Rejoindre » sur mon propre event
+                  quand created_by est périmé/démo → je dois pouvoir l'ANNULER, David). */}
+              {((!!userId && selEv.created_by===userId) || selEv.creator==='Toi') ? (
                 <div>
                   <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
                   <button onClick={()=>{ if(cancelArmed) cancelMyEvent(selEv); else setCancelArmed(true) }} disabled={cancelling}
@@ -9030,7 +9032,7 @@ export default function App2() {
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
-  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
+  const reloadAvail = useCallback(async()=>{ if(!user?.id) return; const {data}=await supabase.from('availabilities').select('id,start_at,end_at,place,radius_km,lat,lng').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
   const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
   // Multi-créneaux (A) : « promotion » du créneau qui couvre MAINTENANT dans profiles, pour être visible
   // pendant chacun de mes créneaux. PROMOTE-ONLY : ne rend JAMAIS indisponible (pire cas = ne fait rien).
@@ -12311,7 +12313,7 @@ export default function App2() {
                       <span style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
-                        <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.place||'—'}</div>
+                        <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{s.radius_km!=null?` · ${Math.round(s.radius_km)} km`:''}</div>
                       </div>
                       {/* B/D1 — Modifier : on retire ce créneau puis on rouvre le réglage (le créneau étant retiré, pas de fausse alerte de chevauchement B3). */}
                       <button onClick={async()=>{ await removeSlot(s.id); setShowSlots(false); setFlow('carte') }} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.white,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✏️ {lang==='en'?'Edit':'Modifier'}</button>

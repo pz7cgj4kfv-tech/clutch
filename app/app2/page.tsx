@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1ab'  // Versionnage HEXADÉCIMAL. ~277e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 167   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ac'  // Versionnage HEXADÉCIMAL. ~278e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 168   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2969,7 +2969,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -2980,6 +2980,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   onPenalty?:(r:PenaltyReason)=>void;
   onOpenProfile?:(name:string,bio:string,photo:string|null)=>void;
   userId?:string;
+  userAge?:number|null;
   isCertified?:boolean;
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
@@ -3058,6 +3059,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     isGroupe: e.type==='user',   // events créés par un user/bot = events de groupe
     type: e.type,                // pour le gate (eventMode : partner=planifié, sinon spontané)
     starts_at: (e as any).starts_at || null, // vrai timestamp → gate + occupation
+    age_min: (e as any).age_min ?? null, age_max: (e as any).age_max ?? null, // 🔞 limite d'âge optionnelle
     reviews: [],
   })) : (((demoOn() && !labClean()) ? MOCK_EVENTS : []))  // 🤖 mock events masqués en Réel ET en Labo propre
 
@@ -3088,13 +3090,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvFile, setNewEvFile] = useState<string|null>(null) // nom du fichier joint (prototype)
   const [newEvHome, setNewEvHome] = useState(false)   // 🏠 chez moi : on n'affiche que le quartier, adresse révélée 5 min avant / au clic de l'hôte
   const [newEvPinned, setNewEvPinned] = useState(false) // 📌 event fixe (cloué) : je ne fais que ça, pas contre-clutchable
+  // 🔞 Limite d'âge OPTIONNELLE (David) — off = ouvert à tous. On = tranche [min,max] imposée à l'inscription.
+  const [newEvAgeOn, setNewEvAgeOn] = useState(false)
+  const [newEvAgeMin, setNewEvAgeMin] = useState(18)
+  const [newEvAgeMax, setNewEvAgeMax] = useState(99)
   const [creating, setCreating] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmCloseEv, setConfirmCloseEv] = useState(false)
   const newEvValid = !!(newEvTitle.trim() && newEvLieu.trim() && newEvTime.trim() && newEvDesc.trim()) // desc obligatoire (David)
   const newEvDirty = !!(newEvTitle || newEvLieu || newEvDesc) // pour confirmer la fermeture
   const tryCloseCreate = () => { if (newEvDirty && !creating) setConfirmCloseEv(true); else setShowCreateGroup(false) }
-  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setEvAddrResults([]); setEvShowSugg(false) }
+  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvAddrResults([]); setEvShowSugg(false) }
   // Recherche d'adresse (réutilise Nominatim, comme la mise en ligne — David)
   const [evAddrResults,setEvAddrResults]=useState<any[]>([])
   const [evShowSugg,setEvShowSugg]=useState(false)
@@ -3145,6 +3151,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           event_time: newEvTime.trim(), event_date: newEvDate, spots: newEvMax,
           starts_at: target.toISOString(), // forteresse : vrai timestamp → l'event occupe un créneau (trigger occupancy)
           description: newEvDesc.trim() || 'Événement créé sur Clutch.',
+          // 🔞 limite d'âge : clés AJOUTÉES seulement si activée → une création sans limite marche même AVANT la migration.
+          ...(newEvAgeOn ? { age_min: newEvAgeMin, age_max: newEvAgeMax } : {}),
           tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'pending',
           active: true, created_by: userId, creator: 'Toi',
         }).select('id').single()
@@ -3169,6 +3177,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       lieu: newEvLieu.trim(),
       spots: newEvMax,
       taken: 1,
+      age_min: newEvAgeOn ? newEvAgeMin : null, age_max: newEvAgeOn ? newEvAgeMax : null,
       price: newEvPrice.trim() || 'Gratuit',
       bring: null,
       durationH: newEvDur,
@@ -3187,7 +3196,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setEvShowSugg(false)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvShowSugg(false)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
@@ -3343,6 +3352,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     if (registered.has(ev.id)) return
     const EN = lang==='en'
     const isMine = (e:any)=> (userId && e.created_by===userId) || e.creator==='Toi'
+    // 🔞 LIMITE D'ÂGE (David) — blocage LÉGITIME (un « 18+ » doit exclure). L'orga n'est pas filtré sur son propre event.
+    const aMin=(ev as any).age_min, aMax=(ev as any).age_max
+    if ((aMin!=null || aMax!=null) && userAge!=null && !isMine(ev)) {
+      if ((aMin!=null && userAge<aMin) || (aMax!=null && userAge>aMax)) {
+        const range = aMin!=null && aMax!=null ? `${aMin}–${aMax}` : aMin!=null ? `${aMin}+` : `≤${aMax}`
+        const m = EN ? `🔞 Reserved for ${range} y/o` : `🔞 Réservé aux ${range} ans`
+        setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),5000)
+        return
+      }
+    }
     // Taxonomie 26.06 : un event SPONTANÉ doit tomber dans un de mes créneaux + horizon 18h ;
     // un PLANIFIÉ (partenaire) est libre. Fail-open si pas de starts_at OU pas de dispo → jamais de blocage parasite.
     // B7 — si pas de starts_at (mock/demo), on le DÉRIVE de ev.time (aujourd'hui, ou demain si l'heure est passée)
@@ -3881,7 +3900,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{fontSize:13,color:C.whiteMid,lineHeight:1.7,marginBottom:12}}>{selEv.description}</div>
 
               <div style={{background:C.bgCard,borderRadius:12,padding:'10px 14px',marginBottom:12}}>
-                {[{icon:'👥',l:lang==='en'?'Spots':'Places',v:`${selEv.taken}/${selEv.spots} ${lang==='en'?'registered':'inscrit·es'}`},{icon:'💰',l:lang==='en'?'Price':'Prix',v:selEv.price},{icon:'🎒',l:lang==='en'?'Bring':'À amener',v:selEv.bring}].map(r=>(
+                {[{icon:'👥',l:lang==='en'?'Spots':'Places',v:`${selEv.taken}/${selEv.spots} ${lang==='en'?'registered':'inscrit·es'}`},
+                  ...((selEv.age_min!=null||selEv.age_max!=null)?[{icon:'🔞',l:lang==='en'?'Age':'Âge',v:(selEv.age_min!=null&&selEv.age_max!=null?`${selEv.age_min}–${selEv.age_max} ${lang==='en'?'y/o':'ans'}`:selEv.age_min!=null?`${selEv.age_min}+`:`≤${selEv.age_max} ${lang==='en'?'y/o':'ans'}`)}]:[]),
+                  {icon:'💰',l:lang==='en'?'Price':'Prix',v:selEv.price},{icon:'🎒',l:lang==='en'?'Bring':'À amener',v:selEv.bring}].map(r=>(
                   <div key={r.icon} style={{display:'flex',gap:8,alignItems:'flex-start',padding:'3px 0'}}>
                     <span style={{fontSize:13,width:18}}>{r.icon}</span>
                     <span style={{fontSize:11,color:C.whiteMid,width:56,flexShrink:0}}>{r.l}</span>
@@ -4244,6 +4265,32 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                     style={{flex:1,minWidth:44,padding:'9px 0',borderRadius:10,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvMax===n?C.salmon:C.border}`,background:newEvMax===n?C.salmonFaint:'transparent',color:newEvMax===n?C.salmon:C.whiteMid}}>{n}</button>
                 ))}
               </div>
+            </div>
+
+            {/* Champ : LIMITE D'ÂGE (optionnel — David) */}
+            <div style={{marginBottom:14}}>
+              <button onClick={()=>setNewEvAgeOn(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',marginBottom:newEvAgeOn?8:0}}>
+                <span style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>🔞 {EN?'AGE LIMIT':'LIMITE D\'ÂGE'} <span style={{fontWeight:600}}>· {EN?'optional':'optionnel'}</span></span>
+                <span style={{width:34,height:19,borderRadius:10,background:newEvAgeOn?C.green:C.border,position:'relative',transition:'.15s',flexShrink:0}}>
+                  <span style={{position:'absolute',top:2,left:newEvAgeOn?17:2,width:15,height:15,borderRadius:'50%',background:'#fff',transition:'.15s'}}/>
+                </span>
+              </button>
+              {newEvAgeOn && (
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:9,color:C.whiteMid,marginBottom:3}}>{EN?'Min':'Min'}</div>
+                    <input type="number" inputMode="numeric" min={16} max={99} value={newEvAgeMin} onChange={e=>setNewEvAgeMin(Math.max(16,Math.min(99,parseInt(e.target.value)||16)))}
+                      style={{width:'100%',boxSizing:'border-box',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:14,fontWeight:700,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
+                  </div>
+                  <span style={{color:C.whiteMid,fontSize:16,paddingTop:14}}>–</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:9,color:C.whiteMid,marginBottom:3}}>{EN?'Max':'Max'}</div>
+                    <input type="number" inputMode="numeric" min={16} max={99} value={newEvAgeMax} onChange={e=>setNewEvAgeMax(Math.max(16,Math.min(99,parseInt(e.target.value)||99)))}
+                      style={{width:'100%',boxSizing:'border-box',background:C.whiteFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:14,fontWeight:700,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon}}/>
+                  </div>
+                </div>
+              )}
+              {newEvAgeOn && newEvAgeMin>newEvAgeMax && <div style={{fontSize:10,color:C.orange,marginTop:5}}>{EN?'Min must be ≤ Max':'Le min doit être ≤ au max'}</div>}
             </div>
 
             {/* Champ : PRIX (David : oublié) */}
@@ -11140,6 +11187,7 @@ export default function App2() {
                 onClearInitialEvent={()=>setOpenEventId(null)}
                 onPenalty={applyPenalty}
                 userId={user?.id}
+                userAge={(user as any)?.age ?? null}
                 centerLat={(user as any)?.center_lat ?? null}
                 centerLng={(user as any)?.center_lng ?? null}
                 showToast={showToast}

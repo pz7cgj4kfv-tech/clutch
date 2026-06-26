@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19a'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 150   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19b'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 151   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12172,7 +12172,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={()=>{ const m=dragRef.current?.moved; onUp(); if(!m) setOpen(true) }}
       style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:44,height:44,borderRadius:22,background:C.bgCard,border:`1.5px solid ${C.orange}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'grab',boxShadow:'0 6px 20px rgba(0,0,0,.45)',touchAction:'none'}}>🎮</div>
   )
-  const TABS:[CockTab,string][] = [['world','👥'],['express','⚡'],['acteur','🎭'],['clutch','☕'],['event','🎟️'],['diag','🩺']]
+  const TABS:[CockTab,string,string][] = [['world','👥','Monde'],['express','⚡','Vite'],['acteur','🎭','Régler'],['clutch','☕','Clutch'],['event','🎟️','Event'],['diag','🩺','Test']]
   return (
     <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:300,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
       <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:C.bgCard,cursor:'grab',borderBottom:`1px solid ${C.border}`}}>
@@ -12181,8 +12181,11 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
         <button onClick={()=>setOpen(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:18,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>×</button>
       </div>
       <div style={{display:'flex'}}>
-        {TABS.map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'9px 0',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,fontSize:16,cursor:'pointer',fontFamily:'inherit',opacity:tab===k?1:.55}}>{l}</button>
+        {TABS.map(([k,emo,lab])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'7px 0 5px',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit',opacity:tab===k?1:.5,display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
+            <span style={{fontSize:15}}>{emo}</span>
+            <span style={{fontSize:8.5,fontWeight:tab===k?800:600,color:tab===k?C.orange:C.whiteMid}}>{lab}</span>
+          </button>
         ))}
       </div>
       {!demoOn() && <div style={{margin:'8px 12px 0',padding:'8px 10px',borderRadius:9,background:'rgba(232,49,122,.12)',border:`1px solid ${C.salmon}66`,fontSize:11,color:C.salmon,lineHeight:1.4}}>⚠️ Tu es en <b>RÉEL</b> → les bots sont <b>cachés</b>. Pour les voir et les piloter, passe en <b>DÉMO</b> (Profil → 🧪 → mode Démo).</div>}
@@ -12230,7 +12233,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('avoff','🔴 Désactiver (elle + ses events)',()=>setActorOnline(false))}
         </>)}
         {tab==='clutch' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Chaque cas fabrique la situation PUIS révèle la vraie raison (dry-run, ne crée pas le clutch). Bot testé : <b style={{color:C.white}}>{nameOf(firstBot())}</b>.</div>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>« Si j'envoie un Clutch, est-ce que ça passe — et sinon, pourquoi ? » Clique un cas, je te donne la réponse (rien n'est envoyé). Personne testée : <b style={{color:C.white}}>{nameOf(firstBot())}</b>.</div>
           {Btn('c_ok','✅ Cas normal (doit passer)', runCase('c_ok', async()=>{ const b=firstBot(); await cleanPair(b); return {s:userId,r:b} }))}
           {Btn('c_busy','❌ Déjà un clutch en cours', runCase('c_busy', async()=>{ const b=firstBot(); await cleanPair(b); await insClutch(userId,b); return {s:userId,r:b} }))}
           {Btn('c_block','❌ Personne bloquée', runCase('c_block', async()=>{ const b=firstBot(); await cleanPair(b); try{ await supabase.from('blocks').insert({blocker_id:userId,blocked_id:b}) }catch{}; return {s:userId,r:b} }))}
@@ -12247,7 +12250,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('c_reset','🧹 Reset paire',resetPair)}
         </>)}
         {tab==='event' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>TOUS les cas d'event en 1 clic. Chacun fabrique la situation (heure/dispo gérées toutes seules) → va dans Événements, tente l'inscription, compare à l'ATTENDU.</div>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>« Qui peut s'inscrire à un event ? » Clique un cas (l'heure/la dispo se règlent seules) → va dans Événements, essaie de t'inscrire, et vois si ça colle au résultat ✅/❌ annoncé.</div>
           {Btn('e1','✅ Spontané DANS ma dispo', evCase('e1', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:120,placeIdx:0,title:'Spontané · dans dispo'}) }, 'inscriptible'))}
           {Btn('e2','❌ Spontané HORS dispo (horaire)', evCase('e2', async()=>{ await mkDispo(0,60,0); await mkEvent({offsetMin:180,placeIdx:0,title:'Spontané · hors dispo'}) }, 'bloqué : hors de ta dispo'))}
           {Btn('e3','❌ Spontané trop loin (>18h)', evCase('e3', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:20*60,placeIdx:0,title:'Spontané · +20h'}) }, 'bloqué : trop loin'))}

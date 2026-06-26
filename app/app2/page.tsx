@@ -22,8 +22,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1bb'  // Versionnage HEXADÉCIMAL. ~293e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 183   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1bc'  // Versionnage HEXADÉCIMAL. ~294e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 184   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5994,6 +5994,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     else { el.style.transform='translate(0,0)'; el.style.opacity='1' }
   }
   const [showBotLab, setShowBotLab] = useState(false)
+  const [resetArmed, setResetArmed] = useState(false) // bouton « Reset TOTAL » (test) → 2 taps (pas de confirm() sur iOS)
   const [showConvDemo, setShowConvDemo] = useState(false) // aperçu de la Convergence (demande David)
   const [showMbti, setShowMbti] = useState(false) // test de personnalité 16 types
   const [mbtiType, setMbtiType] = useState<string>(()=>{ try{return localStorage.getItem('clutch_mbti')||''}catch{return ''} })
@@ -7828,6 +7829,15 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             )
           }}/>
           {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
+          {isAdmin && <MRow icon="🧹" label={resetArmed?"⚠️ Touche encore pour TOUT effacer":"Reset TOTAL (bots + vrais)"} sub={resetArmed?"Supprime tous tes clutchs, feedbacks, cooldowns, occupations…":"Remet à zéro toutes tes interactions (bots ET vraies personnes) pour re-tester de zéro"} onTap={async()=>{
+            if(!resetArmed){ setResetArmed(true); setTimeout(()=>setResetArmed(false),4000); return }
+            setResetArmed(false)
+            const { error } = await supabase.rpc('reset_my_test_state')
+            if(error){ showToast('❌ '+error.message+' — applique la migration reset_my_test_state', C.red); return }
+            try{ ['clutch_completedIds','clutch_mock_cleared','clutch_cancelled_events','clutch_registered_events','clutch_registered_objs'].forEach(k=>localStorage.removeItem(k)) }catch{}
+            try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
+            showToast('🧹 Reset total — tu repars de zéro (clutchs, cooldowns, lapins effacés)', C.green)
+          }}/>}
           {isAdmin && <MRow icon={showBots?'🤖':'🫥'} label={showBots?'Mode DÉMO (bots visibles)':'Mode RÉEL (app vide)'} sub={showBots?'Tape pour passer en RÉEL — app vide, pour tester avec de vrais amis':'Tape pour repasser en DÉMO — bots étiquetés, pour visualiser'} onTap={()=>{ const nv=!showBots; try{localStorage.setItem('clutch_demo_mode',nv?'1':'0')}catch{}; setDemoMode(nv); showToast(nv?'🤖 Mode Démo — bots visibles':'🫥 Mode Réel — app vide',nv?C.gold:C.whiteMid) }}/>}
           {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
               S'AFFICHENT sur ton tél (utile avec un seul téléphone). Espacées pour qu'iOS les montre toutes. */}

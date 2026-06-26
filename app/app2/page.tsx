@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x198'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 148   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x199'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 149   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12182,6 +12182,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'9px 0',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,fontSize:16,cursor:'pointer',fontFamily:'inherit',opacity:tab===k?1:.55}}>{l}</button>
         ))}
       </div>
+      {!demoOn() && <div style={{margin:'8px 12px 0',padding:'8px 10px',borderRadius:9,background:'rgba(232,49,122,.12)',border:`1px solid ${C.salmon}66`,fontSize:11,color:C.salmon,lineHeight:1.4}}>⚠️ Tu es en <b>RÉEL</b> → les bots sont <b>cachés</b>. Pour les voir et les piloter, passe en <b>DÉMO</b> (Profil → 🧪 → mode Démo).</div>}
       <div style={{padding:'12px',maxHeight:'52vh',overflowY:'auto'}}>
         {tab==='world' && (<>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>

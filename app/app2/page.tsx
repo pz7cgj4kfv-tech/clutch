@@ -1655,6 +1655,40 @@ function roastInfeasible(level: number, lang: 'fr'|'en', rk: number, rn: number,
   return det ? pool[0] : pick(pool)
 }
 
+// ROAST « faisabilité du Clutch envoyé » — POOLS par niveau, pour les 2 sévérités du gradient.
+//   sev 3 = j'arriverais en retard à mon engagement de {hh} (faut annuler) · sev 2 = ça va être tendu.
+//   Jamais bloquant : le message invite à re-toucher pour envoyer quand même. det=true → variante stable (aperçu).
+function roastFeasibility(level: number, lang: 'fr'|'en', sev: 2 | 3, hh: string, det = false): string {
+  const L = Math.max(0, Math.min(3, level))
+  const tail = lang === 'fr' ? ' Re-touche pour envoyer quand même.' : ' Tap again to send anyway.'
+  const fr3 = [
+    [ `⚠️ Tu as un engagement à ${hh}. Là tu devrais l'annuler pour y aller.`, `⚠️ Avec ton truc de ${hh}, ce créneau te met en retard. À toi de voir.` ],
+    [ `⚠️ Ton engagement de ${hh} va trinquer 😏 Faudra l'annuler pour assumer ce Clutch.`, `😏 ${hh} t'attend ailleurs… ce Clutch lui passe devant ? Annule alors, assume.` ],
+    [ `😅 Spoiler : tu seras en retard à ${hh}. Sauf si tu maîtrises le voyage temporel 🚀`, `😂 ${hh} : soit tu y es, soit tu Clutches. Les deux = clonage non homologué.` ],
+    [ `🔥 Tu vas planter ton rdv de ${hh} pour ça ? Décision de cowboy. Annule franchement ou renonce.`, `🔥 ${hh} = grillé si tu envoies. Au moins assume et annule l'autre, pas de demi-mesure.` ],
+  ]
+  const fr2 = [
+    [ `⏱️ Ça va être tendu avec ton engagement de ${hh}.`, `⏱️ Faisable mais serré : ton truc de ${hh} est juste après.` ],
+    [ `⏱️ Chrono serré avant ${hh} 😏 Faudra pas traîner au café.`, `😏 Ça passe… si tu cours un peu vers ${hh}.` ],
+    [ `😅 Tendu-tendu avant ${hh} : prévois des baskets ☕➡️🏃`, `😄 Ça le fait, mais ${hh} arrive vite — pas de 2e tournée.` ],
+    [ `🔥 Serré comme un sprint avant ${hh}. Tu gères ? Alors fonce.`, `🔥 ${hh} te colle aux fesses. Faisable pour les rapides.` ],
+  ]
+  const en3 = [
+    [ `⚠️ You have something at ${hh}. You'd need to cancel it to make this.`, `⚠️ With your ${hh} plan, this slot makes you late. Your call.` ],
+    [ `⚠️ Your ${hh} plan will suffer 😏 You'd have to cancel it for this Clutch.`, `😏 ${hh} is waiting elsewhere… this Clutch cuts ahead? Cancel it then, own it.` ],
+    [ `😅 Spoiler: you'll be late to ${hh}. Unless you've cracked time travel 🚀`, `😂 ${hh}: either you're there, or you Clutch. Both = unlicensed cloning.` ],
+    [ `🔥 Gonna torch your ${hh} plan for this? Cowboy move. Cancel for real or pass.`, `🔥 ${hh} = toast if you send. At least own it and cancel the other.` ],
+  ]
+  const en2 = [
+    [ `⏱️ It'll be tight with your ${hh} plan.`, `⏱️ Doable but snug: your ${hh} thing is right after.` ],
+    [ `⏱️ Tight clock before ${hh} 😏 Don't linger at the café.`, `😏 It works… if you jog a bit toward ${hh}.` ],
+    [ `😅 Real tight before ${hh}: bring sneakers ☕➡️🏃`, `😄 It's fine, but ${hh} comes fast — no second round.` ],
+    [ `🔥 Sprint-tight before ${hh}. Got it? Then go.`, `🔥 ${hh} is on your heels. Doable for the quick.` ],
+  ]
+  const pool = (lang === 'fr' ? (sev === 3 ? fr3 : fr2) : (sev === 3 ? en3 : en2))[L]
+  return (det ? pool[0] : pick(pool)) + tail
+}
+
 // PERSONA quips — POOLS (pick aléatoire). À terme : génération IA selon contexte/niveau/personnage.
 function personaQuip(key: string, ctx: string, lang: 'fr'|'en', det = false): string {
   if (key === 'off' || !key) return ''
@@ -1666,6 +1700,14 @@ function personaQuip(key: string, ctx: string, lang: 'fr'|'en', det = false): st
                en: [ '🦉 "To wish to be in two places at once is to be nowhere."', '🦉 "Haste is the mother of error." Honor one place.' ] },
       psy:   { fr: [ '🧠 Tu t\'imposes l\'impossible — qu\'est-ce que tu fuis ? Choisis UN lieu, respire.', '🧠 Vouloir tout, c\'est se disperser. Un plan, pleinement. Le reste attendra.' ],
                en: [ '🧠 You\'re setting yourself up to fail — what are you avoiding? Pick ONE place, breathe.', '🧠 Wanting it all scatters you. One plan, fully. The rest can wait.' ] },
+    },
+    tight_trip: {
+      tesla: { fr: [ '⚡ Tesla : l\'énergie suffit, c\'est la marge qui manque. File sans traîner.', '⚡ Tesla : rendement maximal exige zéro temps perdu. Ne flâne pas.' ],
+               en: [ '⚡ Tesla: energy\'s fine, it\'s the margin that\'s short. Move, don\'t dawdle.', '⚡ Tesla: peak efficiency means zero wasted time. Don\'t linger.' ] },
+      philo: { fr: [ '🦉 « Qui court deux lièvres tient à peine le premier. » Tiens-le bien.', '🦉 « Le temps ne se rattrape pas, il se respecte. » Pars à l\'heure.' ],
+               en: [ '🦉 "Chase two hares, barely catch one." Hold onto this one.', '🦉 "Time isn\'t recovered, it\'s respected." Leave on time.' ] },
+      psy:   { fr: [ '🧠 C\'est jouable si tu t\'y tiens. Pose une limite claire et honore-la.', '🧠 Le serré marche quand on s\'engage vraiment. Décide, puis assume.' ],
+               en: [ '🧠 Doable if you commit. Set a clear limit and honor it.', '🧠 Tight works when you truly commit. Decide, then own it.' ] },
     },
   }
   const pool = Q[ctx]?.[key]?.[lang]
@@ -2010,16 +2052,10 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
       if (fz.severity >= 2 && !feasAck) {
         const v = getVeneritude()
         const nextHH = nextStart ? new Date(nextStart).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : ''
-        const warn = fz.severity===3
-          ? vibe(v,{ soft:`⚠️ Tu as un engagement à ${nextHH}. Là tu devrais l'annuler pour y aller. Re-touche pour envoyer quand même.`,
-                     taquin:`⚠️ ${nextHH} t'attend ailleurs 😏 faudra l'annuler. Re-touche si t'assumes.`,
-                     drole:`⚠️ Spider-Man ? T'as un truc à ${nextHH}. Faudra le lâcher (− fiabilité). Re-touche si tu veux 🕷️`,
-                     trash:`⚠️ T'as DÉJÀ un truc à ${nextHH}, génie. Là tu plantes l'autre (− fiabilité). Re-touche si t'assumes 🔥` })
-          : vibe(v,{ soft:`⏱️ Ça va être tendu avec ton engagement de ${nextHH}. Re-touche pour confirmer.`,
-                     taquin:`⏱️ Tendu avec ${nextHH} 😏 faut courir. Re-touche pour confirmer.`,
-                     drole:`⏱️ Faudra sprinter pour ${nextHH} 🏃 Re-touche pour confirmer.`,
-                     trash:`⏱️ Tu vas devoir COURIR pour ${nextHH}. Baskets prêtes ? Re-touche 🔥` })
-        showToast(warn, fz.severity===3?C.red:C.orange)
+        // POOLS aléatoires sur les 4 tons (jamais 2× la même phrase) + signature persona facultative.
+        const _main = roastFeasibility(v, lang as 'fr'|'en', fz.severity===3?3:2, nextHH)
+        const _q = personaQuip(getPersona(), fz.severity===3?'infeasible_trip':'tight_trip', lang as 'fr'|'en')
+        showToast(_q ? `${_main}  ${_q}` : _main, fz.severity===3?C.red:C.orange)
         setFeasAck(true); setLoading(false); return
       }
     } catch {}

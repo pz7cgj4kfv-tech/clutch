@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x18e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 138   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x18f'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 139   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1587,6 +1587,28 @@ function vibe(level: number, v: { soft: string; taquin: string; drole: string; t
   return [v.soft, v.taquin, v.drole, v.trash][Math.max(0, Math.min(3, level | 0))]
 }
 function getVeneritude(): number { try { return Math.max(0, Math.min(3, parseInt(localStorage.getItem('clutch_veneritude') || '0') || 0)) } catch { return 0 } }
+
+// ── MOODS PERSONNAGE (brain-dump David) — une « voix » qui appose une signature contextuelle.
+// Compose avec la vénéritude (qui règle la dureté) ; le personnage donne la couleur (scientifique, philo, psy…).
+const PERSONAS = [
+  { key:'off',   label:'Aucune', emoji:'🙂', tag:'voix neutre' },
+  { key:'tesla', label:'Tesla',  emoji:'⚡', tag:'le génie électrique' },
+  { key:'philo', label:'Le Sage', emoji:'🦉', tag:'philosophe' },
+  { key:'psy',   label:'Coach',  emoji:'🧠', tag:'confrontant bienveillant' },
+] as const
+function getPersona(): string { try { return localStorage.getItem('clutch_persona') || 'off' } catch { return 'off' } }
+// Signature contextuelle. Pour l'instant un seul contexte branché : 'infeasible_trip'.
+function personaQuip(key: string, ctx: string, lang: 'fr'|'en'): string {
+  if (key === 'off' || !key) return ''
+  const Q: Record<string, Record<string, { fr: string; en: string }>> = {
+    infeasible_trip: {
+      tesla: { fr: '⚡ Tesla : même mes bobines ne te téléporteront pas — le temps n\'est pas si élastique.', en: '⚡ Tesla: not even my coils will teleport you — time isn\'t that elastic.' },
+      philo: { fr: '🦉 « Vouloir être en deux lieux à la fois, c\'est n\'être nulle part. »', en: '🦉 "To wish to be in two places at once is to be nowhere."' },
+      psy:   { fr: '🧠 Tu t\'imposes l\'impossible — qu\'est-ce que tu fuis ? Choisis UN lieu, respire.', en: '🧠 You\'re setting yourself up to fail — what are you avoiding? Pick ONE place, breathe.' },
+    },
+  }
+  return Q[ctx]?.[key]?.[lang] || ''
+}
 
 const BOT_ENRICHMENT: Record<string,{
   name:string; photo_url:string; bio:string; job:string; age:number;
@@ -7114,6 +7136,9 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     try{ localStorage.setItem('clutch_veneritude', String(v)) }catch{}
     if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(v>=3?[8,30,8]:8)
   }
+  // 🎭 MOOD PERSONNAGE — la « voix » qui signe les messages (Tesla, philosophe, coach psy…)
+  const [persona,setPersona] = useState<string>(()=>getPersona())
+  const savePersona = (k:string) => { setPersona(k); try{ localStorage.setItem('clutch_persona', k) }catch{}; if((navigator as any)?.vibrate)(navigator as any).vibrate(6) }
   const PageGeek = () => (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{fontSize:12,color:C.whiteMid,lineHeight:1.55,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px'}}>
@@ -7151,7 +7176,30 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             taquin:"🔴 Hum… 18 km en 10 min ? Même en trottinette c'est chaud 😏 Décale un peu.",
             drole: "🔴 18 km en 10 min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.",
             trash: "🔴 18 km en 10 min ?! T'es en Formule 1 ou t'as bu ? Physiquement IM-PO-SSIBLE, champion. Revois ton horaire 🧠🔥",
-          })}</div>
+          })}{persona!=='off' && <span style={{display:'block',marginTop:6,color:C.salmon,fontStyle:'italic'}}>{personaQuip(persona,'infeasible_trip','fr')}</span>}</div>
+        </div>
+      </div>
+
+      {/* 🎭 Mood PERSONNAGE — la « voix » de Clutch */}
+      <div style={{background:C.bgCard,borderRadius:14,border:`1px solid ${C.border}`,padding:'14px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+          <span style={{fontSize:16}}>🎭</span>
+          <div style={{fontSize:14,fontWeight:800,color:C.white}}>La voix de Clutch</div>
+        </div>
+        <div style={{fontSize:11,color:C.whiteMid,lineHeight:1.5,marginBottom:12}}>
+          Un personnage qui signe les messages d'une phrase à lui. (D'autres voix arrivent.)
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {PERSONAS.map(p=>(
+            <button key={p.key} onClick={()=>savePersona(p.key)}
+              style={{flex:'1 1 calc(50% - 3px)',padding:'10px 8px',borderRadius:10,border:`1.5px solid ${persona===p.key?C.salmon:C.border}`,background:persona===p.key?`${C.salmon}1a`:C.bg,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:18}}>{p.emoji}</span>
+              <div style={{textAlign:'left',minWidth:0}}>
+                <div style={{fontSize:12.5,fontWeight:persona===p.key?800:600,color:persona===p.key?C.salmon:C.white}}>{p.label}</div>
+                <div style={{fontSize:9.5,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.tag}</div>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
       <div style={{background:C.bgCard,borderRadius:14,overflow:'hidden',border:`1px solid ${C.border}`}}>
@@ -9708,7 +9756,7 @@ export default function App2() {
           const needMin = (km * 1.35) / 30 * 60
           if (gapMin < needMin) {
             const rk=Math.round(km), rn=Math.round(needMin), rg=Math.round(gapMin)
-            showToast(lang==='fr' ? vibe(getVeneritude(),{
+            const _main = lang==='fr' ? vibe(getVeneritude(),{
               soft:  `🔴 Trajet infaisable : ~${rk} km ≈ ${rn} min de route pour ${rg} min entre tes 2 créneaux. Revois l'horaire.`,
               taquin:`🔴 Hum… ${rk} km en ${rg} min ? Même en trottinette c'est chaud 😏 Décale un créneau.`,
               drole: `🔴 ${rk} km en ${rg} min ? Faut te téléporter, et on n'a pas (encore) la techno 🚀 Bouge un créneau.`,
@@ -9718,7 +9766,9 @@ export default function App2() {
               taquin:`🔴 Uh… ${rk} km in ${rg} min? Even on a scooter that's a stretch 😏 Shift a slot.`,
               drole: `🔴 ${rk} km in ${rg} min? You'd need teleportation, we don't have it (yet) 🚀 Move a slot.`,
               trash: `🔴 ${rk} km in ${rg} min?! Are you in an F1 car? Physically IMPOSSIBLE, champ. Fix your schedule 🧠🔥`,
-            }), C.orange)
+            })
+            const _q = personaQuip(getPersona(),'infeasible_trip',lang)
+            showToast(_q ? `${_main}  ${_q}` : _main, C.orange)
             break
           } else if (gapMin < needMin + 15) {
             showToast(lang==='fr'

@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x195'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 145   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x196'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 146   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12045,6 +12045,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   const [eTitle,setETitle]=useState('Apéro test'); const [ePlace,setEPlace]=useState(0); const [eH,setEH]=useState(20); const [eSpots,setESpots]=useState(8); const [ePlanned,setEPlanned]=useState(false)
   // Diag
   const [fromId,setFromId]=useState(''); const [toId,setToId]=useState(''); const [diag,setDiag]=useState<string|null>(null)
+  const [cRes,setCRes]=useState<string|null>(null) // résultat des CAS clutch (auto-vérifiés via qa_test_clutch)
   useEffect(()=>{ if(!open) return; (async()=>{
     const { data } = await supabase.from('profiles').select('id,name,is_bot').eq('is_bot',true).order('name')
     const list=[{id:userId,name:'Moi',is_bot:false}, ...((data as any[])||[])]
@@ -12118,6 +12119,20 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   }
   const evCase=(k:string,setup:()=>Promise<void>,expected:string)=>async()=>{ setBusy(k); try{ await setup(); showToast(`✓ Cas prêt → onglet Événements · ATTENDU : ${expected}`, C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const clearTestEvents=async()=>{ setBusy('clrev'); try{ await supabase.from('events').update({active:false}).eq('creator','Cockpit'); showToast('✓ Events de test masqués',C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── CLUTCH : bibliothèque de CAS auto-vérifiés (fabrique la situation PUIS révèle la vraie raison) ──
+  const secondBot=()=> bots.filter(b=>b.is_bot)[1]?.id || firstBot()
+  const cleanPair=async(b:string)=>{
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).eq('receiver_id',b).in('status',ACT)
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b).eq('receiver_id',userId).in('status',ACT)
+    try{ await supabase.from('blocks').delete().eq('blocker_id',userId).eq('blocked_id',b) }catch{}
+  }
+  const insClutch=(s:string,r:string)=> supabase.from('clutches').insert({ sender_id:s, receiver_id:r, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:'(cockpit)' })
+  const runCase=(k:string,fn:()=>Promise<{s:string;r:string}>)=>async()=>{ setBusy(k); setCRes(null); try{
+    const { s, r } = await fn()
+    const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:s, p_receiver:r })
+    setCRes(error ? ('__err__'+(/function|does not exist|schema/i.test(error.message)?'Migration qa_test_clutch pas posée':error.message)) : String(data))
+  }catch(e:any){ setCRes('__err__'+e.message) } setBusy(null) }
+  const resetPair=async()=>{ setBusy('c_reset'); try{ const b=firstBot(); await cleanPair(b); await supabase.from('profiles').update({max_received_clutchs:5}).eq('id',b); setCRes(null); showToast('✓ Paire nettoyée (cooldown : via SQL delete clutch_pairs si besoin)',C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── DIAGNOSTIC ──
   const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
     const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
@@ -12167,14 +12182,21 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Btn('avoff','⏸ Mettre hors-ligne',()=>setActorOnline(false))}
         </>)}
         {tab==='clutch' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Envoie un clutch avec lieu + heure choisis.</div>
-          {Lbl('DE')}{ActorSel(cFrom,setCFrom)}
-          {Lbl('VERS')}{ActorSel(cTo,setCTo)}
-          {Lbl('LIEU')}{PlaceSel(cPlace,setCPlace)}
-          {Lbl('HEURE DU RDV')}
-          <div style={{display:'flex',alignItems:'center',gap:6}}>{HourSel(cH,setCH)}<select value={cM} onChange={e=>setCM(+e.target.value)} style={{...cockSel,width:'auto',flex:1}}>{[0,15,30,45].map(m=><option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}</select></div>
-          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.white,margin:'8px 0'}}><input type="checkbox" checked={cQuick} onChange={e=>setCQuick(e.target.checked)} style={{accentColor:C.orange}}/>Quick Clutch (1h)</label>
-          {Btn('send','☕ Envoyer le clutch',sendClutch)}
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Chaque cas fabrique la situation PUIS révèle la vraie raison (dry-run, ne crée pas le clutch). Bot testé : <b style={{color:C.white}}>{nameOf(firstBot())}</b>.</div>
+          {Btn('c_ok','✅ Cas normal (doit passer)', runCase('c_ok', async()=>{ const b=firstBot(); await cleanPair(b); return {s:userId,r:b} }))}
+          {Btn('c_busy','❌ Déjà un clutch en cours', runCase('c_busy', async()=>{ const b=firstBot(); await cleanPair(b); await insClutch(userId,b); return {s:userId,r:b} }))}
+          {Btn('c_block','❌ Personne bloquée', runCase('c_block', async()=>{ const b=firstBot(); await cleanPair(b); try{ await supabase.from('blocks').insert({blocker_id:userId,blocked_id:b}) }catch{}; return {s:userId,r:b} }))}
+          {Btn('c_cd','❌ Cooldown (après un refus)', runCase('c_cd', async()=>{ const b=firstBot(); await cleanPair(b); const ins=await insClutch(b,userId); const id=(ins as any)?.data?.[0]?.id; const got=await supabase.from('clutches').select('id').eq('sender_id',b).eq('receiver_id',userId).eq('status','pending').order('created_at',{ascending:false}).limit(1); const cid=id||(got.data as any)?.[0]?.id; if(cid) await supabase.from('clutches').update({status:'declined'}).eq('id',cid); return {s:b,r:userId} }))}
+          {Btn('c_full','❌ Boîte pleine (plafond)', runCase('c_full', async()=>{ const b=firstBot(), b2=secondBot(); await supabase.from('profiles').update({max_received_clutchs:1}).eq('id',b); await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b2).eq('receiver_id',b).in('status',ACT); await insClutch(b2,b); return {s:userId,r:b} }))}
+          {cRes && (cRes.startsWith('__err__')
+            ? <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ {cRes.slice(7)}</div>
+            : <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:10,color:C.whiteMid}}>Raison réelle (admin) :</div>
+                <div style={{fontSize:13,fontWeight:800,color:cRes==='ok'?C.green:C.orange,marginBottom:6}}>{REASON[cRes]||cRes}</div>
+                {['blocked','cooldown','inbox_full','pair_busy'].includes(cRes) && (<><div style={{fontSize:10,color:C.whiteMid}}>Vu par l'expéditeur :</div><div style={{fontSize:12,color:C.salmon}}>« Cette proposition n'est pas disponible. » <span style={{color:C.green,fontWeight:700}}>✓ anti-sonde OK</span></div></>)}
+              </div>)}
+          <div style={{height:4}}/>
+          {Btn('c_reset','🧹 Reset paire',resetPair)}
         </>)}
         {tab==='event' && (<>
           <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>TOUS les cas d'event en 1 clic. Chacun fabrique la situation (heure/dispo gérées toutes seules) → va dans Événements, tente l'inscription, compare à l'ATTENDU.</div>

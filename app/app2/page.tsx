@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x193'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 143   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x194'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 144   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12022,26 +12022,44 @@ export default function App2() {
 // Intégré (pas de page à part) pour ne JAMAIS switcher d'écran (demande David : optimiser son temps de test).
 // Autonome (ses propres requêtes Supabase). À RETIRER avant le lancement public (1 composant, admin-gated).
 const cockSel: React.CSSProperties = { width:'100%', padding:'8px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bgCard, color:C.white, fontSize:12, fontFamily:'inherit', marginBottom:4 }
+const COCK_PLACES = [
+  { n:'Lausanne', lat:46.5197, lng:6.6323 },
+  { n:'Morges',   lat:46.5094, lng:6.4983 },
+  { n:'Genève',   lat:46.2044, lng:6.1432 },
+  { n:'Sion',     lat:46.2333, lng:7.3600 },
+  { n:'Vevey',    lat:46.4628, lng:6.8419 },
+]
+type CockTab = 'express'|'acteur'|'clutch'|'event'|'diag'
 function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void }) {
   const [open,setOpen] = useState(false)
-  const [tab,setTab] = useState<'scen'|'diag'>('scen')
-  const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 150 })
+  const [tab,setTab] = useState<CockTab>('express')
+  const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 120 })
   const dragRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
   const [busy,setBusy] = useState<string|null>(null)
   const [bots,setBots] = useState<any[]>([])
-  const [fromId,setFromId] = useState(''); const [toId,setToId] = useState('')
-  const [diag,setDiag] = useState<string|null>(null)
+  // Acteur (rendre dispo)
+  const [aId,setAId]=useState(''); const [aFrom,setAFrom]=useState(18); const [aTo,setATo]=useState(23); const [aPlace,setAPlace]=useState(0); const [aRad,setARad]=useState(10)
+  // Clutch (envoi paramétré)
+  const [cFrom,setCFrom]=useState(''); const [cTo,setCTo]=useState(''); const [cPlace,setCPlace]=useState(0); const [cH,setCH]=useState(20); const [cM,setCM]=useState(0); const [cQuick,setCQuick]=useState(false)
+  // Event
+  const [eTitle,setETitle]=useState('Apéro test'); const [ePlace,setEPlace]=useState(0); const [eH,setEH]=useState(20); const [eSpots,setESpots]=useState(8); const [ePlanned,setEPlanned]=useState(false)
+  // Diag
+  const [fromId,setFromId]=useState(''); const [toId,setToId]=useState(''); const [diag,setDiag]=useState<string|null>(null)
   useEffect(()=>{ if(!open) return; (async()=>{
     const { data } = await supabase.from('profiles').select('id,name,is_bot').eq('is_bot',true).order('name')
-    setBots([{id:userId,name:'Moi',is_bot:false}, ...((data as any[])||[])])
-    if(!fromId && data && (data as any[])[0]) setFromId((data as any[])[0].id)
-    if(!toId) setToId(userId)
+    const list=[{id:userId,name:'Moi',is_bot:false}, ...((data as any[])||[])]
+    setBots(list)
+    const firstBot=(data as any[])?.[0]?.id||''
+    setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId)
   })() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!isAdmin) return null
   const onDown=(e:React.PointerEvent)=>{ dragRef.current={ox:pos.x,oy:pos.y,sx:e.clientX,sy:e.clientY,moved:false}; try{(e.target as HTMLElement).setPointerCapture(e.pointerId)}catch{} }
   const onMove=(e:React.PointerEvent)=>{ const d=dragRef.current; if(!d) return; if(Math.abs(e.clientX-d.sx)+Math.abs(e.clientY-d.sy)>4) d.moved=true; setPos({x:Math.max(4,d.ox+(e.clientX-d.sx)),y:Math.max(40,d.oy+(e.clientY-d.sy))}) }
   const onUp=()=>{ dragRef.current=null }
   const ACT=['pending','accepted','confirmed','checked_in']
+  const tISO=(h:number,m=0)=>{ const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<Date.now()) d.setDate(d.getDate()+1); return d.toISOString() }
+  const nameOf=(id:string)=> bots.find(b=>b.id===id)?.name || '?'
+  // ── EXPRESS ──
   const botsOnline=async()=>{ setBusy('on'); try{
     const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
@@ -12053,8 +12071,13 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const ids=((bs as any[])||[]).map(b=>b.id)
     if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).eq('receiver_id',userId).in('status',ACT)
       await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).in('receiver_id',ids).in('status',ACT) }
-    let n=0; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Café du Marché · Place de la Palud, Lausanne', venue_lat:46.521, venue_lng:6.634, proposed_time:new Date(Date.now()+30*60e3).toISOString(), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++ }
+    let n=0; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++ }
     showToast(n?`✓ ${n} clutchs reçus 📨`:'❌ aucun (déjà pleins ?)', n?C.green:C.orange)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const botsAccept=async()=>{ setBusy('acc'); try{
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
+    const { data, error } = await supabase.from('clutches').update({status:'accepted'}).eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').select('id')
+    showToast(error?('❌ '+error.message):(data?.length?`✓ ${data.length} accepté(s) → ton Verrou 🔒`:'Aucun clutch en attente envoyé à un bot'), error?C.red:(data?.length?C.green:C.orange))
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const resetBots=async()=>{ setBusy('reset'); try{
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
@@ -12062,49 +12085,101 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
       await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT) }
     showToast('✓ Bots reset',C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // 🤝 Les bots ACCEPTENT les clutchs que JE leur ai envoyés → me débloque le Verrou/RDV (sinon ils restent en attente).
-  const botsAccept=async()=>{ setBusy('acc'); try{
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    const { data, error } = await supabase.from('clutches').update({status:'accepted'}).eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').select('id')
-    showToast(error?('❌ '+error.message):(data?.length?`✓ ${data.length} accepté(s) → va voir ton Verrou 🔒`:'Aucun clutch en attente envoyé à un bot'), error?C.red:(data?.length?C.green:C.orange))
+  // ── ACTEUR : rendre un bot dispo sur une fenêtre + lieu + rayon précis ──
+  const setActorOnline=async(on:boolean)=>{ if(!aId){ showToast('Choisis un acteur',C.orange); return } setBusy('av'); try{
+    const p=COCK_PLACES[aPlace]
+    const patch = on ? { is_available:true, available_from:tISO(aFrom), available_until:tISO(aTo), center_lat:p.lat, center_lng:p.lng, available_radius_km:aRad } : { is_available:false }
+    const { error } = await supabase.from('profiles').update(patch).eq('id',aId)
+    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} dispo ${aFrom}h→${aTo}h · ${p.n} · ${aRad}km`:`✓ ${nameOf(aId)} hors-ligne`), error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── CLUTCH : envoi paramétré (de→vers, lieu, heure, Quick) ──
+  const sendClutch=async()=>{ if(!cFrom||!cTo||cFrom===cTo){ showToast('Choisis 2 personnes différentes',C.orange); return } setBusy('send'); try{
+    const p=COCK_PLACES[cPlace]
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cFrom).eq('receiver_id',cTo).in('status',ACT)
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cTo).eq('receiver_id',cFrom).in('status',ACT)
+    const { error } = await supabase.from('clutches').insert({ sender_id:cFrom, receiver_id:cTo, venue:p.n, venue_lat:p.lat, venue_lng:p.lng, proposed_time:tISO(cH,cM), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', is_quick_date:cQuick, duration_minutes:cQuick?60:120, message:`(cockpit) ${p.n} à ${String(cH).padStart(2,'0')}h${String(cM).padStart(2,'0')}` })
+    showToast(error?('❌ '+error.message):`✓ ${nameOf(cFrom)} → ${nameOf(cTo)} · ${p.n} ${String(cH).padStart(2,'0')}:${String(cM).padStart(2,'0')}`, error?C.red:C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── EVENT : création paramétrée (heure, places, spontané/planifié) ──
+  const createEvent=async()=>{ if(!eTitle.trim()){ showToast('Donne un titre',C.orange); return } setBusy('mkev'); try{
+    const p=COCK_PLACES[ePlace]
+    const { error } = await supabase.from('events').insert({ title:eTitle.trim(), emoji:'🎟️', lieu:p.n, event_time:`${String(eH).padStart(2,'0')}:00`, event_date:'Aujourd\'hui', starts_at:tISO(eH), duration_minutes:180, spots:eSpots, taken:0, description:'(cockpit)', tags:['test'], ev_gender:'X', type:ePlanned?'partner':'user', status:'pending', active:true, created_by:userId, creator:'Cockpit' })
+    showToast(error?('❌ '+error.message):`✓ Event « ${eTitle.trim()} » · ${p.n} ${eH}h · ${ePlanned?'planifié':'spontané'}`, error?C.red:C.green)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ── DIAGNOSTIC ──
   const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
     const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
     if(error) setDiag(/function|does not exist|schema/i.test(error.message)?'__nomig__':('❌ '+error.message))
     else setDiag(String(data))
   }catch(e:any){ setDiag('❌ '+e.message) } setBusy(null) }
   const REASON:Record<string,string>={ ok:'✅ passerait', self_clutch:'soi-même', blocked:'bloqué (2 sens)', cooldown:'cooldown actif', pair_busy:'déjà un clutch actif', inbox_full:'boîte pleine', forbidden:'pas admin' }
+  // ── helpers UI ──
   const Btn=(k:string,label:string,fn:()=>void)=>(<button onClick={fn} disabled={!!busy} style={{width:'100%',padding:'10px',marginBottom:6,borderRadius:9,border:`1px solid ${C.border}`,background:busy===k?C.orange:C.bgCard,color:C.white,fontSize:12,fontWeight:700,cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy&&busy!==k?.45:1}}>{busy===k?'…':label}</button>)
+  const Lbl=(t:string)=>(<div style={{fontSize:9.5,fontWeight:700,letterSpacing:'.04em',color:C.whiteMid,margin:'8px 0 3px'}}>{t}</div>)
+  const ActorSel=(v:string,on:(s:string)=>void)=>(<select value={v} onChange={e=>on(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>)
+  const PlaceSel=(v:number,on:(n:number)=>void)=>(<select value={v} onChange={e=>on(+e.target.value)} style={cockSel}>{COCK_PLACES.map((p,i)=><option key={p.n} value={i}>📍 {p.n}</option>)}</select>)
+  const HourSel=(v:number,on:(n:number)=>void)=>(<select value={v} onChange={e=>on(+e.target.value)} style={{...cockSel,width:'auto',flex:1}}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{String(h).padStart(2,'0')}h</option>)}</select>)
   if(!open) return (
     <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={()=>{ const m=dragRef.current?.moved; onUp(); if(!m) setOpen(true) }}
       style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:44,height:44,borderRadius:22,background:C.bgCard,border:`1.5px solid ${C.orange}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'grab',boxShadow:'0 6px 20px rgba(0,0,0,.45)',touchAction:'none'}}>🎮</div>
   )
+  const TABS:[CockTab,string][] = [['express','⚡'],['acteur','🎭'],['clutch','☕'],['event','🎟️'],['diag','🩺']]
   return (
-    <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:288,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
+    <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:300,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
       <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:C.bgCard,cursor:'grab',borderBottom:`1px solid ${C.border}`}}>
         <span style={{fontSize:14}}>🎮</span>
         <span style={{fontSize:12.5,fontWeight:800,color:C.white,flex:1}}>Cockpit QA <span style={{fontSize:9,color:C.whiteMid}}>· glisse-moi</span></span>
         <button onClick={()=>setOpen(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:18,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>×</button>
       </div>
       <div style={{display:'flex'}}>
-        {([['scen','⚡ Scénarios'],['diag','🩺 Diagnostic']] as const).map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k as any)} style={{flex:1,padding:'8px',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,color:tab===k?C.orange:C.whiteMid,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{l}</button>
+        {TABS.map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'9px 0',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,fontSize:16,cursor:'pointer',fontFamily:'inherit',opacity:tab===k?1:.55}}>{l}</button>
         ))}
       </div>
-      <div style={{padding:'12px',maxHeight:'46vh',overflowY:'auto'}}>
-        {tab==='scen' && (<>
+      <div style={{padding:'12px',maxHeight:'52vh',overflowY:'auto'}}>
+        {tab==='express' && (<>
           {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
           {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
           {Btn('acc','🤝 Les bots acceptent mes clutchs (→ Verrou)',botsAccept)}
           {Btn('reset','🧹 Reset bots',resetBots)}
         </>)}
+        {tab==='acteur' && (<>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Rends un acteur dispo sur une fenêtre précise.</div>
+          {Lbl('ACTEUR')}{ActorSel(aId,setAId)}
+          {Lbl('FENÊTRE')}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>{HourSel(aFrom,setAFrom)}<span style={{color:C.whiteMid,fontSize:12}}>→</span>{HourSel(aTo,setATo)}</div>
+          {Lbl('LIEU')}{PlaceSel(aPlace,setAPlace)}
+          {Lbl(`RAYON · ${aRad} km`)}<input type="range" min={1} max={50} value={aRad} onChange={e=>setARad(+e.target.value)} style={{width:'100%',accentColor:C.orange}}/>
+          <div style={{height:6}}/>
+          {Btn('av','✅ Mettre dispo',()=>setActorOnline(true))}
+          {Btn('avoff','⏸ Mettre hors-ligne',()=>setActorOnline(false))}
+        </>)}
+        {tab==='clutch' && (<>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Envoie un clutch avec lieu + heure choisis.</div>
+          {Lbl('DE')}{ActorSel(cFrom,setCFrom)}
+          {Lbl('VERS')}{ActorSel(cTo,setCTo)}
+          {Lbl('LIEU')}{PlaceSel(cPlace,setCPlace)}
+          {Lbl('HEURE DU RDV')}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>{HourSel(cH,setCH)}<select value={cM} onChange={e=>setCM(+e.target.value)} style={{...cockSel,width:'auto',flex:1}}>{[0,15,30,45].map(m=><option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}</select></div>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.white,margin:'8px 0'}}><input type="checkbox" checked={cQuick} onChange={e=>setCQuick(e.target.checked)} style={{accentColor:C.orange}}/>Quick Clutch (1h)</label>
+          {Btn('send','☕ Envoyer le clutch',sendClutch)}
+        </>)}
+        {tab==='event' && (<>
+          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Crée un événement à l'heure que tu veux.</div>
+          {Lbl('TITRE')}<input value={eTitle} onChange={e=>setETitle(e.target.value)} style={cockSel as any}/>
+          {Lbl('LIEU')}{PlaceSel(ePlace,setEPlace)}
+          {Lbl('HEURE')}<div style={{display:'flex',gap:6}}>{HourSel(eH,setEH)}</div>
+          {Lbl(`PLACES · ${eSpots}`)}<input type="range" min={2} max={40} value={eSpots} onChange={e=>setESpots(+e.target.value)} style={{width:'100%',accentColor:C.orange}}/>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.white,margin:'8px 0'}}><input type="checkbox" checked={ePlanned} onChange={e=>setEPlanned(e.target.checked)} style={{accentColor:C.orange}}/>Planifié (partenaire, hors dispo)</label>
+          {Btn('mkev','🎟️ Créer l\'event',createEvent)}
+        </>)}
         {tab==='diag' && (<>
           <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Simule un envoi A→B (ne crée rien) et révèle la VRAIE raison vs le message anti-sonde.</div>
-          <select value={fromId} onChange={e=>setFromId(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>
+          {Lbl('DE')}{ActorSel(fromId,setFromId)}
           <div style={{textAlign:'center',color:C.whiteMid,fontSize:11,margin:'2px 0'}}>↓ envoie à ↓</div>
-          <select value={toId} onChange={e=>setToId(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>
+          {Lbl('VERS')}{ActorSel(toId,setToId)}
           {Btn('diag','🩺 Tester l\'envoi',runDiag)}
-          {diag==='__nomig__' && <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ Migration <code>qa_test_clutch</code> pas encore posée — on la pose ensemble (2 min) et cet onglet s'allume.</div>}
+          {diag==='__nomig__' && <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ Migration <code>qa_test_clutch</code> pas posée.</div>}
           {diag && diag!=='__nomig__' && (<div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>
             <div style={{fontSize:10,color:C.whiteMid}}>Raison réelle (admin) :</div>
             <div style={{fontSize:13,fontWeight:800,color:diag==='ok'?C.green:C.orange,marginBottom:6}}>{REASON[diag]||diag}</div>

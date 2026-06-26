@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x19d'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 153   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x19e'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 154   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2793,7 +2793,7 @@ const MOCK_EVENTS = [
 // mais à documenter dans CGU. Pas de filtrage automatique = utilisateur choisit.
 // 🤝 PROTOTYPE — Groupes / Partenaires (vision David : suivre un organisateur récurrent → notifs ciblées = réseau)
 // Données mock pour visualiser le concept. À brancher DB en V2.
-const PARTNERS_MOCK = [
+const PARTNERS_ALL = [
   {id:'p_dclub',   emoji:'🎶', name:'D Club Lausanne',      cat:'Clubbing · Soirées',   zone:'Flon, Lausanne',     members:1240, desc:'Les meilleures nuits de Lausanne. Soirées chaque week-end.', next:'Techno night · sam. 23h', verified:true, photo:'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=600&q=80'},
   {id:'p_pingpong',emoji:'🏓', name:'Ping-Pong chez Bibi',  cat:'Sport · Convivial',    zone:'Région Lausanne',    members:38,   desc:'Tournois ping-pong détendus chez un passionné. Lieu donné avant.', next:'Tournoi débutants · dim. 14h', verified:false},
   {id:'p_jazz',    emoji:'🎷', name:'Apéro Jazz Collectif',  cat:'Musique · Apéro',      zone:'Vieille Ville',      members:212,  desc:'Jam sessions et apéros jazz une fois par mois. Amène ton instrument.', next:'Jam ouverte · ven. 19h', verified:true, photo:'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80'},
@@ -2967,6 +2967,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     })()
   }, [userId])
 
+  // 🧪 Labo propre : on coupe AUSSI les bannières partenaires codées en dur (décor bidon).
+  const PARTNERS_MOCK = labClean() ? [] : PARTNERS_ALL
   const partnerEvents = dbEvents.length > 0 ? dbEvents.map(e => ({
     id: e.id,
     emoji: e.emoji || '🎉',
@@ -12252,7 +12254,8 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
             <div style={{fontSize:10,color:C.whiteMid}}>Toutes les personnes · 🟢 = en ligne</div>
             <div style={{display:'flex',gap:6}}>
               <button onClick={loadWorld} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>↻</button>
-              <button onClick={resetBots} disabled={!!busy} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.salmon,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout éteindre</button>
+              <button onClick={async()=>{ await botsOnline(); loadWorld() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.green}55`,borderRadius:8,color:C.green,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout allumer</button>
+              <button onClick={async()=>{ await resetBots(); loadWorld() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.salmon,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout éteindre</button>
             </div>
           </div>
           {bots.filter(b=>b.is_bot).length===0 && <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',padding:'14px 0'}}>Aucun bot — génère-en dans le BotLab.</div>}
@@ -12264,7 +12267,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
                   <div style={{fontSize:12.5,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.name}{evBots.has(b.id)&&' 🎟️'}</div>
                   <div style={{fontSize:9.5,color:C.whiteMid}}>{live?`en ligne${place?' · '+place:''}`:'hors-ligne'}</div>
                 </div>
-                <button onClick={()=>toggleActor(b)} disabled={!!busy} style={{flexShrink:0,width:50,padding:'6px 0',borderRadius:8,border:`1px solid ${live?C.salmon:C.green}55`,background:busy===('t'+b.id)?C.orange:(live?`${C.salmon}1a`:`${C.green}1a`),color:live?C.salmon:C.green,fontSize:12,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:'inherit'}}>{busy===('t'+b.id)?'…':(live?'🔴':'🟢')}</button>
+                <button onClick={()=>toggleActor(b)} disabled={!!busy} style={{flexShrink:0,minWidth:74,padding:'6px 8px',borderRadius:8,border:`1px solid ${live?C.salmon:C.green}66`,background:busy===('t'+b.id)?C.orange:(live?`${C.salmon}1a`:`${C.green}1a`),color:live?C.salmon:C.green,fontSize:11,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{busy===('t'+b.id)?'…':(live?'⏻ Éteindre':'▶ Allumer')}</button>
               </div>
             )})}
         </>)}

@@ -16,8 +16,8 @@ import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDis
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x196'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 146   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x197'  // Versionnage HEXADÉCIMAL. ~273e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 147   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12080,18 +12080,25 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
     const { data, error } = await supabase.from('clutches').update({status:'accepted'}).eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').select('id')
     showToast(error?('❌ '+error.message):(data?.length?`✓ ${data.length} accepté(s) → ton Verrou 🔒`:'Aucun clutch en attente envoyé à un bot'), error?C.red:(data?.length?C.green:C.orange))
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // RESET COMPLET et HONNÊTE : annule les clutchs + met TOUS les bots hors-ligne + masque LEURS events.
   const resetBots=async()=>{ setBusy('reset'); try{
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).in('status',ACT)
-      await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT) }
-    showToast('✓ Bots reset',C.green)
+    if(ids.length){
+      await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).in('status',ACT)
+      await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT)
+      await supabase.from('profiles').update({ is_available:false }).in('id',ids)                // ↓ COHÉRENCE
+      await supabase.from('events').update({ active:false }).in('created_by',ids)                 // leurs events s'éteignent aussi
+    }
+    showToast('✓ Reset complet : clutchs annulés · bots hors-ligne · leurs events masqués',C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── ACTEUR : rendre un bot dispo sur une fenêtre + lieu + rayon précis ──
+  // ── ACTEUR : gérer un bot COMME UNE VRAIE PERSONNE (dispo + ses events suivent, cohérence garantie) ──
   const setActorOnline=async(on:boolean)=>{ if(!aId){ showToast('Choisis un acteur',C.orange); return } setBusy('av'); try{
     const p=COCK_PLACES[aPlace]
     const patch = on ? { is_available:true, available_from:tISO(aFrom), available_until:tISO(aTo), center_lat:p.lat, center_lng:p.lng, available_radius_km:aRad } : { is_available:false }
     const { error } = await supabase.from('profiles').update(patch).eq('id',aId)
-    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} dispo ${aFrom}h→${aTo}h · ${p.n} · ${aRad}km`:`✓ ${nameOf(aId)} hors-ligne`), error?C.red:C.green)
+    // COHÉRENCE : éteindre la personne éteint AUSSI ses events (sinon ils restent en ligne tout seuls = incohérent).
+    if(!on) await supabase.from('events').update({ active:false }).eq('created_by',aId)
+    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne ${aFrom}h→${aTo}h · ${p.n} · ${aRad}km`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── CLUTCH : envoi paramétré (de→vers, lieu, heure, Quick) ──
   const sendClutch=async()=>{ if(!cFrom||!cTo||cFrom===cTo){ showToast('Choisis 2 personnes différentes',C.orange); return } setBusy('send'); try{
@@ -12179,7 +12186,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
           {Lbl(`RAYON · ${aRad} km`)}<input type="range" min={1} max={50} value={aRad} onChange={e=>setARad(+e.target.value)} style={{width:'100%',accentColor:C.orange}}/>
           <div style={{height:6}}/>
           {Btn('av','✅ Mettre dispo',()=>setActorOnline(true))}
-          {Btn('avoff','⏸ Mettre hors-ligne',()=>setActorOnline(false))}
+          {Btn('avoff','🔴 Désactiver (elle + ses events)',()=>setActorOnline(false))}
         </>)}
         {tab==='clutch' && (<>
           <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Chaque cas fabrique la situation PUIS révèle la vraie raison (dry-run, ne crée pas le clutch). Bot testé : <b style={{color:C.white}}>{nameOf(firstBot())}</b>.</div>

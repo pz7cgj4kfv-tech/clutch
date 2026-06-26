@@ -15,14 +15,15 @@ import { hap } from '@/lib/haptics'  // vibration native iOS/Android (confirmati
 import { haversineKm, eventKm, EV_PHOTO_POOL, eventPhotoFor, eventCat, evLieuDisplay, kmHeat } from '@/lib/events-helpers'
 import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch-states'  // refactor 23.06 : helpers purs extraits
 import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, sweepExpired as evSweepExpired } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
+import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b6'  // Versionnage HEXADÉCIMAL. ~288e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 178   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b7'  // Versionnage HEXADÉCIMAL. ~289e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 179   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -11659,6 +11660,15 @@ export default function App2() {
                                         {outside?'⚠️ ':'📏 '}{zoneKm<1?`${Math.round(zoneKm*1000)} m`:`${zoneKm.toFixed(zoneKm<10?1:0)} km`}{outside?(lang==='en'?' away':' de toi'):''}
                                       </span>
                                     )}
+                                    {/* 🛡️ Sécurité du LIEU (receveuse seulement, jamais bloquant). Tape → Profil Sécurité (bouclier). */}
+                                    {(()=>{ if(!isRec||!venueShort||venueShort==='–') return null
+                                      const sf=placeSafety(c.venue||'', dt?dt.getHours():12); if(!sf.advise) return null
+                                      return <span onClick={(e:any)=>{e.stopPropagation(); setTab('profil')}}
+                                        title={lang==='en'?sf.en:sf.fr}
+                                        style={{width:'100%',marginTop:3,fontSize:10.5,fontWeight:700,cursor:'pointer',color:sf.level===3?C.red:C.orange,
+                                          background:sf.level===3?`${C.red}14`:`${C.orange}12`,border:`1px solid ${sf.level===3?C.red:C.orange}44`,borderRadius:8,padding:'4px 8px',lineHeight:1.35}}>
+                                        {lang==='en'?sf.en:sf.fr}</span>
+                                    })()}
                                   </div>
                                 )
                               })()}

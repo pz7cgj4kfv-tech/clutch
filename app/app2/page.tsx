@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b1'  // Versionnage HEXADÉCIMAL. ~283e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 173   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b2'  // Versionnage HEXADÉCIMAL. ~284e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 174   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3007,7 +3007,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false, onRegisteredObjs }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -3019,6 +3019,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   onOpenProfile?:(name:string,bio:string,photo:string|null)=>void;
   userId?:string;
   userAge?:number|null;
+  onRegisteredObjs?:(objs:any[])=>void;
   isCertified?:boolean;
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
@@ -3113,6 +3114,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     const seen = new Set(partnerEvents.map((e:any)=>e.id))
     return [...partnerEvents, ...userGroupEvents.filter((e:any)=>!seen.has(e.id))].filter((e:any)=>!cancelledLocal.has(e.id) && e.status!=='cancelled')
   })()
+  // 🎟️ Remonte au parent les OBJETS des events où je suis inscrit (toutes sources : démo, DB, groupe) → la boîte
+  //   Clutchs les affiche, même si ce ne sont pas des events DB. Signature stable → pas de boucle de re-render.
+  const regEvSig = events.filter((e:any)=>registered.has(e.id)).map((e:any)=>e.id).sort().join(',')
+  useEffect(()=>{ onRegisteredObjs?.(events.filter((e:any)=>registered.has(e.id))) }, [regEvSig]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Création event groupe
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -9006,6 +9011,7 @@ export default function App2() {
   const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
   const [eventEng,setEventEng] = useState<any[]>([]) // 🎟️ mes engagements EVENT (= des clutchs) injectés dans la boîte Clutchs
+  const [registeredEventObjs,setRegisteredEventObjs] = useState<any[]>([]) // objets des events inscrits (toutes sources) remontés par EventsTab
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
@@ -11265,6 +11271,7 @@ export default function App2() {
                 onPenalty={applyPenalty}
                 userId={user?.id}
                 userAge={(user as any)?.age ?? null}
+                onRegisteredObjs={setRegisteredEventObjs}
                 centerLat={(user as any)?.center_lat ?? null}
                 centerLng={(user as any)?.center_lng ?? null}
                 showToast={showToast}
@@ -11325,17 +11332,14 @@ export default function App2() {
                 //   organisateur avec demandes en attente → 🔥 (0) · sinon mon event à venir → 📍 (1)
                 //   participation acceptée → 📍 (1) · ma demande en attente → ⏳ (3)
                 const evStart=(ev:any)=> ev?.starts_at ? new Date(ev.starts_at).getTime() : null
-                // 🎟️ Events de DÉMO inscrits (pas en base) → AUSSI dans la boîte (sinon ils n'apparaissent jamais ici).
-                //   David teste avec MOCK_EVENTS/GROUP_EVENTS_DEMO ; s'inscrire = setRegistered local, sans ligne DB.
-                //   On les normalise au format carte + on dédup contre les vrais events (eventEng = DB).
+                // 🎟️ Tout event où je suis INSCRIT apparaît ici (David : « la centrale de commande »). On prend les
+                //   OBJETS remontés par EventsTab (registeredEventObjs) → marche pour TOUTES les sources (démo, DB, groupe),
+                //   pas seulement les events DB. On dédup contre eventEng (organisateur/participation déjà chargés en base).
                 const dbEvIds = new Set((eventEng||[]).map((it:any)=>it.ev?.id))
-                const DEMO_EVENTS = [...MOCK_EVENTS, ...GROUP_EVENTS_DEMO]
-                const demoEventItems = [...registeredEvents]
-                  .filter((id:string)=> !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(id) && !dbEvIds.has(id)) // UUID = vrai event (déjà via eventEng)
-                  .map((id:string)=> DEMO_EVENTS.find((e:any)=>e.id===id))
-                  .filter(Boolean)
+                const demoEventItems = (registeredEventObjs||[])
+                  .filter((e:any)=> e && e.id && !dbEvIds.has(e.id))
                   .map((e:any)=>({ __event:true, id:`evpart-${e.id}`, kind:'participant', state:'accepted',
-                    ev:{ id:e.id, title:e.title, emoji:e.emoji, lieu:e.lieu, spots:e.spots, taken:e.taken, starts_at:null, event_date:e.date, event_time:e.time } }))
+                    ev:{ id:e.id, title:e.title, emoji:e.emoji, lieu:e.lieu, spots:e.spots, taken:e.taken, starts_at:(e as any).starts_at||null, event_date:e.date, event_time:e.time } }))
                 const eventItems = [...(eventEng||[]), ...demoEventItems].filter((it:any)=>{ const s=evStart(it.ev); return s==null || s > Date.now()-3*3600*1000 }) // garde futurs + récents (3h)
                 const eventRank=(it:any)=> it.kind==='organizer' ? (it.pendingCount>0?0:1) : (it.state==='accepted'?1:3)
                 const rankOf=(it:any)=> it.__event ? eventRank(it) : groupRank(it)

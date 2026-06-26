@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1a9'  // Versionnage HEXADÉCIMAL. ~275e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 165   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1aa'  // Versionnage HEXADÉCIMAL. ~276e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 166   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5510,6 +5510,27 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', botPart.user_id)
     setBusy(null); showToast(`🪑 1 place libérée sur "${ev.title}"`, C.green)
   }
+  // 🎟️ Des bots DEMANDENT à rejoindre MON dernier event (state='requested') → fait apparaître la carte
+  // organisateur « 🔥 X demandes à valider » dans la boîte Clutchs, avec accepter/refuser inline.
+  const botsRequestMyEvent = async () => {
+    setBusy('all')
+    const { data: evs } = await supabase.from('events').select('id,title').eq('active',true).eq('created_by', user.id).neq('status','cancelled').order('created_at',{ascending:false}).limit(1)
+    if (!evs?.length) { setBusy(null); showToast("Crée d'abord TON event (🎟️) puis relance", C.orange); return }
+    const ev = evs[0]
+    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', user.id).limit(3)
+    const botIds = (botRows||[]).map((b:any)=>b.id)
+    if (!botIds.length) { setBusy(null); showToast('Aucun bot — génère-en', C.orange); return }
+    let n=0; let lastErr=''
+    for (const bid of botIds) {
+      // upsert : si déjà inscrit (accepted), on repasse en 'requested' pour la démo
+      await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', bid)
+      const { error } = await supabase.from('event_participants').insert({ event_id: ev.id, user_id: bid, state:'requested' })
+      if (!error) n++; else lastErr = error.message||''
+    }
+    setBusy(null)
+    window.dispatchEvent(new Event('clutch:refresh'))
+    showToast(n>0?`✓ ${n} demandes sur "${ev.title}" — onglet Clutchs 🔥 (accepte/refuse)`:`❌ ${lastErr||'applique event_participants_bot_admin'}`, n>0?C.green:C.red)
+  }
   const resetMyOnboarding = async () => {
     if (!confirm("Réinitialiser TON inscription pour la re-tester ?\nTon profil (photo/âge/genre) sera vidé. Déconnecte-toi puis reconnecte-toi ensuite → l'inscription recommence.")) return
     await supabase.from('profiles').update({ photo_url:null, age:null, gender:null, is_available:false }).eq('id', user.id)
@@ -5622,6 +5643,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
           <Btn onClick={deactivateAll} bg="rgba(239,68,68,.12)" col="#f87171">🔄 Désactiver tous les bots</Btn>
           <Btn onClick={clearBotInteractions} bg={C.salmonFaint} col={C.salmon}>🧹 Reset complet (débloque les bots)</Btn>
           <Btn onClick={fillEventWithBots} bg={C.salmonFaint} col={C.salmon}>🎟️ Remplir (complet)</Btn>
+          <Btn onClick={botsRequestMyEvent} bg={`${C.salmon}1a`} col={C.salmon}>🔥 Demandes sur MON event (→ Clutchs)</Btn>
           <Btn onClick={freeEventSpot} bg={C.salmonFaint} col={C.salmon}>🪑 Libérer une place</Btn>
           <Btn onClick={resetMyOnboarding} bg={C.salmonFaint} col={C.salmon}>👤 Refaire mon inscription</Btn>
         </div>
@@ -8878,6 +8900,7 @@ export default function App2() {
   const [profiles,setProfiles] = useState<Profile[]>([])
   const [lapinIds,setLapinIds] = useState<Set<string>>(new Set())  // personnes à qui j'ai mis un lapin → masquées des présences
   const [clutches,setClutches] = useState<any[]>([])
+  const [eventEng,setEventEng] = useState<any[]>([]) // 🎟️ mes engagements EVENT (= des clutchs) injectés dans la boîte Clutchs
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
@@ -9323,8 +9346,84 @@ export default function App2() {
     }
   },[user?.id])
 
+  // 🎟️ MES ENGAGEMENTS EVENT (= des clutchs). Décision David 27.06 : « l'event EST un clutch »
+  // → tout ce que je reçois/envoie/confirme (clutch OU event) est centralisé dans la boîte Clutchs,
+  // sauf les grosses bannières PARTENAIRE (découverte, restent dans Événements).
+  // Modèle (events-engine.ts, validé GPT) : inscription = DEMANDE → l'orga accepte/refuse.
+  //   organisateur avec demandes en attente → 🔥 à répondre · participation acceptée → 📍 à venir · ma demande → ⏳ en attente.
+  const loadEventEng = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const EVCOLS = 'id,title,emoji,lieu,starts_at,event_date,event_time,spots,taken,mode,created_by,creator,lat,lng,status'
+      // 1) Mes participations actives (je suis demandeur/participant)
+      const { data: parts } = await supabase.from('event_participants')
+        .select('event_id,state,requested_at').eq('user_id', user.id)
+        .in('state', ['requested','waitlisted','accepted'])
+      // 2) Mes events organisés (actifs, non annulés)
+      const { data: myEvents } = await supabase.from('events').select(EVCOLS)
+        .eq('created_by', user.id).eq('active', true).neq('status','cancelled')
+      const myEvMap = new Map((myEvents||[]).map((e:any)=>[e.id,e]))
+      // 3) Détails des events de mes participations (ceux que je n'organise pas)
+      const partIds = [...new Set((parts||[]).map((p:any)=>p.event_id))].filter((id:any)=>!myEvMap.has(id))
+      let partEvents:any[] = []
+      if (partIds.length) {
+        const { data } = await supabase.from('events').select(EVCOLS)
+          .in('id', partIds).eq('active', true).neq('status','cancelled')
+        partEvents = data||[]
+      }
+      const evById = new Map<string,any>([...(myEvents||[]),...partEvents].map((e:any)=>[e.id,e]))
+      // 4) Demandes ENTRANTES sur MES events (à valider) — state requested/waitlisted, hors moi-même
+      const myEvIds = (myEvents||[]).map((e:any)=>e.id)
+      let incoming:any[] = []
+      if (myEvIds.length) {
+        const { data } = await supabase.from('event_participants')
+          .select('event_id,user_id,state,requested_at')
+          .in('event_id', myEvIds).in('state', ['requested','waitlisted'])
+        incoming = (data||[]).filter((i:any)=>i.user_id!==user.id)
+      }
+      // Profils des demandeurs
+      const reqIds = [...new Set(incoming.map((i:any)=>i.user_id))]
+      let profMap = new Map<string,any>()
+      if (reqIds.length) {
+        const { data } = await supabase.from('profiles').select('id,name,photo_url').in('id', reqIds)
+        profMap = new Map((data||[]).map((p:any)=>[p.id,p]))
+      }
+      const incomingByEv = new Map<string,any[]>()
+      for (const i of incoming) { const a=incomingByEv.get(i.event_id)||[]; a.push({...i, prof:profMap.get(i.user_id)}); incomingByEv.set(i.event_id, a) }
+      const items:any[] = []
+      // MES events organisés → carte « j'organise » (🔥 si demandes en attente, sinon 📍 à venir)
+      for (const ev of (myEvents||[])) {
+        const reqs = incomingByEv.get(ev.id)||[]
+        items.push({ __event:true, id:`evorg-${ev.id}`, kind:'organizer', ev, reqs, pendingCount:reqs.length })
+      }
+      // MES participations aux events des AUTRES (acceptée → 📍 · en attente → ⏳)
+      for (const p of (parts||[])) {
+        if (myEvMap.has(p.event_id)) continue // mon propre event → déjà en carte organisateur
+        const ev = evById.get(p.event_id); if(!ev) continue
+        items.push({ __event:true, id:`evpart-${p.event_id}`, kind:'participant', ev, state:p.state, requestedAt:p.requested_at })
+      }
+      setEventEng(items)
+    } catch { /* silencieux : la boîte Clutchs reste valide sans les events */ }
+  }, [user?.id])
+
+  // Organisateur : accepter / refuser une demande d'inscription (modèle events-engine).
+  // accept → state='accepted' (le trigger DB crée l'occupation forteresse pour l'invité ; si ça chevauche
+  // un de SES RDV, la contrainte EXCLUDE rejette → on prévient sans casser). refuse → 'declined'.
+  const respondEventRequest = useCallback(async (eventId:string, requesterId:string, accept:boolean)=>{
+    const { error } = await supabase.from('event_participants')
+      .update({ state: accept?'accepted':'declined', responded_at:new Date().toISOString() })
+      .eq('event_id', eventId).eq('user_id', requesterId)
+    if (error) {
+      showToast(accept ? (lang==='fr'?'⛔ Cette personne a déjà un engagement à cette heure':'⛔ This person is already booked then') : 'Erreur', C.orange)
+      return
+    }
+    showToast(accept ? (lang==='fr'?'✓ Inscription acceptée':'✓ Accepted') : (lang==='fr'?'Demande refusée':'Declined'), accept?C.green:C.whiteMid)
+    loadEventEng()
+  }, [lang, showToast, loadEventEng])
+
   const loadClutches = useCallback(async () => {
     if (!user?.id) return
+    loadEventEng()
     // Ne charge que les clutchs récents (48h) ou actifs — évite d'afficher l'historique complet
     const cutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString()
     const {data} = await supabase.from('clutches')
@@ -11079,15 +11178,24 @@ export default function App2() {
                 // ── Boîte de réception ACTION-FIRST (struct validée GPT+Claude) :
                 //    0=🔥 à répondre · 1=📍 RDV · 2=⏸ en pause (chevauche un RDV) · 3=⏳ envoyé en attente · 4=autres
                 const groupRank=(c:any)=>{ const eff=localConfirmed.has(c.id)?'confirmed':c.status; if(c.id===inlineFeedbackId)return 0; if(['confirmed','accepted','checked_in'].includes(eff))return 1; if(c.status==='pending'&&isPausedClutch(c))return 2; const rec=c.receiver_id===user.id; if(rec&&c.status==='pending')return 0; if(!rec&&c.status==='pending')return 3; return 4 }
-                actifs.sort((a:any,b:any)=>groupRank(a)-groupRank(b))
+                // 🎟️ EVENTS = des clutchs : on les fond dans LA MÊME boîte action-first.
+                //   organisateur avec demandes en attente → 🔥 (0) · sinon mon event à venir → 📍 (1)
+                //   participation acceptée → 📍 (1) · ma demande en attente → ⏳ (3)
+                const evStart=(ev:any)=> ev?.starts_at ? new Date(ev.starts_at).getTime() : null
+                const eventItems = (eventEng||[]).filter((it:any)=>{ const s=evStart(it.ev); return s==null || s > Date.now()-3*3600*1000 }) // garde futurs + récents (3h)
+                const eventRank=(it:any)=> it.kind==='organizer' ? (it.pendingCount>0?0:1) : (it.state==='accepted'?1:3)
+                const rankOf=(it:any)=> it.__event ? eventRank(it) : groupRank(it)
+                const allItems=[...actifs, ...eventItems]
+                allItems.sort((a:any,b:any)=>rankOf(a)-rankOf(b))
                 const aRepondre = actifs.filter((c:any)=>c.id===inlineFeedbackId||(c.receiver_id===user.id&&c.status==='pending'&&!isPausedClutch(c))).length
+                  + eventItems.filter((it:any)=>it.kind==='organizer'&&it.pendingCount>0).reduce((a:number,it:any)=>a+it.pendingCount,0)
                 // Libellés de section (boîte de réception par ACTION) — bilingue
                 const SEC_LABELS:Record<number,string> = lang==='en'
                   ? {0:'🔥 To answer',1:'📍 Upcoming meetups',2:'⏸ On hold (you have a meetup then)',3:'⏳ Waiting',4:'🗂️ Other'}
                   : {0:'🔥 Action requise',1:'📍 Prochains rendez-vous',2:'⏸ En pause (RDV à cette heure)',3:'⏳ En attente',4:'🗂️ Autres'}
-                // Intercale un marqueur d'en-tête {__hdr:g} quand le groupe change (actifs déjà trié par groupRank)
+                // Intercale un marqueur d'en-tête {__hdr:g} quand le groupe change (allItems déjà trié par rankOf)
                 const actifsWithHdrs:any[] = []
-                { let _pg=-1; actifs.forEach((c:any)=>{ const g=groupRank(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
+                { let _pg=-1; allItems.forEach((c:any)=>{ const g=rankOf(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -11146,9 +11254,52 @@ export default function App2() {
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId && !radarMin ? 180 : 14}}>
                     {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
-                    {actifs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
+                    {allItems.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
                     {actifsWithHdrs.map((c:any)=>{
                       if(c.__hdr!==undefined) return (<div key={'sec'+c.__hdr} style={{fontSize:11,fontWeight:800,color:C.salmon,letterSpacing:'.04em',margin:'12px 2px 4px'}}>{SEC_LABELS[c.__hdr]}</div>)
+                      // ── 🎟️ CARTE EVENT (= un clutch) dans la boîte ──
+                      if (c.__event) {
+                        const ev=c.ev
+                        const evDt=ev.starts_at?new Date(ev.starts_at):null
+                        const now2=new Date()
+                        const evSameDay=evDt&&evDt.toDateString()===now2.toDateString()
+                        const evTmrw=evDt&&new Date(now2.getTime()+86400000).toDateString()===evDt.toDateString()
+                        const evWhen=evDt?((evSameDay?(lang==='en'?'today ':'auj. '):evTmrw?(lang==='en'?'tmrw ':'dem. '):evDt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})+' ')+evDt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})):(ev.event_date||'')+' '+(ev.event_time||'')
+                        const isOrg=c.kind==='organizer'
+                        const accepted=!isOrg&&c.state==='accepted'
+                        const accent=isOrg&&c.pendingCount>0?C.salmon:accepted?C.green:C.orange
+                        const openEv=()=>{ setOpenEventId(ev.id); setTab('evenements') }
+                        return (
+                          <div key={c.id} style={{background:C.bgCard,borderRadius:14,border:`${isOrg&&c.pendingCount>0?2:1}px solid ${accent}${isOrg&&c.pendingCount>0?'88':accepted?'66':'44'}`,padding:'11px 13px',marginBottom:8,boxShadow:'0 1px 3px rgba(83,41,67,.06)'}}>
+                            <div onClick={openEv} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+                              <div style={{width:38,height:38,borderRadius:11,flexShrink:0,background:`${accent}1a`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{ev.emoji||'🎟️'}</div>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:14,fontWeight:900,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ev.title||(lang==='en'?'Event':'Événement')}</div>
+                                <div style={{fontSize:11,color:C.whiteMid,marginTop:1,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                  <span style={{fontWeight:700,color:accent}}>{isOrg?(lang==='en'?'🎟️ You host':'🎟️ Tu organises'):accepted?(lang==='en'?'✓ You\'re in':'✓ Tu es validé·e'):(lang==='en'?'⏳ Awaiting host':'⏳ En attente de l\'orga')}</span>
+                                  {ev.lieu&&<span>📍 {String(ev.lieu).split('·')[0].trim()}</span>}
+                                  <span style={{color:C.white,fontWeight:800,background:'rgba(255,255,255,.06)',borderRadius:8,padding:'1px 7px'}}>🕐 {evWhen}</span>
+                                  {ev.spots!=null&&<span>· {ev.taken||0}/{ev.spots}</span>}
+                                </div>
+                              </div>
+                              {isOrg&&c.pendingCount>0&&<span style={{flexShrink:0,fontSize:11,fontWeight:900,color:'#fff',background:C.salmon,borderRadius:20,padding:'2px 9px'}}>{c.pendingCount}</span>}
+                            </div>
+                            {/* Organisateur : demandes à valider, inline (l'orga accepte/refuse — modèle GPT) */}
+                            {isOrg&&c.reqs.length>0&&(
+                              <div style={{marginTop:9,paddingTop:9,borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:7}}>
+                                {c.reqs.map((r:any)=>(
+                                  <div key={r.user_id} style={{display:'flex',alignItems:'center',gap:9}}>
+                                    <div onClick={()=>{if(r.prof){setSelProfile(r.prof);setShowProfileSheet(true)}}} style={{cursor:'pointer',flexShrink:0}}><Av src={r.prof?.photo_url} name={r.prof?.name||'?'} size={30}/></div>
+                                    <div style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.prof?.name||(lang==='en'?'Someone':'Quelqu\'un')}{r.state==='waitlisted'&&<span style={{fontSize:10,color:C.whiteMid,fontWeight:600}}> · {lang==='en'?'waitlist':'liste d\'attente'}</span>}</div>
+                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,false)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+                                    <button onClick={()=>respondEventRequest(ev.id,r.user_id,true)} style={{flexShrink:0,width:32,height:32,borderRadius:9,border:'none',background:C.green,color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
                       const isRec=c.receiver_id===user.id
                       const other=isRec?c.sender:c.receiver
                       const msLeft = c.expires_at ? new Date(c.expires_at).getTime()-Date.now() : 0
@@ -11789,8 +11940,12 @@ export default function App2() {
                   ['confirmed','accepted','checked_in'].includes(c.status)
                 ).length
 
+                // 🎟️ Demandes d'inscription en attente sur MES events (orga doit valider) → consolidé dans le badge Clutchs
+                const evReqPending = (eventEng as any[]).filter((it:any)=>it.kind==='organizer'&&it.pendingCount>0).reduce((a:number,it:any)=>a+it.pendingCount,0)
+
                 const clutchBadge: TabBadge =
                   pendingRec > 0 ? {type:'clutch-new', count:pendingRec}  // 🔴 priorité max
+                  : evReqPending > 0 ? {type:'clutch-new', count:evReqPending} // 🔴 demandes event à valider
                   : pendingRetard > 0 ? {type:'retard'}                   // 🔴 retard 30min à valider
                   : totalUnread > 0 ? {type:'message', count:totalUnread} // 💬 messages
                   : newVerrou > 0 ? {type:'verrou'}                       // 🟢 verrou

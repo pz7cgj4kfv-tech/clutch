@@ -21,8 +21,8 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 const EVENTS_CURATED_LIVE = false
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1b3'  // Versionnage HEXADÉCIMAL. ~285e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 175   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1b4'  // Versionnage HEXADÉCIMAL. ~286e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 176   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12168,7 +12168,7 @@ export default function App2() {
             <QuickSOS user={user} supabase={supabase} lang={lang} showToast={showToast}/>
           )}
           {/* 🎮 Cockpit de test flottant — admin only, par-dessus l'app, déplaçable. À retirer avant lancement. */}
-          {flow==='app' && user && isAdminId(user.id) && <TestCockpit userId={user.id} isAdmin={true} showToast={showToast}/>}
+          {flow==='app' && user && isAdminId(user.id) && <TestCockpit userId={user.id} isAdmin={true} showToast={showToast} meLat={(user as any)?.center_lat ?? null} meLng={(user as any)?.center_lng ?? null}/>}
           {/* D3 — RDV en cours RÉDUIT : pastille flottante (coin bas-droit) qui n'obstrue pas l'écran.
               Toucher = ré-agrandir le radar. L'utilisateur peut voir/parcourir les events librement. */}
           {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && radarMin && (()=>{
@@ -12578,7 +12578,11 @@ const COCK_PLACES = [
   { n:'Vevey',    lat:46.4628, lng:6.8419 },
 ]
 type CockTab = 'world'|'express'|'acteur'|'clutch'|'event'|'diag'
-function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void }) {
+function TestCockpit({ userId, isAdmin, showToast, meLat, meLng }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void; meLat?:number|null; meLng?:number|null }) {
+  // 🏰 Pour que les bots APPARAISSENT dans MES présences (David : « tout doit marcher avec les bots »), on les
+  //   place dans MA zone (intersection géo garantie) + live MAINTENANT. refreshAll() rafraîchit la liste tout de suite.
+  const meCenter = (meLat!=null && meLng!=null) ? { lat:meLat, lng:meLng } : COCK_PLACES[0]
+  const refreshAll = ()=>{ try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{} }
   const [open,setOpen] = useState(false)
   const [tab,setTab] = useState<CockTab>('world')
   const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 120 })
@@ -12688,19 +12692,22 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── ACTEUR : gérer un bot COMME UNE VRAIE PERSONNE (dispo + ses events suivent, cohérence garantie) ──
   const setActorOnline=async(on:boolean)=>{ if(!aId){ showToast('Choisis un acteur',C.orange); return } setBusy('av'); try{
-    const p=COCK_PLACES[aPlace]
-    const patch = on ? { is_available:true, available_from:tISO(aFrom), available_until:tISO(aTo), center_lat:p.lat, center_lng:p.lng, available_radius_km:aRad } : { is_available:false }
+    // 🏰 Placé dans MA zone (pas une ville fixe lointaine) + live MAINTENANT jusqu'à l'heure choisie → apparaît
+    //    forcément dans mes présences (intersection géo + créneau qui couvre maintenant). Rayon large (30km) = sûr.
+    const patch = on ? { is_available:true, available_from:new Date().toISOString(), available_until:tISO(aTo), center_lat:meCenter.lat, center_lng:meCenter.lng, available_radius_km:Math.max(aRad,30) } : { is_available:false }
     const { error } = await supabase.from('profiles').update(patch).eq('id',aId)
     // COHÉRENCE : éteindre la personne éteint AUSSI ses events (sinon ils restent en ligne tout seuls = incohérent).
     if(!on) await supabase.from('events').update({ active:false }).eq('created_by',aId)
-    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne ${aFrom}h→${aTo}h · ${p.n} · ${aRad}km`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
+    refreshAll()
+    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne MAINTENANT→${aTo}h · dans ta zone`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── ROSTER : un interrupteur par personne (allume = dispo MAINTENANT 5h Lausanne · éteint = + ses events) ──
   const isLive=(b:any)=> !!(b.is_available && b.available_until && new Date(b.available_until).getTime()>Date.now())
   const toggleActor=async(b:any)=>{ setBusy('t'+b.id); try{
     if(isLive(b)){ await supabase.from('profiles').update({ is_available:false }).eq('id',b.id); await supabase.from('events').update({ active:false }).eq('created_by',b.id) }
-    else { const p=COCK_PLACES[0]; await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+5*3600e3).toISOString(), center_lat:p.lat, center_lng:p.lng, available_radius_km:10 }).eq('id',b.id) }
-    await loadWorld()
+    // Allumer = dispo MAINTENANT 5h, DANS MA ZONE, rayon large → apparaît dans mes présences à coup sûr.
+    else { await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+5*3600e3).toISOString(), center_lat:meCenter.lat, center_lng:meCenter.lng, available_radius_km:30 }).eq('id',b.id) }
+    await loadWorld(); refreshAll()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ── CLUTCH : envoi paramétré (de→vers, lieu, heure, Quick) ──
   const sendClutch=async()=>{ if(!cFrom||!cTo||cFrom===cTo){ showToast('Choisis 2 personnes différentes',C.orange); return } setBusy('send'); try{
@@ -12783,7 +12790,7 @@ function TestCockpit({ userId, isAdmin, showToast }: { userId:string; isAdmin:bo
             <div style={{fontSize:10,color:C.whiteMid}}>Toutes les personnes · 🟢 = en ligne</div>
             <div style={{display:'flex',gap:6}}>
               <button onClick={loadWorld} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>↻</button>
-              <button onClick={async()=>{ await botsOnline(); loadWorld() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.green}55`,borderRadius:8,color:C.green,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout allumer</button>
+              <button onClick={async()=>{ await botsOnline(); loadWorld(); refreshAll() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.green}55`,borderRadius:8,color:C.green,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout allumer</button>
               <button onClick={async()=>{ await resetBots(); loadWorld() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.salmon,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout éteindre</button>
             </div>
           </div>

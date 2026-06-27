@@ -10842,23 +10842,8 @@ export default function App2() {
                   )
                 })()}
 
-                {/* ⚡ CTA Clutch Live — rayon tout petit = dispo MAINTENANT, hyper-local (décision David 29.06).
-                    Petit rayon n'est PAS un bug : c'est le signal « l'immédiat, autour de moi » → on propose le mode Live
-                    (0-1 km). Grand rayon = dispo plus tard = Clutch planifié. cf project-forteresse-espacetemps. */}
-                {!liveMode && rayon <= 1.5 && (
-                  <button onClick={()=>{ hap('medium'); setFlow('app'); setTab('presences'); activateLive() }}
-                    style={{display:'flex',alignItems:'center',gap:10,width:'calc(100% - 24px)',margin:'4px 12px 8px',
-                      padding:'11px 14px',borderRadius:14,border:`1px solid ${C.pink}`,
-                      background:'linear-gradient(135deg,rgba(235,107,175,0.10),rgba(119,188,31,0.08))',
-                      cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
-                    <span style={{fontSize:22,flexShrink:0}}>⚡</span>
-                    <span style={{flex:1}}>
-                      <span style={{display:'block',fontSize:13.5,fontWeight:800,color:C.plum}}>Tu es dispo tout près, là, maintenant</span>
-                      <span style={{display:'block',fontSize:11.5,color:C.ink,marginTop:1}}>Active <strong style={{color:C.pink}}>Clutch Live</strong> pour voir qui est autour de toi en direct</span>
-                    </span>
-                    <span style={{fontSize:18,color:C.pink,flexShrink:0}}>›</span>
-                  </button>
-                )}
+                {/* CTA Clutch Live RETIRÉ (David 29.06 : « on n'en a plus besoin »). La souplesse petit rayon reste
+                    (slider vert, pas d'alerte « trop loin »), mais on ne pousse plus vers le mode Live depuis ce flow. */}
 
                 {/* 🕐 Boutons « moment de la journée » — calculés depuis maintenant, bornés à 18h.
                     Tap = je suis dispo de MAINTENANT jusqu'à la fin de ce moment (ex : « ce soir » → jusqu'à minuit).

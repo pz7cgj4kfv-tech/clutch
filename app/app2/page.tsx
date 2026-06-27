@@ -10779,12 +10779,21 @@ export default function App2() {
                         <div style={{position:'absolute',left:`calc(${pct}% - 10px)`,width:20,height:36,borderRadius:7,background:'#fff',border:`3.5px solid ${fillCol}`,pointerEvents:'none',transition:'border-color .12s',boxShadow:`0 0 0 1.5px rgba(255,255,255,.9), 0 2px 8px ${fillCol}66`}}/>
                       </div>
                     </div>
-                    {high && <style>{`@keyframes conePulseMsg{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}`}</style>}
+                    {high && <style>{`@keyframes coneBreathe{0%,100%{box-shadow:0 0 0 0 rgba(83,41,67,0)}50%{box-shadow:0 0 0 5px rgba(83,41,67,.07)}}`}</style>}
+                    {/* Alerte du Cône en PASTILLE (polish temporaire avant le design Mel) : badge rond + texte,
+                        fond teinté de la zone, respiration douce quand c'est tendu (plus de texte gras qui saute). */}
                     {msg && (
-                      <div style={{padding: high?'2px 16px 9px':'0 16px 6px',display:'flex',alignItems:'center',gap:6,
-                        fontSize: high?13.5:10.5, fontWeight: high?800:500, color:msgCol, transition:'color .15s',
-                        transformOrigin:'left center', animation: high?'conePulseMsg 1s ease-in-out infinite':undefined}}>
-                        <span style={{flexShrink:0,fontSize:high?16:11}}>{high?'⚠️':'🌀'}</span><span>{msg}</span>
+                      <div style={{padding: high?'3px 14px 10px':'0 14px 7px'}}>
+                        <span style={{display:'inline-flex',alignItems:'center',gap:8,
+                          padding: high?'6px 12px 6px 7px':'4px 11px 4px 6px', borderRadius:999,
+                          background:`${fillCol}14`, border:`1px solid ${fillCol}38`,
+                          transition:'background .2s,border-color .2s',
+                          animation: high?'coneBreathe 2s ease-in-out infinite':undefined}}>
+                          <span style={{flexShrink:0,width:high?20:16,height:high?20:16,borderRadius:'50%',
+                            display:'grid',placeItems:'center',fontSize:high?12:9,fontWeight:800,
+                            background:fillCol,color:'#fff',lineHeight:1}}>{high?'!':'›'}</span>
+                          <span style={{fontSize:high?12.5:11,fontWeight:high?700:500,color:msgCol,lineHeight:1.2}}>{msg}</span>
+                        </span>
                       </div>
                     )}
                     </>

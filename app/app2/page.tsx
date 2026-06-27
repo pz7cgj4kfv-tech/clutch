@@ -9264,6 +9264,10 @@ export default function App2() {
   // (jour inclus) → handleOuvrirFenetre les utilise tels quels, sans l'ambiguïté « HH:MM aujourd'hui ».
   // null = l'user a réglé à la molette → on retombe sur le calcul HH:MM classique.
   const [presetWin,setPresetWin] = useState<{from:number;until:number}|null>(null)
+  // 🕐 MOMENTS multi-sélection (décision GPT 28.06 : sélection non contiguë = PLUSIEURS créneaux distincts, pas un bloc).
+  //    pickedMoments[0] (le plus tôt) = créneau PRINCIPAL (pilote presetWin + molettes + sauvegarde existante INCHANGÉE).
+  //    Les suivants = créneaux SUPPLÉMENTAIRES insérés après (additif, zéro risque sur le chemin critique). Cap 3.
+  const [pickedMoments,setPickedMoments] = useState<{key:string;start:number;end:number;fr:string;en:string}[]>([])
   // 🌀 LE CÔNE — re-serre le rayon DÈS QUE L'HEURE change (fix bypass David : mettre l'heure loin → pousser le rayon
   //    à 50km → ramener l'heure à maintenant ne doit PAS laisser un rayon impossible). On clamp au max crédible.
   useEffect(() => {
@@ -10413,8 +10417,24 @@ export default function App2() {
     const { error: eFlags } = await supabase.from('profiles').update({ quick_clutch:quickClutch, intent_pinned:intentPinned } as any).eq('id',user.id)
     if (eFlags) console.warn('[handleOuvrirFenetre] flags quick_clutch/intent_pinned non sauvés (colonnes à migrer ?) :', eFlags.message)
 
+    // 🕐 MULTI-CRÉNEAUX (David+GPT 28.06) — le créneau PRINCIPAL (le plus tôt) vient d'être sauvé ci-dessus.
+    //    On insère les moments SUPPLÉMENTAIRES choisis comme créneaux distincts (additif, défensif, plafond total 3).
+    let extraCreated = 0
+    if (pickedMoments.length > 1) {
+      try {
+        for (const m of pickedMoments.slice(1, 3)) {   // principal + 2 = 3 max
+          const ins = await supabase.from('availabilities').insert({ user_id:user.id, start_at:new Date(m.start).toISOString(), end_at:new Date(m.end).toISOString(), place:city, lat:meetupPos[0], lng:meetupPos[1], radius_km:Math.round(rayon), active:true }).select('id').single()
+          if (ins.data?.id) {
+            extraCreated++
+            if (seekModes.length || seekMood) await supabase.from('availabilities').update({ ...(seekModes.length?{modes:seekModes}:{}), ...(seekMood?{mood:seekMood}:{}) }).eq('id', ins.data.id)
+          }
+        }
+      } catch(err){ console.warn('[multi-créneaux] insert supplémentaire échoué (non bloquant)', err) }
+    }
+    setPickedMoments([])
+
     setUser(prev=>prev?{...prev,is_available:true,available_from:from.toISOString(),available_until:until.toISOString(),available_city:city,center_lat:meetupPos[0],center_lng:meetupPos[1],available_radius_km:rayon,available_modes:(seekModes.length?seekModes:null),quick_clutch:quickClutch,intent_pinned:intentPinned,bio:intentMsg||((user as any).bio)} as any:prev)
-    showToast(`✦ Fenêtre ouverte · ${city} · ${Math.round(rayon)} km`,C.green)
+    showToast(extraCreated>0 ? `✦ ${1+extraCreated} créneaux ouverts · ${city} · ${Math.round(rayon)} km` : `✦ Fenêtre ouverte · ${city} · ${Math.round(rayon)} km`,C.green)
     requestNotificationPermission()
     setFlow('app')
     setTab('presences')
@@ -10849,19 +10869,28 @@ export default function App2() {
                   const parts = dayParts(Date.now())
                   if (!parts.length) return null
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
+                  const keyOf = (p:any)=>p.key+p.dayOffset
+                  const toggle = (p:any)=>{
+                    const k = keyOf(p)
+                    const exists = pickedMoments.some(x=>x.key===k)
+                    let next = exists ? pickedMoments.filter(x=>x.key!==k)
+                                      : [...pickedMoments, {key:k, start:p.start, end:p.end, fr:p.fr, en:p.en}]
+                    next = next.sort((a,b)=>a.start-b.start)
+                    setPickedMoments(next)
+                    // Le créneau le plus TÔT pilote le principal (presetWin + molettes) ; les autres = créneaux en plus.
+                    if (next.length) { const m=next[0]; setPresetWin({from:m.start, until:m.end}); setFromTime(hhmm(m.start)); setUntilTime(hhmm(m.end)) }
+                    else setPresetWin(null)
+                    if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
+                  }
+                  const n = pickedMoments.length
                   return (
+                    <>
                     <div style={{display:'flex',gap:6,padding:'2px 12px 6px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}
                       onTouchStart={e=>e.stopPropagation()} onTouchEnd={e=>e.stopPropagation()}>
                       {parts.map(p=>{
-                        const active = !!presetWin && presetWin.until===p.end
+                        const active = pickedMoments.some(x=>x.key===keyOf(p))
                         return (
-                          <button key={p.key+p.dayOffset} onClick={()=>{
-                            // dispo = de maintenant jusqu'à la fin du moment choisi
-                            const from = Date.now()
-                            setPresetWin({from, until:p.end})
-                            setFromTime(hhmm(from)); setUntilTime(hhmm(p.end))   // reflet visuel sur les molettes
-                            if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
-                          }} style={{
+                          <button key={keyOf(p)} onClick={()=>toggle(p)} style={{
                             flexShrink:0,padding:'7px 13px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
                             fontSize:12,fontWeight:active?900:700,whiteSpace:'nowrap',
                             background:active?C.green:C.bg, color:active?'#fff':C.whiteMid,
@@ -10870,19 +10899,26 @@ export default function App2() {
                         )
                       })}
                     </div>
+                    {n>=2 && (
+                      <div style={{padding:'0 14px 6px',fontSize:11.5,fontWeight:800,color: n>3?C.orange:C.green}}>
+                        {n>3 ? (lang==='en'?'Max 3 slots — keep the 3 most important':'Max 3 créneaux — garde les 3 plus importants')
+                             : (lang==='en'?`${n} slots will be created`:`${n} créneaux seront créés`)}
+                      </div>
+                    )}
+                    </>
                   )
                 })()}
                 {/* 2 roues temps */}
                 <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}>
                   <JogWheel slots={initSlots} value={fromTime} onChange={v => {
-                    setPresetWin(null)   // réglage manuel → on quitte le mode bouton
+                    setPresetWin(null); setPickedMoments([])   // réglage manuel → on quitte le mode « moments » (créneau unique)
                     setFromTime(v)
                     const [h,m]=v.split(':').map(Number); const b=new Date(); b.setHours(h,m,0,0)
                     const ns=makeSlots(new Date(b.getTime()+5*60_000)).slice(0,216)
                     if (!ns.includes(untilTime)) setUntilTime(ns[1]||ns[0])
                   }}/>
                   <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
-                  <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setUntilTime(v) }}/>
+                  <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setPickedMoments([]); setUntilTime(v) }}/>
                 </div>
 
                 {/* ⚡ QUICK CLUTCH — PAGE 1, sous les molettes (David 29.06). « Je veux que ça se passe dans l'heure. »

@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c2'  // Versionnage HEXADÉCIMAL. ~300e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 190   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c3'  // Versionnage HEXADÉCIMAL. ~301e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 191   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7820,32 +7820,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             cf mémoire project_test_features_to_remove. N'agit QUE sur le compte connecté. */}
         {SH('🧪 Test (dev)')}
         <MCard>
-          <MRow icon="🔄" label="Reset test complet" sub="Clutchs + cooldowns + lapins + events + Verrou → tu revois tout le monde" onTap={async()=>{
-            if(!user?.id) return
-            const diag = (msg:string,color:string)=>{ try{ window.dispatchEvent(new CustomEvent('clutch:diag',{detail:{msg,color}})) }catch{} }
-            hap('medium'); diag('⏳ Reset en cours…', C.orange)  // feedback IMMÉDIAT + PERSISTANT (bandeau)
-            // PAS de window.confirm (bloqué WebView iOS). On VÉRIFIE l'effet réel (.select()) = combien de lignes
-            // touchées → on AFFICHE le compte (preuve que ça a pris + diagnostic RLS si 0).
-            const rC = await supabase.from('clutches').update({status:'cancelled',expires_at:new Date().toISOString()})
-              .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-              .in('status',['pending','accepted','confirmed','checked_in','declined']).select('id')   // 'declined' inclus → vide le cooldown 48h (trigger DB) pour les tests
-            // 🧹 Mes lapins (rdv_feedbacks « absent » me masquent les gens 48h). ⚠️ RLS peut bloquer le DELETE.
-            const lapinsAvant = (await supabase.from('rdv_feedbacks').select('to_id').eq('from_id', user.id).eq('outcome','absent')).data?.length || 0
-            const rF = await supabase.from('rdv_feedbacks').delete().eq('from_id', user.id).select('to_id')
-            const rE = await supabase.from('event_participants').delete().eq('user_id', user.id).select('event_id')
-            try{ await supabase.from('event_waitlist').delete().eq('user_id', user.id) }catch{}
-            await supabase.from('profiles').update({rdv_locked_until:null,rdv_locked_from:null,is_available:false,available_until:null}).eq('id',user.id)
-            const nC=rC.data?.length||0, nF=rF.data?.length||0, nE=rE.data?.length||0
-            const blocked = lapinsAvant>0 && nF===0  // avait des lapins mais 0 supprimé = RLS bloque
-            diag(
-              blocked
-                ? `⚠️ Reset : ${nC} clutchs · ${nE} events OK, MAIS ${lapinsAvant} lapin(s) NON supprimé(s) (RLS bloque). → colle le SQL de Claude.`
-                : `✅ Reset OK : ${nC} clutchs annulés · ${nF} lapin(s) supprimé(s) · ${nE} events. Recharge l'app.`,
-              blocked ? C.red : C.green,
-            )
-          }}/>
-          {isAdmin && <MRow icon="🧪" label="Clutch Test Lab" sub="Le panneau de test UNIQUE : bots, clutchs, reset, scénarios — tout au même endroit (mobile)" onTap={()=>{ try{ window.dispatchEvent(new Event('clutch:open-testlab')) }catch{} }}/>}
-          {isAdmin && <MRow icon="🤖" label="Générateur de bots (ancien)" sub="Cockpit historique — sera remplacé par le Test Lab" onTap={()=>setShowBotLab(true)}/>}
+          {isAdmin && <MRow icon="🧪" label="Clutch Test Lab" sub="Le panneau de test UNIQUE : bots, clutchs, reset, scénarios. Aussi via le bouton flottant 🧪." onTap={()=>{ try{ window.dispatchEvent(new Event('clutch:open-testlab')) }catch{} }}/>}
           {isAdmin && <MRow icon="🧹" label={resetArmed?"⚠️ Touche encore pour TOUT effacer":"Reset TOTAL (bots + vrais)"} sub={resetArmed?"Supprime tous tes clutchs, feedbacks, cooldowns, occupations…":"Remet à zéro toutes tes interactions (bots ET vraies personnes) pour re-tester de zéro"} onTap={async()=>{
             if(!resetArmed){ setResetArmed(true); setTimeout(()=>setResetArmed(false),4000); return }
             setResetArmed(false)
@@ -12353,8 +12328,8 @@ export default function App2() {
             <QuickSOS user={user} supabase={supabase} lang={lang} showToast={showToast}/>
           )}
           {/* 🎮 Cockpit de test flottant — admin only, par-dessus l'app, déplaçable. À retirer avant lancement. */}
-          {flow==='app' && user && isAdminId(user.id) && <TestCockpit userId={user.id} isAdmin={true} showToast={showToast} meLat={(user as any)?.center_lat ?? null} meLng={(user as any)?.center_lng ?? null}/>}
-          {user && isAdminId(user.id) && <TestLab userId={user.id} showToast={showToast}/>}
+          {/* Ancien Cockpit QA flottant retiré (28.06) — remplacé par le Test Lab unique ci-dessous. */}
+          {flow==='app' && user && isAdminId(user.id) && <TestLab userId={user.id} showToast={showToast}/>}
           {/* D3 — RDV en cours RÉDUIT : pastille flottante (coin bas-droit) qui n'obstrue pas l'écran.
               Toucher = ré-agrandir le radar. L'utilisateur peut voir/parcourir les events librement. */}
           {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && radarMin && (()=>{

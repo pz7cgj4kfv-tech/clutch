@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c6'  // Versionnage HEXADÉCIMAL. ~304e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 194   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c7'  // Versionnage HEXADÉCIMAL. ~305e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 195   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -876,8 +876,10 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
           if (!latlng) return
           if (lpTimer) clearTimeout(lpTimer)
           lpTimer = setTimeout(() => {
-            map.panTo(latlng, {animate:true}); syncCircle()
-            try{ if((navigator as any).vibrate) (navigator as any).vibrate(18) }catch{}
+            // David : « l'épingle doit RESTER à sa place ». On ne recentre PLUS la carte (ça la faisait sauter).
+            // Le lieu se place en DÉPLAÇANT la carte (l'épingle reste au centre) ; l'appui long = confirmation (vibration).
+            try{ if((navigator as any).vibrate) (navigator as any).vibrate(22) }catch{}
+            try{ window.dispatchEvent(new Event('clutch:pin-confirm')) }catch{}
             lpTimer = null
           }, 500)
         })
@@ -10640,9 +10642,36 @@ export default function App2() {
                 {/* Hint sobre — bas gauche */}
                 <div style={{position:'absolute',bottom:8,left:8,zIndex:1100,pointerEvents:'none'}}>
                   <div style={{background:C.bordeaux,borderRadius:8,padding:'5px 11px',fontSize:10,fontWeight:600,color:'#fff',whiteSpace:'nowrap'}}>
-                    {lang==='en'?'Move map · long-press to pin':'Déplace la carte · appui long = épingler'}
+                    {lang==='en'?'Move the map to place the spot':'Déplace la carte pour placer le lieu'}
                   </div>
                 </div>
+                {/* 🌀 ALERTE DU CÔNE — SUR la carte, et qui GROSSIT + pulse quand la tension monte (idée David). */}
+                {CONE_RAYON_HEURE_LIVE && (()=>{
+                  const now=Date.now()
+                  const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+                  const winMin = Math.max(1,(untilAt-now)/60000)
+                  const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin,10))
+                  const tension = coneTension({ now, startAt:untilAt, radiusKm:rayon })
+                  const over = rayon > Math.max(r10,0)+0.01
+                  const lvl = (over||tension>=7) ? 'high' : tension>=4 ? 'mid' : 'ok'
+                  if (rayon<1 || lvl==='ok') return null
+                  const col = lvl==='high' ? C.bordeaux : C.orange
+                  const scale = 1 + Math.min(1, tension/10)*0.7   // plus la tension monte, plus c'est GROS
+                  return (
+                    <div style={{position:'absolute',top:54,left:0,right:0,zIndex:1150,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
+                      <style>{`@keyframes coneMapPulse{0%,100%{transform:scale(${scale})}50%{transform:scale(${(scale*1.08).toFixed(3)})}}`}</style>
+                      <div style={{display:'flex',alignItems:'center',gap:7,background:col,color:'#fff',borderRadius:999,
+                        padding:'9px 18px',fontSize:13.5,fontWeight:900,whiteSpace:'nowrap',boxShadow:`0 6px 22px ${col}aa`,
+                        transformOrigin:'center top', transform:`scale(${scale})`, transition:'background .15s',
+                        animation: lvl==='high' ? 'coneMapPulse 0.85s ease-in-out infinite' : undefined}}>
+                        <span style={{fontSize:16}}>{lvl==='high'?'⚠️':'🌀'}</span>
+                        {lvl==='high'
+                          ? (lang==='en'?'Too far for this time':'Trop loin pour cette heure')
+                          : (lang==='en'?`Edge ~${Math.round(coneTravelMs(rayon)/60000)} min`:`Bord à ~${Math.round(coneTravelMs(rayon)/60000)} min`)}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Zone roues + CTA — fixe en bas, hauteur compacte

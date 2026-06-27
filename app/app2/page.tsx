@@ -17,13 +17,17 @@ import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch
 import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, sweepExpired as evSweepExpired } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
 import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
+import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
+// 🌀 Feature flag : le couplage RAYON↔HEURE du Cône (Problème 1). Ligne d'info NON bloquante sous le slider
+// rayon (gradient, jamais un mur). À false → rien ne change. cf. project-forteresse-espacetemps.
+const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1bd'  // Versionnage HEXADÉCIMAL. ~295e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 185   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1be'  // Versionnage HEXADÉCIMAL. ~296e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 186   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -696,8 +700,20 @@ function rayonToZoom(km: number): number {
   return 8
 }
 // Slider logarithmique : val 0-100 → rayon 1-100km (0 = 1km tout à gauche)
-function sliderToRayon(v: number): number { return 1 + (v/100)**2 * 99 }  // float, smooth
-function rayonToSlider(r: number): number { return Math.sqrt(Math.max(0,(r-1)/99))*100 }
+// Rayon d'un créneau. Max 50 km = arc lémanique complet (Genève ~60 km hors champ assumé) — 100 km était trop
+// pour de la rencontre spontanée (David 28.06). À challenger GPT/Grok pour l'Europe/régions. Config = 1 nombre.
+const RAYON_MIN_KM = 1
+const RAYON_MAX_KM = 50
+// Échelle LOGARITHMIQUE pure (fine au début, large à la fin) : 50 % du slider ≈ 7 km (pas 25). Le détail utile
+// (1-10 km, là où vivent 90 % des Clutchs) occupe les 2 premiers tiers ; le haut est compressé.
+function sliderToRayon(v: number): number {
+  const t = Math.max(0, Math.min(1, v/100))
+  return RAYON_MIN_KM * Math.pow(RAYON_MAX_KM/RAYON_MIN_KM, t)
+}
+function rayonToSlider(r: number): number {
+  const rr = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, r))
+  return 100 * Math.log(rr/RAYON_MIN_KM) / Math.log(RAYON_MAX_KM/RAYON_MIN_KM)
+}
 function fmtKm(r: number): string { return r < 10 ? r.toFixed(1)+' km' : Math.round(r)+' km' }
 
 // Lac Léman rough bbox — évite de placer des étoiles dans l'eau
@@ -10641,27 +10657,98 @@ export default function App2() {
                 onTouchStart={e=>e.stopPropagation()}
                 onTouchEnd={e=>e.stopPropagation()}
               >
-                {/* Slider rayon — sans légende km */}
+                {/* Slider rayon + 🌀 LE CÔNE (« résister + expliquer », choix David 28.06).
+                    Zones colorées (vert=large · rose=serré · bordeaux=dur) + RÉSISTANCE au-delà du rayon
+                    crédible (rubber-band, jamais un mur) + tick haptique + message qui explique le fix. */}
                 {(()=>{
+                  const now = Date.now()
+                  const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
+                  // Fin de fenêtre choisie (presetWin ou molette « until ») → minutes de marge dispo.
+                  const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+                  const winMin = Math.max(1, (untilAt - now)/60000)
+                  // Seuils de zones (km), bornés au max du slider. r10 = rayon crédible (la « limite »).
+                  const r4  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 4))
+                  const r7  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 7))
+                  const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
+                  const flag = CONE_RAYON_HEURE_LIVE
+                  const p = (km:number)=> Math.max(0, Math.min(100, rayonToSlider(km)))
                   const pct = rayonToSlider(rayon)
+                  const p4=p(r4), p7=p(r7), p10=p(r10)
+                  const tension = coneTension({ now, startAt: untilAt, radiusKm: rayon })
+                  const overWindow = flag && r10>0 && rayon > r10 + 0.01
+                  const fillCol = !flag ? C.orange : (tension>=7||overWindow ? C.bordeaux : tension>=4 ? C.orange : C.green)
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
                     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-                    setRayon(sliderToRayon(ratio * 100))
+                    let target = sliderToRayon(ratio * 100)
+                    if (flag) {
+                      // RÉSISTANCE PROGRESSIVE (David : « plus dur encore sur les bords »). On lutte contre le slider
+                      // quand la tension monte dans le cône — jamais un mur, mais de plus en plus dur.
+                      if (r10>0 && target>r10) {
+                        // au-delà du rayon crédible : très dur, ET de plus en plus dur plus on pousse loin.
+                        const over = target - r10
+                        target = r10 + over * 0.22 / (1 + over*0.18)
+                      } else if (r7>0 && target>r7) {
+                        // zone bordeaux (tension 7-10) : léger frein, ça commence à accrocher.
+                        target = r7 + (target - r7) * 0.6
+                      }
+                      target = Math.min(RAYON_MAX_KM, Math.max(RAYON_MIN_KM, target))
+                    }
+                    if (flag && typeof navigator!=='undefined' && (navigator as any).vibrate) {
+                      const cross=(a:number,b:number,th:number)=> th>0 && a<th && b>=th
+                      if (cross(rayon,target,r7) || cross(rayon,target,r10)) (navigator as any).vibrate(10)
+                    }
+                    setRayon(target)
+                  }
+                  // Message qui EXPLIQUE + propose le fix (jamais juste « non »).
+                  const edgeMin = Math.round(coneTravelMs(rayon)/60000)
+                  const earliest = earliestCredibleStart(now, rayon)
+                  let msg:string|null = null, msgCol = C.whiteMid
+                  if (flag && rayon>=2) {
+                    if (overWindow || tension>=7) { msgCol=C.bordeaux
+                      msg = lang==='en'
+                        ? `Wide radius — a Clutch at the edge would be tight. Extend the time to reach further.`
+                        : `Rayon large — un Clutch au bord serait juste. Prolonge l’heure pour aller plus loin.` }
+                    else if (tension>=4) { msgCol=C.orange
+                      msg = lang==='en'
+                        ? `Edge ~${edgeMin} min away · reachable from ${hhmm(earliest)}`
+                        : `Bord à ~${edgeMin} min · joignable dès ${hhmm(earliest)}` }
+                    else {
+                      msg = lang==='en'
+                        ? `Edge of radius ~${edgeMin} min away · reachable from ${hhmm(earliest)}`
+                        : `Bord du rayon à ~${edgeMin} min · joignable dès ${hhmm(earliest)}` }
                   }
                   return (
+                    <>
                     <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
-                      <span style={{fontSize:11,color:C.whiteMid,flexShrink:0}}>📍 {fmtKm(rayon)}</span>
+                      <span style={{fontSize:11,color:fillCol,flexShrink:0,fontWeight:600,transition:'color .12s'}}>📍 {fmtKm(rayon)}</span>
                       <div ref={sliderRef}
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
                         onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
+                        {/* track de base */}
                         <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'#E3E3E3',pointerEvents:'none'}}/>
-                        <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:C.orange,pointerEvents:'none'}}/>
-                        <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:C.orange,border:`2px solid ${C.bg}`,pointerEvents:'none'}}/>
+                        {/* zones du Cône (faibles, sous le fill) : vert → rose → bordeaux */}
+                        {flag && r10>0 && <>
+                          {p4>0 && <div style={{position:'absolute',left:0,width:`${p4}%`,height:6,borderRadius:3,background:'rgba(119,188,31,.20)',pointerEvents:'none'}}/>}
+                          {p7>p4 && <div style={{position:'absolute',left:`${p4}%`,width:`${p7-p4}%`,height:6,background:'rgba(235,107,175,.18)',pointerEvents:'none'}}/>}
+                          {p10>p7 && <div style={{position:'absolute',left:`${p7}%`,width:`${p10-p7}%`,height:6,background:'rgba(83,41,67,.20)',pointerEvents:'none'}}/>}
+                        </>}
+                        {/* fill (couleur = zone courante) */}
+                        <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:fillCol,pointerEvents:'none',transition:'background .12s'}}/>
+                        {/* marqueur de la limite crédible (« le mur » du cône) */}
+                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,width:2,height:16,borderRadius:1,background:C.bordeaux,opacity:.55,pointerEvents:'none'}}/>}
+                        {/* thumb */}
+                        <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:fillCol,border:`2px solid ${C.bg}`,pointerEvents:'none',transition:'background .12s'}}/>
                       </div>
                     </div>
+                    {msg && (
+                      <div style={{padding:'0 16px 6px',display:'flex',alignItems:'center',gap:6,fontSize:10.5,color:msgCol,transition:'color .15s'}}>
+                        <span style={{flexShrink:0}}>🌀</span><span>{msg}</span>
+                      </div>
+                    )}
+                    </>
                   )
                 })()}
 

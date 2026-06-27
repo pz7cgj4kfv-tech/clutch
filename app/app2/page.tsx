@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c7'  // Versionnage HEXADÉCIMAL. ~305e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 195   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c8'  // Versionnage HEXADÉCIMAL. ~306e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 196   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12843,20 +12843,17 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     }
     showToast(`✓ ${n} bots en ligne sur toi 📍`, C.green); note(`✅ ${n} bots en ligne dans ta zone (créneaux + rayons variés)`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // 🛡️ Passe par la RPC GARDÉE admin_create_clutch (mêmes règles que les vrais users + feedback {ok,code,message}).
   const clutchToMe=async(fromId:string)=>{ if(!fromId){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',fromId).eq('receiver_id',userId).in('status',ACT)
-    const { error } = await supabase.from('clutches').insert({ sender_id:fromId, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${nameOf(fromId)}` })
-    if(error){ showToast('❌ '+error.message,C.red); note('❌ clutch échoué : '+error.message) }
-    else { showToast(`📨 ${nameOf(fromId)} t'a envoyé un clutch`, C.green); note(`📨 ${nameOf(fromId)} t'a envoyé un clutch → onglet Clutchs`); refreshAll() }
+    const { data, error } = await supabase.rpc('admin_create_clutch', { p_actor:fromId, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:tISO(20,0), p_message:`Un café ? — ${nameOf(fromId)}` })
+    if(error){ showToast('❌ '+error.message+' — applique la migration admin_actor_rpc',C.red); note('❌ RPC : '+error.message) }
+    else { const r:any=data; const ok=r?.ok; showToast(`${ok?'📨':'🚫'} ${r?.message||''}`, ok?C.green:C.orange); note(`${ok?'📨':'🚫'} ${nameOf(fromId)} → ${r?.message||''}${r?.code&&!ok?` [${r.code}]`:''}`); refreshAll() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // 🛡️ RPC GARDÉE admin_accept_clutch : l'exclusion forteresse (chevauchement) remonte en message clair.
   const botAccepts=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('acc'); try{
-    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',botId).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
-    const row=((pend as any[])||[])[0]
-    if(!row){ showToast(`Envoie d'abord un clutch à ${nameOf(botId)}`,C.orange); note(`ℹ️ aucun clutch en attente vers ${nameOf(botId)} — clutche-le d'abord`); setBusy(null); return }
-    const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',row.id)
-    if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')){ showToast('🏰 Forteresse : chevauche un RDV → bloqué',C.orange); note(`🏰 ${nameOf(botId)} ne peut pas accepter : ça chevauche un RDV (forteresse OK)`) }
-    else if(error){ showToast('❌ '+error.message,C.red); note('❌ '+error.message) }
-    else { showToast(`🔒 ${nameOf(botId)} a accepté → Verrou`, C.green); note(`🔒 ${nameOf(botId)} accepte → Verrou créé. Les clutchs qui chevauchent passent « en pause ».`); refreshAll() }
+    const { data, error } = await supabase.rpc('admin_accept_clutch', { p_actor:botId, p_counterparty:userId })
+    if(error){ showToast('❌ '+error.message+' — applique la migration admin_actor_rpc',C.red); note('❌ RPC : '+error.message) }
+    else { const r:any=data; const ok=r?.ok; showToast(`${ok?'🔒':'⚠️'} ${r?.message||''}`, ok?C.green:C.orange); note(`${ok?'🔒':'⚠️'} ${nameOf(botId)} → ${r?.message||''}${r?.code&&!ok?` [${r.code}]`:''}`); refreshAll() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const soon=(what:string)=>{ showToast(`🔜 ${what} — phase suivante`, C.salmon); note(`🔜 ${what} : bientôt`) }
 
@@ -12898,11 +12895,9 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     return ((data as any[])||[])[0] || null
   }
   const botRefuse=async(botId:string)=>{ if(!botId)return; setBusy('ref'); try{
-    const { data:pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',botId).eq('status','pending').limit(1)
-    const row=((pend as any[])||[])[0]
-    if(!row){ showToast(`Aucun clutch en attente vers ${nameOf(botId)}`,C.orange); setBusy(null); return }
-    await supabase.from('clutches').update({status:'declined'}).eq('id',row.id)
-    refreshAll(); showToast(`✗ ${nameOf(botId)} a refusé`,C.orange); note(`✗ ${nameOf(botId)} a refusé ton clutch (cooldown)`)
+    const { data, error } = await supabase.rpc('admin_refuse_clutch', { p_actor:botId, p_counterparty:userId })
+    if(error){ showToast('❌ '+error.message+' — applique la migration admin_actor_rpc',C.red); note('❌ RPC : '+error.message) }
+    else { const r:any=data; const ok=r?.ok; showToast(`${ok?'✗':'⚠️'} ${r?.message||''}`, ok?C.orange:C.orange); note(`${ok?'✗':'⚠️'} ${nameOf(botId)} → ${r?.message||''}`); refreshAll() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   const botRdvNow=async(botId:string)=>{ if(!botId)return; setBusy('rdvnow'); try{
     const c=await verrouOf(botId); if(!c){ showToast(`Pas de Verrou avec ${nameOf(botId)} — fais accepter d'abord`,C.orange); note(`ℹ️ pas de Verrou actif avec ${nameOf(botId)}`); setBusy(null); return }

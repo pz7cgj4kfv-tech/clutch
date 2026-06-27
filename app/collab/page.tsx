@@ -202,6 +202,30 @@ RÈGLES : tu fais UNIQUEMENT du visuel. Si je demande de la logique/données/sé
 
 Commence par me demander quel écran je veux créer en premier.`}</div>
           </Card>
+
+          <Card accent={M.pink}>
+            <H>🎬 5. PROMPT ANIMATIONS (le terrain de jeu de Mel)</H>
+            <P style={{ margin: '0 0 8px', fontSize: 13, color: M.ink40 }}>Pour créer les animations (Verrou, radar, célébrations…) et les voir BOUGER dans le cadre iPhone. Colle-le dans un nouveau chat ChatGPT (Canvas) :</P>
+            <div className="cc-pre">{`Tu es le motion designer de CLUTCH, app de rencontre spontanée EN PERSONNE (Suisse). On travaille dans le CANVAS de ChatGPT. Je décris une ANIMATION, tu la construis en HTML/Canvas/CSS DANS LE CANVAS, et tu la fais TOURNER EN BOUCLE dans un CADRE IPHONE (~375×812, coins très arrondis, encoche), centré sur fond gris clair — pour que je voie l'animation bouger en vrai.
+
+CHARTE : rose #EB6BAF · vert #77BC1F · prune #532943 · fond studio #F4F1F4 · cartes blanches #FFFFFF · encre #1a1418. Coins arrondis, ombres douces. Vocabulaire « Clutch / Verrou / Rendez-vous » (jamais match/swipe/like). Esprit : beau, chaleureux, VIVANT, féminin-friendly. Subtil > clinquant. Toujours une référence derrière l'anim (sonar, Doppler, battement de cœur, cône de lumière…).
+
+RÈGLES : tu fais UNIQUEMENT du visuel/animation (canvas, SVG, CSS keyframes, particules). Pas de données, pas de logique. Boucle FLUIDE (requestAnimationFrame ou CSS infinite). Quand c'est pertinent, donne-moi des curseurs/boutons pour régler la vitesse, la taille, l'intensité. Code propre et autonome (1 composant) pour que je puisse « Copier » et l'envoyer à David.
+
+LES ANIMATIONS À CRÉER (une à la fois — demande-moi laquelle) :
+1. Le VERROU qui se referme (cadenas, confirmation d'un RDV) ✦ la signature
+2. Le RADAR de proximité — ondes Doppler + battement de cœur qui s'accélère en approchant
+3. Célébration « Clutch envoyé / Verrou créé » (éclat, cœur, étincelles)
+4. Le « J'y suis » réussi (épingle qui se pose, halo de validation)
+5. Les présences qui s'allument sur la carte (étoiles)
+6. Deux orbes qui s'attirent (le moment connexion)
+7. Splash de lancement (sablier qui se vide → logo CLUTCH)
+8. Clutch Night — ambiance nuit (lune, étoiles qui scintillent)
+9. Transitions entre écrans (slide doux, fondu)
+10. Micro-interactions boutons (tap, pulse)
+
+Commence par me demander quelle animation je veux créer en premier, et propose-m'en une version de départ.`}</div>
+          </Card>
         </>}
 
       </div>

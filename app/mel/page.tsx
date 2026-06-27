@@ -106,8 +106,45 @@ export default function MelAtelier() {
         <textarea readOnly value={PROMPT} onFocus={e => e.currentTarget.select()}
           style={{ width: '100%', height: 340, resize: 'vertical', background: '#1a1018', color: '#f3e8f0', border: 'none', borderRadius: 12, padding: '14px 16px', fontSize: 11.5, lineHeight: 1.5, fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', boxSizing: 'border-box' }} />
 
+        {/* Comment m'envoyer ton travail */}
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, margin: '26px 0 10px' }}>📤 Comment me l'envoyer (à David)</div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12 }}>
+          {/* Cas 1 : une animation / un écran */}
+          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.pink, marginBottom: 8 }}>🎬 Une animation / un écran</div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6, color: C.ink }}>
+              <li>Dans le Canvas, clique <strong>« Copier »</strong> (tout le code).</li>
+              <li>Colle-le dans ton message à David (WhatsApp/mail — c'est juste du texte).</li>
+              <li>Ajoute une <strong>petite vidéo d'écran</strong> de l'anim qui bouge + son <strong>nom</strong> (« le Verrou », « célébration »…).</li>
+            </ol>
+          </div>
+
+          {/* Cas 2 : un bouton / une icône en SVG */}
+          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.pink, marginBottom: 8 }}>🔘 Un bouton / une icône</div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6, color: C.ink }}>
+              <li>Exporte-le en <strong>SVG</strong> (parfait : net à toutes les tailles, recolorable).</li>
+              <li>Si ça <strong>remplace</strong> un bouton existant → <strong>garde le même nom</strong> (échange direct).</li>
+              <li>Si c'est <strong>nouveau</strong> → un <strong>nom clair</strong> (ex. <code>bouton-verrou</code>, <code>icone-event</code>).</li>
+              <li>Dis-moi juste : « ça remplace X » ou « c'est un nouveau ».</li>
+            </ol>
+          </div>
+        </div>
+
+        {/* Filet de sécurité : on ne perd jamais une version */}
+        <div style={{ background: 'linear-gradient(135deg,rgba(119,188,31,0.10),rgba(235,107,175,0.07))', border: `1px solid ${C.green}`, borderRadius: 14, padding: '14px 16px', marginTop: 12, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 22, flexShrink: 0 }}>🛟</span>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum, marginBottom: 3 }}>On ne perd JAMAIS une version</div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.55, color: C.ink }}>
+              Chaque fichier que tu m'envoies est archivé pour toujours côté David. Si un nouveau bouton crée un bug, on remet l'ancien <strong>en 10 secondes</strong>. Tu n'as pas à gérer de numéros de version ni à garder les vieux fichiers — <strong>envoie sans stress</strong>, c'est mon filet.
+            </div>
+          </div>
+        </div>
+
         {/* Liens vers ce qui existe */}
-        <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, margin: '22px 0 10px' }}>👀 Regarde ce qui existe déjà (pour t'inspirer / refaire)</div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, margin: '24px 0 10px' }}>👀 Regarde ce qui existe déjà (pour t'inspirer / refaire)</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10 }}>
           {LINKS.map(([t, href, sub]) => (
             <a key={href} href={href} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', display: 'block' }}>

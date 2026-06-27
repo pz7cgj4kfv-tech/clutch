@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c4'  // Versionnage HEXADÉCIMAL. ~302e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 192   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c5'  // Versionnage HEXADÉCIMAL. ~303e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 193   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -862,20 +862,31 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
           (divRef.current as HTMLElement).style.userSelect = 'none';
           (divRef.current as HTMLElement).style.webkitUserSelect = 'none';
         }
+        // Appui long → épingle le lieu de RDV ici. FIX (David 28.06) : on n'annulait PLUS au moindre
+        // micro-mouvement (un doigt tremble toujours → ça ne se déclenchait jamais). On annule seulement
+        // si le doigt bouge VRAIMENT (> 14px = drag de carte), sinon le press tient.
         let lpTimer: ReturnType<typeof setTimeout>|null = null
+        let lpStart: {x:number;y:number}|null = null
+        const lpPt = (oe:any) => oe?.touches?.[0] || oe?.changedTouches?.[0] || oe
         map.on('mousedown touchstart', (e:any) => {
-          // Prévenir la sélection de texte du navigateur
-          if (e.originalEvent) { try { e.originalEvent.preventDefault() } catch {} }
-          const latlng = e.latlng || (e.touches&&e.touches[0]?map.mouseEventToLatLng(e.touches[0]):null)
+          const oe = e.originalEvent
+          const p = lpPt(oe)
+          lpStart = p ? { x:p.clientX, y:p.clientY } : null
+          const latlng = e.latlng || (oe?.touches?.[0] ? map.mouseEventToLatLng(oe.touches[0]) : null)
           if (!latlng) return
+          if (lpTimer) clearTimeout(lpTimer)
           lpTimer = setTimeout(() => {
-            map.panTo(latlng, {animate:true})
-            syncCircle()
-          }, 600)
+            map.panTo(latlng, {animate:true}); syncCircle()
+            try{ if((navigator as any).vibrate) (navigator as any).vibrate(18) }catch{}
+            lpTimer = null
+          }, 500)
         })
-        map.on('mouseup touchend mousemove touchmove', () => {
-          if (lpTimer) { clearTimeout(lpTimer); lpTimer=null }
+        map.on('mousemove touchmove', (e:any) => {
+          if (!lpTimer || !lpStart) return
+          const p = lpPt(e.originalEvent); if (!p) return
+          if (Math.abs(p.clientX - lpStart.x) + Math.abs(p.clientY - lpStart.y) > 14) { clearTimeout(lpTimer); lpTimer = null }
         })
+        map.on('mouseup touchend', () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null } })
 
         // (géolocalisation gérée dans le bloc selfMarker ci-dessus)
 
@@ -9212,7 +9223,7 @@ export default function App2() {
   const mapGetCenterRef = useRef<(()=>[number,number])|null>(null)
   const mapRecenterRef  = useRef<(()=>void)|null>(null)
   // Page 2 — Quel type de rencontre (multi-select)
-  const [seekModes,setSeekModes]   = useState<string[]>(['romantic','friend'])  // multi
+  const [seekModes,setSeekModes]   = useState<string[]>([])  // multi — AUCUN sélectionné par défaut (David : boutons blancs au départ)
   const [seekMood,setSeekMood]     = useState<string|null>(null)  // 🎭 mood DU CRÉNEAU (contexte soft, 1 seul)
   const [seekGender,setSeekGender] = useState<'F'|'M'|'X'|'all'>('all')
   const [ageMin,setAgeMin] = useState('18')
@@ -10614,10 +10625,10 @@ export default function App2() {
                   showPin={true}
                   onReady={(fn,rc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc }}
                   onGpsUpdate={(loc)=>setMeetupPos(loc)}/>
-                {/* Bouton reset position — en haut à droite, compact */}
+                {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
                   title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}
-                  style={{position:'absolute',top:8,right:8,zIndex:1200,
+                  style={{position:'absolute',bottom:40,left:8,zIndex:1200,
                     padding:'6px 12px',borderRadius:20,
                     background:C.bordeaux,border:'none',
                     color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
@@ -10657,7 +10668,9 @@ export default function App2() {
                   const pct = rayonToSlider(rayon)
                   const p4=p(r4), p7=p(r7), p10=p(r10)
                   const tension = coneTension({ now, startAt: untilAt, radiusKm: rayon })
-                  const overWindow = flag && r10>0 && rayon > r10 + 0.01
+                  // ⚠️ NE PAS exiger r10>0 : si la fenêtre est trop courte, r10 tombe à 0 et TOUT le Cône
+                  //    disparaissait (bug David). r10=0 = rien d'atteignable → tension max, pas disparition.
+                  const overWindow = flag && rayon > Math.max(r10,0) + 0.01
                   const fillCol = !flag ? C.orange : (tension>=7||overWindow ? C.bordeaux : tension>=4 ? C.orange : C.green)
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
@@ -10667,11 +10680,11 @@ export default function App2() {
                     if (flag) {
                       // RÉSISTANCE PROGRESSIVE (David : « plus dur encore sur les bords »). On lutte contre le slider
                       // quand la tension monte dans le cône — jamais un mur, mais de plus en plus dur.
-                      if (r10>0 && target>r10) {
+                      if (target > r10) {
                         // au-delà du rayon crédible : très dur, ET de plus en plus dur plus on pousse loin.
                         const over = target - r10
                         target = r10 + over * 0.22 / (1 + over*0.18)
-                      } else if (r7>0 && target>r7) {
+                      } else if (target > r7) {
                         // zone bordeaux (tension 7-10) : léger frein, ça commence à accrocher.
                         target = r7 + (target - r7) * 0.6
                       }
@@ -10687,19 +10700,14 @@ export default function App2() {
                   const edgeMin = Math.round(coneTravelMs(rayon)/60000)
                   const earliest = earliestCredibleStart(now, rayon)
                   let msg:string|null = null, msgCol = C.whiteMid
-                  if (flag && rayon>=2) {
-                    if (overWindow || tension>=7) { msgCol=C.bordeaux
-                      msg = lang==='en'
-                        ? `Wide radius — a Clutch at the edge would be tight. Extend the time to reach further.`
-                        : `Rayon large — un Clutch au bord serait juste. Prolonge l’heure pour aller plus loin.` }
+                  const high = flag && rayon>=1 && (overWindow || tension>=7)   // alerte forte = dynamique
+                  if (flag && rayon>=1) {
+                    if (high) { msgCol=C.bordeaux
+                      msg = lang==='en' ? `Too far for this time — push it later` : `Trop loin pour cette heure — décale plus tard` }
                     else if (tension>=4) { msgCol=C.orange
-                      msg = lang==='en'
-                        ? `Edge ~${edgeMin} min away · reachable from ${hhmm(earliest)}`
-                        : `Bord à ~${edgeMin} min · joignable dès ${hhmm(earliest)}` }
+                      msg = lang==='en' ? `Edge ~${edgeMin} min · from ${hhmm(earliest)}` : `Bord à ~${edgeMin} min · dès ${hhmm(earliest)}` }
                     else {
-                      msg = lang==='en'
-                        ? `Edge of radius ~${edgeMin} min away · reachable from ${hhmm(earliest)}`
-                        : `Bord du rayon à ~${edgeMin} min · joignable dès ${hhmm(earliest)}` }
+                      msg = lang==='en' ? `Edge ~${edgeMin} min away` : `Bord du rayon à ~${edgeMin} min` }
                   }
                   return (
                     <>
@@ -10721,13 +10729,16 @@ export default function App2() {
                         <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:fillCol,pointerEvents:'none',transition:'background .12s'}}/>
                         {/* marqueur de la limite crédible (« le mur » du cône) */}
                         {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,width:2,height:16,borderRadius:1,background:C.bordeaux,opacity:.55,pointerEvents:'none'}}/>}
-                        {/* thumb */}
-                        <div style={{position:'absolute',left:`calc(${pct}% - 6px)`,width:12,height:30,borderRadius:4,background:fillCol,border:`2px solid ${C.bg}`,pointerEvents:'none',transition:'background .12s'}}/>
+                        {/* thumb — BLANC + anneau fluo (couleur de zone), bien visible (David 28.06) */}
+                        <div style={{position:'absolute',left:`calc(${pct}% - 10px)`,width:20,height:36,borderRadius:7,background:'#fff',border:`3.5px solid ${fillCol}`,pointerEvents:'none',transition:'border-color .12s',boxShadow:`0 0 0 1.5px rgba(255,255,255,.9), 0 2px 8px ${fillCol}66`}}/>
                       </div>
                     </div>
+                    {high && <style>{`@keyframes conePulseMsg{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}`}</style>}
                     {msg && (
-                      <div style={{padding:'0 16px 6px',display:'flex',alignItems:'center',gap:6,fontSize:10.5,color:msgCol,transition:'color .15s'}}>
-                        <span style={{flexShrink:0}}>🌀</span><span>{msg}</span>
+                      <div style={{padding: high?'2px 16px 9px':'0 16px 6px',display:'flex',alignItems:'center',gap:6,
+                        fontSize: high?13.5:10.5, fontWeight: high?800:500, color:msgCol, transition:'color .15s',
+                        transformOrigin:'left center', animation: high?'conePulseMsg 1s ease-in-out infinite':undefined}}>
+                        <span style={{flexShrink:0,fontSize:high?16:11}}>{high?'⚠️':'🌀'}</span><span>{msg}</span>
                       </div>
                     )}
                     </>
@@ -12593,7 +12604,7 @@ export default function App2() {
           {showVerrou&&<VerrouExplosion onDone={onVerrouDone} verrou={verrouData}/>}
           {/* Boutons flottants Clutch Live + Clutch Night (physique billard + dock long-press).
               Masqués pendant un Verrou actif (ne pas cliquer en plein RDV). Affichage piloté par Geek Setup. */}
-          <FloatingFabs showLive={fabPrefs.live} showNight={fabPrefs.night} hidden={!!activeVerrou}
+          <FloatingFabs showLive={fabPrefs.live} showNight={fabPrefs.night} hidden={!!activeVerrou || flow==='carte' || flow==='options'}
             onTapLive={()=>{ setFlow('app'); setTab('presences'); activateLive() }}
             onTapNight={()=>setShowClutchNight(true)} />
           <NotifBanner lang={lang} />
@@ -12871,9 +12882,9 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     return (
       <button onPointerDown={onFabDown} onPointerMove={onFabMove} onPointerUp={onFabUp} onPointerCancel={onFabUp}
         aria-label="Ouvrir le Test Lab" style={{ position:'fixed', ...fp, zIndex:8000, display:'flex', alignItems:'center', gap:5,
-          padding:'9px 13px', borderRadius:999, border:`1.5px solid ${C.bordeaux}`, background:C.bordeaux, color:'#fff',
-          fontFamily:'inherit', fontSize:13, fontWeight:900, cursor:'grab', touchAction:'none', boxShadow:'0 6px 18px rgba(83,41,67,.45)' }}>
-        🎮<span style={{fontSize:12}}>Test Lab</span>
+          padding:'10px 15px', borderRadius:999, border:`2.5px solid #fff`, background:C.green, color:'#fff',
+          fontFamily:'inherit', fontSize:13, fontWeight:900, cursor:'grab', touchAction:'none', boxShadow:'0 0 0 1.5px rgba(119,188,31,.6), 0 6px 20px rgba(119,188,31,.55)' }}>
+        🎮<span style={{fontSize:12.5}}>Test Lab</span>
       </button>
     )
   }
@@ -12897,7 +12908,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     return (
       <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
         {/* Bandeau permanent */}
-        <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bordeaux,color:'#fff'}}>
+        <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'calc(var(--sat) + 10px) 16px 10px',background:C.bordeaux,color:'#fff'}}>
           <span style={{fontSize:14,fontWeight:900}}>🎭 TU INCARNES {nameOf(inc).toUpperCase()}</span>
           <button onClick={exitInc} style={{marginLeft:'auto',fontSize:12.5,fontWeight:800,padding:'7px 14px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'rgba(255,255,255,.12)',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↩︎ Quitter</button>
           <button onClick={()=>setOpen(false)} style={{fontSize:12.5,fontWeight:800,padding:'7px 12px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'transparent',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
@@ -12935,7 +12946,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   return (
     <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
       {/* Header */}
-      <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
+      <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'calc(var(--sat) + 12px) 16px 12px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
         <span style={{fontSize:18,fontWeight:900,color:C.bordeaux}}>🎮 Test Lab</span>
         <span style={{fontSize:11,color:C.whiteMid}}>{bots.filter(isLive).length}/{bots.length} bots en ligne</span>
         <button onClick={()=>setOpen(false)} style={{marginLeft:'auto',fontSize:13,fontWeight:800,padding:'7px 14px',borderRadius:999,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>✕ Fermer</button>

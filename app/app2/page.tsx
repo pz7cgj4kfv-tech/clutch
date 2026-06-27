@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1cc'  // Versionnage HEXADÉCIMAL. ~310e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 200   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1cd'  // Versionnage HEXADÉCIMAL. ~311e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 201   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9261,12 +9261,13 @@ export default function App2() {
   useEffect(() => {
     if (!CONE_RAYON_HEURE_LIVE) return
     const now = Date.now()
-    const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+    // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
+    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
     const winMin = Math.max(1, (untilAt - now)/60000)
     const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
     const maxOk = r10 > RAYON_MIN_KM ? r10 : RAYON_MIN_KM
     setRayon(r => r > maxOk + 0.05 ? maxOk : r)
-  }, [untilTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fromTime, untilTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)
@@ -10660,7 +10661,8 @@ export default function App2() {
                 {/* 🌀 ALERTE DU CÔNE — SUR la carte, et qui GROSSIT + pulse quand la tension monte (idée David). */}
                 {CONE_RAYON_HEURE_LIVE && (()=>{
                   const now=Date.now()
-                  const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+                  // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
+    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
                   const winMin = Math.max(1,(untilAt-now)/60000)
                   const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin,10))
                   const tension = coneTension({ now, startAt:untilAt, radiusKm:rayon })
@@ -10700,7 +10702,8 @@ export default function App2() {
                   const now = Date.now()
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
                   // Fin de fenêtre choisie (presetWin ou molette « until ») → minutes de marge dispo.
-                  const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+                  // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
+    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
                   const winMin = Math.max(1, (untilAt - now)/60000)
                   // Seuils de zones (km), bornés au max du slider. r10 = rayon crédible (la « limite »).
                   const r4  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 4))

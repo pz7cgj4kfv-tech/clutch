@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c3'  // Versionnage HEXADÉCIMAL. ~301e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 191   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c4'  // Versionnage HEXADÉCIMAL. ~302e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 192   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7851,7 +7851,10 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
           <div style={{fontSize:11,color:`${C.whiteMid}aa`,marginTop:7}}>Designed in Lausanne <span style={{fontSize:12}}>🇨🇭</span> · © 2026</div>
           <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:3,fontStyle:'italic'}}>La vraie vie, maintenant.</div>
 
-          <button onClick={()=>onFeedback?.()} style={{marginTop:20,padding:'13px 22px',borderRadius:14,background:C.orange,border:'none',color:'#fff',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(235,107,175,.4)'}}>
+          {/* Lien vers le Hub = la page générale qui donne accès à tous les onglets (David 28.06) */}
+          <a href="/hub" style={{display:'inline-block',marginTop:16,fontSize:12.5,fontWeight:800,color:C.bordeaux,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:999,padding:'9px 18px'}}>🗺️ Toutes les pages · le Hub</a>
+
+          <button onClick={()=>onFeedback?.()} style={{marginTop:16,padding:'13px 22px',borderRadius:14,background:C.orange,border:'none',color:'#fff',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 5px 16px rgba(235,107,175,.4)'}}>
             💌 Un mot au boss ?
           </button>
           <div style={{fontSize:10,color:`${C.whiteMid}66`,marginTop:9,lineHeight:1.5}}>Vocal (max 5 min) ou texte — ça arrive direct<br/>chez les créateurs ✦ Merci de tester Clutch 🙏</div>
@@ -12868,7 +12871,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
         aria-label="Ouvrir le Test Lab" style={{ position:'fixed', ...fp, zIndex:8000, display:'flex', alignItems:'center', gap:5,
           padding:'9px 13px', borderRadius:999, border:`1.5px solid ${C.bordeaux}`, background:C.bordeaux, color:'#fff',
           fontFamily:'inherit', fontSize:13, fontWeight:900, cursor:'grab', touchAction:'none', boxShadow:'0 6px 18px rgba(83,41,67,.45)' }}>
-        🧪<span style={{fontSize:12}}>Test Lab</span>
+        🎮<span style={{fontSize:12}}>Test Lab</span>
       </button>
     )
   }
@@ -12931,7 +12934,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
       {/* Header */}
       <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
-        <span style={{fontSize:18,fontWeight:900,color:C.bordeaux}}>🧪 Test Lab</span>
+        <span style={{fontSize:18,fontWeight:900,color:C.bordeaux}}>🎮 Test Lab</span>
         <span style={{fontSize:11,color:C.whiteMid}}>{bots.filter(isLive).length}/{bots.length} bots en ligne</span>
         <button onClick={()=>setOpen(false)} style={{marginLeft:'auto',fontSize:13,fontWeight:800,padding:'7px 14px',borderRadius:999,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>✕ Fermer</button>
       </div>

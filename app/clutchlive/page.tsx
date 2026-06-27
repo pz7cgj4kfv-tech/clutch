@@ -41,7 +41,7 @@ const CROWDS = [
   { lat: 46.5230, lng: 6.6360, n: 12 }, { lat: 46.5090, lng: 6.6270, n: 4 },
 ]
 
-export default function ClutchLive() {
+function ClutchLiveSimV1() {
   const divRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const tileRef = useRef<any>(null)
@@ -211,6 +211,339 @@ export default function ClutchLive() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMMERSION V2 — « écran Tesla » + boussole façon PeakFinder.
+// Tu tournes ton téléphone (ou tu glisses) → la scène pivote et tu vois ce qu'il y a
+// AUTOUR de toi dans la direction où tu regardes, dans un horizon de 500 m. En bas,
+// un radar top-down (Tesla) qui tourne avec ton cap. Jamais la position exacte d'une
+// personne (densité floue). Boussole = magnétomètre du téléphone (azimut).
+// ─────────────────────────────────────────────────────────────────────────────
+const CENTER: [number, number] = [46.5197, 6.6323]
+// Présences « solo » (gens seuls qui veulent faire un truc) — floues, jamais exactes.
+type Solo = { id: string; emoji: string; label: string; lat: number; lng: number; night?: boolean }
+const SOLOS: Solo[] = [
+  { id: 's1', emoji: '🃏', label: 'Quelqu’un · cartes', lat: 46.5188, lng: 6.6300 },
+  { id: 's2', emoji: '☕', label: 'Quelqu’un · café', lat: 46.5210, lng: 6.6345 },
+  { id: 's3', emoji: '🚶', label: 'Quelqu’un · balade', lat: 46.5179, lng: 6.6338, night: true },
+  { id: 's4', emoji: '🎸', label: 'Quelqu’un · jam', lat: 46.5224, lng: 6.6290, night: true },
+]
+// Relèvement (bearing) de A vers B : 0 = Nord, sens horaire, en radians.
+function bearing(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const φ1 = aLat * Math.PI / 180, φ2 = bLat * Math.PI / 180, Δλ = (bLng - aLng) * Math.PI / 180
+  const y = Math.sin(Δλ) * Math.cos(φ2)
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+  return Math.atan2(y, x)
+}
+const norm = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
+
+function ClutchLiveImmersionV2() {
+  const cvRef = useRef<HTMLCanvasElement | null>(null)
+  const headingRef = useRef(0)          // cap regardé (rad, 0 = Nord)
+  const posRef = useRef<[number, number]>([...CENTER])
+  const nightRef = useRef(false)
+  const walkRef = useRef(false)
+  const dragRef = useRef<{ x: number; h: number } | null>(null)
+  const [night, setNight] = useState(false)
+  const [walking, setWalking] = useState(false)
+  const [sensor, setSensor] = useState(false)
+  const [headDeg, setHeadDeg] = useState(0)
+  nightRef.current = night; walkRef.current = walking
+
+  // capteur d'orientation (boussole) — iOS demande une permission explicite.
+  const onOrient = (e: any) => {
+    const h = (e.webkitCompassHeading != null) ? e.webkitCompassHeading
+      : (e.alpha != null ? 360 - e.alpha : null)
+    if (h != null) headingRef.current = h * Math.PI / 180
+  }
+  const enableSensor = async () => {
+    const D: any = typeof window !== 'undefined' ? (window as any).DeviceOrientationEvent : null
+    try {
+      if (D && typeof D.requestPermission === 'function') {
+        const r = await D.requestPermission(); if (r !== 'granted') return
+      }
+      window.addEventListener('deviceorientation', onOrient, true)
+      setSensor(true)
+    } catch { /* refusé → on garde le drag */ }
+  }
+  useEffect(() => () => window.removeEventListener('deviceorientation', onOrient, true), [])
+
+  // marche simulée : on dérive doucement vers le cap regardé (les distances diminuent).
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (!walkRef.current) return
+      const [la, ln] = posRef.current
+      const step = 0.00035
+      posRef.current = [la + Math.cos(headingRef.current) * step, ln + Math.sin(headingRef.current) * step]
+    }, 120)
+    return () => clearInterval(iv)
+  }, [])
+
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return
+    const ctx = cv.getContext('2d'); if (!ctx) return
+    let raf = 0, alive = true, t0 = 0
+    const resize = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize(); const onR = () => resize(); window.addEventListener('resize', onR)
+
+    const draw = (ts: number) => {
+      if (!alive) return
+      if (!t0) t0 = ts
+      const time = (ts - t0) / 1000
+      // auto-rotation douce si pas de capteur ni de drag (pour que ça vive)
+      if (!sensor && !dragRef.current) headingRef.current += 0.0016
+      const W = cv.clientWidth, H = cv.clientHeight
+      const ngt = nightRef.current
+      const horizonY = H * 0.52
+      const cx = W / 2
+
+      // ── CIEL / FOND ──
+      const sky = ctx.createLinearGradient(0, 0, 0, horizonY)
+      if (ngt) { sky.addColorStop(0, '#0a0616'); sky.addColorStop(1, '#241436') }
+      else { sky.addColorStop(0, '#FFE7D6'); sky.addColorStop(1, '#FFF6EF') }
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, horizonY)
+      // sol
+      const grd = ctx.createLinearGradient(0, horizonY, 0, H)
+      if (ngt) { grd.addColorStop(0, '#160a24'); grd.addColorStop(1, '#0b0512') }
+      else { grd.addColorStop(0, '#F3E5DC'); grd.addColorStop(1, '#E7D6CB') }
+      ctx.fillStyle = grd; ctx.fillRect(0, horizonY, W, H - horizonY)
+
+      // étoiles la nuit
+      if (ngt) for (let i = 0; i < 50; i++) {
+        const sx = (i * 89.7 % W), sy = (i * 41.3 % (horizonY - 10))
+        const tw = 0.3 + 0.3 * Math.sin(time * 1.6 + i)
+        ctx.fillStyle = `rgba(255,235,250,${0.15 + tw * 0.25})`; ctx.fillRect(sx, sy, 1.5, 1.5)
+      }
+
+      const pos = posRef.current, head = headingRef.current
+      const FOV = 1.25 // demi-champ visible (~72°)
+
+      // ── SILHOUETTES D'IMMEUBLES (parallaxe selon le cap) ──
+      ctx.fillStyle = ngt ? 'rgba(124,92,208,.16)' : 'rgba(83,41,67,.10)'
+      for (let i = 0; i < 26; i++) {
+        const a = norm((i / 26) * 2 * Math.PI - head)
+        if (Math.abs(a) > FOV) continue
+        const x = cx + Math.sin(a) * (W * 0.62)
+        const bw = 26 + (i % 4) * 12, bh = 30 + (i * 53 % 70)
+        ctx.fillRect(x - bw / 2, horizonY - bh, bw, bh)
+      }
+      // ligne d'horizon
+      ctx.strokeStyle = ngt ? 'rgba(201,182,255,.4)' : 'rgba(83,41,67,.25)'
+      ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, horizonY); ctx.lineTo(W, horizonY); ctx.stroke()
+
+      // ── ÉVÉNEMENTS + SOLOS dans l'horizon (façon PeakFinder) ──
+      const live = [
+        ...EVENTS.filter(e => !ngt || e.night).map(e => ({ kind: 'ev' as const, emoji: e.emoji, label: e.title, lat: e.lat, lng: e.lng })),
+        ...SOLOS.filter(s => !ngt || s.night).map(s => ({ kind: 'solo' as const, emoji: s.emoji, label: s.label, lat: s.lat, lng: s.lng })),
+      ].map(o => {
+        const km = hav(pos[0], pos[1], o.lat, o.lng)
+        const rel = norm(bearing(pos[0], pos[1], o.lat, o.lng) - head)
+        return { ...o, km, rel }
+      }).filter(o => Math.abs(o.rel) < FOV).sort((a, b) => b.km - a.km)
+
+      for (const o of live) {
+        const x = cx + Math.sin(o.rel) * (W * 0.52)
+        const near = Math.max(0, 1 - o.km / 1.6)           // 0 loin … 1 tout près
+        const y = horizonY - 26 - near * (H * 0.20)        // plus près = plus bas/grand
+        const sz = 16 + near * 16
+        const isSolo = o.kind === 'solo'
+        const col = isSolo ? (ngt ? '#9b7bff' : '#7c5cd0') : (ngt ? '#c9b6ff' : '#EB6BAF')
+        // halo
+        ctx.beginPath(); ctx.arc(x, y, sz * 0.9, 0, 6.28)
+        ctx.fillStyle = isSolo ? 'rgba(124,92,208,.16)' : 'rgba(235,107,175,.16)'; ctx.fill()
+        // pastille
+        ctx.beginPath(); ctx.arc(x, y, sz * 0.62, 0, 6.28); ctx.fillStyle = col; ctx.fill()
+        ctx.font = `${Math.round(sz * 0.7)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText(o.emoji, x, y + 1)
+        // étiquette (titre + distance)
+        const dist = o.km < 1 ? `${Math.round(o.km * 1000)} m` : `${o.km.toFixed(1)} km`
+        ctx.font = '700 11px system-ui'; ctx.textBaseline = 'alphabetic'
+        const tw = ctx.measureText(o.label).width + 16
+        const ly = y - sz * 0.62 - 16
+        ctx.fillStyle = ngt ? 'rgba(20,10,30,.82)' : 'rgba(255,255,255,.92)'
+        ctx.beginPath(); (ctx as any).roundRect(x - tw / 2, ly - 13, tw, 18, 9); ctx.fill()
+        ctx.fillStyle = ngt ? '#ECE6F5' : '#1a0810'; ctx.fillText(o.label, x, ly)
+        ctx.fillStyle = col; ctx.font = '800 10px system-ui'; ctx.fillText(dist, x, ly + 12)
+        // trait vers le sol
+        ctx.strokeStyle = isSolo ? 'rgba(124,92,208,.35)' : 'rgba(235,107,175,.35)'
+        ctx.beginPath(); ctx.moveTo(x, y + sz * 0.62); ctx.lineTo(x, horizonY); ctx.stroke()
+      }
+
+      // ── BANDE BOUSSOLE (haut) ──
+      const cardinals: [number, string][] = [[0, 'N'], [Math.PI / 2, 'E'], [Math.PI, 'S'], [-Math.PI / 2, 'O']]
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      for (const [ang, lab] of cardinals) {
+        const rel = norm(ang - head); if (Math.abs(rel) > FOV) continue
+        const x = cx + Math.sin(rel) * (W * 0.52)
+        ctx.fillStyle = ngt ? 'rgba(201,182,255,.85)' : 'rgba(83,41,67,.8)'
+        ctx.font = `${lab === 'N' ? '900 16px' : '700 13px'} system-ui`
+        ctx.fillText(lab, x, 18)
+      }
+      ctx.strokeStyle = ngt ? 'rgba(201,182,255,.25)' : 'rgba(83,41,67,.18)'
+      ctx.beginPath(); ctx.moveTo(0, 32); ctx.lineTo(W, 32); ctx.stroke()
+      // viseur central
+      ctx.strokeStyle = ngt ? 'rgba(201,182,255,.5)' : 'rgba(235,107,175,.6)'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(cx, 6); ctx.lineTo(cx, 28); ctx.stroke()
+
+      // ── RADAR TESLA (bas, top-down, tourne avec le cap) ──
+      const rcx = cx, rcy = H - 78, R = 62
+      ctx.fillStyle = ngt ? 'rgba(12,6,20,.7)' : 'rgba(255,255,255,.75)'
+      ctx.beginPath(); ctx.arc(rcx, rcy, R + 6, 0, 6.28); ctx.fill()
+      for (const rr of [0.5, 1]) {
+        ctx.strokeStyle = ngt ? 'rgba(201,182,255,.22)' : 'rgba(83,41,67,.14)'; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(rcx, rcy, R * rr, 0, 6.28); ctx.stroke()
+      }
+      // balayage
+      const sweep = time * 1.1
+      const sg = ('createConicGradient' in ctx) ? (ctx as any).createConicGradient(sweep, rcx, rcy) : null
+      if (sg) { sg.addColorStop(0, 'rgba(235,107,175,.30)'); sg.addColorStop(0.12, 'rgba(235,107,175,0)'); ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(rcx, rcy, R, 0, 6.28); ctx.fill() }
+      // blips (events + solos) sur le radar — orientés « cap en haut »
+      for (const o of [
+        ...EVENTS.filter(e => !ngt || e.night).map(e => ({ lat: e.lat, lng: e.lng, solo: false })),
+        ...SOLOS.filter(s => !ngt || s.night).map(s => ({ lat: s.lat, lng: s.lng, solo: true })),
+      ]) {
+        const km = hav(pos[0], pos[1], o.lat, o.lng)
+        const rel = norm(bearing(pos[0], pos[1], o.lat, o.lng) - head)
+        const rr = Math.min(1, km / 1.6) * R
+        const bx = rcx + Math.sin(rel) * rr, by = rcy - Math.cos(rel) * rr
+        ctx.beginPath(); ctx.arc(bx, by, o.solo ? 2.6 : 3.4, 0, 6.28)
+        ctx.fillStyle = o.solo ? '#7c5cd0' : '#EB6BAF'; ctx.fill()
+      }
+      // toi au centre (chevron pointant en haut = direction regardée)
+      ctx.fillStyle = ngt ? '#FFBF9E' : '#532943'
+      ctx.beginPath(); ctx.moveTo(rcx, rcy - 8); ctx.lineTo(rcx - 5, rcy + 5); ctx.lineTo(rcx, rcy + 2); ctx.lineTo(rcx + 5, rcy + 5); ctx.closePath(); ctx.fill()
+      ctx.font = '700 9px system-ui'; ctx.fillStyle = ngt ? 'rgba(201,182,255,.7)' : 'rgba(83,41,67,.6)'; ctx.textAlign = 'center'
+      ctx.fillText('500 m', rcx, rcy + R + 14)
+
+      setHeadDeg(Math.round(((head * 180 / Math.PI) % 360 + 360) % 360))
+      raf = requestAnimationFrame(draw)
+    }
+    raf = requestAnimationFrame(draw)
+    return () => { alive = false; cancelAnimationFrame(raf); window.removeEventListener('resize', onR) }
+  }, [sensor])
+
+  // drag pour pivoter (fallback desktop / sans capteur)
+  const onDown = (e: React.PointerEvent) => { dragRef.current = { x: e.clientX, h: headingRef.current }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) }
+  const onMove = (e: React.PointerEvent) => { if (!dragRef.current) return; const dx = e.clientX - dragRef.current.x; headingRef.current = dragRef.current.h + dx * 0.006 }
+  const onUp = () => { dragRef.current = null }
+
+  const cardinal = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(headDeg / 45) % 8]
+  const ink = night ? '#ECE6F5' : '#1a0810', dim = night ? 'rgba(236,230,245,.55)' : 'rgba(26,8,16,.5)'
+
+  return (
+    <div style={{ background: night ? '#0C0818' : '#FAF6F0', transition: 'background .5s' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '6px 14px 36px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 21, fontWeight: 900, color: night ? '#c9b6ff' : '#532943' }}>⚡ Clutch Live · Immersion</span>
+          <span style={{ fontSize: 12, color: dim }}>tourne ton tél, regarde autour</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button onClick={() => setWalking(w => !w)} style={{ fontSize: 12.5, fontWeight: 800, padding: '6px 13px', borderRadius: 9, cursor: 'pointer', border: 'none', background: walking ? '#EB6BAF' : '#532943', color: '#fff' }}>{walking ? '⏸ Stop' : '▶ J’avance'}</button>
+            <button onClick={() => setNight(n => !n)} style={{ fontSize: 12.5, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer', border: `1px solid rgba(42,16,32,.14)`, background: night ? '#1c1530' : '#fff', color: ink }}>{night ? '☀️ Jour' : '🌙 Nuit'}</button>
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: `1px solid rgba(42,16,32,.14)`, boxShadow: '0 14px 40px -16px rgba(42,16,32,.45)' }}>
+          <canvas ref={cvRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+            style={{ width: '100%', height: '64vh', minHeight: 440, display: 'block', cursor: 'grab', touchAction: 'none' }} />
+          {/* cap */}
+          <div style={{ position: 'absolute', top: 40, left: 12, fontSize: 12, fontWeight: 800, color: night ? '#c9b6ff' : '#532943', background: night ? 'rgba(12,6,20,.6)' : 'rgba(255,255,255,.8)', borderRadius: 8, padding: '3px 9px' }}>{cardinal} · {headDeg}°</div>
+          {/* activer boussole */}
+          {!sensor && (
+            <button onClick={enableSensor} style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', fontSize: 12, fontWeight: 800, padding: '8px 16px', borderRadius: 999, cursor: 'pointer', border: 'none', background: '#EB6BAF', color: '#fff', boxShadow: '0 4px 14px rgba(235,107,175,.45)' }}>🧭 Activer la boussole</button>
+          )}
+        </div>
+        <div style={{ fontSize: 11.5, color: dim, marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
+          Sur le téléphone : appuie sur <b style={{ color: ink }}>« Activer la boussole »</b> puis tourne sur toi-même — la scène pivote en vrai. Sur ordi : <b>glisse</b> pour pivoter. <b>« J’avance »</b> simule la marche (les distances fondent).
+        </div>
+
+        <ScienceImmersion night={night} />
+      </div>
+    </div>
+  )
+}
+
+// Explication scientifique — claire ET profonde (David : « beaucoup plus claire et profonde »).
+function ScienceImmersion({ night }: { night: boolean }) {
+  const [open, setOpen] = useState(false)
+  const ink = night ? '#ECE6F5' : '#1a0810', dim = night ? 'rgba(236,230,245,.7)' : 'rgba(26,8,16,.7)'
+  const card = night ? 'rgba(255,255,255,.05)' : '#fff', border = 'rgba(42,16,32,.14)'
+  const Item = ({ icon, t, children }: any) => (
+    <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: ink, marginBottom: 3 }}>{icon} {t}</div>
+      <div style={{ fontSize: 12.5, color: dim, lineHeight: 1.6 }}>{children}</div>
+    </div>
+  )
+  return (
+    <div style={{ marginTop: 18 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ width: '100%', textAlign: 'left', fontSize: 14, fontWeight: 800, color: ink, background: card, border: `1px solid ${border}`, borderRadius: 12, padding: '12px 14px', cursor: 'pointer' }}>
+        🔬 La science derrière — {open ? 'masquer' : 'comment ça marche vraiment'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <Item icon="📡" t="Te localiser : le GNSS (GPS & co)">
+            Ton téléphone écoute plusieurs constellations de satellites (GPS américain, Galileo européen, GLONASS…).
+            Chaque satellite envoie l’heure exacte de son horloge atomique ; en mesurant le <b>retard</b> de 4 signaux ou
+            plus, le tél résout sa position par <b>trilatération</b> (intersection de sphères). En ville, précision ~5-10 m
+            — d’où une marge de sécurité dans nos calculs, jamais une fausse certitude.
+          </Item>
+          <Item icon="🧭" t="Savoir où tu regardes : le magnétomètre">
+            La boussole lit le <b>champ magnétique terrestre</b> (~50 µT) pour trouver le Nord, et le combine avec le
+            <b> gyroscope</b> (vitesse de rotation) et l’<b>accéléromètre</b> (gravité) — c’est la <b>fusion de capteurs</b>.
+            Résultat : un <b>azimut</b> stable (l’angle entre le Nord et la direction où pointe ton tél). C’est lui qui fait
+            pivoter la scène quand tu tournes sur toi-même, comme dans PeakFinder.
+          </Item>
+          <Item icon="📐" t="Placer ce qui t’entoure : le relèvement">
+            Pour chaque lieu, on calcule son <b>relèvement</b> (bearing) : l’angle Nord→lieu, par trigonométrie sphérique.
+            On le compare à ton azimut → un angle <b>relatif</b>. S’il est dans ton champ de vision (~±72°), on l’affiche
+            devant toi ; sinon il est « derrière ». La distance (formule de <b>Haversine</b>) règle sa taille : plus c’est
+            proche, plus c’est gros et bas dans l’horizon.
+          </Item>
+          <Item icon="🌫️" t="Protéger les gens : la densité floue">
+            On ne montre <b>jamais</b> la position exacte d’une personne — seulement une <b>densité</b> (« ≈ 8 dans le coin »).
+            Tout le calcul reste <b>sur ton téléphone</b> ou côté serveur, et ne renvoie qu’un résultat agrégé. Ça rend la
+            <b> triangulation</b> d’un individu impossible (sécurité, surtout pour les femmes).
+          </Item>
+          <Item icon="🎯" t="Pourquoi 500 m ?">
+            500 m ≈ <b>6 minutes à pied</b> : l’échelle de la vraie spontanéité. Au-delà, ce n’est plus « maintenant, tout
+            de suite » — ça bascule dans le Cône (la Forteresse) qui vérifie que tu peux y arriver à temps.
+          </Item>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHELL — onglets de VERSIONS. Fenêtre principale = la plus récente (v2). On garde
+// les anciennes simulations accessibles (David : « voir les anciennes »).
+// ─────────────────────────────────────────────────────────────────────────────
+const VERSIONS: { id: string; label: string; tag: string }[] = [
+  { id: 'v2', label: 'Immersion', tag: 'nouveau' },
+  { id: 'v1', label: 'Carte', tag: 'v1' },
+]
+export default function ClutchLivePage() {
+  const [ver, setVer] = useState('v2')
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#fff', borderBottom: '1px solid rgba(42,16,32,.1)', position: 'sticky', top: 0, zIndex: 50, overflowX: 'auto' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,8,16,.45)', flexShrink: 0 }}>VERSIONS</span>
+        {VERSIONS.map(v => (
+          <button key={v.id} onClick={() => setVer(v.id)} style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+            padding: '6px 12px', borderRadius: 999, border: `1.5px solid ${ver === v.id ? '#EB6BAF' : 'rgba(42,16,32,.14)'}`,
+            background: ver === v.id ? '#EB6BAF' : '#fff', color: ver === v.id ? '#fff' : '#532943',
+          }}>{v.label}<span style={{ fontSize: 9, fontWeight: 700, opacity: .8, background: ver === v.id ? 'rgba(255,255,255,.25)' : 'rgba(42,16,32,.08)', borderRadius: 6, padding: '1px 5px' }}>{v.tag}</span></button>
+        ))}
+        <a href="/clutchnight" style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11.5, fontWeight: 700, textDecoration: 'none', color: '#532943' }}>🌙 Clutch Night →</a>
+      </div>
+      {ver === 'v2' ? <ClutchLiveImmersionV2 /> : <ClutchLiveSimV1 />}
     </div>
   )
 }

@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c5'  // Versionnage HEXADÉCIMAL. ~303e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 193   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c6'  // Versionnage HEXADÉCIMAL. ~304e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 194   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9225,7 +9225,7 @@ export default function App2() {
   // Page 2 — Quel type de rencontre (multi-select)
   const [seekModes,setSeekModes]   = useState<string[]>([])  // multi — AUCUN sélectionné par défaut (David : boutons blancs au départ)
   const [seekMood,setSeekMood]     = useState<string|null>(null)  // 🎭 mood DU CRÉNEAU (contexte soft, 1 seul)
-  const [seekGender,setSeekGender] = useState<'F'|'M'|'X'|'all'>('all')
+  const [seekGender,setSeekGender] = useState<string>('')  // '' = rien sélectionné au départ (David : pas de « peu importe » par défaut)
   const [ageMin,setAgeMin] = useState('18')
   const [ageMax,setAgeMax] = useState('45')
   const [intentMsg,setIntentMsg]   = useState('')
@@ -9314,12 +9314,14 @@ export default function App2() {
     return () => window.removeEventListener('clutch:pushresult', onResult as any)
   }, [user])
 
-  // 🔧 DIAGNOSTIC générique (bandeau persistant) — utilisé par les outils dev (Reset test, etc.).
+  // 🔧 DIAGNOSTIC générique (bandeau) — utilisé par les outils dev (Reset test, etc.).
   useEffect(() => {
     const onDiag = (e:any) => { const d=e?.detail; if(d?.msg) setPushDiag({msg:d.msg, color:d.color||C.salmon}) }
     window.addEventListener('clutch:diag', onDiag as any)
     return () => window.removeEventListener('clutch:diag', onDiag as any)
   }, [])
+  // Le bandeau de test ne RESTE PLUS collé en haut (David) → il disparaît tout seul après 5 s.
+  useEffect(() => { if(!pushDiag) return; const t=setTimeout(()=>setPushDiag(null), 5000); return ()=>clearTimeout(t) }, [pushDiag])
 
   // 🔒 SAFE-AREA ROBUSTE — mesure le vrai inset via une sonde. Si la WKWebView Capacitor renvoie 0
   // (bug connu iOS : l'encoche n'est pas rapportée malgré viewport-fit=cover), on applique un fallback
@@ -12738,9 +12740,9 @@ export default function App2() {
           />}
         </>
       )}
-      {/* 🔧 DIAGNOSTIC PUSH (admin) — bandeau PERSISTANT, reste affiché jusqu'au tap. Pour voir le résultat
-          réel d'un envoi de notif (combien de destinataires / erreur) sans qu'il disparaisse en 2s. */}
-      {pushDiag && (
+      {/* 🔧 DIAGNOSTIC PUSH — bandeau de TEST des notifications. Gardé pour DAVID uniquement (pas Mélanie ni
+          les autres) : on s'en sert encore pour vérifier que les push passent. Disparaît seul après 5 s. */}
+      {pushDiag && user?.id==='bad38f3e-87df-40e0-a2d2-75c03b58d72b' && (
         <div onClick={()=>setPushDiag(null)}
           style={{position:'fixed',top:'calc(var(--sat) + 8px)',left:8,right:8,zIndex:99999,background:pushDiag.color,
             color:'#fff',borderRadius:12,padding:'12px 14px',fontSize:13,fontWeight:800,lineHeight:1.4,
@@ -12865,6 +12867,37 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     showToast(`🎉 Event créé · ${n} demandes`, C.green); note(`🎉 ${nameOf(botId)} a créé un event (8 places) · ${n} bots inscrits → va dans Événements voir la liste + la liste d'attente`); refreshAll()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
+  // ── CYCLE DE VIE DU RDV côté bot (David : « il manque j'y suis, terminer, accepte/refuse »). ──
+  const verrouOf=async(botId:string)=>{
+    const { data } = await supabase.from('clutches')
+      .select('id,venue_lat,venue_lng,sender_id,receiver_id,sender_arrived,receiver_arrived')
+      .or(`sender_id.eq.${botId},receiver_id.eq.${botId}`).in('status',['accepted','confirmed','checked_in'])
+      .order('created_at',{ascending:false}).limit(1)
+    return ((data as any[])||[])[0] || null
+  }
+  const botRefuse=async(botId:string)=>{ if(!botId)return; setBusy('ref'); try{
+    const { data:pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',botId).eq('status','pending').limit(1)
+    const row=((pend as any[])||[])[0]
+    if(!row){ showToast(`Aucun clutch en attente vers ${nameOf(botId)}`,C.orange); setBusy(null); return }
+    await supabase.from('clutches').update({status:'declined'}).eq('id',row.id)
+    refreshAll(); showToast(`✗ ${nameOf(botId)} a refusé`,C.orange); note(`✗ ${nameOf(botId)} a refusé ton clutch (cooldown)`)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const botRdvNow=async(botId:string)=>{ if(!botId)return; setBusy('rdvnow'); try{
+    const c=await verrouOf(botId); if(!c){ showToast(`Pas de Verrou avec ${nameOf(botId)} — fais accepter d'abord`,C.orange); note(`ℹ️ pas de Verrou actif avec ${nameOf(botId)}`); setBusy(null); return }
+    const patch:any={ proposed_time:new Date(Date.now()-60000).toISOString() }
+    if(c.venue_lat==null){ patch.venue_lat=46.5197; patch.venue_lng=6.6323 }
+    await supabase.from('clutches').update(patch).eq('id',c.id)
+    refreshAll(); showToast(`⏱ RDV avec ${nameOf(botId)} = maintenant`,C.green); note(`⏱ RDV mis à MAINTENANT → ton bouton « j'y suis » apparaît sur le radar`)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const botArrive=async(botId:string)=>{ if(!botId)return; setBusy('arrive'); try{
+    const c=await verrouOf(botId); if(!c){ showToast(`Pas de Verrou avec ${nameOf(botId)}`,C.orange); setBusy(null); return }
+    const isSnd=c.sender_id===botId
+    const patch = isSnd ? {sender_arrived:true, sender_cur_lat:c.venue_lat, sender_cur_lng:c.venue_lng}
+                        : {receiver_arrived:true, receiver_cur_lat:c.venue_lat, receiver_cur_lng:c.venue_lng}
+    await supabase.from('clutches').update(patch).eq('id',c.id)
+    refreshAll(); showToast(`📍 ${nameOf(botId)} est au RDV (j'y suis)`,C.green); note(`📍 ${nameOf(botId)} a dit « j'y suis » → dis « j'y suis » toi aussi, puis Terminer le RDV`)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
   // ── SCÉNARIO 1 CLIC : clutch complet (reset → tout en ligne → un bot te clutche). ──
   const scenarioClutch=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return }
     try{ const { data } = await supabase.rpc('reset_total_qa'); note(`🎯 Scénario clutch 1/3 — reset (${(data as any)?.total??0} lignes)`); refreshAll() }catch{}
@@ -12914,11 +12947,15 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <button onClick={()=>setOpen(false)} style={{fontSize:12.5,fontWeight:800,padding:'7px 12px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'transparent',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
         </div>
         <div style={{flex:1,minHeight:0,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'14px 16px 30px'}}>
-          {/* Agir en son nom */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
-            <Big id="c2me" icon="📨" label="J'envoie un clutch à David" sub="depuis ce bot, vers toi" onTap={()=>clutchToMe(inc)}/>
-            <Big id="acc" icon="🔒" label="J'accepte le clutch de David" sub="le clutch que tu m'as envoyé" onTap={()=>botAccepts(inc)}/>
+          {/* Agir en son nom — tout le cycle de vie du RDV */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
+            <Big id="c2me" icon="📨" label="Je clutche David" sub="depuis ce bot, vers toi" onTap={()=>clutchToMe(inc)}/>
+            <Big id="acc" icon="🔒" label="J'accepte son clutch" sub="le clutch que tu m'as envoyé" onTap={()=>botAccepts(inc)}/>
+            <Big id="ref" icon="🚫" label="Je refuse son clutch" sub="teste le refus + cooldown" onTap={()=>botRefuse(inc)}/>
+            <Big id="rdvnow" icon="⏱" label="RDV = maintenant" sub="active ton « j'y suis »" onTap={()=>botRdvNow(inc)}/>
+            <Big id="arrive" icon="📍" label="Je dis « j'y suis »" sub="je suis arrivé·e au RDV → à toi de confirmer, puis Terminer" onTap={()=>botArrive(inc)} wide/>
           </div>
+          <div style={{fontSize:10.5,color:C.whiteMid,margin:'0 0 16px',lineHeight:1.5}}>Flow complet : J'accepte → RDV maintenant → (ton radar montre « j'y suis ») → Je dis « j'y suis » → tu confirmes → Terminer.</div>
           {/* Ce que le bot voit */}
           <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
             <span style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>👁 CE QUE {nameOf(inc).toUpperCase()} VOIT AUTOUR ({seen.length})</span>

@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c0'  // Versionnage HEXADÉCIMAL. ~298e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 188   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c1'  // Versionnage HEXADÉCIMAL. ~299e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 189   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12861,6 +12861,25 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const incarnate=(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setInc(botId); loadSeen(botId); note(`🎭 Tu incarnes ${nameOf(botId)} — tu vois l'app de son point de vue`) }
   const exitInc=()=>{ note(`🎭 Fin de l'incarnation de ${nameOf(inc||'')}`); setInc(null); setSeen([]) }
 
+  // ── EVENT + demandes : un bot crée un event, les autres bots s'inscrivent (les « demandes » à valider). ──
+  const eventDemands=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('ev'); try{
+    const eH=20
+    const { data: ins, error } = await supabase.from('events').insert({ title:`Apéro test — ${nameOf(botId)}`, emoji:'🎟️', lieu:'Lausanne', event_time:'20:00', event_date:"Aujourd'hui", starts_at:tISO(eH), duration_minutes:180, spots:8, taken:0, description:'(test lab)', tags:['test'], ev_gender:'X', type:'user', status:'pending', active:true, created_by:botId, creator:nameOf(botId) }).select('id').single()
+    if(error || !ins){ showToast('❌ event : '+(error?.message||'?'),C.red); note('❌ event échoué : '+(error?.message||'?')); setBusy(null); return }
+    const evId=(ins as any).id
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id',botId); const ids=((bs as any[])||[]).map(b=>b.id)
+    let n=0; for(const id of ids){ const { error:e2 } = await supabase.from('event_participants').insert({ event_id:evId, user_id:id }); if(!e2) n++ }
+    showToast(`🎉 Event créé · ${n} demandes`, C.green); note(`🎉 ${nameOf(botId)} a créé un event (8 places) · ${n} bots inscrits → va dans Événements voir la liste + la liste d'attente`); refreshAll()
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
+  // ── SCÉNARIO 1 CLIC : clutch complet (reset → tout en ligne → un bot te clutche). ──
+  const scenarioClutch=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return }
+    try{ const { data } = await supabase.rpc('reset_total_qa'); note(`🎯 Scénario clutch 1/3 — reset (${(data as any)?.total??0} lignes)`); refreshAll() }catch{}
+    await allOnline()
+    await clutchToMe(sel)
+    note(`🎯 Scénario prêt — ${nameOf(sel)} t'a clutché. Ouvre l'onglet Clutchs et accepte → Verrou.`)
+  }
+
   if(!open) return null
   const Big=({id,icon,label,sub,onTap,danger,wide}:{id:string;icon:string;label:string;sub?:string;onTap:()=>void;danger?:boolean;wide?:boolean})=>(
     <button disabled={!!busy&&busy!==id} onClick={onTap} style={{
@@ -12944,9 +12963,18 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <Big id="on" icon="🟢" label="Tout mettre en ligne" sub="Tous les bots, dans ta zone, maintenant" onTap={allOnline}/>
           <Big id="c2me" icon="📨" label="Clutch vers moi" sub={`${nameOf(sel)} t'envoie un clutch`} onTap={()=>clutchToMe(sel)}/>
           <Big id="acc" icon="🔒" label="Le bot accepte" sub={`${nameOf(sel)} accepte ton clutch`} onTap={()=>botAccepts(sel)}/>
-          <Big id="ev" icon="🎉" label="Event + demandes" sub="Un bot crée un event" onTap={()=>soon('Event + demandes')}/>
+          <Big id="ev" icon="🎉" label="Event + demandes" sub={`${nameOf(sel)} crée un event, les bots s'inscrivent`} onTap={()=>eventDemands(sel)}/>
           <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>incarnate(sel)}/>
           <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
+        </div>
+
+        {/* Scénarios 1 clic */}
+        <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',margin:'18px 0 8px'}}>SCÉNARIOS 1 CLIC</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button onClick={scenarioClutch} style={{flex:'1 1 100%',textAlign:'left',padding:'12px 14px',borderRadius:14,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>
+            <span style={{fontSize:13.5,fontWeight:800}}>🎯 Clutch complet</span>
+            <span style={{display:'block',fontSize:10.5,color:C.whiteMid,marginTop:1}}>reset → tous en ligne → {nameOf(sel)} te clutche (tu n'as plus qu'à accepter)</span>
+          </button>
         </div>
 
         {/* Journal humain */}

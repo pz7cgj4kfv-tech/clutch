@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c9'  // Versionnage HEXADÉCIMAL. ~307e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 197   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ca'  // Versionnage HEXADÉCIMAL. ~308e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 198   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12810,6 +12810,8 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const [sel,setSel] = useState<string>('')
   const [log,setLog] = useState<string[]>([])
   const [armed,setArmed] = useState(false)
+  const [onlineStart,setOnlineStart] = useState('now')   // picker d'heure pour mettre un bot en ligne
+  const [onlineDur,setOnlineDur] = useState(2)
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(null)   // lanceur flottant déplaçable (« manette »)
   const fabRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
   const ACT=['pending','accepted','confirmed','checked_in']
@@ -12851,6 +12853,18 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     }
     showToast(`✓ ${n} bots en ligne sur toi 📍`, C.green); note(`✅ ${n} bots en ligne dans ta zone (créneaux + rayons variés)`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ⏰ Mettre un bot en ligne à une HEURE choisie (David : « je ne peux pas choisir l'heure »). Via admin_set_availability.
+  const ONLINE_STARTS:[string,string,number][] = [['now','Maintenant',0],['30','+30 min',30],['1h','+1h',60],['2h','+2h',120],['soir','Ce soir 19h',-1]]
+  const startEpoch=(k:string)=>{ if(k==='soir'){ const d=new Date(); d.setHours(19,0,0,0); if(d.getTime()<Date.now()) d.setDate(d.getDate()+1); return d.getTime() } const m=(ONLINE_STARTS.find(s=>s[0]===k)?.[2])||0; return Date.now()+m*60000 }
+  const setBotOnlineAt=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('onlineat'); try{
+    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
+    const s=startEpoch(onlineStart)
+    const { data, error } = await supabase.rpc('admin_set_availability',{ p_actor:botId, p_from:new Date(s).toISOString(), p_until:new Date(s+onlineDur*3600e3).toISOString(), p_lat:lat, p_lng:lng, p_radius:10 })
+    if(error){ showToast('❌ '+error.message+' — applique admin_actor_rpc',C.red); note('❌ RPC : '+error.message) }
+    else { const r:any=data; showToast(`${r?.ok?'🟢':'🚫'} ${r?.message||''}`, r?.ok?C.green:C.orange); note(`${r?.ok?'🟢':'🚫'} ${nameOf(botId)} → ${r?.message||''}`); refreshAll(); loadBots() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
   // 🛡️ Passe par la RPC GARDÉE admin_create_clutch (mêmes règles que les vrais users + feedback {ok,code,message}).
   const clutchToMe=async(fromId:string)=>{ if(!fromId){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
     const { data, error } = await supabase.rpc('admin_create_clutch', { p_actor:fromId, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:tISO(20,0), p_message:`Un café ? — ${nameOf(fromId)}` })
@@ -13038,6 +13052,23 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <Big id="ev" icon="🎉" label="Event + demandes" sub={`${nameOf(sel)} crée un event, les bots s'inscrivent`} onTap={()=>eventDemands(sel)}/>
           <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>incarnate(sel)}/>
           <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
+        </div>
+
+        {/* ⏰ Mettre le bot sélectionné en ligne à une HEURE choisie (via admin_set_availability) */}
+        <div style={{marginTop:16}}>
+          <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:8}}>⏰ METTRE {nameOf(sel).toUpperCase()} EN LIGNE À…</div>
+          <div style={{display:'flex',gap:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:6,marginBottom:8}}>
+            {ONLINE_STARTS.map(([k,l])=>(
+              <button key={k} onClick={()=>setOnlineStart(k)} style={{flexShrink:0,padding:'6px 11px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,whiteSpace:'nowrap',border:`1.5px solid ${onlineStart===k?C.green:C.border}`,background:onlineStart===k?C.green:C.bgCard,color:onlineStart===k?'#fff':C.white}}>{l}</button>
+            ))}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:11,color:C.whiteMid}}>Durée</span>
+            {[1,2,4].map(h=>(
+              <button key={h} onClick={()=>setOnlineDur(h)} style={{padding:'5px 12px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,border:`1.5px solid ${onlineDur===h?C.green:C.border}`,background:onlineDur===h?C.green:C.bgCard,color:onlineDur===h?'#fff':C.white}}>{h}h</button>
+            ))}
+            <button disabled={busy==='onlineat'} onClick={()=>setBotOnlineAt(sel)} style={{marginLeft:'auto',padding:'8px 16px',borderRadius:999,border:'none',background:C.bordeaux,color:'#fff',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='onlineat'?'⏳':'🟢 En ligne'}</button>
+          </div>
         </div>
 
         {/* Scénarios 1 clic */}

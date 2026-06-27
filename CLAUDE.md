@@ -108,7 +108,15 @@ const t = (k: string) => TR[lang][k] || TR.fr[k] || k
 
 - Toujours ajouter les clés EN ET FR en même temps
 - Jamais de strings hardcodées en anglais dans l'UI
-- Dans `app/app2/page.tsx` vers les lignes 80-220
+- Dico `TR` (fr/en) dans `app/app2/page.tsx` ~lignes 240-487 · hook `useT(lang)`
+
+### STANDARD i18n (gravé 28.06) — voir `docs/i18n-guide.md`
+- **Tout nouveau texte user-facing → `t('clé')`**, jamais `isFr ? :` ni FR brut. Clé en fr ET en.
+- État mesuré : dico parité PARFAITE (218 clés fr/en). MAIS ~227 ternaires `isFr` (bloquent une 3ᵉ langue) +
+  ~300-450 strings FR codées en dur → chantier de **plusieurs sessions**, par lots testables (FR inchangé).
+- **Outils** : `node scripts/i18n-audit.mts` (parité) · `node scripts/i18n-hardcoded.mts` (backlog du codé-en-dur).
+- **Ajouter une langue** = 3 endroits (type `Lang`, bloc `TR.xx`, registre `LANGS` du sélecteur). Détail dans le guide.
+- Méthode sûre : 1 composant/lot → clés fr+en → remplacer → `tsc` (attrape le `t` mal placé) → 2 scripts → commit.
 
 ---
 

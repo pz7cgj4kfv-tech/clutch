@@ -240,6 +240,7 @@ type Lang = 'fr' | 'en'
 const TR: Record<Lang, Record<string,string>> = {
   fr: {
     'tab.presences':'Présences','tab.events':'Événements','tab.clutchs':'Clutchs','tab.contacts':'Contacts','tab.profil':'Profil',
+    'avail.tip.visible':'Tu es visible','avail.tip.offline':'Tu es hors ligne','avail.tip.until':'Jusqu\'à','avail.tip.openslot':'Ouvre un créneau pour apparaître','avail.tip.change':'Modifier →',
     'contacts.title':'Mes contacts','contacts.empty':'Aucun contact pour l\'instant','contacts.empty.sub':'Tes contacts apparaissent ici après un RDV réussi',
     'page1.title':'Choisis ton moment','page1.cta':'Voir les présences →',
     'page1.step':'Étape 1/2 — Quand ?',
@@ -363,6 +364,7 @@ const TR: Record<Lang, Record<string,string>> = {
   },
   en: {
     'tab.presences':'Nearby','tab.events':'Events','tab.clutchs':'Clutches','tab.contacts':'Contacts','tab.profil':'Profile',
+    'avail.tip.visible':'You\'re visible','avail.tip.offline':'You\'re offline','avail.tip.until':'Until','avail.tip.openslot':'Open a slot to appear','avail.tip.change':'Change →',
     'contacts.title':'My contacts','contacts.empty':'No contacts yet','contacts.empty.sub':'Contacts appear here after a successful meetup',
     'page1.title':'Pick your window','page1.cta':'See who\'s around →',
     'page1.step':'Step 1/2 — When?',
@@ -1509,17 +1511,17 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
         <div style={{position:'fixed',bottom:80,right:12,zIndex:2000,background:C.bgCard,border:`1px solid ${availInfo.isAvail?'rgba(34,197,94,.4)':C.border}`,borderRadius:16,padding:'14px 16px',minWidth:200,boxShadow:'0 8px 32px rgba(0,0,0,.5)'}}>
           <div style={{fontSize:11,fontWeight:800,color:availInfo.isAvail?'#22C55E':C.whiteMid,marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
             <span style={{width:7,height:7,borderRadius:'50%',background:availInfo.isAvail?'#22C55E':'rgba(255,255,255,.3)',display:'inline-block',flexShrink:0}}/>
-            {availInfo.isAvail?(isFr?'Tu es visible':'You\'re visible'):(isFr?'Tu es hors ligne':'You\'re offline')}
+            {availInfo.isAvail?t('avail.tip.visible'):t('avail.tip.offline')}
           </div>
           {availInfo.isAvail&&availInfo.until&&(
-            <div style={{fontSize:12,color:C.white,marginBottom:4}}>🕐 {isFr?'Jusqu\'à':'Until'} {availInfo.until}</div>
+            <div style={{fontSize:12,color:C.white,marginBottom:4}}>🕐 {t('avail.tip.until')} {availInfo.until}</div>
           )}
           {availInfo.isAvail&&availInfo.city&&(
             <div style={{fontSize:12,color:C.white,marginBottom:10}}>📍 {availInfo.city}</div>
           )}
-          {!availInfo.isAvail&&<div style={{fontSize:11,color:C.whiteMid,marginBottom:10}}>{isFr?'Ouvre un créneau pour apparaître':'Open a slot to appear'}</div>}
+          {!availInfo.isAvail&&<div style={{fontSize:11,color:C.whiteMid,marginBottom:10}}>{t('avail.tip.openslot')}</div>}
           <button onClick={()=>{setShowAvailTooltip(false);onAvailClick?.()}} style={{width:'100%',padding:'8px 0',borderRadius:10,background:`rgba(235,107,175,0.15)`,border:`1px solid rgba(235,107,175,0.3)`,color:C.orange,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-            {isFr?'Modifier →':'Change →'}
+            {t('avail.tip.change')}
           </button>
           <div onClick={()=>setShowAvailTooltip(false)} style={{position:'fixed',inset:0,zIndex:-1}}/>
         </div>

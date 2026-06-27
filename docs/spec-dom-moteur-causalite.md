@@ -145,3 +145,13 @@ tension  = clamp( 10 * (1 - slack / 60min), 0, 10 )   // 0=large, 10=hors cône
 Tmin(R)  = R / V + buffer     // couplage rayon↔heure
 ```
 Ton seul rôle : que `estimateTravelMax().minutes` soit **juste et conservateur**. Tout le cône en dépend.
+
+---
+
+## ANNEXE 2 — où ton module se branche (mise à jour archi 29.06)
+Décision d'architecture (challenge GPT+Grok) : la forteresse s'applique **côté serveur** (Postgres), via des RPC
+gardées. Le Cône est désormais une **fonction DB** : `check_cone_feasibility()` (cf migration
+`20260629_cone_feasibility.sql`) qui, pour l'instant, utilise une estimation grossière `distance × 1.35 ÷ 30 km/h`.
+**Ton moteur la remplace** : quand tu livres `estimateTravelMax()`, on porte sa logique dans cette fonction DB (ou on
+l'appelle via un service), pour que les vraies minutes multimodales pilotent la faisabilité. Donc : continue de livrer
+le **module pur** (TS + tests) comme prévu ; nous, on le branche dans la couche serveur. Rien ne change pour toi.

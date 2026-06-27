@@ -12983,7 +12983,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     return (
       <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
         {/* Bandeau permanent */}
-        <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'calc(var(--sat) + 10px) 16px 10px',background:C.bordeaux,color:'#fff'}}>
+        <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'max(calc(var(--sat) + 10px), 52px) 16px 10px',background:C.bordeaux,color:'#fff'}}>
           <span style={{fontSize:14,fontWeight:900}}>🎭 TU INCARNES {nameOf(inc).toUpperCase()}</span>
           <button onClick={exitInc} style={{marginLeft:'auto',fontSize:12.5,fontWeight:800,padding:'7px 14px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'rgba(255,255,255,.12)',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↩︎ Quitter</button>
           <button onClick={()=>setOpen(false)} style={{fontSize:12.5,fontWeight:800,padding:'7px 12px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'transparent',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
@@ -13025,7 +13025,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   return (
     <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
       {/* Header */}
-      <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'calc(var(--sat) + 12px) 16px 12px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
+      <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'max(calc(var(--sat) + 12px), 54px) 16px 12px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
         <span style={{fontSize:18,fontWeight:900,color:C.bordeaux}}>🎮 Test Lab</span>
         <span style={{fontSize:11,color:C.whiteMid}}>{bots.filter(isLive).length}/{bots.length} bots en ligne</span>
         <button onClick={()=>setOpen(false)} style={{marginLeft:'auto',fontSize:13,fontWeight:800,padding:'7px 14px',borderRadius:999,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>✕ Fermer</button>

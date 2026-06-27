@@ -240,6 +240,33 @@ function bearing(aLat: number, aLng: number, bLat: number, bLng: number) {
 }
 const norm = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 
+// Pools pour la génération PROCÉDURALE : quand tu avances, la ville se repeuple devant toi
+// (sinon tu laisses tous les events derrière). Prototype — un jour branché sur les vrais events.
+const POI_POOL: [string, string][] = [
+  ['🎷', 'Cave à jazz'], ['🎸', 'Concert'], ['🍷', 'Apéro'], ['🍻', 'Afterwork'], ['🎨', 'Atelier peinture'],
+  ['🛼', 'Roller'], ['🏓', 'Ping-pong'], ['🧘', 'Yoga'], ['☕', 'Café perché'], ['🌃', 'Rooftop'], ['🍕', 'Pizza party'],
+]
+const SOLO_POOL: [string, string][] = [
+  ['🃏', 'Quelqu’un · cartes'], ['☕', 'Quelqu’un · café'], ['🚶', 'Quelqu’un · balade'], ['🎸', 'Quelqu’un · jam'],
+  ['📷', 'Quelqu’un · photo'], ['🍺', 'Quelqu’un · verre'], ['🐕', 'Quelqu’un · chien'],
+]
+type Poi = { id: string; emoji: string; label: string; lat: number; lng: number; solo: boolean }
+let _pid = 0
+function spawnPoi(lat: number, lng: number, headRad: number, ahead: boolean): Poi {
+  const solo = Math.random() < 0.4
+  const pool = solo ? SOLO_POOL : POI_POOL
+  const [emoji, label] = pool[Math.floor(Math.random() * pool.length)]
+  const dist = 0.2 + Math.random() * 1.3                                   // 200 m … 1.5 km
+  const b = ahead ? headRad + (Math.random() - 0.5) * Math.PI : Math.random() * 2 * Math.PI  // devant toi si tu avances
+  const dLat = (dist / 111) * Math.cos(b)
+  const dLng = (dist / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(b)
+  return { id: 'p' + (_pid++), emoji, label, lat: lat + dLat, lng: lng + dLng, solo }
+}
+
+const SPEEDS: { id: number; label: string; m: number }[] = [
+  { id: 1, label: '🐢 Lent', m: 4 }, { id: 2, label: '🚶 Marche', m: 10 }, { id: 3, label: '🚀 Rapide', m: 22 },
+]
+
 function ClutchLiveImmersionV2() {
   const cvRef = useRef<HTMLCanvasElement | null>(null)
   const headingRef = useRef(0)          // cap regardé (rad, 0 = Nord)
@@ -247,11 +274,20 @@ function ClutchLiveImmersionV2() {
   const nightRef = useRef(false)
   const walkRef = useRef(false)
   const dragRef = useRef<{ x: number; h: number } | null>(null)
+  const poisRef = useRef<Poi[]>([])
+  const speedRef = useRef(2)
   const [night, setNight] = useState(false)
   const [walking, setWalking] = useState(false)
   const [sensor, setSensor] = useState(false)
+  const [speed, setSpeed] = useState(2)
   const [headDeg, setHeadDeg] = useState(0)
-  nightRef.current = night; walkRef.current = walking
+  nightRef.current = night; walkRef.current = walking; speedRef.current = speed
+
+  // semis initial de POI autour de toi
+  useEffect(() => {
+    const [la, ln] = posRef.current
+    poisRef.current = Array.from({ length: 13 }, () => spawnPoi(la, ln, headingRef.current, false))
+  }, [])
 
   // capteur d'orientation (boussole) — iOS demande une permission explicite.
   const onOrient = (e: any) => {
@@ -271,14 +307,22 @@ function ClutchLiveImmersionV2() {
   }
   useEffect(() => () => window.removeEventListener('deviceorientation', onOrient, true), [])
 
-  // marche simulée : on dérive doucement vers le cap regardé (les distances diminuent).
+  // marche simulée : on avance dans le cap regardé, à la VITESSE choisie, et la ville se
+  // REPEUPLE devant toi (on retire ce qui est trop loin derrière, on respawn devant).
   useEffect(() => {
     const iv = setInterval(() => {
       if (!walkRef.current) return
       const [la, ln] = posRef.current
-      const step = 0.00035
-      posRef.current = [la + Math.cos(headingRef.current) * step, ln + Math.sin(headingRef.current) * step]
-    }, 120)
+      const m = (SPEEDS.find(s => s.id === speedRef.current) || SPEEDS[1]).m
+      const km = m / 1000
+      const dLat = (km / 111) * Math.cos(headingRef.current)
+      const dLng = (km / (111 * Math.cos(la * Math.PI / 180))) * Math.sin(headingRef.current)
+      const nl: [number, number] = [la + dLat, ln + dLng]
+      posRef.current = nl
+      const keep = poisRef.current.filter(p => hav(nl[0], nl[1], p.lat, p.lng) < 1.7)
+      while (keep.length < 13) keep.push(spawnPoi(nl[0], nl[1], headingRef.current, true))
+      poisRef.current = keep
+    }, 200)
     return () => clearInterval(iv)
   }, [])
 
@@ -338,14 +382,11 @@ function ClutchLiveImmersionV2() {
       ctx.strokeStyle = ngt ? 'rgba(201,182,255,.4)' : 'rgba(83,41,67,.25)'
       ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, horizonY); ctx.lineTo(W, horizonY); ctx.stroke()
 
-      // ── ÉVÉNEMENTS + SOLOS dans l'horizon (façon PeakFinder) ──
-      const live = [
-        ...EVENTS.filter(e => !ngt || e.night).map(e => ({ kind: 'ev' as const, emoji: e.emoji, label: e.title, lat: e.lat, lng: e.lng })),
-        ...SOLOS.filter(s => !ngt || s.night).map(s => ({ kind: 'solo' as const, emoji: s.emoji, label: s.label, lat: s.lat, lng: s.lng })),
-      ].map(o => {
+      // ── POI (events + présences solo) dans l'horizon (façon PeakFinder) ──
+      const live = poisRef.current.map(o => {
         const km = hav(pos[0], pos[1], o.lat, o.lng)
         const rel = norm(bearing(pos[0], pos[1], o.lat, o.lng) - head)
-        return { ...o, km, rel }
+        return { kind: o.solo ? 'solo' as const : 'ev' as const, emoji: o.emoji, label: o.label, km, rel }
       }).filter(o => Math.abs(o.rel) < FOV).sort((a, b) => b.km - a.km)
 
       for (const o of live) {
@@ -404,11 +445,8 @@ function ClutchLiveImmersionV2() {
       const sweep = time * 1.1
       const sg = ('createConicGradient' in ctx) ? (ctx as any).createConicGradient(sweep, rcx, rcy) : null
       if (sg) { sg.addColorStop(0, 'rgba(235,107,175,.30)'); sg.addColorStop(0.12, 'rgba(235,107,175,0)'); ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(rcx, rcy, R, 0, 6.28); ctx.fill() }
-      // blips (events + solos) sur le radar — orientés « cap en haut »
-      for (const o of [
-        ...EVENTS.filter(e => !ngt || e.night).map(e => ({ lat: e.lat, lng: e.lng, solo: false })),
-        ...SOLOS.filter(s => !ngt || s.night).map(s => ({ lat: s.lat, lng: s.lng, solo: true })),
-      ]) {
+      // blips (POI) sur le radar — orientés « cap en haut »
+      for (const o of poisRef.current) {
         const km = hav(pos[0], pos[1], o.lat, o.lng)
         const rel = norm(bearing(pos[0], pos[1], o.lat, o.lng) - head)
         const rr = Math.min(1, km / 1.6) * R
@@ -447,6 +485,18 @@ function ClutchLiveImmersionV2() {
             <button onClick={() => setWalking(w => !w)} style={{ fontSize: 12.5, fontWeight: 800, padding: '6px 13px', borderRadius: 9, cursor: 'pointer', border: 'none', background: walking ? '#EB6BAF' : '#532943', color: '#fff' }}>{walking ? '⏸ Stop' : '▶ J’avance'}</button>
             <button onClick={() => setNight(n => !n)} style={{ fontSize: 12.5, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer', border: `1px solid rgba(42,16,32,.14)`, background: night ? '#1c1530' : '#fff', color: ink }}>{night ? '☀️ Jour' : '🌙 Nuit'}</button>
           </div>
+        </div>
+
+        {/* Vitesse de marche (David : « on avance beaucoup trop vite ») */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11.5, color: dim, fontWeight: 700 }}>Vitesse</span>
+          {SPEEDS.map(s => (
+            <button key={s.id} onClick={() => setSpeed(s.id)} style={{
+              fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+              border: `1.5px solid ${speed === s.id ? '#EB6BAF' : 'rgba(42,16,32,.14)'}`,
+              background: speed === s.id ? '#EB6BAF' : (night ? '#1c1530' : '#fff'), color: speed === s.id ? '#fff' : ink,
+            }}>{s.label}</button>
+          ))}
         </div>
 
         <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: `1px solid rgba(42,16,32,.14)`, boxShadow: '0 14px 40px -16px rgba(42,16,32,.45)' }}>

@@ -87,27 +87,35 @@ function ConeCanvas({ rayon, temps }: { rayon: number; temps: number }) {
         ctx.fillRect(sx, sy, 1.4, 1.4)
       }
 
-      // disque de dispo (le rayon choisi) — anneau sur le sol
-      ringPath(rk.current, 0)
-      ctx.strokeStyle = 'rgba(255,191,158,.5)'; ctx.lineWidth = 1.5; ctx.stroke()
-      ringPath(rk.current, 0)
-      ctx.fillStyle = 'rgba(110,58,92,.16)'; ctx.fill()
-
-      // disque crédible (atteignable) — vert/rose, pulse doux
-      const pulse = 0.5 + 0.5 * Math.sin(time * 2)
+      // TENSION 0→10 (rayon vs cône) — pilote toutes les couleurs et le rythme
+      const travelEdge = rk.current * KM_TO_MIN
+      const slack = tk.current - travelEdge - BUFFER_MIN
+      const tension = slack < 0 ? 10 : Math.max(0, Math.min(10, 10 * (1 - slack / 60)))
+      const tc = tension >= 7 ? [83, 41, 67] : tension >= 4 ? [235, 107, 175] : [119, 188, 31]
+      const tHex = `rgb(${tc[0]},${tc[1]},${tc[2]})`
+      const hot = tension / 10
+      const pulse = 0.5 + 0.5 * Math.sin(time * (2 + hot * 4))   // pulse plus rapide quand ça chauffe
       const rr = Math.min(reachR, RAYON_MAX)
+
+      // disque de dispo (le rayon choisi) — la zone HORS CÔNE s'allume en tension (pulse)
+      ringPath(rk.current, 0)
+      ctx.fillStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},${0.10 + (rk.current > rr ? hot * 0.16 * (0.55 + 0.45 * pulse) : 0)})`; ctx.fill()
+      ringPath(rk.current, 0)
+      ctx.strokeStyle = tHex; ctx.lineWidth = 2 + hot * 1.5; ctx.stroke()
+
+      // disque crédible (atteignable) — toujours vert, par-dessus → l'anneau restant = hors cône
       if (rr > 0.3) {
         ringPath(rr, 0)
-        ctx.fillStyle = `rgba(119,188,31,${0.12 + pulse * 0.05})`; ctx.fill()
+        ctx.fillStyle = `rgba(119,188,31,${0.16 + pulse * 0.05})`; ctx.fill()
         ringPath(rr, 0)
-        ctx.strokeStyle = COL.green; ctx.lineWidth = 2; ctx.stroke()
+        ctx.strokeStyle = COL.green; ctx.lineWidth = 1.5; ctx.stroke()
       }
 
       // LE CÔNE — apex (toi) → anneau crédible levé à coneH
       const apex = proj(0, 0, 0)
       const lifted = Math.min(rr, RAYON_MAX)
-      // surface latérale (quelques génératrices)
-      ctx.strokeStyle = 'rgba(235,107,175,.30)'; ctx.lineWidth = 1
+      // surface latérale (quelques génératrices) — teintée par la tension
+      ctx.strokeStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},.30)`; ctx.lineWidth = 1
       for (let i = 0; i < 32; i++) {
         const a = (i / 32) * Math.PI * 2
         const p = proj(Math.cos(a) * lifted, Math.sin(a) * lifted, coneH)
@@ -115,9 +123,9 @@ function ConeCanvas({ rayon, temps }: { rayon: number; temps: number }) {
       }
       // anneau haut du cône
       ringPath(lifted, coneH)
-      ctx.strokeStyle = COL.pink; ctx.lineWidth = 2; ctx.stroke()
+      ctx.strokeStyle = tHex; ctx.lineWidth = 2 + hot * 1.5; ctx.stroke()
       ringPath(lifted, coneH)
-      ctx.fillStyle = `rgba(235,107,175,${0.10 + pulse * 0.04})`; ctx.fill()
+      ctx.fillStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},${0.10 + pulse * 0.05})`; ctx.fill()
 
       // nuage de points (RDV possibles) — vert si dans le cône, bordeaux sinon
       const all = pts.map(pt => {
@@ -158,10 +166,15 @@ function ConeCanvas({ rayon, temps }: { rayon: number; temps: number }) {
 
 export default function ForteressePage() {
   const [rayon, setRayon] = useState(18)
-  const [temps, setTemps] = useState(90)
+  const [tempsRaw, setTempsRaw] = useState(38)                       // slider 0-100 (log)
+  const temps = Math.round(20 * Math.pow(1080 / 20, tempsRaw / 100)) // minutes, échelle LOG : 20 min … 18 h (horizon Clutch)
   const reachR = Math.max(0, (temps - BUFFER_MIN)) / KM_TO_MIN
-  const credible = rayon <= reachR
   const edgeMin = Math.round(rayon * KM_TO_MIN)
+  const slack = Math.round(temps - edgeMin - BUFFER_MIN)
+  const tension = slack < 0 ? 10 : Math.max(0, Math.min(10, Math.round(10 * (1 - slack / 60) * 10) / 10))
+  const tcol = tension >= 7 ? COL.prune : tension >= 4 ? COL.pink : COL.green
+  const tlevel = tension >= 7 ? 'hot' : tension >= 4 ? 'warn' : 'ok'
+  const fmtH = (m: number) => m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`
 
   const Section = ({ tag, color, title, children }: any) => (
     <div style={{ background: COL.paper, border: `1px solid ${COL.line}`, borderRadius: 18, padding: '20px 22px', marginBottom: 16 }}>
@@ -187,6 +200,7 @@ export default function ForteressePage() {
         {/* Animation du cône */}
         <div style={{ background: COL.space, borderRadius: 22, padding: 8, marginBottom: 14, boxShadow: '0 18px 50px -20px rgba(83,41,67,.5)' }}>
           <ConeCanvas rayon={rayon} temps={temps} />
+          <style>{`@keyframes ftpulse{0%,100%{opacity:1}50%{opacity:.5}}@keyframes ftbar{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}`}</style>
           {/* Curseurs */}
           <div style={{ padding: '6px 14px 14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, color: COL.salmon, marginBottom: 4 }}>
@@ -195,15 +209,41 @@ export default function ForteressePage() {
             <input type="range" min={1} max={RAYON_MAX} value={rayon} onChange={e => setRayon(+e.target.value)}
               style={{ width: '100%', accentColor: COL.pink }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, color: COL.salmon, margin: '10px 0 4px' }}>
-              <span>Temps avant le RDV</span><span style={{ fontWeight: 800, color: '#fff' }}>{Math.floor(temps / 60)}h{String(temps % 60).padStart(2, '0')}</span>
+              <span>Temps avant le RDV <span style={{ opacity: .6 }}>(jusqu’à 18 h)</span></span><span style={{ fontWeight: 800, color: '#fff' }}>{fmtH(temps)}</span>
             </div>
-            <input type="range" min={20} max={300} step={5} value={temps} onChange={e => setTemps(+e.target.value)}
+            <input type="range" min={0} max={100} value={tempsRaw} onChange={e => setTempsRaw(+e.target.value)}
               style={{ width: '100%', accentColor: COL.green }} />
-            {/* Verdict live */}
-            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, background: credible ? 'rgba(119,188,31,.14)' : 'rgba(235,107,175,.14)', border: `1px solid ${credible ? COL.green : COL.pink}`, color: '#fff', fontSize: 13, lineHeight: 1.45 }}>
-              {credible
-                ? <>✅ <strong>Crédible.</strong> Tu peux honorer un RDV partout dans ton rayon — le bord est à ~{edgeMin} min, dans ton cône.</>
-                : <>⚠️ <strong>Au bord du cône.</strong> Le bord de ton rayon (~{edgeMin} min) dépasse ce que tu atteins en {Math.floor(temps / 60)}h{String(temps % 60).padStart(2, '0')}. Donne-toi plus de temps, ou resserre le rayon.</>}
+
+            {/* JAUGE DE TENSION 0→10 — le cœur visible de la Forteresse */}
+            <div style={{ marginTop: 16, marginBottom: 4, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: '.02em' }}>🌀 Tension de la Forteresse</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: tcol }}>{tension.toFixed(1).replace('.0', '')}<span style={{ fontSize: 12, color: COL.salmon, fontWeight: 700 }}> /10</span></span>
+            </div>
+            <div style={{ position: 'relative', height: 12, borderRadius: 6, background: 'rgba(255,255,255,.10)', overflow: 'hidden' }}>
+              {/* graduations zones */}
+              {[40, 70].map(p => <div key={p} style={{ position: 'absolute', left: `${p}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.18)' }} />)}
+              <div style={{ height: '100%', width: `${tension * 10}%`, borderRadius: 6, background: tcol, transition: 'width .18s, background .18s', animation: tlevel === 'hot' ? 'ftbar 0.7s infinite' : undefined }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: COL.salmon, marginTop: 3, opacity: .8 }}>
+              <span>0 · large</span><span>4-6 · serré</span><span>7-9 · tendu</span><span>10 · hors cône</span>
+            </div>
+
+            {/* DÉCOMPOSITION pédagogique — d'où sort la tension */}
+            <div style={{ marginTop: 12, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,.06)', fontSize: 11.5, color: COL.salmon, lineHeight: 1.7 }}>
+              <span style={{ color: '#fff', fontWeight: 700 }}>{fmtH(temps)}</span> de temps
+              <span style={{ opacity: .6 }}> − </span><span style={{ color: '#fff', fontWeight: 700 }}>{edgeMin} min</span> de trajet au bord
+              <span style={{ opacity: .6 }}> − </span><span style={{ color: '#fff', fontWeight: 700 }}>15 min</span> de marge
+              <span style={{ opacity: .6 }}> = </span><span style={{ color: tcol, fontWeight: 900 }}>{slack >= 0 ? '+' : ''}{slack} min</span> de jeu
+              <span style={{ opacity: .6 }}> → plus c’est serré, plus la tension monte.</span>
+            </div>
+
+            {/* Verdict live — dynamique */}
+            <div style={{ marginTop: 10, padding: '11px 14px', borderRadius: 12, background: tcol + '24', border: `1.5px solid ${tcol}`, color: '#fff', fontSize: 13, lineHeight: 1.5, animation: tlevel === 'hot' ? 'ftpulse 1.1s infinite' : undefined }}>
+              {tlevel === 'ok'
+                ? <>✅ <strong>Crédible (tension {tension.toFixed(0)}).</strong> Tu peux honorer un RDV partout dans ton rayon — le bord est à ~{edgeMin} min, bien dans ton cône.</>
+                : tlevel === 'warn'
+                  ? <>◑ <strong>Ça se tend (tension {tension.toFixed(0)}).</strong> Un Clutch au bord (~{edgeMin} min) serait juste. Encore jouable, mais prends une marge.</>
+                  : <>⚠️ <strong>Au bord du cône (tension {tension.toFixed(0)}).</strong> Le bord de ton rayon (~{edgeMin} min) dépasse ce que tu atteins en {fmtH(temps)}. Donne-toi plus de temps, ou resserre le rayon.</>}
             </div>
           </div>
         </div>

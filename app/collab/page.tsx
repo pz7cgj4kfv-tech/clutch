@@ -168,21 +168,37 @@ export default function Collab() {
             <P style={{ margin: '6px 0 0', fontSize: 13, color: M.ink40 }}>Pour démarrer avec une base : David t’envoie les écrans actuels de l’app — tu pars de là, tu améliores.</P>
           </Card>
 
-          <Card>
-            <H>4. Ton PROMPT DE DÉMARRAGE (copie-colle dans Claude)</H>
-            <div className="cc-pre">{`Tu es le designer-développeur de CLUTCH, une app de rencontre spontanée EN PERSONNE (Suisse). Mon rôle : je décris des écrans, tu les dessines en React dans un ARTIFACT, et tu les affiches DANS UN CADRE IPHONE (375×812, coins arrondis, encoche en haut) pour que je voie le rendu réel.
+          <Card accent={M.green}>
+            <H>4. Ton PROMPT DE DÉMARRAGE — version ChatGPT (Canvas) ⭐</H>
+            <P style={{ margin: '0 0 8px', fontSize: 13, color: M.ink40 }}>Sur Firefox → chatgpt.com, abonnement <strong>ChatGPT Plus (~20 $/mois)</strong>. Colle ça dans un nouveau chat :</P>
+            <div className="cc-pre">{`Tu es le designer-développeur de CLUTCH, une app de rencontre spontanée EN PERSONNE (Suisse). On travaille dans le CANVAS de ChatGPT.
 
-CHARTE GRAPHIQUE (à respecter toujours) :
-- Couleurs : rose #EB6BAF (accents, CTA), vert #77BC1F (validations), prune #532943 (texte fort, onglet actif), fond studio #F4F1F4, cartes BLANCHES #FFFFFF, encre #1a1418.
+Je décris des écrans, tu les construis en HTML/React DANS LE CANVAS, et tu les affiches DANS UN CADRE IPHONE (largeur ~375px, hauteur ~812px, coins très arrondis, encoche en haut), centré sur un fond gris clair — pour que je voie le rendu réel d'un téléphone.
+
+CHARTE GRAPHIQUE (toujours) :
+- Couleurs : rose #EB6BAF (accents, boutons), vert #77BC1F (validations), prune #532943 (texte fort, onglet actif), fond studio #F4F1F4, cartes BLANCHES #FFFFFF, encre #1a1418.
 - Cartes blanches séparées par des lignes fines gris clair (#E6E3E6), JAMAIS de fonds teintés.
-- Police system/SF, coins arrondis (12-16px), ombres très douces.
+- Police système/SF, coins arrondis (12-16px), ombres très douces.
 - Vocabulaire : « Clutch », « Verrou », « Rendez-vous ». Jamais « match/swipe/like ».
 - Esprit : beau, chaleureux, simple, féminin-friendly. Micro-animations subtiles.
 
 RÈGLES :
-- Tu fais UNIQUEMENT du visuel (mise en page, couleurs, formes, textes, animations).
-- Si je te demande de la logique, des données, de la sécurité → préviens-moi que ça sort du design et qu’il faut en parler à David.
-- À chaque écran : montre-le dans le cadre iPhone, et donne-moi un bouton/zone pour ajuster facilement.
+- Tu fais UNIQUEMENT du visuel (mise en page, couleurs, formes, textes, animations). Pas de données, pas de logique, pas de sécurité.
+- Si je demande de la logique/des données/de la sécurité → préviens-moi que ça sort du design et qu'il faut en parler à David (le dev).
+- Travaille DANS LE CANVAS (pas juste dans le chat) pour que je voie le rendu et qu'on itère.
+- Garde le code propre et autonome (un seul composant) pour que je puisse cliquer « Copier » et l'envoyer à David.
+
+Commence par me demander quel écran je veux créer en premier.`}</div>
+          </Card>
+
+          <Card>
+            <H>4 bis. Variante Claude (Artifacts) — si tu préfères Claude</H>
+            <P style={{ margin: '0 0 8px', fontSize: 13, color: M.ink40 }}>Même chose sur claude.ai (Claude Pro ~22 CHF/mois). Identique, juste « Artifact » au lieu de « Canvas » :</P>
+            <div className="cc-pre">{`Tu es le designer-développeur de CLUTCH, une app de rencontre spontanée EN PERSONNE (Suisse). Je décris des écrans, tu les dessines en React dans un ARTIFACT, et tu les affiches DANS UN CADRE IPHONE (375×812, coins arrondis, encoche en haut) pour que je voie le rendu réel.
+
+CHARTE : rose #EB6BAF · vert #77BC1F · prune #532943 · fond #F4F1F4 · cartes BLANCHES #FFFFFF · encre #1a1418. Cartes séparées par lignes fines #E6E3E6 (jamais de fond teinté). Police SF, coins arrondis, ombres douces. Vocabulaire « Clutch/Verrou/Rendez-vous », jamais « match/swipe/like ». Beau, chaleureux, simple, féminin-friendly.
+
+RÈGLES : tu fais UNIQUEMENT du visuel. Si je demande de la logique/données/sécurité → préviens-moi (voir David). À chaque écran : montre-le dans le cadre iPhone.
 
 Commence par me demander quel écran je veux créer en premier.`}</div>
           </Card>

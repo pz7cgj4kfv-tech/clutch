@@ -10662,15 +10662,12 @@ export default function App2() {
           {flow==='carte' && (
             <div className="fi" style={{position:'fixed',inset:0,background:C.bg,display:'flex',flexDirection:'column'}}>
 
-              {/* Header flottant — absolu, sans dégradé */}
+              {/* Header flottant — absolu, sans dégradé. « Annuler » DÉPLACÉ en bas à côté de « Suivant » (David 29.06). */}
               <div style={{position:'absolute',top:0,left:0,right:0,zIndex:900,padding:'48px 16px 10px'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:8}}>
                   <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:900,letterSpacing:'.2em',textTransform:'uppercase',color:'#fff',background:C.bordeaux,padding:'6px 13px',borderRadius:20}}>
                     ✦ Clutch
                   </div>
-                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{fontSize:12,fontWeight:800,color:'#fff',background:C.bordeaux,padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontFamily:'inherit'}}>
-                    {lang==='en'?'← Cancel':'← Annuler'}
-                  </button>
                 </div>
               </div>
 
@@ -10888,8 +10885,12 @@ export default function App2() {
                   <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setUntilTime(v) }}/>
                 </div>
 
-                {/* CTA bas */}
+                {/* CTA bas — Annuler (gauche) · étape 1—2 (centre) · Suivant (droite). David 29.06. */}
                 <div style={{padding:'8px 20px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+                  {/* Annuler — quitte la création de fenêtre, retour aux présences */}
+                  <button onClick={()=>{setFlow('app');setTab('presences')}} style={{padding:'11px 16px',borderRadius:24,background:'transparent',border:`1px solid ${C.border}`,color:C.salmon,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                    {lang==='en'?'Cancel':'Annuler'}
+                  </button>
                   {/* Step pill */}
                   <div style={{display:'flex',alignItems:'center',gap:4}}>
                     <div style={{width:18,height:18,borderRadius:'50%',background:C.pink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:900,color:'#fff'}}>1</div>

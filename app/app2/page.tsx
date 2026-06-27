@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1ca'  // Versionnage HEXADÉCIMAL. ~308e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 198   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1cb'  // Versionnage HEXADÉCIMAL. ~309e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 199   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9256,6 +9256,17 @@ export default function App2() {
   // (jour inclus) → handleOuvrirFenetre les utilise tels quels, sans l'ambiguïté « HH:MM aujourd'hui ».
   // null = l'user a réglé à la molette → on retombe sur le calcul HH:MM classique.
   const [presetWin,setPresetWin] = useState<{from:number;until:number}|null>(null)
+  // 🌀 LE CÔNE — re-serre le rayon DÈS QUE L'HEURE change (fix bypass David : mettre l'heure loin → pousser le rayon
+  //    à 50km → ramener l'heure à maintenant ne doit PAS laisser un rayon impossible). On clamp au max crédible.
+  useEffect(() => {
+    if (!CONE_RAYON_HEURE_LIVE) return
+    const now = Date.now()
+    const untilAt = presetWin?.until ?? (()=>{ const [h,m]=(untilTime||'23:59').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<=now) d.setDate(d.getDate()+1); return d.getTime() })()
+    const winMin = Math.max(1, (untilAt - now)/60000)
+    const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
+    const maxOk = r10 > RAYON_MIN_KM ? r10 : RAYON_MIN_KM
+    setRayon(r => r > maxOk + 0.05 ? maxOk : r)
+  }, [untilTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)

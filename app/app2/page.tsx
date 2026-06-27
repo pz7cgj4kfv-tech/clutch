@@ -3605,15 +3605,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             background:nightMode?'linear-gradient(120deg,#532943,#2C1020)':'#fff',boxShadow:nightMode?'0 0 12px rgba(235,107,175,.5)':'0 1px 3px rgba(120,115,125,.18), 0 4px 10px rgba(120,115,125,.20)',transition:'.2s'}}>
             <span className="cn-moon" style={{fontSize:18,lineHeight:1}}>🌙</span>
           </button>
-          {/* 🟢 Pastille « Mes events » — apparaît UNIQUEMENT si tu es inscrit à des events (David). Toggle le filtre « mine ». */}
-          {registered.size>0 && (
-            <button onClick={()=>setEvFilter(f=>f==='mine'?'all':'mine')} title={EN?'My events':'Mes events'} style={{flexShrink:0,position:'relative',width:38,height:38,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontFamily:'inherit',padding:0,
-              border:evFilter==='mine'?`1px solid ${C.green}`:`1px solid ${C.border}`,
-              background:evFilter==='mine'?`${C.green}1a`:'#fff',boxShadow:evFilter==='mine'?`0 0 10px ${C.green}66`:'0 1px 3px rgba(120,115,125,.18), 0 4px 10px rgba(120,115,125,.20)',transition:'.2s'}}>
-              <span style={{fontSize:17,lineHeight:1}}>🎟️</span>
-              <span style={{position:'absolute',top:-3,right:-3,minWidth:16,height:16,padding:'0 4px',borderRadius:8,background:C.green,color:'#fff',fontSize:9,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid #fff'}}>{registered.size}</span>
-            </button>
-          )}
+          {/* Pastille 🎟️ « Mes events » RETIRÉE (David : « on avait dit qu'on l'enlevait »). Le filtre « Mes events »
+              reste accessible dans les chips ci-dessous. */}
           {/* Filtres (scroll horizontal) */}
           <div style={{display:'flex',gap:6,overflowX:'auto',whiteSpace:'nowrap',flex:1,minWidth:0,paddingBottom:2}}>
           {EV_FILTERS.map(f=>{

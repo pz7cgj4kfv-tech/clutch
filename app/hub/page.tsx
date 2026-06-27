@@ -13,10 +13,14 @@ const M = {
 
 // Ordre d'importance demandé par David
 const TABS: { href: string; icon: string; t: string; d: string; group: string; accent?: string }[] = [
+  { href: '/collab', icon: '🤝', t: 'Collaboration', d: 'Hiérarchie + procédures Dom & Mel (imprimable PDF)', group: 'Équipe', accent: M.green },
+  { href: '/app2', icon: '📱', t: 'L\'app (live)', d: 'Le vrai produit : flow complet Clutch', group: 'Produit', accent: M.pink },
+  { href: '/forteresse', icon: '🌌', t: 'La Forteresse', d: 'Le Cône — comment chaque rencontre tient debout', group: 'Produit', accent: M.pink },
+  { href: '/clutchlive', icon: '⚡', t: 'Clutch Live', d: 'Immersion Tesla — la ville s\'allume autour de toi', group: 'Produit' },
+  { href: '/clutchnight', icon: '🌙', t: 'Clutch Night', d: 'Le mode sorties, le soir', group: 'Produit' },
   { href: '/tutoriel', icon: '📖', t: 'Tutoriel', d: 'Comprendre l\'app en 5 chapitres', group: 'Produit' },
   { href: '/onboarding', icon: '🚀', t: 'Onboarding', d: 'L\'inscription, étape par étape', group: 'Produit' },
-  { href: '/clutchlive', icon: '⚡', t: 'Clutch Live', d: 'La ville s\'allume autour de toi', group: 'Produit' },
-  { href: '/clutchnight', icon: '🌙', t: 'Clutch Night', d: 'Le mode sorties, le soir', group: 'Produit' },
+  { href: '/scenario', icon: '🗺️', t: 'Scénarios', d: 'Le parcours complet + cas limites + sécurité', group: 'Coulisses' },
   { href: '/animation', icon: '✨', t: 'Animation', d: 'Le labo des animations', group: 'Coulisses' },
   { href: '/sim', icon: '🧪', t: 'Simulateur', d: 'L\'algo, de 5 à 50 000 personnes', group: 'Coulisses' },
   { href: '/cockpit', icon: '🛰️', t: 'Cockpit', d: 'Le centre de contrôle de la dynamique', group: 'Coulisses' },
@@ -26,7 +30,7 @@ const TABS: { href: string; icon: string; t: string; d: string; group: string; a
   { href: '/confidentialite', icon: '🔒', t: 'Confidentialité', d: 'Le contrat (NDA) à signer', group: 'Docs', accent: M.green },
   { href: '/hq', icon: '🗄️', t: 'Archives · QG', d: 'Anciennes versions & QG interne', group: 'Archives' },
 ]
-const GROUPS = ['Produit', 'Coulisses', 'Docs', 'Archives']
+const GROUPS = ['Équipe', 'Produit', 'Coulisses', 'Docs', 'Archives']
 
 export default function Hub() {
   return (

@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1be'  // Versionnage HEXADÉCIMAL. ~296e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 186   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1bf'  // Versionnage HEXADÉCIMAL. ~297e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 187   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -7844,15 +7844,17 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               blocked ? C.red : C.green,
             )
           }}/>
-          {isAdmin && <MRow icon="🤖" label="Générateur de bots" sub="Activer/piloter des bots pour tout tester seul" onTap={()=>setShowBotLab(true)}/>}
+          {isAdmin && <MRow icon="🧪" label="Clutch Test Lab" sub="Le panneau de test UNIQUE : bots, clutchs, reset, scénarios — tout au même endroit (mobile)" onTap={()=>{ try{ window.dispatchEvent(new Event('clutch:open-testlab')) }catch{} }}/>}
+          {isAdmin && <MRow icon="🤖" label="Générateur de bots (ancien)" sub="Cockpit historique — sera remplacé par le Test Lab" onTap={()=>setShowBotLab(true)}/>}
           {isAdmin && <MRow icon="🧹" label={resetArmed?"⚠️ Touche encore pour TOUT effacer":"Reset TOTAL (bots + vrais)"} sub={resetArmed?"Supprime tous tes clutchs, feedbacks, cooldowns, occupations…":"Remet à zéro toutes tes interactions (bots ET vraies personnes) pour re-tester de zéro"} onTap={async()=>{
             if(!resetArmed){ setResetArmed(true); setTimeout(()=>setResetArmed(false),4000); return }
             setResetArmed(false)
-            const { error } = await supabase.rpc('reset_my_test_state')
-            if(error){ showToast('❌ '+error.message+' — applique la migration reset_my_test_state', C.red); return }
+            const { data, error } = await supabase.rpc('reset_total_qa')
+            if(error){ showToast('❌ '+error.message+' — applique la migration reset_total_qa', C.red); return }
             try{ ['clutch_completedIds','clutch_mock_cleared','clutch_cancelled_events','clutch_registered_events','clutch_registered_objs'].forEach(k=>localStorage.removeItem(k)) }catch{}
             try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-            showToast('🧹 Reset total — tu repars de zéro (clutchs, cooldowns, lapins effacés)', C.green)
+            const total=(data as any)?.total ?? 0
+            showToast(`🧹 Reset total — ${total} ligne(s) effacée(s), tu repars de zéro`, C.green)
           }}/>}
           {isAdmin && <MRow icon={showBots?'🤖':'🫥'} label={showBots?'Mode DÉMO (bots visibles)':'Mode RÉEL (app vide)'} sub={showBots?'Tape pour passer en RÉEL — app vide, pour tester avec de vrais amis':'Tape pour repasser en DÉMO — bots étiquetés, pour visualiser'} onTap={()=>{ const nv=!showBots; try{localStorage.setItem('clutch_demo_mode',nv?'1':'0')}catch{}; setDemoMode(nv); showToast(nv?'🤖 Mode Démo — bots visibles':'🫥 Mode Réel — app vide',nv?C.gold:C.whiteMid) }}/>}
           {/* 🔔 Test notifs : s'envoie À SOI-MÊME une push de chaque type → tu vérifies qu'elles
@@ -12352,6 +12354,7 @@ export default function App2() {
           )}
           {/* 🎮 Cockpit de test flottant — admin only, par-dessus l'app, déplaçable. À retirer avant lancement. */}
           {flow==='app' && user && isAdminId(user.id) && <TestCockpit userId={user.id} isAdmin={true} showToast={showToast} meLat={(user as any)?.center_lat ?? null} meLng={(user as any)?.center_lng ?? null}/>}
+          {user && isAdminId(user.id) && <TestLab userId={user.id} showToast={showToast}/>}
           {/* D3 — RDV en cours RÉDUIT : pastille flottante (coin bas-droit) qui n'obstrue pas l'écran.
               Toucher = ré-agrandir le radar. L'utilisateur peut voir/parcourir les events librement. */}
           {flow==='app' && activeVerrou && !showVerrou && !inlineFeedbackId && radarMin && (()=>{
@@ -12771,6 +12774,133 @@ const COCK_PLACES = [
   { n:'Vevey',    lat:46.4628, lng:6.8419 },
 ]
 type CockTab = 'world'|'express'|'acteur'|'clutch'|'event'|'diag'
+// ─────────────────────────────────────────────────────────────────────────────
+// 🧪 CLUTCH TEST LAB — le panneau de test UNIQUE (mobile, plein écran), ouvert par UN bouton
+// (Profil → admin → dispatch 'clutch:open-testlab'). Synthèse GPT+Grok challengée : simple devant,
+// 6 actions essentielles, retour visible sur chaque (toast + journal humain), reset_total_qa fiable.
+// Tout passe par les MÊMES opérations que les vrais users. Incarnation + scénarios = phases suivantes.
+// ─────────────────────────────────────────────────────────────────────────────
+function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:string)=>void }) {
+  const [open,setOpen] = useState(false)
+  const [busy,setBusy] = useState<string|null>(null)
+  const [bots,setBots] = useState<any[]>([])
+  const [sel,setSel] = useState<string>('')
+  const [log,setLog] = useState<string[]>([])
+  const [armed,setArmed] = useState(false)
+  const ACT=['pending','accepted','confirmed','checked_in']
+  const hhmm=()=>{ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
+  const note=(m:string)=> setLog(l=>[`${hhmm()} · ${m}`, ...l].slice(0,30))
+  const refreshAll=()=>{ try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{} }
+  const tISO=(h:number,m=0)=>{ const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<Date.now()) d.setDate(d.getDate()+1); return d.toISOString() }
+
+  useEffect(()=>{ const h=()=>setOpen(true); window.addEventListener('clutch:open-testlab',h); return ()=>window.removeEventListener('clutch:open-testlab',h) },[])
+  const loadBots=async()=>{
+    const { data } = await supabase.from('profiles').select('id,name,is_available,available_until').eq('is_bot',true).order('name')
+    const arr=((data as any[])||[])
+    const seen=new Set<string>(); const uniq:any[]=[]
+    for(const b of arr){ const k=(b.name||'').replace(/\s*test\s*$/i,'').trim().toLowerCase(); if(k&&seen.has(k))continue; seen.add(k); uniq.push({...b,name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
+    setBots(uniq); setSel(p=>p||uniq[0]?.id||'')
+  }
+  useEffect(()=>{ if(open) loadBots() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const isLive=(b:any)=> !!(b.is_available && b.available_until && new Date(b.available_until).getTime()>Date.now())
+  const nameOf=(id:string)=> bots.find(b=>b.id===id)?.name || 'le bot'
+
+  // ── Les 6 actions essentielles — chacune donne un retour VISIBLE (toast + journal) ──
+  const resetTotal=async()=>{
+    if(!armed){ setArmed(true); setTimeout(()=>setArmed(false),4000); return }
+    setArmed(false); setBusy('reset'); try{
+      const { data, error } = await supabase.rpc('reset_total_qa')
+      if(error){ showToast('❌ '+error.message+' — applique reset_total_qa', C.red); note('❌ reset échoué : '+error.message) }
+      else { const t=(data as any)?.total??0; showToast(`🧹 Reset total — ${t} ligne(s) effacée(s)`, C.green); note(`🧹 Reset total — ${t} ligne(s) effacée(s), tout est propre`); refreshAll(); loadBots() }
+    }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null)
+  }
+  const allOnline=async()=>{ setBusy('on'); try{
+    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const rows=((bs as any[])||[])
+    let n=0
+    for(let i=0;i<rows.length;i++){
+      const durH=2+(i%5), rad=5+(i%4)*5
+      const { error } = await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+durH*3600e3).toISOString(), center_lat:lat, center_lng:lng, available_radius_km:rad }).eq('id',rows[i].id)
+      if(!error) n++
+    }
+    showToast(`✓ ${n} bots en ligne sur toi 📍`, C.green); note(`✅ ${n} bots en ligne dans ta zone (créneaux + rayons variés)`); refreshAll(); loadBots()
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const clutchToMe=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',sel).eq('receiver_id',userId).in('status',ACT)
+    const { error } = await supabase.from('clutches').insert({ sender_id:sel, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${nameOf(sel)}` })
+    if(error){ showToast('❌ '+error.message,C.red); note('❌ clutch échoué : '+error.message) }
+    else { showToast(`📨 ${nameOf(sel)} t'a envoyé un clutch`, C.green); note(`📨 ${nameOf(sel)} t'a envoyé un clutch → onglet Clutchs`); refreshAll() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const botAccepts=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return } setBusy('acc'); try{
+    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',sel).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
+    const row=((pend as any[])||[])[0]
+    if(!row){ showToast(`Envoie d'abord un clutch à ${nameOf(sel)}`,C.orange); note(`ℹ️ aucun clutch en attente vers ${nameOf(sel)} — clutche-le d'abord`); setBusy(null); return }
+    const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',row.id)
+    if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')){ showToast('🏰 Forteresse : chevauche un RDV → bloqué',C.orange); note(`🏰 ${nameOf(sel)} ne peut pas accepter : ça chevauche un RDV (forteresse OK)`) }
+    else if(error){ showToast('❌ '+error.message,C.red); note('❌ '+error.message) }
+    else { showToast(`🔒 ${nameOf(sel)} a accepté → Verrou`, C.green); note(`🔒 ${nameOf(sel)} accepte → Verrou créé. Les clutchs qui chevauchent passent « en pause ».`); refreshAll() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const soon=(what:string)=>{ showToast(`🔜 ${what} — phase suivante`, C.salmon); note(`🔜 ${what} : bientôt (incarnation + scénarios + events en cours de construction)`) }
+
+  if(!open) return null
+  const Big=({id,icon,label,sub,onTap,danger,wide}:{id:string;icon:string;label:string;sub?:string;onTap:()=>void;danger?:boolean;wide?:boolean})=>(
+    <button disabled={!!busy&&busy!==id} onClick={onTap} style={{
+      gridColumn: wide?'1 / -1':'auto', textAlign:'left', display:'flex', alignItems:'center', gap:11, cursor:'pointer',
+      padding:'14px 14px', borderRadius:16, border:`1.5px solid ${danger?C.bordeaux:C.border}`,
+      background: busy===id?C.bordeaux:(danger?'rgba(83,41,67,.06)':C.bgCard), color:C.white, opacity: (busy&&busy!==id)?.5:1, fontFamily:'inherit',
+    }}>
+      <span style={{fontSize:22,flexShrink:0}}>{busy===id?'⏳':icon}</span>
+      <span style={{minWidth:0}}>
+        <span style={{display:'block',fontSize:14,fontWeight:800,color:danger?C.bordeaux:C.white}}>{label}</span>
+        {sub&&<span style={{display:'block',fontSize:10.5,color:C.whiteMid,lineHeight:1.3,marginTop:1}}>{sub}</span>}
+      </span>
+    </button>
+  )
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
+      {/* Header */}
+      <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,background:C.bgCard}}>
+        <span style={{fontSize:18,fontWeight:900,color:C.bordeaux}}>🧪 Test Lab</span>
+        <span style={{fontSize:11,color:C.whiteMid}}>{bots.filter(isLive).length}/{bots.length} bots en ligne</span>
+        <button onClick={()=>setOpen(false)} style={{marginLeft:'auto',fontSize:13,fontWeight:800,padding:'7px 14px',borderRadius:999,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>✕ Fermer</button>
+      </div>
+
+      <div style={{flex:1,minHeight:0,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'14px 16px 30px'}}>
+        {/* Bot sélectionné */}
+        <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:8}}>BOT SÉLECTIONNÉ (pour clutch / accepter)</div>
+        <div style={{display:'flex',gap:8,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:6,marginBottom:16}}>
+          {bots.map(b=>(
+            <button key={b.id} onClick={()=>setSel(b.id)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'7px 12px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',
+              border:`1.5px solid ${sel===b.id?C.bordeaux:C.border}`, background:sel===b.id?C.bordeaux:C.bgCard, color:sel===b.id?'#fff':C.white, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap'}}>
+              <span style={{width:7,height:7,borderRadius:'50%',background:isLive(b)?C.green:C.salmonMid,flexShrink:0}}/>{b.name||'Bot'}
+            </button>
+          ))}
+          {!bots.length && <span style={{fontSize:12,color:C.whiteMid}}>Aucun bot — tape « Tout mettre en ligne »</span>}
+        </div>
+
+        {/* 6 boutons essentiels */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <Big id="on" icon="🟢" label="Tout mettre en ligne" sub="Tous les bots, dans ta zone, maintenant" onTap={allOnline}/>
+          <Big id="c2me" icon="📨" label="Clutch vers moi" sub={`${nameOf(sel)} t'envoie un clutch`} onTap={clutchToMe}/>
+          <Big id="acc" icon="🔒" label="Le bot accepte" sub={`${nameOf(sel)} accepte ton clutch`} onTap={botAccepts}/>
+          <Big id="ev" icon="🎉" label="Event + demandes" sub="Un bot crée un event" onTap={()=>soon('Event + demandes')}/>
+          <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>soon('Incarner un bot')}/>
+          <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
+        </div>
+
+        {/* Journal humain */}
+        <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',margin:'20px 0 8px'}}>JOURNAL</div>
+        <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',minHeight:60}}>
+          {log.length? log.map((l,i)=><div key={i} style={{fontSize:12,color:i===0?C.white:C.whiteMid,lineHeight:1.7,borderBottom:i<log.length-1?`1px solid ${C.salmonFaint}`:'none',paddingBottom:2}}>{l}</div>)
+            : <div style={{fontSize:12,color:C.whiteMid,fontStyle:'italic'}}>Tes actions s'afficheront ici en clair (ex. « 18:04 Anaïs accepte → Verrou créé »).</div>}
+        </div>
+        <div style={{fontSize:10.5,color:C.whiteMid,marginTop:12,lineHeight:1.5}}>🔜 Phases suivantes : incarner un bot (voir l'app comme lui), créer un event + 30 demandes (liste d'attente), et les scénarios 1 clic (dont le Cône).</div>
+      </div>
+    </div>
+  )
+}
+
 function TestCockpit({ userId, isAdmin, showToast, meLat, meLng }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void; meLat?:number|null; meLng?:number|null }) {
   // 🏰 Pour que les bots APPARAISSENT dans MES présences (David : « tout doit marcher avec les bots »), on les
   //   place dans MA zone (intersection géo garantie) + live MAINTENANT. refreshAll() rafraîchit la liste tout de suite.

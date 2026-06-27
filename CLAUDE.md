@@ -120,6 +120,24 @@ const t = (k: string) => TR[lang][k] || TR.fr[k] || k
 
 ---
 
+## 🛡️ ARCHITECTURE RPC GARDÉE — STANDARD (validé GPT+Grok 29.06)
+
+**Règle d'or :** aucune action métier (clutch, accept, refuse, dispo, create_event, join_event, check-in, finish)
+ne doit modifier les tables EN DIRECT. Tout passe par des **RPC SECURITY DEFINER gardées** qui appliquent les vraies
+règles (forteresse/exclusion, cooldown, dispo↔event, plafonds) et renvoient un **contrat `{ ok, code, message }`**.
+- En prod : `actor = auth.uid()`. En Test Lab : `actor = bot_id` **uniquement si `qa_is_admin()`** (allowlist 3 IDs).
+- Migrations en place : `20260629_admin_actor_rpc.sql` (admin_create_clutch/accept/refuse/set_availability),
+  `20260629_event_rpc_dispo.sql` (join_event = dispo↔event serveur, admin_create_event = date réelle).
+- `create_clutch()` (gardé) existe depuis 20260626 ; `qa_test_clutch()` en est le miroir DRY-RUN.
+- **Codes feedback** : NO_COMPATIBLE_AVAILABILITY · OUT_OF_CONE · OVERLAP_OCCUPANCY · COOLDOWN_ACTIVE · INBOX_FULL ·
+  EVENT_FULL · WAITLIST_FULL · NOT_EVENT_VISIBLE · INVALID_TIME · RLS_FORBIDDEN. Prod = message neutre · Test = vraie raison.
+- **Reste (Phase 4)** : brancher l'APP RÉELLE (SendModal, accept, doRegister) sur ces RPC → feedback clair partout.
+- **Le Cône** deviendra une fonction DB `check_cone_feasibility()` appelée par ces RPC, alimentée par le moteur de
+  trajet de Dom (lib/travel-estimate → portée serveur). cf docs/spec-dom-moteur-causalite.md + project-forteresse.
+- Détail/challenge : docs/challenge-testlab-realiste-gpt-grok.md · mémoire project-braindump-test-29jun.
+
+---
+
 ## 🐛 BUGS CONNUS — Solutions validées
 
 ### Supabase `.update()` silencieux

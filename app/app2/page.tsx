@@ -10290,6 +10290,28 @@ export default function App2() {
       const [fh,fm] = fromTime.split(':').map(Number)
       from = new Date(); from.setHours(fh,fm,0,0)
     }
+    // 🛡️ FORTERESSE — RE-VÉRIF À L'INSTANT DU CONFIRM (anti-bypass de causalité, David 29.06).
+    //    Le check du Cône se fait pendant le réglage (page 1), mais l'user peut TRAÎNER sur la page 2 → le temps avance
+    //    et au clic « Ouvrir » la protection serait périmée (il s'est rapproché de l'heure sans pouvoir y être).
+    //    Règle : au CONFIRM, le DÉBUT doit TOUJOURS rester atteignable = maintenant + trajet(rayon) + 15 min de marge.
+    //    Sinon → on décale au prochain créneau crédible, on prévient, et on NE sauve PAS (l'user voit la nouvelle heure et reconfirme).
+    if (CONE_RAYON_HEURE_LIVE) {
+      const nowMs = Date.now()
+      const minStart = earliestCredibleStart(nowMs, rayon)   // now + trajet(rayon) + 15 min
+      if (from.getTime() < minStart - 60_000) {              // 60 s de tolérance
+        const nextSlot = makeSlots(new Date(minStart))[0]    // 1er créneau de la grille ≥ minStart (5 min test / 15 min prod)
+        setPresetWin(null); setFromTime(nextSlot)
+        const [nh,nm] = nextSlot.split(':').map(Number)
+        const [uh,um] = (untilTime||'').split(':').map(Number)
+        if (!isNaN(uh) && (uh*60+um) <= (nh*60+nm)) { const u2 = makeSlots(new Date(minStart + 60*60_000))[0]; setUntilTime(u2) }
+        const need = Math.round(coneTravelMs(rayon)/60000) + 15
+        showToast?.(lang==='en'
+          ? `You still need ~${need} min to reach ${fmtKm(rayon)} — start moved to ${nextSlot}, confirm again`
+          : `Il te faut encore ~${need} min pour aller à ${fmtKm(rayon)} — début décalé à ${nextSlot}, reconfirme`, C.orange)
+        hap('warning')
+        return
+      }
+    }
     // Si from > until (ex: from=02:30 mais on est à 03:00 donc until=04:00 aujourd'hui), on laisse from tel quel
     const city = nearestCity(meetupPos[0], meetupPos[1])
 

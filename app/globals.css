@@ -43,3 +43,19 @@ input, textarea, select {
    On garde juste le tap-highlight transparent (inoffensif). À refaire plus tard de façon native-safe
    (ex. user-select:none ciblé sur des éléments décoratifs précis, JAMAIS sur les ancêtres d'un input). */
 * { -webkit-tap-highlight-color: transparent; }
+
+/* 🚫 Anti-sélection de texte au double-tap — VERSION NATIVE-SAFE (David 29.06).
+   On cible le TEXTE et les contrôles (jamais `*`, jamais `body`/`div`/`form` = ancêtres d'inputs),
+   ET on RÉ-ACTIVE explicitement la saisie sur les champs → le login natif iOS reste OK. */
+h1,h2,h3,h4,h5,h6,p,span,a,button,label,li,strong,em,b,small,td,th,figcaption {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* La saisie reste sélectionnable/éditable (sinon login bloqué) */
+input, textarea, select, [contenteditable="true"], [contenteditable=""] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+/* Tue le double-tap (zoom + clic synthétisé qui double-déclenche / saute la page 2) sur les contrôles */
+button, a, [role="button"] { touch-action: manipulation; }

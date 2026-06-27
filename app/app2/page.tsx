@@ -1109,7 +1109,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         @keyframes snC{0%,100%{box-shadow:0 0 14px 5px rgba(119,188,31,.8),0 0 28px 10px rgba(119,188,31,.3);}
           50%{box-shadow:0 0 20px 8px rgba(182,226,122,1),0 0 40px 14px rgba(119,188,31,.5);}}
       `}</style>
-      <div ref={divRef} style={{ position:'absolute',inset:0 }}/>
+      <div ref={divRef} style={{ position:'absolute',inset:0, touchAction:'none' }}/>
       {/* Tooltip étoile — mini preview profil */}
       {starTooltip && (()=>{
         const p = enrichProfile(starTooltip.profile)
@@ -9288,9 +9288,14 @@ export default function App2() {
   // → David proposait une fenêtre DÉJÀ EXPIRÉE (ex. 19h45–20h05 à 20h07) → personne n'était vraiment live.
   // On ne recale PAS en revenant de 'options' (back) pour ne pas écraser un choix en cours.
   const prevFlowRef = useRef<AppFlow>(flow)
+  // ✏️ ÉDITION d'un créneau existant : quand on clique « Modifier », on PRÉ-REMPLIT les champs depuis le
+  //    créneau (position, rayon, heures, modes, mood) et on pose ce ref → l'effet ci-dessous NE recale PAS
+  //    (sinon il écrasait tout par makeSlots() + GPS = bug David « il me remet à Lausanne »).
+  const editingSlotRef = useRef<any>(null)
   useEffect(() => {
     const prev = prevFlowRef.current; prevFlowRef.current = flow
     if (flow === 'carte' && prev !== 'carte' && prev !== 'options') {
+      if (editingSlotRef.current) { editingSlotRef.current = null; return }  // édition en cours → garder le pré-rempli
       const fresh = makeSlots()
       setInitSlots(fresh)
       setFromTime(fresh[0] || '18:00')
@@ -10266,6 +10271,9 @@ export default function App2() {
 
   const handleOuvrirFenetre = async () => {
     if (!user?.id) return
+    // ✋ Garde page 2 : au moins UN type de rencontre + au moins UN genre (sinon créneau vide = invisible/inutile).
+    if (!seekModes || seekModes.length === 0) { showToast?.(lang==='en'?'Pick at least one type of meetup':'Choisis au moins un type de rencontre', C.orange); hap('warning'); return }
+    if (!seekGender) { showToast?.(lang==='en'?'Pick who you want to meet':'Choisis qui tu veux rencontrer', C.orange); hap('warning'); return }
     // NB : pas de window.confirm (BLOQUÉ dans la WebView iOS). Ouvrir un nouveau créneau remplace l'ancien = comportement
     // attendu quand l'user le fait volontairement → on procède + on prévient par toast. Fenêtre = depuis le DÉBUT choisi (roues limitées à +18h, décision David).
     const alreadyAvail = user?.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date()
@@ -10676,7 +10684,9 @@ export default function App2() {
                   const tension = coneTension({ now, startAt:untilAt, radiusKm:rayon })
                   const over = rayon > Math.max(r10,0)+0.01
                   const lvl = (over||tension>=7) ? 'high' : tension>=4 ? 'mid' : 'ok'
-                  if (rayon<1 || lvl==='ok') return null
+                  // 🟢 Souplesse Clutch Live (décision David 29.06) : petit rayon (≤1.5km) = dispo maintenant, hyper-local.
+                  //    On NE met PAS l'alerte « trop loin » sur la carte — la personne peut physiquement y être à pied/vélo.
+                  if (rayon<1 || rayon<=1.5 || lvl==='ok') return null
                   const col = lvl==='high' ? C.bordeaux : C.orange
                   const scale = 1 + Math.min(1, tension/10)*0.7   // plus la tension monte, plus c'est GROS
                   return (
@@ -10725,7 +10735,9 @@ export default function App2() {
                   // ⚠️ NE PAS exiger r10>0 : si la fenêtre est trop courte, r10 tombe à 0 et TOUT le Cône
                   //    disparaissait (bug David). r10=0 = rien d'atteignable → tension max, pas disparition.
                   const overWindow = flag && rayon > Math.max(r10,0) + 0.01
-                  const fillCol = !flag ? C.orange : (tension>=7||overWindow ? C.bordeaux : tension>=4 ? C.orange : C.green)
+                  // 🟢 Zone Clutch Live (petit rayon = dispo maintenant) : on reste SOUPLE → couleur apaisée (vert), pas d'alarme.
+                  const isClutchLive = flag && rayon <= 1.5
+                  const fillCol = !flag ? C.orange : isClutchLive ? C.green : (tension>=7||overWindow ? C.bordeaux : tension>=4 ? C.orange : C.green)
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
@@ -10754,8 +10766,8 @@ export default function App2() {
                   const edgeMin = Math.round(coneTravelMs(rayon)/60000)
                   const earliest = earliestCredibleStart(now, rayon)
                   let msg:string|null = null, msgCol = C.whiteMid
-                  const high = flag && rayon>=1 && (overWindow || tension>=7)   // alerte forte = dynamique
-                  if (flag && rayon>=1) {
+                  const high = flag && !isClutchLive && rayon>=1 && (overWindow || tension>=7)   // alerte forte = dynamique (jamais en zone Live)
+                  if (flag && rayon>1.5) {  // ≤1.5km = Clutch Live → le nudge Live remplace tout message de cône
                     if (high) { msgCol=C.bordeaux
                       msg = lang==='en' ? `Too far for this time — push it later` : `Trop loin pour cette heure — décale plus tard` }
                     else if (tension>=4) { msgCol=C.orange
@@ -12561,7 +12573,18 @@ export default function App2() {
                         ) : null}
                       </div>
                       {/* B/D1 — Modifier : on retire ce créneau puis on rouvre le réglage (le créneau étant retiré, pas de fausse alerte de chevauchement B3). */}
-                      <button onClick={async()=>{ await removeSlot(s.id); setShowSlots(false); setFlow('carte') }} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.white,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✏️ {lang==='en'?'Edit':'Modifier'}</button>
+                      <button onClick={async()=>{
+                        // 🟢 Pré-remplir depuis CE créneau (sinon reset GPS Lausanne — bug David). editingSlotRef bloque le recalage.
+                        const hhmm=(iso:string)=>{const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+                        editingSlotRef.current = s
+                        if (s.lat!=null && s.lng!=null) setMeetupPos([s.lat, s.lng])
+                        if (s.radius_km!=null) setRayon(s.radius_km)
+                        setPresetWin(null)
+                        if (s.start_at) setFromTime(hhmm(s.start_at)); if (s.end_at) setUntilTime(hhmm(s.end_at))
+                        setSeekModes(Array.isArray(s.modes)?s.modes:[])
+                        setSeekMood(s.mood||null)
+                        await removeSlot(s.id); setShowSlots(false); setFlow('carte')
+                      }} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.white,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✏️ {lang==='en'?'Edit':'Modifier'}</button>
                       <button onClick={()=>removeSlot(s.id)} style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,color:C.salmon,fontSize:11,fontWeight:700,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{lang==='en'?'Remove':'Retirer'}</button>
                     </div>
                   )

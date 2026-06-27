@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c8'  // Versionnage HEXADÉCIMAL. ~306e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 196   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c9'  // Versionnage HEXADÉCIMAL. ~307e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 197   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3479,6 +3479,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       const d = new Date(); d.setHours(Math.floor(m/60), m%60, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate()+1)
       return d.getTime()
     })()
+    // 🔒 BUG David : on pouvait rejoindre un event SPONTANÉ alors qu'on n'a AUCUNE dispo (fail-open). Corrigé :
+    //    un event spontané (pas planifié/partenaire) avec une heure → il FAUT un créneau. Zéro dispo = bloqué.
+    const isPlanned = (ev as any).type==='partner' || (ev as any).mode==='open'
+    if (evStart && !isPlanned && availSlots.length===0) {
+      const m = EN ? '⏱️ Outside your availability — open a slot to join' : '⏱️ Hors de ta dispo — ouvre un créneau qui couvre cette heure pour rejoindre'
+      setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),6000)
+      return
+    }
     if (evStart && availSlots.length) {
       const evEnd = evStart + (eventDurH(ev) || 3) * 3600000
       const gate = canRegisterEvent({ mode: eventMode((ev as any).type), eventStart: evStart, eventEnd: evEnd, now: Date.now(), availSlots })
@@ -12876,14 +12884,17 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const exitInc=()=>{ note(`🎭 Fin de l'incarnation de ${nameOf(inc||'')}`); setInc(null); setSeen([]) }
 
   // ── EVENT + demandes : un bot crée un event, les autres bots s'inscrivent (les « demandes » à valider). ──
+  // 🛡️ Via admin_create_event (date RÉELLE) + join_event (dispo↔event s'applique aux bots = réaliste).
   const eventDemands=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('ev'); try{
-    const eH=20
-    const { data: ins, error } = await supabase.from('events').insert({ title:`Apéro test — ${nameOf(botId)}`, emoji:'🎟️', lieu:'Lausanne', event_time:'20:00', event_date:"Aujourd'hui", starts_at:tISO(eH), duration_minutes:180, spots:8, taken:0, description:'(test lab)', tags:['test'], ev_gender:'X', type:'user', status:'pending', active:true, created_by:botId, creator:nameOf(botId) }).select('id').single()
-    if(error || !ins){ showToast('❌ event : '+(error?.message||'?'),C.red); note('❌ event échoué : '+(error?.message||'?')); setBusy(null); return }
-    const evId=(ins as any).id
+    const starts=new Date(); starts.setHours(20,0,0,0); if(starts.getTime()<Date.now()) starts.setDate(starts.getDate()+1)
+    const { data: ce, error } = await supabase.rpc('admin_create_event', { p_actor:botId, p_title:`Apéro test — ${nameOf(botId)}`, p_starts_at:starts.toISOString() })
+    if(error){ showToast('❌ '+error.message+' — applique la migration event_rpc_dispo',C.red); note('❌ RPC : '+error.message); setBusy(null); return }
+    const r:any=ce; if(!r?.ok){ showToast('🚫 '+(r?.message||''),C.orange); note('🚫 event : '+(r?.message||'')); setBusy(null); return }
+    const evId=r.event_id
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id',botId); const ids=((bs as any[])||[]).map(b=>b.id)
-    let n=0; for(const id of ids){ const { error:e2 } = await supabase.from('event_participants').insert({ event_id:evId, user_id:id }); if(!e2) n++ }
-    showToast(`🎉 Event créé · ${n} demandes`, C.green); note(`🎉 ${nameOf(botId)} a créé un event (8 places) · ${n} bots inscrits → va dans Événements voir la liste + la liste d'attente`); refreshAll()
+    let joined=0, blocked=0
+    for(const id of ids){ const { data: jr } = await supabase.rpc('join_event',{ p_event_id:evId, p_actor:id }); if((jr as any)?.ok) joined++; else blocked++ }
+    showToast(`🎉 Event 20h · ${joined} inscrits${blocked?` · ${blocked} pas dispo`:''}`, C.green); note(`🎉 ${nameOf(botId)} a créé un event à 20h · ${joined} bots inscrits${blocked?`, ${blocked} bloqués (pas dispo à 20h)`:''} → onglet Événements`); refreshAll()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
   // ── CYCLE DE VIE DU RDV côté bot (David : « il manque j'y suis, terminer, accepte/refuse »). ──

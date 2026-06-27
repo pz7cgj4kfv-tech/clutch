@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1bf'  // Versionnage HEXADÉCIMAL. ~297e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 187   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c0'  // Versionnage HEXADÉCIMAL. ~298e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 188   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12795,7 +12795,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
 
   useEffect(()=>{ const h=()=>setOpen(true); window.addEventListener('clutch:open-testlab',h); return ()=>window.removeEventListener('clutch:open-testlab',h) },[])
   const loadBots=async()=>{
-    const { data } = await supabase.from('profiles').select('id,name,is_available,available_until').eq('is_bot',true).order('name')
+    const { data } = await supabase.from('profiles').select('id,name,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
     const arr=((data as any[])||[])
     const seen=new Set<string>(); const uniq:any[]=[]
     for(const b of arr){ const k=(b.name||'').replace(/\s*test\s*$/i,'').trim().toLowerCase(); if(k&&seen.has(k))continue; seen.add(k); uniq.push({...b,name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
@@ -12826,22 +12826,40 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     }
     showToast(`✓ ${n} bots en ligne sur toi 📍`, C.green); note(`✅ ${n} bots en ligne dans ta zone (créneaux + rayons variés)`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const clutchToMe=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',sel).eq('receiver_id',userId).in('status',ACT)
-    const { error } = await supabase.from('clutches').insert({ sender_id:sel, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${nameOf(sel)}` })
+  const clutchToMe=async(fromId:string)=>{ if(!fromId){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
+    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',fromId).eq('receiver_id',userId).in('status',ACT)
+    const { error } = await supabase.from('clutches').insert({ sender_id:fromId, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${nameOf(fromId)}` })
     if(error){ showToast('❌ '+error.message,C.red); note('❌ clutch échoué : '+error.message) }
-    else { showToast(`📨 ${nameOf(sel)} t'a envoyé un clutch`, C.green); note(`📨 ${nameOf(sel)} t'a envoyé un clutch → onglet Clutchs`); refreshAll() }
+    else { showToast(`📨 ${nameOf(fromId)} t'a envoyé un clutch`, C.green); note(`📨 ${nameOf(fromId)} t'a envoyé un clutch → onglet Clutchs`); refreshAll() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const botAccepts=async()=>{ if(!sel){ showToast('Choisis un bot',C.orange); return } setBusy('acc'); try{
-    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',sel).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
+  const botAccepts=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('acc'); try{
+    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).eq('receiver_id',botId).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
     const row=((pend as any[])||[])[0]
-    if(!row){ showToast(`Envoie d'abord un clutch à ${nameOf(sel)}`,C.orange); note(`ℹ️ aucun clutch en attente vers ${nameOf(sel)} — clutche-le d'abord`); setBusy(null); return }
+    if(!row){ showToast(`Envoie d'abord un clutch à ${nameOf(botId)}`,C.orange); note(`ℹ️ aucun clutch en attente vers ${nameOf(botId)} — clutche-le d'abord`); setBusy(null); return }
     const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',row.id)
-    if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')){ showToast('🏰 Forteresse : chevauche un RDV → bloqué',C.orange); note(`🏰 ${nameOf(sel)} ne peut pas accepter : ça chevauche un RDV (forteresse OK)`) }
+    if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')){ showToast('🏰 Forteresse : chevauche un RDV → bloqué',C.orange); note(`🏰 ${nameOf(botId)} ne peut pas accepter : ça chevauche un RDV (forteresse OK)`) }
     else if(error){ showToast('❌ '+error.message,C.red); note('❌ '+error.message) }
-    else { showToast(`🔒 ${nameOf(sel)} a accepté → Verrou`, C.green); note(`🔒 ${nameOf(sel)} accepte → Verrou créé. Les clutchs qui chevauchent passent « en pause ».`); refreshAll() }
+    else { showToast(`🔒 ${nameOf(botId)} a accepté → Verrou`, C.green); note(`🔒 ${nameOf(botId)} accepte → Verrou créé. Les clutchs qui chevauchent passent « en pause ».`); refreshAll() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const soon=(what:string)=>{ showToast(`🔜 ${what} — phase suivante`, C.salmon); note(`🔜 ${what} : bientôt (incarnation + scénarios + events en cours de construction)`) }
+  const soon=(what:string)=>{ showToast(`🔜 ${what} — phase suivante`, C.salmon); note(`🔜 ${what} : bientôt`) }
+
+  // ── INCARNATION (Phase 3) : voir l'app COMME un bot + agir en son nom. Pas de switch de session (risqué) :
+  //   on lit ce que le bot verrait (présences dans SA zone) + on agit via les mêmes opérations. Bandeau permanent.
+  const [inc,setInc] = useState<string|null>(null)
+  const [seen,setSeen] = useState<any[]>([])
+  const havKm=(aLat:number,aLng:number,bLat:number,bLng:number)=>{ const R=6371,dLa=(bLat-aLat)*Math.PI/180,dLo=(bLng-aLng)*Math.PI/180; const s=Math.sin(dLa/2)**2+Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLo/2)**2; return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)) }
+  const loadSeen=async(botId:string)=>{
+    let b:any = bots.find(x=>x.id===botId)
+    if(b?.center_lat==null){ const { data } = await supabase.from('profiles').select('center_lat,center_lng,available_radius_km').eq('id',botId).maybeSingle(); b={...b,...(data||{})} }
+    const lat=b?.center_lat, lng=b?.center_lng, rad=b?.available_radius_km||10, now=Date.now()
+    const { data } = await supabase.from('profiles').select('id,name,is_bot,gender,age,center_lat,center_lng,available_until').eq('is_available',true).neq('id',botId)
+    const rows=((data as any[])||[]).filter(p=>p.available_until && new Date(p.available_until).getTime()>now)
+      .map(p=>({ ...p, km:(lat!=null&&p.center_lat!=null)?havKm(lat,lng,p.center_lat,p.center_lng):null }))
+      .filter(p=> p.km==null || p.km<=Math.max(rad,1)+0.05).sort((a,b)=>(a.km??999)-(b.km??999))
+    setSeen(rows)
+  }
+  const incarnate=(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setInc(botId); loadSeen(botId); note(`🎭 Tu incarnes ${nameOf(botId)} — tu vois l'app de son point de vue`) }
+  const exitInc=()=>{ note(`🎭 Fin de l'incarnation de ${nameOf(inc||'')}`); setInc(null); setSeen([]) }
 
   if(!open) return null
   const Big=({id,icon,label,sub,onTap,danger,wide}:{id:string;icon:string;label:string;sub?:string;onTap:()=>void;danger?:boolean;wide?:boolean})=>(
@@ -12857,6 +12875,48 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
       </span>
     </button>
   )
+
+  // ── VUE INCARNATION : tu es DANS la peau du bot. Bandeau permanent + ce qu'il voit + agir en son nom. ──
+  if(inc){
+    const meSeen = seen.find(p=>p.id===userId)
+    return (
+      <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
+        {/* Bandeau permanent */}
+        <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bordeaux,color:'#fff'}}>
+          <span style={{fontSize:14,fontWeight:900}}>🎭 TU INCARNES {nameOf(inc).toUpperCase()}</span>
+          <button onClick={exitInc} style={{marginLeft:'auto',fontSize:12.5,fontWeight:800,padding:'7px 14px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'rgba(255,255,255,.12)',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↩︎ Quitter</button>
+          <button onClick={()=>setOpen(false)} style={{fontSize:12.5,fontWeight:800,padding:'7px 12px',borderRadius:999,border:'1px solid rgba(255,255,255,.5)',background:'transparent',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+        </div>
+        <div style={{flex:1,minHeight:0,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'14px 16px 30px'}}>
+          {/* Agir en son nom */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
+            <Big id="c2me" icon="📨" label="J'envoie un clutch à David" sub="depuis ce bot, vers toi" onTap={()=>clutchToMe(inc)}/>
+            <Big id="acc" icon="🔒" label="J'accepte le clutch de David" sub="le clutch que tu m'as envoyé" onTap={()=>botAccepts(inc)}/>
+          </div>
+          {/* Ce que le bot voit */}
+          <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
+            <span style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em'}}>👁 CE QUE {nameOf(inc).toUpperCase()} VOIT AUTOUR ({seen.length})</span>
+            <button onClick={()=>loadSeen(inc)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:999,border:`1px solid ${C.border}`,background:C.bgCard,color:C.white,cursor:'pointer',fontFamily:'inherit'}}>↻</button>
+          </div>
+          {meSeen && <div style={{fontSize:12,fontWeight:700,color:C.green,marginBottom:8}}>✓ TOI, tu apparais dans sa liste{meSeen.km!=null?` (à ${meSeen.km<1?Math.round(meSeen.km*1000)+' m':meSeen.km.toFixed(1)+' km'})`:''} — le matching te voit bien.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {seen.map(p=>(
+              <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,background:p.id===userId?'rgba(119,188,31,.10)':C.bgCard,border:`1px solid ${p.id===userId?C.green:C.border}`,borderRadius:12,padding:'9px 12px'}}>
+                <span style={{fontSize:16}}>{p.is_bot?'🤖':'🧑'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:800,color:C.white}}>{p.id===userId?'David (toi)':(p.name||'?')}</div>
+                  <div style={{fontSize:10.5,color:C.whiteMid}}>{[p.gender,p.age].filter(Boolean).join(' · ')||'—'}</div>
+                </div>
+                <div style={{fontSize:12,fontWeight:800,color:C.salmon}}>{p.km==null?'—':p.km<1?`${Math.round(p.km*1000)} m`:`${p.km.toFixed(1)} km`}</div>
+              </div>
+            ))}
+            {!seen.length && <div style={{fontSize:12,color:C.whiteMid,fontStyle:'italic',padding:'12px 0'}}>Personne de dispo dans la zone de {nameOf(inc)}. Mets des bots en ligne (ou mets-toi dispo) pour voir.</div>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{position:'fixed',inset:0,zIndex:9000,background:C.bg,display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
       {/* Header */}
@@ -12882,10 +12942,10 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
         {/* 6 boutons essentiels */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <Big id="on" icon="🟢" label="Tout mettre en ligne" sub="Tous les bots, dans ta zone, maintenant" onTap={allOnline}/>
-          <Big id="c2me" icon="📨" label="Clutch vers moi" sub={`${nameOf(sel)} t'envoie un clutch`} onTap={clutchToMe}/>
-          <Big id="acc" icon="🔒" label="Le bot accepte" sub={`${nameOf(sel)} accepte ton clutch`} onTap={botAccepts}/>
+          <Big id="c2me" icon="📨" label="Clutch vers moi" sub={`${nameOf(sel)} t'envoie un clutch`} onTap={()=>clutchToMe(sel)}/>
+          <Big id="acc" icon="🔒" label="Le bot accepte" sub={`${nameOf(sel)} accepte ton clutch`} onTap={()=>botAccepts(sel)}/>
           <Big id="ev" icon="🎉" label="Event + demandes" sub="Un bot crée un event" onTap={()=>soon('Event + demandes')}/>
-          <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>soon('Incarner un bot')}/>
+          <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>incarnate(sel)}/>
           <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
         </div>
 

@@ -807,9 +807,12 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         })
         mapRef.current = map
 
+        // 🗺️ Base de tuiles épurée → on la teinte ensuite dans la palette Clutch via filtre CSS (.leaflet-tile-pane).
+        //   Jour = Positron (light_all) : carte claire minimale, parfaite à teinter rosé/prune sans devenir boueuse.
+        //   Nuit = Dark Matter (dark_all) : fond sombre → poussé vers le prune. Réversible (git) : essai design David 29.06.
         const tileUrl = night
           ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-          : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
         L.tileLayer(tileUrl, { maxZoom:19 }).addTo(map)
 
         // Cercle RDV — 3 couches : glow fill + border animé + halo pulsant
@@ -1055,8 +1058,13 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
       )}
       {/* hint inside map removed — see carte overlay */}
       <style>{`
-        .leaflet-container{background:${night?'#2A1E28':'#e8e0d8'}!important;}
-        .leaflet-tile-pane{filter:${night?'brightness(1.55) contrast(0.88) saturate(0.5) hue-rotate(5deg)':'saturate(1.1) contrast(1.05)'};}
+        .leaflet-container{background:${night?'#2a1020':'#efe6e2'}!important;}
+        /* 🎨 Teinte Clutch (essai design David 29.06, réversible) :
+           Jour : Positron clair → sepia ajoute de la chaleur, hue-rotate la pousse vers le rosé/prune → carte douce & propre.
+           Nuit : Dark Matter → poussé vers le prune profond (bgBase), un peu éclairci pour rester lisible. */
+        .leaflet-tile-pane{filter:${night
+          ? 'brightness(1.35) contrast(0.9) saturate(0.75) hue-rotate(-18deg) sepia(0.12)'
+          : 'saturate(0.92) sepia(0.20) hue-rotate(-12deg) brightness(1.03) contrast(0.96)'};}
         /* Cercle rayon — ROSE Mel, bien visible (le CSS !important écrasait tout → rayon invisible, bug David) */
         .clutch-radius path{stroke:#EB6BAF!important;fill:transparent!important;stroke-width:2.5px!important;stroke-opacity:1!important;stroke-dasharray:10 7!important;transition:d .35s cubic-bezier(.22,1,.36,1);}
         .clutch-halo path{stroke:#EB6BAF!important;stroke-width:11px!important;stroke-opacity:.18!important;fill:transparent!important;display:block!important;}

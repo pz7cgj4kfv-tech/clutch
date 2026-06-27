@@ -25,6 +25,8 @@ const EVENTS_CURATED_LIVE = false
 // rayon (gradient, jamais un mur). À false → rien ne change. cf. project-forteresse-espacetemps.
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
+import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
+import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
 const V = '0x1ce'  // Versionnage HEXADÉCIMAL. ~311e version. NB: le build Apple reste un entier dans pbxproj.
 const BUILD = 202   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
@@ -239,14 +241,14 @@ function ClutchMark({ size=40 }:{ size?:number }) {
 type Lang = 'fr' | 'en'
 const TR: Record<Lang, Record<string,string>> = {
   fr: {
-    'tab.presences':'Présences','tab.events':'Événements','tab.clutchs':'Clutchs','tab.contacts':'Contacts','tab.profil':'Profil',
+    'tab.presences':'Présences','tab.events':'Événements','tab.clutchs':'Clutchs','tab.contacts':'Favoris','tab.profil':'Profil',
     'avail.tip.visible':'Tu es visible','avail.tip.offline':'Tu es hors ligne','avail.tip.until':'Jusqu\'à','avail.tip.openslot':'Ouvre un créneau pour apparaître','avail.tip.change':'Modifier →',
-    'contacts.title':'Mes contacts','contacts.empty':'Aucun contact pour l\'instant','contacts.empty.sub':'Tes contacts apparaissent ici après un RDV réussi',
+    'contacts.title':'Mes favoris','contacts.empty':'Aucun favori pour l\'instant','contacts.empty.sub':'Ajoute des favoris après un RDV — ils remontent en premier quand vous êtes en ligne tous les deux',
     'page1.title':'Choisis ton moment','page1.cta':'Voir les présences →',
     'page1.step':'Étape 1/2 — Quand ?',
     'page2.title':'Tes envies','page2.cta':'Ouvrir ma Fenêtre ✦',
     'page2.step':'Étape 2/2 — Quoi ?',
-    'page2.type':'Quel type de rencontre ?','page2.intention':'Définis ton intention pour ce soir',
+    'page2.type':'Ton intention','page2.intention':'Décris ton envie — on trouve les bonnes personnes',
     'page2.mode':'Mode — plusieurs choix possibles',
     'page2.seek':'Je cherche à rencontrer…',
     'page2.age':'Tranche d\'âge — cumul possible',
@@ -363,14 +365,14 @@ const TR: Record<Lang, Record<string,string>> = {
     'profile.languages': 'Langues parlées',
   },
   en: {
-    'tab.presences':'Nearby','tab.events':'Events','tab.clutchs':'Clutches','tab.contacts':'Contacts','tab.profil':'Profile',
+    'tab.presences':'Nearby','tab.events':'Events','tab.clutchs':'Clutches','tab.contacts':'Favorites','tab.profil':'Profile',
     'avail.tip.visible':'You\'re visible','avail.tip.offline':'You\'re offline','avail.tip.until':'Until','avail.tip.openslot':'Open a slot to appear','avail.tip.change':'Change →',
-    'contacts.title':'My contacts','contacts.empty':'No contacts yet','contacts.empty.sub':'Contacts appear here after a successful meetup',
+    'contacts.title':'My favorites','contacts.empty':'No favorites yet','contacts.empty.sub':'Add favorites after a meetup — they show first when you’re both online',
     'page1.title':'Pick your window','page1.cta':'See who\'s around →',
     'page1.step':'Step 1/2 — When?',
     'page2.title':'Your vibe','page2.cta':'Open my Window ✦',
     'page2.step':'Step 2/2 — What?',
-    'page2.type':'What kind of meetup?','page2.intention':'Set your intention for tonight',
+    'page2.type':'Your intention','page2.intention':'Describe what you’re up for — we’ll find the right people',
     'page2.mode':'Mode — multiple choice',
     'page2.seek':'I\'m looking for…',
     'page2.age':'Age range — combine as you like',
@@ -10275,8 +10277,9 @@ export default function App2() {
 
   const handleOuvrirFenetre = async () => {
     if (!user?.id) return
-    // ✋ Garde page 2 : au moins UN type de rencontre + au moins UN genre (sinon créneau vide = invisible/inutile).
-    if (!seekModes || seekModes.length === 0) { showToast?.(lang==='en'?'Pick at least one type of meetup':'Choisis au moins un type de rencontre', C.orange); hap('warning'); return }
+    // ✋ Garde page 2 ÉPURÉE (David 28.06) : INTENTION obligatoire + MODÉRÉE, et genre. (Les modes/tuiles ont disparu.)
+    const mod = checkIntent(intentMsg, 10)
+    if (!mod.ok) { showToast?.(intentRefusal(mod.reason, lang==='en'?'en':'fr'), C.orange); hap('warning'); return }
     if (!seekGender) { showToast?.(lang==='en'?'Pick who you want to meet':'Choisis qui tu veux rencontrer', C.orange); hap('warning'); return }
     // NB : pas de window.confirm (BLOQUÉ dans la WebView iOS). Ouvrir un nouveau créneau remplace l'ancien = comportement
     // attendu quand l'user le fait volontairement → on procède + on prévient par toast. Fenêtre = depuis le DÉBUT choisi (roues limitées à +18h, décision David).
@@ -10329,7 +10332,7 @@ export default function App2() {
       center_lng:meetupPos[1],
       available_radius_km:Math.round(rayon),
       available_modes: seekModes.length ? seekModes : null,
-      ...(seekMood ? { default_moods: [seekMood] } : {}), // mémorise le dernier mood → préremplissage (col migrée)
+      ...((()=>{ const dm = deriveMoods(intentMsg); return dm.length ? { default_moods: dm } : {} })()), // 🎭 moods DÉDUITS du texte d'intention (page 2 épurée)
       pref_age_min: parseInt(ageMin) || 18,
       pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
       ...(intentMsg ? {bio:intentMsg} : {}),
@@ -11006,52 +11009,8 @@ export default function App2() {
 
                 {/* ⚡ QUICK CLUTCH déplacé en PAGE 1, sous les molettes d'heure (David 29.06 + GPT/Grok : c'est du « quand », pas de l'intention). */}
 
-                {/* 1. MODE — multi-select (pas exclusif : on peut chercher rencontre ET amitié) */}
-                <div style={{marginBottom:16}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>Mode <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'multiple choices allowed':'plusieurs choix possibles'}</span></div>
-                  </div>
-                  <div style={{display:'flex',gap:9}}>
-                    {([
-                      {k:'romantic',icon:'/icons/mel/rencontre_amour.svg',  l:'Romance'},
-                      {k:'friend',  icon:'/icons/mel/rencontre_amis.svg',   l:lang==='en'?'Friendship':'Amitié'},
-                      {k:'pro',     icon:'/icons/mel/rencontre_pro.svg',    l:'Pro'},
-                      {k:'parent',  icon:'/icons/mel/rencontre_parents.svg',l:lang==='en'?'Family':'Famille'},
-                    ] as const).map(m=>{
-                      const on=seekModes.includes(m.k)
-                      return <button key={m.k} onClick={()=>{
-                        if (m.k==='parent') { setSeekModes(on ? [] : ['parent']) }       // Mode Famille = exclusif
-                        else { const without = seekModes.filter(x=>x!==m.k&&x!=='parent'); setSeekModes(on ? without : [...without, m.k]) }
-                      }}
-                        style={{flex:1,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:0}}>
-                        {/* Tuile surélevée — remplie plum quand sélectionnée (design Mel) */}
-                        <div style={{width:'100%',height:58,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
-                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
-                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18), 0 4px 11px rgba(120,115,125,.20)',transition:'all .15s'}}>
-                          {on ? <img src={m.icon.replace('.svg','_color.svg')} width={32} height={32} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={28}/>}
-                        </div>
-                        <div style={{fontSize:10.5,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap'}}>{m.l}</div>
-                      </button>
-                    })}
-                  </div>
-                  {seekModes.length===0&&<div style={{fontSize:9,color:C.orange,marginTop:4}}>⚠️ {lang==='en'?'Select at least one mode to be visible':'Sélectionne au moins un mode pour être visible'}</div>}
-                </div>
-
-                {/* 🎭 MOOD — contexte du créneau (1 seul, optionnel). « Pour quoi ? » Soft : n'exclut jamais, précise la forme. */}
-                <div style={{marginBottom:16}}>
-                  <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid,marginBottom:8}}>Mood <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'what for? (optional)':'pour quoi ? (optionnel)'}</span></div>
-                  <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
-                    {MOOD_OPTS.map(m=>{ const on=seekMood===m.k
-                      return <button key={m.k} onClick={()=>setSeekMood(on?null:m.k)}
-                        style={{flex:'1 0 28%',minWidth:0,padding:'9px 6px',borderRadius:13,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3,
-                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
-                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18)',transition:'all .15s'}}>
-                        <span style={{fontSize:19,lineHeight:1}}>{m.e}</span>
-                        <span style={{fontSize:10,fontWeight:on?900:600,color:on?C.pink:C.whiteMid}}>{lang==='en'?m.en:m.fr}</span>
-                      </button>
-                    })}
-                  </div>
-                </div>
+                {/* ÉPURÉ (David 28.06) — tuiles MODE + MOOD RETIRÉES. Le tri se fait sur l'INTENTION obligatoire (1 input riche
+                    au lieu de 2 redondants). Le mood (dont l'axe nature romantique/amical) est DÉDUIT du texte via lib/mood.ts. */}
 
                 {/* 2. GENRE RECHERCHÉ */}
                 <div style={{marginBottom:16}}>
@@ -11115,14 +11074,25 @@ export default function App2() {
 
                 {/* 4. (Menu « J'ai envie de » retiré — design Mel 22.06. L'intention passe par le message libre ci-dessous.) */}
 
-                {/* 5. MESSAGE D'INTENTION */}
+                {/* INTENTION — désormais OBLIGATOIRE + suggestions cliquables (épuré, David 28.06). Le mood en est déduit (lib/mood.ts). */}
                 <div style={{marginBottom:16}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{t('page2.intMsg')} <span style={{fontWeight:400,textTransform:'none'}}>{t('page2.optional')}</span></div>
-                    <div style={{fontSize:9,color:intentMsg.length>48?C.orange:C.whiteMid}}>{intentMsg.length}/60</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{lang==='en'?'Your intention':'Ton intention'} <span style={{fontWeight:800,textTransform:'none',color:C.pink}}>· {lang==='en'?'required':'obligatoire'}</span></div>
+                    <div style={{fontSize:9,color:intentMsg.length>110?C.orange:C.whiteMid}}>{intentMsg.length}/120</div>
                   </div>
+                  <div style={{fontSize:10.5,color:C.whiteMid,marginBottom:8,lineHeight:1.4}}>{lang==='en'?'Describe what you’re up for — we’ll find the right people.':'Décris ton envie du moment — on trouve les bonnes personnes.'}</div>
+                  {!intentPinned && (
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                      {(lang==='en'
+                        ? ['A coffee & a chat','A drink on a terrace','A walk by the lake','Meet new people','A quiet date','Talk about a project']
+                        : ['Un café pour discuter','Un verre en terrasse','Une balade au lac','Rencontrer du monde','Un date tranquille','Parler d’un projet']
+                      ).map(s=>(
+                        <button key={s} onClick={()=>{ hap('light'); setIntentMsg(s) }} style={{padding:'6px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s}</button>
+                      ))}
+                    </div>
+                  )}
                   <div style={{position:'relative'}}>
-                    <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,60))} readOnly={intentPinned}
+                    <textarea value={intentMsg} onChange={e=>setIntentMsg(e.target.value.slice(0,120))} readOnly={intentPinned}
                       placeholder={t('page2.intPlaceholder')}
                       rows={2} style={{width:'100%',background:intentPinned?C.salmonFaint:C.whiteFaint,border:`1px solid ${intentPinned?C.salmonMid:C.border}`,borderRadius:12,padding:'10px 38px 10px 14px',fontSize:12,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',caretColor:C.salmon,boxSizing:'border-box'}}/>
                     {intentPinned && <img src="/icons/mel/Pin_RDVfixe.svg" width={18} height={18} alt="" style={{position:'absolute',top:10,right:12,opacity:.9,pointerEvents:'none'}}/>}

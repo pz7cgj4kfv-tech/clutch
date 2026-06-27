@@ -26,8 +26,8 @@ const EVENTS_CURATED_LIVE = false
 const CONE_RAYON_HEURE_LIVE = true
 import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglables (zéro nombre magique)
 
-const V = '0x1c1'  // Versionnage HEXADÉCIMAL. ~299e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 189   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1c2'  // Versionnage HEXADÉCIMAL. ~300e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 190   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12787,6 +12787,8 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const [sel,setSel] = useState<string>('')
   const [log,setLog] = useState<string[]>([])
   const [armed,setArmed] = useState(false)
+  const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(null)   // lanceur flottant déplaçable (« manette »)
+  const fabRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
   const ACT=['pending','accepted','confirmed','checked_in']
   const hhmm=()=>{ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
   const note=(m:string)=> setLog(l=>[`${hhmm()} · ${m}`, ...l].slice(0,30))
@@ -12880,7 +12882,21 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     note(`🎯 Scénario prêt — ${nameOf(sel)} t'a clutché. Ouvre l'onglet Clutchs et accepte → Verrou.`)
   }
 
-  if(!open) return null
+  // Lanceur flottant (« manette ») — visible PARTOUT dans l'app, déplaçable, tap = ouvre le Test Lab.
+  const onFabDown=(e:React.PointerEvent)=>{ const r=(e.currentTarget as HTMLElement).getBoundingClientRect(); fabRef.current={ox:r.left,oy:r.top,sx:e.clientX,sy:e.clientY,moved:false}; try{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)}catch{} }
+  const onFabMove=(e:React.PointerEvent)=>{ const d=fabRef.current; if(!d) return; if(Math.abs(e.clientX-d.sx)+Math.abs(e.clientY-d.sy)>4) d.moved=true; if(d.moved) setFabPos({x:Math.max(4,Math.min(window.innerWidth-58,d.ox+(e.clientX-d.sx))),y:Math.max(40,Math.min(window.innerHeight-58,d.oy+(e.clientY-d.sy)))}) }
+  const onFabUp=()=>{ const d=fabRef.current; fabRef.current=null; if(d && !d.moved) setOpen(true) }
+  if(!open){
+    const fp = fabPos ? { left:fabPos.x, top:fabPos.y } : { right:14, top:118 }
+    return (
+      <button onPointerDown={onFabDown} onPointerMove={onFabMove} onPointerUp={onFabUp} onPointerCancel={onFabUp}
+        aria-label="Ouvrir le Test Lab" style={{ position:'fixed', ...fp, zIndex:8000, display:'flex', alignItems:'center', gap:5,
+          padding:'9px 13px', borderRadius:999, border:`1.5px solid ${C.bordeaux}`, background:C.bordeaux, color:'#fff',
+          fontFamily:'inherit', fontSize:13, fontWeight:900, cursor:'grab', touchAction:'none', boxShadow:'0 6px 18px rgba(83,41,67,.45)' }}>
+        🧪<span style={{fontSize:12}}>Test Lab</span>
+      </button>
+    )
+  }
   const Big=({id,icon,label,sub,onTap,danger,wide}:{id:string;icon:string;label:string;sub?:string;onTap:()=>void;danger?:boolean;wide?:boolean})=>(
     <button disabled={!!busy&&busy!==id} onClick={onTap} style={{
       gridColumn: wide?'1 / -1':'auto', textAlign:'left', display:'flex', alignItems:'center', gap:11, cursor:'pointer',

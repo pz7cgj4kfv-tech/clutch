@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d3'  // Versionnage HEXADÉCIMAL. ~312e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 207   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d4'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 208   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -769,7 +769,7 @@ function makeStars(centerLat:number, centerLng:number, radiusKm:number, genders:
 
 function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate }:{
   rayon:number; userPhoto?:string|null; profiles?:Profile[];
-  showPin?:boolean; onReady?:(getCenter:()=>[number,number], recenter:()=>void)=>void;
+  showPin?:boolean; onReady?:(getCenter:()=>[number,number], recenter:()=>void, setCenter:(lat:number,lng:number)=>void)=>void;
   onGpsUpdate?:(pos:[number,number])=>void;
 }) {
   const divRef    = useRef<HTMLDivElement>(null)
@@ -984,10 +984,11 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
           )
         }
 
-        // Expose getCenter + recenter → utilise la position GPS réelle (gpsRef)
+        // Expose getCenter + recenter + setCenter (recherche de lieu) → utilise la position GPS réelle (gpsRef)
         if (onReady) onReady(
           () => { const c = map.getCenter(); return [c.lat, c.lng] as [number,number] },
-          () => { map.panTo(gpsRef.current, {animate:true}); setTimeout(syncCircle, 400) }
+          () => { map.panTo(gpsRef.current, {animate:true}); setTimeout(syncCircle, 400) },
+          (lat:number, lng:number) => { map.setView([lat,lng], Math.max(map.getZoom(), 14), {animate:true}); setTimeout(syncCircle, 400) }
         )
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -9209,6 +9210,28 @@ export default function App2() {
   },[])
   const mapGetCenterRef = useRef<(()=>[number,number])|null>(null)
   const mapRecenterRef  = useRef<(()=>void)|null>(null)
+  const mapSetCenterRef = useRef<((lat:number,lng:number)=>void)|null>(null)
+  // 🔎 Recherche de lieu par nom (Nominatim, biaisée par ma position GPS) — David 28.06
+  const [placeQuery,setPlaceQuery] = useState('')
+  const [placeRes,setPlaceRes]     = useState<any[]>([])
+  const [placeBusy,setPlaceBusy]   = useState(false)
+  const searchPlace = async (q:string) => {
+    const query = q.trim(); if (query.length < 3) { setPlaceRes([]); return }
+    setPlaceBusy(true)
+    try {
+      // Biais GPS : viewbox ~±0.6° (~60km) autour de ma position réelle → priorise les lieux PROCHES (l'auberge de Beaulieu à Lausanne, pas ailleurs).
+      const c = realGps || meetupPos || ME
+      const d = 0.6
+      const vb = `${c[1]-d},${c[0]+d},${c[1]+d},${c[0]-d}`
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=1&viewbox=${vb}&bounded=0`
+      const res = await fetch(url, { headers:{ 'Accept-Language': lang==='en'?'en':'fr' } })
+      const j = (await res.json())||[]
+      // Tri par distance réelle à ma position (Nominatim ne le fait pas avec bounded=0).
+      const sorted = (j as any[]).sort((a,b)=> haversineKm(c[0],c[1],+a.lat,+a.lon) - haversineKm(c[0],c[1],+b.lat,+b.lon))
+      setPlaceRes(sorted)
+    } catch { showToast(lang==='en'?'Search unavailable':'Recherche indisponible', C.orange) }
+    setPlaceBusy(false)
+  }
   // Page 2 — Quel type de rencontre (multi-select)
   const [seekModes,setSeekModes]   = useState<string[]>([])  // multi — AUCUN sélectionné par défaut (David : boutons blancs au départ)
   const [seekMood,setSeekMood]     = useState<string|null>(null)  // 🎭 mood DU CRÉNEAU (contexte soft, 1 seul)
@@ -10713,6 +10736,35 @@ export default function App2() {
                   <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:900,letterSpacing:'.2em',textTransform:'uppercase',color:'#fff',background:C.bordeaux,padding:'6px 13px',borderRadius:20}}>
                     ✦ Clutch
                   </div>
+                  {/* 🔎 Recherche de lieu par NOM (David 28.06) — placée à droite du logo, biaisée par ma position. */}
+                  <div style={{flex:1,position:'relative'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,background:'#fff',borderRadius:20,padding:'7px 12px',boxShadow:'0 2px 10px rgba(83,41,67,.18)'}}>
+                      <span style={{fontSize:13,opacity:.6}}>🔎</span>
+                      <input value={placeQuery}
+                        onChange={e=>{ const v=e.target.value; setPlaceQuery(v); if(!v.trim()) setPlaceRes([]) }}
+                        onKeyDown={e=>{ if(e.key==='Enter') searchPlace(placeQuery) }}
+                        placeholder={lang==='en'?'Search a place…':'Chercher un lieu…'}
+                        style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:13,color:C.white,fontFamily:'inherit',minWidth:0}}/>
+                      {placeQuery && <button onClick={()=>{setPlaceQuery('');setPlaceRes([])}} style={{border:'none',background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',padding:0,lineHeight:1}}>✕</button>}
+                      <button onClick={()=>searchPlace(placeQuery)} style={{border:'none',background:C.bordeaux,color:'#fff',fontSize:11,fontWeight:800,borderRadius:14,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{placeBusy?'⏳':'OK'}</button>
+                    </div>
+                    {placeRes.length>0 && (
+                      <div style={{position:'absolute',top:'calc(100% + 6px)',left:0,right:0,background:'#fff',borderRadius:12,boxShadow:'0 6px 22px rgba(83,41,67,.22)',overflow:'hidden',maxHeight:240,overflowY:'auto'}}>
+                        {placeRes.map((r:any,ri:number)=>{
+                          const c = realGps||meetupPos||ME
+                          const km = haversineKm(c[0],c[1],+r.lat,+r.lon)
+                          const main = (r.display_name||'').split(',').slice(0,2).join(',')
+                          return (
+                            <div key={ri} onClick={()=>{ const lat=+r.lat,lng=+r.lon; mapSetCenterRef.current?.(lat,lng); setMeetupPos([lat,lng]); setPlaceRes([]); setPlaceQuery(main.split(',')[0]); hap('light') }}
+                              style={{padding:'10px 12px',fontSize:12.5,color:C.white,cursor:'pointer',borderBottom:ri<placeRes.length-1?`1px solid ${C.border}`:'none',display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}>
+                              <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {main}</span>
+                              <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:C.whiteMid}}>{fmtKm(km)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -10720,7 +10772,7 @@ export default function App2() {
               <div style={{flex:1,minHeight:0,position:'relative'}}>
                 <MapLeaflet rayon={rayon} userPhoto={user.photo_url} profiles={profiles}
                   showPin={true}
-                  onReady={(fn,rc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc }}
+                  onReady={(fn,rc,sc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc; mapSetCenterRef.current=sc }}
                   onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}/>
                 {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
@@ -11099,8 +11151,8 @@ export default function App2() {
                   {!intentPinned && (
                     <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
                       {(lang==='en'
-                        ? ['A coffee & a chat','A drink on a terrace','A walk by the lake','Meet new people','A quiet date','Talk about a project']
-                        : ['Un café pour discuter','Un verre en terrasse','Une balade au lac','Rencontrer du monde','Un date tranquille','Parler d’un projet']
+                        ? ['A coffee & a chat','A drink on a terrace','A walk by the lake','Meet new people','A quiet date','Lunch together','Go for a run','A bouldering session','An exhibition','Live music tonight','Talk about a project','Play chess / cards']
+                        : ['Un café pour discuter','Un verre en terrasse','Une balade au lac','Rencontrer du monde','Un date tranquille','Manger un bout','Aller courir','Une séance d’escalade','Une expo','Un concert ce soir','Parler d’un projet','Échecs / cartes']
                       ).map(s=>(
                         <button key={s} onClick={()=>{ hap('light'); setIntentMsg(s) }} style={{padding:'6px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{s}</button>
                       ))}

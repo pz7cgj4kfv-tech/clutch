@@ -9333,6 +9333,17 @@ export default function App2() {
     return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
   }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 🌀 CÔNE VIVANT (David : « plus je m'approche de l'heure, plus le créneau se resserre tout seul »).
+  //    Un tick léger toutes les 30 s pendant le flow dispo → le slider recalcule sa tension/limite crédible
+  //    en TEMPS RÉEL (la fenêtre rétrécit quand l'heure de départ approche). Aucun GPS background : pur recalcul
+  //    local de l'espace-temps. Gated à flow==='carte' pour ne rien recalculer ailleurs (batterie/perf).
+  const [, setConeTick] = useState(0)
+  useEffect(() => {
+    if (flow !== 'carte') return
+    const t = setInterval(() => setConeTick(x => x + 1), 30_000)
+    return () => clearInterval(t)
+  }, [flow])
+
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
     import('@/lib/onesignal').then(({ initOneSignal }) => initOneSignal()).catch(() => {})
@@ -10476,7 +10487,8 @@ export default function App2() {
     requestNotificationPermission()
     setFlow('app')
     setTab('presences')
-    setTimeout(()=>loadProfiles(), 500) // Refresh la liste après mise à jour DB
+    reloadAvail()                          // 🔄 le créneau apparaît TOUT DE SUITE (badge 📍N/3 + « Mes créneaux ») — bug David « au départ ça s'affichait pas »
+    setTimeout(()=>{ loadProfiles(); reloadAvail() }, 500) // Refresh la liste après MAJ DB (+ 2ᵉ passe : la dispo vient d'être commit)
   }
 
   const activateLive = () => {

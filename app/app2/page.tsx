@@ -9275,7 +9275,7 @@ export default function App2() {
   useEffect(() => {
     const prev = prevFlowRef.current; prevFlowRef.current = flow
     if (flow === 'carte' && prev !== 'carte' && prev !== 'options') {
-      if (editingSlotRef.current) { editingSlotRef.current = null; return }  // édition en cours → garder le pré-rempli
+      if (editingSlotRef.current) { editingSlotRef.current = null; setInitSlots(makeSlots()); return }  // édition : garder le pré-rempli MAIS rafraîchir les slots (molette = début ≥ maintenant, plus de retour dans le passé — bug David)
       const fresh = makeSlots()
       setInitSlots(fresh)
       // ⏰ DÉFAUT = créneau dans 1h → 2h (David 28.06). Évite que le Cône bloque (rayon 10km a besoin de ~42min de marge)

@@ -10583,6 +10583,9 @@ export default function App2() {
   // Poids v1 (ajustables) : intérêts communs 50% · proximité 30% · fiabilité 20%.
   // GPT validé : « compréhension > contrôle » → on EXPLIQUE pourquoi chaque profil remonte.
   const myInterestsLC = (Array.isArray((user as any)?.interests) ? (user as any).interests : []).map((x:string)=>String(x).toLowerCase())
+  // 🎭 MES moods = déduits de MON intention (default_moods stocké, sinon recalcul depuis ma bio). Signal SOUPLE.
+  const myMoods:string[] = (Array.isArray((user as any)?.default_moods) && (user as any).default_moods.length)
+    ? (user as any).default_moods : deriveMoods((user as any)?.bio || '')
   const compatScored = filtered.map(p => {
     const theirInt:string[] = Array.isArray((p as any).interests) ? (p as any).interests : []
     const shared = theirInt.filter(i => myInterestsLC.includes(String(i).toLowerCase()))
@@ -10592,10 +10595,17 @@ export default function App2() {
     const myR = (user as any)?.available_radius_km ?? rayon
     const prox = km==null ? 0.3 : Math.max(0, 1 - km/Math.max(myR,1))
     const fiab = (p as any).reliability_score!=null ? (p as any).reliability_score/100 : 0.5
-    const score = compat*0.5 + prox*0.3 + fiab*0.2
+    // 🎭 Intersection de moods (Jaccard) — l'intention obligatoire sert ENFIN à trier (matching souple, jamais exclure).
+    const theirMoods:string[] = (Array.isArray((p as any).default_moods) && (p as any).default_moods.length)
+      ? (p as any).default_moods : deriveMoods((p as any).bio || '')
+    const moodInter = myMoods.filter(m => theirMoods.includes(m)).length
+    const moodUnion = new Set([...myMoods, ...theirMoods]).size
+    const mood = moodUnion > 0 ? moodInter / moodUnion : 0
+    const score = compat*0.4 + prox*0.25 + fiab*0.15 + mood*0.2
     // dots 1..5 + raisons lisibles (les 2 plus fortes)
     const dots = Math.max(1, Math.min(5, Math.round(1 + score*4)))
     const reasons:string[] = []
+    if (moodInter>0) reasons.push('Même envie')                       // mood = priorité d'affichage (l'intention recoupe)
     if (shared.length>=2) reasons.push(`${shared.length} goûts communs`)
     else if (shared.length===1) reasons.push(`Goût commun : ${shared[0]}`)
     if (km!=null && km<2) reasons.push('Tout près')

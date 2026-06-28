@@ -1,120 +1,101 @@
-# 🌍 PROMPT GPT / GROK — AUDIT MÉTA de Clutch (concurrents · faisabilité · adoption · scénarios · lancement · budget)
+# 🌍 AUDIT MÉTA CLUTCH — le vrai (v4 · 28.06.2026)
 
-> Auto-suffisant (l'IA ne connaît pas l'app). À COLLER dans GPT puis dans Grok séparément. On veut un audit
-> SANS COMPLAISANCE, chiffré, avec des sources quand possible. Challengez le fondateur. Format imposé à la fin.
+> ⚠️ CE PROMPT ANNULE ET REMPLACE tous les audits précédents. Dis à l'IA : « ignore tout audit Clutch précédent, on
+> recommence proprement ». On veut un **VRAI audit de ~10 pages**, dense, **DATÉ**, avec de vraies **PROJECTIONS DE
+> REVENUS** (pas des coûts fantaisistes), **PLUSIEURS options** de lancement (pas une seule vérité imposée), et des
+> **hypothèses explicites** (« hypothèse : … » dès qu'une donnée manque). À coller dans GPT, puis dans Grok.
 
 COLLE À PARTIR D'ICI 👇
 
 ---
 
-Tu es un **panel de 5 experts** qui débattent sans complaisance puis convergent :
-1. **Analyste concurrentiel** (apps de rencontre/social, veille produit mondiale).
-2. **Spécialiste product-market-fit & adoption** (pourquoi les gens utilisent ou abandonnent une app sociale).
-3. **Growth / go-to-market** (lancement d'apps à effet de réseau local, 2024-2026).
-4. **CFO / finance early-stage** (budgets pub, CAC, runway, maintenance).
-5. **Ingénieur produit / faisabilité technique** (apps géo temps-réel, sécurité).
+Tu es un **cabinet d'audit** (5 experts : analyste concurrentiel · finance/revenus early-stage · growth/go-to-market ·
+product/adoption · tech). Tu produis un **rapport long (~10 pages), structuré, daté, chiffré, sans complaisance.**
+Trois règles dures :
+1. **Donne PLUSIEURS scénarios/options, jamais une seule « bonne » réponse.** C'est un produit social et dynamique en
+   2026 — il n'y a pas de vérité unique. Pour chaque grande question, propose 2-4 voies avec leurs trade-offs.
+2. **Quand une donnée réelle te manque, écris « hypothèse : … » et donne ta fourchette.** Pas de pseudo-certitude.
+3. **Date chaque section** (mois/année de la donnée ou de l'estimation).
 
-Chacun donne SON avis, vous vous contredisez là où c'est utile, puis vous convergez. Pas de bla-bla : du concret,
-des chiffres, des exemples nommés, et vous **CHALLENGEZ le fondateur** quand il se trompe.
+## CE QU'EST CLUTCH (lis bien, il y a un point souvent mal compris)
+App mobile de **rencontre SPONTANÉE EN PERSONNE**, d'abord **Lausanne / Suisse romande**.
+Pitch : **« Finis de swiper dans le vide — un vrai rendez-vous en personne, dans les 18 h, ou ça expire. »**
+Pas de swipe, pas de chat infini : on se déclare **dispo** (heure + lieu sur carte + rayon), quelqu'un propose un **RDV
+réel** (« Clutch »), l'autre accepte → **Verrou** → on se voit. Sécurité au cœur (femmes) : check-in GPS, score de
+fiabilité, cooldown anti-relance, SOS, certification.
 
-## CE QU'EST « CLUTCH »
-App mobile (iOS/Android) de **rencontre SPONTANÉE EN PERSONNE**, pensée d'abord pour **Lausanne / Suisse romande**.
-Le pitch en une phrase : **« Finis de swiper dans le vide — un vrai rendez-vous en personne, dans les 18 heures, ou ça expire. »**
+**⚠️ LA « FORTERESSE » N'EST PAS UN ARGUMENT MARKETING.** C'est un **moteur INTERNE** (cône de causalité espace-temps)
+qui empêche les configs physiquement impossibles (être à 2 endroits à la fois ; se déclarer joignable à un lieu qu'on ne
+peut pas atteindre à temps). **L'utilisateur ne la voit jamais comme une feature.** Sa SEULE manifestation visible : un
+curseur de rayon qui **rougit progressivement** quand on pousse une config peu crédible (pur ressenti visuel, sans texte).
+**Ne perds donc pas de temps à juger si « la Forteresse est un moat marketing » — ce n'est pas la question.** La vraie
+question : améliore-t-elle la QUALITÉ des rencontres (moins de faux RDV, plus de confiance) — valeur interne uniquement ?
 
-Différences assumées vs Tinder/Bumble/Thursday/Timeleft :
-- **Pas de swipe, pas de chat infini, pas de match qui dort.** On se déclare **disponible** sur un **créneau** (heure
-  + lieu sur une carte + rayon), quelqu'un propose un **RDV réel** (« Clutch »), l'autre accepte → **Verrou** → on se voit.
-- **Fenêtre de 18 h max** : tout est spontané, rien ne se planifie à 3 semaines.
-- **Vocabulaire propre** : Clutch / Verrou / Rendez-vous (jamais match/swipe/like).
-- **Sécurité au centre** (cœur = femmes) : check-in GPS « j'y suis », score de fiabilité, cooldown anti-relance après
-  refus, SOS, certification selfie, signalement.
-- **« La Forteresse »** (la brique technique différenciante) : un **moteur espace-temps** qui empêche les configs
-  physiquement incrédibles. Deux garanties : (1) une personne ne peut pas être à 2 endroits en même temps
-  (exclusion) ; (2) **cône de causalité** — ta dispo {position GPS · lieu · rayon · heure} doit être CRÉDIBLE :
-  tu dois pouvoir physiquement être au point de RDV à l'heure dite, sinon tu n'es pas proposable là. Version
-  dynamique en cours : la fenêtre **se réduit selon ta position GPS réelle dans le temps** (si tu ne bouges pas,
-  l'heure recule). Anti-triangulation : on ne montre jamais la distance à une personne, seulement le temps.
-- Modèle éco visé : **freemium**, prix égaux H/F (gratuité femmes abandonnée pour raison éthique), features premium
-  différenciées par usage (CHF ~19.90/mois en hypothèse).
+État (28.06.2026) : **app fonctionnelle en TestFlight** (auth, profils, carte, flow Clutch complet, Verrou, feedback,
+modération client+serveur, events de groupe, Test Lab). **L'app a encore beaucoup de bugs — on n'est PAS prêt à chercher
+de vrais utilisateurs.** Built en solo (fondateur non-dev + IA). Le fondateur estime la complexité **technique à construire**
+à 8/10 — challenge honnête vs Uber, Tinder, BlaBlaCar, Citymapper.
 
-État actuel : **app fonctionnelle en TestFlight** (auth, profils, carte, flow Clutch complet, Verrou, feedback,
-modération de contenu client+serveur, events de groupe, Test Lab interne). Built en solo (fondateur non-dev + IA).
-Réseau encore froid (0 utilisateur réel — test avec des bots). **Le fondateur estime la complexité de Clutch comme
-élevée (8/10).** Challengez honnêtement cette estimation en la comparant à Uber, Tinder, BlaBlaCar et Citymapper.
+Modèle éco visé : **freemium**. Sources de revenus à projeter : (a) **abonnements** (paliers ~10 CHF et ~20 CHF/mois) ·
+(b) **partenaires** (bars/cafés/events sponsorisés, commission, mise en avant) · (c) **clutchs/crédits** (ex. crédits
+d'envoi pour hommes, boosts) · (d) **events payants** éventuels. Prix égaux H/F.
 
-## CE QU'ON VEUT DE VOUS (audit en 6 volets)
+## LE RAPPORT (8 volets — ~10 pages)
 
-### 1. CONCURRENTS — qui fait déjà ça ?
-Recensez les apps/produits **réellement comparables** (spontané, en personne, fenêtre courte, anti-swipe) — mondiaux
-et européens. Citez-les nommément (ex. Thursday, Timeleft, IRL, Pie, 222, Honeypot, Meeting/Happn « live », Sortir,
-applis « apéro/dîner entre inconnus », « Softday » si ça existe…). Pour chacune : ce qu'elle fait, où elle marche/échoue,
-si elle a une brique « causalité physique » comme la Forteresse (probablement aucune). **Y a-t-il un trou de marché réel,
-ou est-ce un cimetière d'apps mortes ?** Soyez francs.
+### 1. CONCURRENTS (daté)
+Recense les apps réellement comparables (spontané/IRL/fenêtre courte/anti-swipe), mondiales et européennes, avec
+**dates** (lancement, pivot, fermeture, levées). Nomme-les (Thursday, Timeleft, IRL, Pie, 222, Honeypot, Happn « live »,
+apéros/dîners entre inconnus, etc.). Tableau : nom · ce qu'ils font · traction connue (chiffres + date) · ce qui marche/échoue.
+**Quelqu'un fait-il déjà le « cône de causalité » / la contrainte physique ? Trou de marché réel, ou cimetière ?**
 
-### 2. FAISABILITÉ & COMPLEXITÉ TECHNIQUE
-Le fondateur estime Clutch à 8/10. **Challengez cette note honnêtement** face à Uber, Tinder, BlaBlaCar, Citymapper. Situez la complexité réelle de Clutch (moteur géo
-temps-réel + cône de causalité + sécurité + anti-abus) par rapport à : Uber, Tinder, Doodle, BlaBlaCar, Citymapper.
-Qu'est-ce qui est DÉJÀ résolu par des libs/services (geocoding, maps, push, RLS) vs ce qui est vraiment dur
-(estimation de trajet multimodale, forteresse dynamique GPS, anti-triangulation, modération à l'échelle) ? Le risque
-technique #1 ?
+### 2. FAISABILITÉ & COMPLEXITÉ TECHNIQUE (à CONSTRUIRE)
+Note /10 **justifiée** la complexité de Clutch (moteur géo temps-réel + cône + sécurité + anti-abus) vs Uber/Tinder/
+BlaBlaCar/Citymapper. Distingue ce qui est **déjà résolu par des libs** (maps, push, RLS, geocoding) de ce qui est
+**vraiment dur** (cône dynamique GPS, anti-triangulation, modération à l'échelle, estimation de trajet multimodale). Risque #1.
 
-### 3. ADOPTION — les gens vont-ils l'utiliser ?
-Le pari : les gens préfèrent un VRAI RDV bientôt à du swipe infini. **Est-ce vrai, ou les gens AIMENT scroller ?**
-Quels sont les vrais freins (friction de se déclarer dispo, peur de l'engagement en personne, masse critique,
-sécurité femmes, « je ne suis jamais prêt là maintenant ») ? Quels critères font qu'une femme de 23 ans à Lausanne,
-seule un soir, l'ouvre une 2e fois ? Le problème de l'**œuf-poule masse critique** (sans gens dispo = vide = on part) :
-comment d'autres l'ont résolu (events comme amorce ? heures « golden » ? villes denses ?) ?
+### 3. ADOPTION
+Plusieurs angles. Les gens préfèrent-ils un vrai RDV bientôt, ou aiment-ils scroller ? 3-5 freins, 3-5 leviers. Le
+problème **œuf-poule (masse critique)** : donne **2-3 façons différentes** de l'amorcer (events ? golden hours ? communauté
+de filles d'abord ? B2B avec des bars ?). Pas une seule recette.
 
-### 4. POTENTIEL & PRÉVISIONS CHIFFRÉES par région (⚠️ partie LA PLUS IMPORTANTE — soyez RIGOUREUX, pas de chiffres ronds en l'air)
-Donnez de VRAIES prévisions, pas des estimations vagues. Pour CHAQUE échelle (Lausanne · Canton de Vaud · Suisse
-romande · Suisse · **pays francophones (= France + Belgique francophone + Suisse romande + Luxembourg + Québec francophone)** ·
-Europe occidentale · monde), donnez **4 scénarios — MAUVAIS / MOYEN / BON /
-EXCELLENT** avec, pour chacun :
-- **MAU (utilisateurs actifs mensuels)** à **M3 · M6 · M12 · M24** (4 échéances, courbe de croissance, pas un seul chiffre).
-- **% de probabilité** que vous assignez à CHAQUE scénario (les 4 doivent sommer à 100 %).
-- **La rétention** (D1 / D30) supposée et le **ratio dispo-simultanés / inscrits** un soir typique.
-- **La MÉTHODE** : sur quelles données réelles vous basez-vous (population de la zone, % cible 18-35 célibataires,
-  taux de pénétration observé sur des apps comparables — Tinder, Thursday, Timeleft — à un stade équivalent, CAC, viralité k).
-  Citez les chiffres réels des comparables quand vous les connaissez.
-- Le **point de bascule** chiffré : masse critique minimale par ville (inscrits ET dispo simultanés un soir) en dessous
-  de laquelle l'app meurt, et au-dessus de laquelle elle s'auto-entretient.
-**Si vous donnez des chiffres ronds sans méthode, c'est un échec.** On veut une fourchette défendable + l'hypothèse derrière.
-**Si une donnée réelle manque, donnez une hypothèse EXPLICITE et écrivez « hypothèse » — pas une pseudo-certitude.**
+### 4. 💰 PROJECTIONS DE REVENUS (LE CŒUR — sois rigoureux, daté, chiffré)
+C'est la partie la plus importante. Donne, **par scénario FAIBLE / MOYEN / FORT / EXCELLENT** (+ une probabilité par
+scénario, somme = 100 %), et pour chaque échelle (Lausanne · Vaud · Suisse romande · Suisse · pays francophones
+[= France + Belgique fr. + Suisse romande + Luxembourg + Québec fr.] · Europe occidentale) :
+- **Le MRR (revenu mensuel récurrent) à M3 / M6 / M12 / M24** — pas un seul chiffre, une courbe.
+- **La décomposition par SOURCE** : combien d'abonnés ×ARPU (paliers 10/20 CHF), combien de revenus partenaires, combien
+  de revenus clutchs/crédits/boosts.
+- **Les hypothèses** : MAU, % qui payent (conversion freemium typique 2-8 % — situe-toi), ARPU, churn, mix H/F.
+- Et le **ARR / l'argent cumulé à 24 mois** par scénario.
+Méthode : appuie-toi sur des comparables réels (Tinder/Bumble ARPU, taux de conversion d'apps freemium sociales) et
+**écris « hypothèse »** quand tu extrapoles. **Pas de chiffres ronds sans justification.**
 
-### 5. LANCEMENT 2026 — la meilleure stratégie
-On n'achète plus des affiches à 1M. En 2026, pour une app sociale locale à effet de réseau, quelle est la MEILLEURE
-approche ? Challengez ces options : **teaser mystère** (logo sablier partout pendant des semaines + date, façon
-« hype », idée de Shirley) · **business angel** vs bootstrap · **micro-influenceurs locaux** · **une seule ville
-hyper-dense d'abord** (Lausanne, campus, soirées) vs plusieurs · events réels comme amorce. Donnez UNE séquence de
-lancement recommandée, étape par étape.
+### 5. STRATÉGIES DE LANCEMENT 2026 — PLUSIEURS OPTIONS (pas une seule)
+Donne **3-4 stratégies DISTINCTES**, pas une vérité unique. Pour chacune : pour qui ça marche, coût d'amorçage, risque,
+vitesse, et dans quel cas la choisir. Couvre au moins : **teaser mystère** (logo sablier + date, idée Shirley) ·
+**micro-influenceurs locaux** · **events réels d'abord** (à la Timeleft) · **B2B partenaires (bars) d'abord** ·
+**une seule ville hyper-dense** vs **plusieurs** · **communauté noyau (ex. groupe de filles) d'abord**. Ne dis pas
+« la masse critique dans une ville parce que c'est comme ça qu'on faisait » — challenge cette idée pour 2026.
 
-### 6. BUDGET pub + maintenance (chiffré)
-Proposez un budget réaliste pour un lancement Lausanne (3-6 mois) : acquisition (social/TikTok/Insta/micro-influenceurs,
-CAC estimé), création de contenu, et **maintenance** (serveurs Supabase, push, modération, support). Fourchettes en CHF.
-Quel est le coût RÉEL de « faire vivre » la masse critique d'une première ville ?
+### 6. LA FORTERESSE — valeur INTERNE + intégration visuelle (PAS un moat marketing)
+(a) Améliore-t-elle réellement la qualité produit (moins de faux RDV, confiance) ? Valeur interne faible/moyenne/forte.
+(b) **Question design** : quelle est la MEILLEURE façon de la rendre sensible à l'utilisateur **purement visuellement**
+sur le curseur de rayon (toute la course qui rougit progressivement, résistance ressentie), **sans texte explicatif** ?
+Donne 2-3 directions visuelles.
 
-### 7. LA FORTERESSE est-elle un vrai MOAT, ou juste un outil interne ?
-Techniquement la Forteresse est originale. Mais **commercialement** : est-ce une vraie barrière à l'entrée (un
-concurrent ne peut pas copier), ou surtout un **outil de qualité produit interne que l'utilisateur ne percevra
-jamais** ? Donnez : valeur perçue utilisateur (faible/moyenne/forte) · valeur produit interne · défendabilité du moat.
-Le fondateur surestime-t-il l'avantage compétitif de la Forteresse ?
+### 7. POURQUOI Clutch pourrait MOURIR (classé par probabilité)
+5 raisons d'échec les plus probables (liquidité · friction/peur IRL · économie unitaire · concurrence indirecte
+WhatsApp/Insta/amis · sécurité). Classe-les, dis LAQUELLE est la plus probable, et **comment la désamorcer** (plusieurs pistes).
 
-### 8. POURQUOI Clutch pourrait MOURIR malgré un bon produit ? (la question qui tue)
-Donnez les **5 raisons d'échec les plus probables** (liquidité/masse critique · sécurité femmes · comportement humain
-& habitude · économie unitaire/CAC · concurrence indirecte : WhatsApp, Insta, amis, Meetup), **classées par probabilité**,
-et dites **LAQUELLE est la plus probable** + ce qu'il faudrait pour la désamorcer.
+### 8. VERDICT & RECOMMANDATIONS
+3-5 voies possibles pour aller au bout (pas une seule), avec leurs conditions. Les 3 vérités dures. Ce que ferait un VC.
 
-## FORMAT DE SORTIE (impératif)
-1. **Verdict en 3 lignes** (le projet a-t-il une vraie chance ? oui/non/à conditions).
-2. **Concurrents** : tableau (nom · ce qu'ils font · forces · faiblesses · ont-ils la « forteresse » ?).
-3. **Complexité** : note /10 justifiée + comparaison Uber/Tinder + risque technique #1.
-4. **Adoption** : 3 freins majeurs + 3 leviers + la réponse au problème masse critique.
-5. **Scénarios** : tableau 4 scénarios × 7 régions. **Inclure M3/M6/M12/M24 dans CHAQUE cellule** (ou un sous-tableau par région) + la proba de chaque scénario + la condition de bascule. Ne PAS simplifier.
-6. **Lancement** : la séquence recommandée (numérotée) + le piège à éviter.
-7. **Budget** : fourchettes CHF (acquisition / contenu / maintenance) pour Lausanne 3-6 mois.
-8. **Les 3 vérités dures** que le fondateur ne veut pas entendre.
-Chiffré, sourcé quand possible, sans complaisance.
+## FORMAT
+~10 pages, dense, **daté section par section**, tableaux, hypothèses explicites, PLUSIEURS options partout. Chiffré
+(CHF, MAU, MRR, %). Pas de coûts de maintenance fantaisistes (une app qui marche croît au bouche-à-oreille — concentre-toi
+sur les ENTRÉES, pas sur des dépenses inventées).
 
 ---
 
-FIN DU BLOC ☝️ — colle-le tel quel dans GPT, puis dans Grok. Renvoie-moi les 2 réponses, je les re-challenge.
+FIN DU BLOC ☝️ — colle dans GPT puis Grok. Renvoie-moi les 2 rapports : Claude (moi) les croise, les challenge, et on
+en fait UN document daté qui ira dans un onglet « Audit » de l'app.

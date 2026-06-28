@@ -192,10 +192,16 @@ Appeler `map.invalidateSize()` dans un `requestAnimationFrame` après montage.
 
 | Bug | Priorité | Note |
 |-----|----------|------|
-| Events "No" au lieu du texte traduit pour les places | Haute | Onglet Événements, texte non traduit |
-| Anti-doublon Clutch | Haute | Possible d'envoyer 2 Clutchs à la même personne si un est pending |
+| ~~Events "No" au lieu du texte traduit~~ | ✅ RÉSOLU 28.06 | Refonte cartes events : affiche un propre `X/Y` (taken/spots), plus de "No" |
+| ~~Anti-doublon Clutch~~ | ✅ RÉSOLU | Géré par le RPC gardé `create_clutch` (`pair_busy` → message clair « déjà un Clutch en cours ») |
 | Post-RDV feedback UI | Moyenne | Écran "Comment ça s'est passé ?" manquant dans /app2 |
 | /scenario : étape chat/messages manquante | Basse | Après Verrou, avant le RDV dans le happy path |
+
+### 🌀 Forteresse (le Cône) — état 28.06 (build 208)
+- Moteur recalibré **22→35 km/h** (lib/cone.ts + feasibility.ts) → 18 km à 1h n'est plus « impossible ». test-cone 27/27.
+- Slider = charte **vert→rose→violet** ancrée sur toute la course (plus de full-red) + boussole micro-signal + cône VIVANT (tick 30 s → la fenêtre se resserre quand l'heure approche).
+- Moments **EXCLUSIFS** (1 clic = 1 fenêtre réelle, « + Créneau » pour plus). Intention **optionnelle**.
+- ⏳ RESTE Phase 2 (#10) : forteresse GPS **dynamique** (dispo publiée qui se recale selon les déplacements réels → besoin GPS continu + recompute serveur). Session dédiée.
 
 ---
 

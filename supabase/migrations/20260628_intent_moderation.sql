@@ -12,7 +12,7 @@ returns text language sql immutable as $$
       translate(
         translate(lower(coalesce(t,'')),
           'àâäáãéèêëíìîïóòôöõúùûüçñ', 'aaaaaeeeeiiiiooooouuuucn'),     -- accents
-          '@43!|10$57', 'aeiilios t'                                    -- leetspeak grossier (@,4→a 3→e 1,!,|→i 0→o $,5→s 7→t)
+          '@43!|10$578', 'aaeiiiosstb'                                  -- leetspeak (@,4→a · 3→e · 1,!,|→i · 0→o · $,5→s · 7→t · 8→b)
       ),
       '[^a-z ]', ' ', 'g'                                              -- vire tout sauf lettres + espace
     ),

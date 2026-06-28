@@ -12911,18 +12911,6 @@ export default function App2() {
   )
 }
 
-// ── 🎮 COCKPIT DE TEST (admin-only) — fenêtre FLOTTANTE déplaçable PAR-DESSUS l'app, avec onglets.
-// Intégré (pas de page à part) pour ne JAMAIS switcher d'écran (demande David : optimiser son temps de test).
-// Autonome (ses propres requêtes Supabase). À RETIRER avant le lancement public (1 composant, admin-gated).
-const cockSel: React.CSSProperties = { width:'100%', padding:'8px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bgCard, color:C.white, fontSize:12, fontFamily:'inherit', marginBottom:4 }
-const COCK_PLACES = [
-  { n:'Lausanne', lat:46.5197, lng:6.6323 },
-  { n:'Morges',   lat:46.5094, lng:6.4983 },
-  { n:'Genève',   lat:46.2044, lng:6.1432 },
-  { n:'Sion',     lat:46.2333, lng:7.3600 },
-  { n:'Vevey',    lat:46.4628, lng:6.8419 },
-]
-type CockTab = 'world'|'express'|'acteur'|'clutch'|'event'|'diag'
 // ─────────────────────────────────────────────────────────────────────────────
 // 🧪 CLUTCH TEST LAB — le panneau de test UNIQUE (mobile, plein écran), ouvert par UN bouton
 // (Profil → admin → dispatch 'clutch:open-testlab'). Synthèse GPT+Grok challengée : simple devant,
@@ -12991,11 +12979,31 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     else { const r:any=data; showToast(`${r?.ok?'🟢':'🚫'} ${r?.message||''}`, r?.ok?C.green:C.orange); note(`${r?.ok?'🟢':'🚫'} ${nameOf(botId)} → ${r?.message||''}`); refreshAll(); loadBots() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
-  // 🛡️ Passe par la RPC GARDÉE admin_create_clutch (mêmes règles que les vrais users + feedback {ok,code,message}).
+  // 🕐 Heure de RDV TOUJOURS COHÉRENTE avec la fenêtre de dispo du bot (jamais 20h sorti de nulle part — bug David).
+  const coherentRdv=(fromMs:number, untilMs:number)=>{
+    const now=Date.now()
+    let t=Math.max(now+30*60000, fromMs+30*60000)              // 30 min après le début de SA fenêtre (ou maintenant+30)
+    if(t>untilMs-10*60000) t=Math.max(fromMs+10*60000, untilMs-10*60000)   // borné avant la fin de sa dispo
+    return t
+  }
+  const hhmmOf=(ms:number)=> new Date(ms).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
+  // 🛡️ RPC GARDÉE admin_create_clutch. AVANT : si le bot n'est pas dispo, on le met en ligne près de moi → puis RDV DANS sa fenêtre.
   const clutchToMe=async(fromId:string)=>{ if(!fromId){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
-    const { data, error } = await supabase.rpc('admin_create_clutch', { p_actor:fromId, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:tISO(20,0), p_message:`Un café ? — ${nameOf(fromId)}` })
+    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
+    const { data: b } = await supabase.from('profiles').select('available_from,available_until,is_available').eq('id',fromId).maybeSingle()
+    let from=(b as any)?.available_from ? new Date((b as any).available_from).getTime() : 0
+    let until=(b as any)?.available_until ? new Date((b as any).available_until).getTime() : 0
+    const live=(b as any)?.is_available && until>Date.now()
+    if(!live){   // pas dispo → on le met en ligne près de moi, fenêtre cohérente (maintenant → +2h)
+      from=Date.now(); until=Date.now()+2*3600e3
+      await supabase.rpc('admin_set_availability',{ p_actor:fromId, p_from:new Date(from).toISOString(), p_until:new Date(until).toISOString(), p_lat:lat, p_lng:lng, p_radius:10 })
+      note(`🟢 ${nameOf(fromId)} mise en ligne près de toi (maintenant → ${hhmmOf(until)})`)
+    }
+    const rdv=coherentRdv(from, until)
+    const { data, error } = await supabase.rpc('admin_create_clutch', { p_actor:fromId, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:new Date(rdv).toISOString(), p_venue_lat:lat, p_venue_lng:lng, p_message:`Un café ? — ${nameOf(fromId)}` })
     if(error){ showToast('❌ '+error.message+' — applique la migration admin_actor_rpc',C.red); note('❌ RPC : '+error.message) }
-    else { const r:any=data; const ok=r?.ok; showToast(`${ok?'📨':'🚫'} ${r?.message||''}`, ok?C.green:C.orange); note(`${ok?'📨':'🚫'} ${nameOf(fromId)} → ${r?.message||''}${r?.code&&!ok?` [${r.code}]`:''}`); refreshAll() }
+    else { const r:any=data; const ok=r?.ok; showToast(`${ok?'📨':'🚫'} ${r?.message||''}${ok?` · RDV ${hhmmOf(rdv)}`:''}`, ok?C.green:C.orange); note(`${ok?'📨':'🚫'} ${nameOf(fromId)} → ${r?.message||''}${ok?` · RDV à ${hhmmOf(rdv)} (dans sa fenêtre)`:''}${r?.code&&!ok?` [${r.code}]`:''}`); refreshAll(); loadBots() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // 🛡️ RPC GARDÉE admin_accept_clutch : l'exclusion forteresse (chevauchement) remonte en message clair.
   const botAccepts=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('acc'); try{
@@ -13026,15 +13034,26 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   // ── EVENT + demandes : un bot crée un event, les autres bots s'inscrivent (les « demandes » à valider). ──
   // 🛡️ Via admin_create_event (date RÉELLE) + join_event (dispo↔event s'applique aux bots = réaliste).
   const eventDemands=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('ev'); try{
-    const starts=new Date(); starts.setHours(20,0,0,0); if(starts.getTime()<Date.now()) starts.setDate(starts.getDate()+1)
-    const { data: ce, error } = await supabase.rpc('admin_create_event', { p_actor:botId, p_title:`Apéro test — ${nameOf(botId)}`, p_starts_at:starts.toISOString() })
+    // 🕐 COHÉRENT : event dans ~1h (pas 20h sorti de nulle part) + on met les bots dispo pour COUVRIR cette heure,
+    //    sinon join_event les refuse (dispo↔event). Sans ça « 0 inscrits » — l'incohérence que David voyait.
+    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
+    const startMs=Date.now()+60*60000   // +1h
+    const starts=new Date(startMs)
+    const { data: ce, error } = await supabase.rpc('admin_create_event', { p_actor:botId, p_title:`Apéro test — ${nameOf(botId)}`, p_starts_at:starts.toISOString(), p_lat:lat, p_lng:lng })
     if(error){ showToast('❌ '+error.message+' — applique la migration event_rpc_dispo',C.red); note('❌ RPC : '+error.message); setBusy(null); return }
     const r:any=ce; if(!r?.ok){ showToast('🚫 '+(r?.message||''),C.orange); note('🚫 event : '+(r?.message||'')); setBusy(null); return }
     const evId=r.event_id
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id',botId); const ids=((bs as any[])||[]).map(b=>b.id)
+    // fenêtre dispo qui couvre l'heure de l'event (maintenant → +2h)
+    const winFrom=new Date().toISOString(), winUntil=new Date(Date.now()+2*3600e3).toISOString()
     let joined=0, blocked=0
-    for(const id of ids){ const { data: jr } = await supabase.rpc('join_event',{ p_event_id:evId, p_actor:id }); if((jr as any)?.ok) joined++; else blocked++ }
-    showToast(`🎉 Event 20h · ${joined} inscrits${blocked?` · ${blocked} pas dispo`:''}`, C.green); note(`🎉 ${nameOf(botId)} a créé un event à 20h · ${joined} bots inscrits${blocked?`, ${blocked} bloqués (pas dispo à 20h)`:''} → onglet Événements`); refreshAll()
+    for(const id of ids){
+      await supabase.rpc('admin_set_availability',{ p_actor:id, p_from:winFrom, p_until:winUntil, p_lat:lat, p_lng:lng, p_radius:10 })
+      const { data: jr } = await supabase.rpc('join_event',{ p_event_id:evId, p_actor:id }); if((jr as any)?.ok) joined++; else blocked++
+    }
+    const hh=hhmmOf(startMs)
+    showToast(`🎉 Event ${hh} · ${joined} inscrits${blocked?` · ${blocked} pleins`:''}`, C.green); note(`🎉 ${nameOf(botId)} a créé un event à ${hh} · ${joined} bots inscrits${blocked?`, ${blocked} en liste d'attente`:''} → onglet Événements`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
   // ── CYCLE DE VIE DU RDV côté bot (David : « il manque j'y suis, terminer, accepte/refuse »). ──
@@ -13064,6 +13083,14 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
                         : {receiver_arrived:true, receiver_cur_lat:c.venue_lat, receiver_cur_lng:c.venue_lng}
     await supabase.from('clutches').update(patch).eq('id',c.id)
     refreshAll(); showToast(`📍 ${nameOf(botId)} est au RDV (j'y suis)`,C.green); note(`📍 ${nameOf(botId)} a dit « j'y suis » → dis « j'y suis » toi aussi, puis Terminer le RDV`)
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ⏰ Le bot ANNONCE UN RETARD — exactement le même write que le vrai flow (retard_min/by/declared_at/accepted), retard_by = bot.
+  const botRetard=async(botId:string, min:number)=>{ if(!botId)return; setBusy('retard'); try{
+    const c=await verrouOf(botId); if(!c){ showToast(`Pas de Verrou avec ${nameOf(botId)} — fais accepter d'abord`,C.orange); setBusy(null); return }
+    const updates={ retard_min:min, retard_by:botId, retard_declared_at:new Date().toISOString(), retard_accepted: min===15?true:null }
+    const { error }=await supabase.from('clutches').update(updates).eq('id',c.id)
+    if(error){ showToast('❌ '+error.message,C.red); note('❌ retard : '+error.message) }
+    else { refreshAll(); showToast(`⏰ ${nameOf(botId)} annonce +${min} min`, C.orange); note(`⏰ ${nameOf(botId)} → retard +${min} min${min===30?' (tu dois l\'accepter)':' (auto-accepté)'}`) }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
   // ── SCÉNARIO 1 CLIC : clutch complet (reset → tout en ligne → un bot te clutche). ──
@@ -13180,6 +13207,19 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
         </div>
 
+        {/* ── CYCLE DU RDV (une fois un Verrou créé avec ce bot) ── */}
+        <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',margin:'18px 0 8px'}}>CYCLE DU RDV — {nameOf(sel).toUpperCase()} (après un Verrou)</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <Big id="ref" icon="🚫" label="Le bot refuse" sub={`${nameOf(sel)} refuse ton clutch (+ cooldown)`} onTap={()=>botRefuse(sel)}/>
+          <Big id="rdvnow" icon="⏱" label="RDV = maintenant" sub="avance l'heure pour tester « j'y suis »" onTap={()=>botRdvNow(sel)}/>
+          <Big id="arrive" icon="📍" label="Le bot « j'y suis »" sub={`${nameOf(sel)} est arrivé·e au lieu`} onTap={()=>botArrive(sel)}/>
+          <Big id="retard" icon="⏰" label="Le bot est en retard" sub="annonce +15 / +30 min" onTap={()=>botRetard(sel,15)}/>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:8}}>
+          <button disabled={busy==='retard'} onClick={()=>botRetard(sel,15)} style={{flex:1,padding:'9px',borderRadius:12,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>⏰ +15 min</button>
+          <button disabled={busy==='retard'} onClick={()=>botRetard(sel,30)} style={{flex:1,padding:'9px',borderRadius:12,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>⏰ +30 min (tu dois accepter)</button>
+        </div>
+
         {/* ⏰ Mettre le bot sélectionné en ligne à une HEURE choisie (via admin_set_availability) */}
         <div style={{marginTop:16}}>
           <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:8}}>⏰ METTRE {nameOf(sel).toUpperCase()} EN LIGNE À…</div>
@@ -13218,307 +13258,6 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   )
 }
 
-function TestCockpit({ userId, isAdmin, showToast, meLat, meLng }: { userId:string; isAdmin:boolean; showToast:(m:string,c?:string)=>void; meLat?:number|null; meLng?:number|null }) {
-  // 🏰 Pour que les bots APPARAISSENT dans MES présences (David : « tout doit marcher avec les bots »), on les
-  //   place dans MA zone (intersection géo garantie) + live MAINTENANT. refreshAll() rafraîchit la liste tout de suite.
-  const meCenter = (meLat!=null && meLng!=null) ? { lat:meLat, lng:meLng } : COCK_PLACES[0]
-  const refreshAll = ()=>{ try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{} }
-  const [open,setOpen] = useState(false)
-  const [tab,setTab] = useState<CockTab>('world')
-  const [pos,setPos] = useState<{x:number;y:number}>({ x: 12, y: 120 })
-  const dragRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
-  const [busy,setBusy] = useState<string|null>(null)
-  const [bots,setBots] = useState<any[]>([])
-  // Acteur (rendre dispo)
-  const [aId,setAId]=useState(''); const [aFrom,setAFrom]=useState(18); const [aTo,setATo]=useState(23); const [aPlace,setAPlace]=useState(0); const [aRad,setARad]=useState(10)
-  // Clutch (envoi paramétré)
-  const [cFrom,setCFrom]=useState(''); const [cTo,setCTo]=useState(''); const [cPlace,setCPlace]=useState(0); const [cH,setCH]=useState(20); const [cM,setCM]=useState(0); const [cQuick,setCQuick]=useState(false)
-  // Event
-  const [eTitle,setETitle]=useState('Apéro test'); const [ePlace,setEPlace]=useState(0); const [eH,setEH]=useState(20); const [eSpots,setESpots]=useState(8); const [ePlanned,setEPlanned]=useState(false)
-  // Diag
-  const [fromId,setFromId]=useState(''); const [toId,setToId]=useState(''); const [diag,setDiag]=useState<string|null>(null)
-  const [cRes,setCRes]=useState<string|null>(null) // résultat des CAS clutch (auto-vérifiés via qa_test_clutch)
-  const [cbId,setCbId]=useState('') // personne testée dans l'onglet Clutch (choisie par l'opérateur)
-  const [evBots,setEvBots]=useState<Set<string>>(new Set()) // bots qui ont un event actif (pour le roster)
-  const loadWorld=async()=>{
-    const { data } = await supabase.from('profiles').select('id,name,is_bot,is_available,available_from,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
-    const arr=(data as any[])||[]; const ids=arr.map(b=>b.id)
-    const evset=new Set<string>()
-    if(ids.length){ const { data: evs } = await supabase.from('events').select('created_by').eq('active',true).in('created_by',ids); ((evs as any[])||[]).forEach(e=>evset.add(e.created_by)) }
-    setEvBots(evset)
-    // Bug 1 — dédoublonnage VISUEL : un seul bot par prénom (on enlève les « X TEST » en double). Ne touche pas la donnée.
-    const norm=(n:string)=> (n||'').replace(/\s*test\s*$/i,'').trim().toLowerCase()
-    const seen=new Set<string>(); const uniq:any[]=[]
-    for(const b of arr){ const k=norm(b.name); if(k && seen.has(k)) continue; seen.add(k); uniq.push({...b, name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
-    setBots([{id:userId,name:'Moi',is_bot:false}, ...uniq])
-    const firstBot=uniq[0]?.id||''
-    setAId(p=>p||firstBot); setCFrom(p=>p||firstBot); setCTo(p=>p||userId); setFromId(p=>p||firstBot); setToId(p=>p||userId); setCbId(p=>p||firstBot)
-  }
-  useEffect(()=>{ if(open) loadWorld() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (!isAdmin) return null
-  const onDown=(e:React.PointerEvent)=>{ dragRef.current={ox:pos.x,oy:pos.y,sx:e.clientX,sy:e.clientY,moved:false}; try{(e.target as HTMLElement).setPointerCapture(e.pointerId)}catch{} }
-  const onMove=(e:React.PointerEvent)=>{ const d=dragRef.current; if(!d) return; if(Math.abs(e.clientX-d.sx)+Math.abs(e.clientY-d.sy)>4) d.moved=true; setPos({x:Math.max(4,d.ox+(e.clientX-d.sx)),y:Math.max(40,d.oy+(e.clientY-d.sy))}) }
-  const onUp=()=>{ dragRef.current=null }
-  const ACT=['pending','accepted','confirmed','checked_in']
-  const tISO=(h:number,m=0)=>{ const d=new Date(); d.setHours(h,m,0,0); if(d.getTime()<Date.now()) d.setDate(d.getDate()+1); return d.toISOString() }
-  const nameOf=(id:string)=> bots.find(b=>b.id===id)?.name || '?'
-  // ── EXPRESS ──
-  const botsOnline=async()=>{ setBusy('on'); try{
-    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
-    const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true)
-    const rows=((bs as any[])||[])
-    // Créneaux VARIÉS par bot (réaliste : tous live maintenant, mais fenêtres de durées différentes + rayons variés).
-    let n=0
-    for(let i=0;i<rows.length;i++){
-      const durH = 2 + (i%5)               // 2 à 6h de fenêtre selon le bot
-      const rad = 5 + (i%4)*5              // 5/10/15/20 km
-      const { error } = await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+durH*3600e3).toISOString(), center_lat:lat, center_lng:lng, available_radius_km:rad }).eq('id',rows[i].id)
-      if(!error) n++
-    }
-    showToast(`✓ ${n} bots en ligne sur toi 📍 (créneaux variés)`, C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const fillInbox=async()=>{ setBusy('fill'); try{
-    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot',true).limit(5)
-    const ids=((bs as any[])||[]).map(b=>b.id)
-    if(ids.length){ await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).eq('receiver_id',userId).in('status',ACT)
-      await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).in('receiver_id',ids).in('status',ACT) }
-    let n=0, lastErr=''; for(const b of ((bs as any[])||[])){ const {error}=await supabase.from('clutches').insert({ sender_id:b.id, receiver_id:userId, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20,0), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:`Un café ? — ${b.name}` }); if(!error)n++; else lastErr=error.message||'' }
-    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-    showToast(n?`✓ ${n} clutchs reçus 📨 — onglet Clutchs`:`❌ Échec : ${lastErr||'aucun bot'}`, n?C.green:C.red)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const botsAccept=async()=>{ setBusy('acc'); try{
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    const { data: pend } = await supabase.from('clutches').select('id').eq('sender_id',userId).in('receiver_id',ids).eq('status','pending')
-    const rows=((pend as any[])||[])
-    if(!rows.length){ showToast('Aucun clutch en attente envoyé à un bot',C.orange); setBusy(null); return }
-    // Réaliste : ils n'acceptent PAS tous (2 sur 3 acceptent, 1 sur 3 refuse).
-    // 🏰 Forteresse : un accept dont l'occupation CHEVAUCHE un RDV déjà confirmé est REJETÉ par la contrainte EXCLUDE
-    //   (occ_no_overlap) → on compte les bloqués. C'est le comportement « vraie personne » : 2 RDV en même temps = impossible.
-    let acc=0, dec=0, blocked=0
-    for(let i=0;i<rows.length;i++){
-      const accept = (i%3!==2)
-      if(!accept){ await supabase.from('clutches').update({status:'declined'}).eq('id',rows[i].id); dec++; continue }
-      const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',rows[i].id)
-      if(error && /occ_no_overlap|exclusion|overlap|23P01/i.test(error.message||error.code||'')) blocked++  // forteresse a bloqué → reste pending
-      else if(error) blocked++
-      else acc++
-    }
-    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-    showToast(`✓ ${acc} Verrou 🔒 · ${dec} refusé · ${blocked} bloqué(s) par la forteresse (chevauchent ton RDV)`, blocked>0?C.orange:C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // 🏰 TEST forteresse : UN SEUL bot accepte (le 1er pending) → ton RDV se crée → tes AUTRES pendings qui
-  //   chevauchent passent « ⏸ en pause ». Reproduit exactement « j'ai clutché plein de monde, un valide ».
-  const botAcceptOne=async()=>{ setBusy('acc1'); try{
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    const { data: pend } = await supabase.from('clutches').select('id,receiver_id').eq('sender_id',userId).in('receiver_id',ids).eq('status','pending').order('proposed_time',{ascending:true}).limit(1)
-    const row=((pend as any[])||[])[0]
-    if(!row){ showToast('Aucun clutch en attente envoyé à un bot — clutche d\'abord',C.orange); setBusy(null); return }
-    const { error } = await supabase.from('clutches').update({status:'accepted'}).eq('id',row.id)
-    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-    if(error) showToast('❌ '+error.message, C.red)
-    else showToast('✓ 1 bot a accepté → Verrou 🔒. Tes autres clutchs qui chevauchent passent « en pause ».', C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // RESET COMPLET et HONNÊTE : annule les clutchs + met TOUS les bots hors-ligne + masque LEURS events.
-  const resetBots=async()=>{ setBusy('reset'); try{
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const ids=((bs as any[])||[]).map(b=>b.id)
-    if(ids.length){
-      await supabase.from('clutches').update({status:'cancelled'}).in('sender_id',ids).in('status',ACT)
-      await supabase.from('clutches').update({status:'cancelled'}).in('receiver_id',ids).in('status',ACT)
-      await supabase.from('profiles').update({ is_available:false }).in('id',ids)                // ↓ COHÉRENCE
-      await supabase.from('events').update({ active:false }).in('created_by',ids)                 // leurs events s'éteignent aussi
-    }
-    showToast('✓ Reset complet : clutchs annulés · bots hors-ligne · leurs events masqués',C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── ACTEUR : gérer un bot COMME UNE VRAIE PERSONNE (dispo + ses events suivent, cohérence garantie) ──
-  const setActorOnline=async(on:boolean)=>{ if(!aId){ showToast('Choisis un acteur',C.orange); return } setBusy('av'); try{
-    // 🏰 Placé dans MA zone (pas une ville fixe lointaine) + live MAINTENANT jusqu'à l'heure choisie → apparaît
-    //    forcément dans mes présences (intersection géo + créneau qui couvre maintenant). Rayon large (30km) = sûr.
-    const patch = on ? { is_available:true, available_from:new Date().toISOString(), available_until:tISO(aTo), center_lat:meCenter.lat, center_lng:meCenter.lng, available_radius_km:Math.max(aRad,30) } : { is_available:false }
-    const { error } = await supabase.from('profiles').update(patch).eq('id',aId)
-    // COHÉRENCE : éteindre la personne éteint AUSSI ses events (sinon ils restent en ligne tout seuls = incohérent).
-    if(!on) await supabase.from('events').update({ active:false }).eq('created_by',aId)
-    refreshAll()
-    // Feedback visible (David) : on RÉDUIT le cockpit après « Mettre dispo » → tu vois tout de suite la personne
-    // apparaître dans tes présences.
-    if(on && !error) setOpen(false)
-    showToast(error?('❌ '+error.message):(on?`✓ ${nameOf(aId)} en ligne MAINTENANT→${aTo}h · dans ta zone · va voir tes Présences`:`✓ ${nameOf(aId)} hors-ligne — et ses events masqués`), error?C.red:C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── ROSTER : un interrupteur par personne (allume = dispo MAINTENANT 5h Lausanne · éteint = + ses events) ──
-  const isLive=(b:any)=> !!(b.is_available && b.available_until && new Date(b.available_until).getTime()>Date.now())
-  const toggleActor=async(b:any)=>{ setBusy('t'+b.id); try{
-    if(isLive(b)){ await supabase.from('profiles').update({ is_available:false }).eq('id',b.id); await supabase.from('events').update({ active:false }).eq('created_by',b.id) }
-    // Allumer = dispo MAINTENANT 5h, DANS MA ZONE, rayon large → apparaît dans mes présences à coup sûr.
-    else { await supabase.from('profiles').update({ is_available:true, available_from:new Date().toISOString(), available_until:new Date(Date.now()+5*3600e3).toISOString(), center_lat:meCenter.lat, center_lng:meCenter.lng, available_radius_km:30 }).eq('id',b.id) }
-    await loadWorld(); refreshAll()
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── CLUTCH : envoi paramétré (de→vers, lieu, heure, Quick) ──
-  const sendClutch=async()=>{ if(!cFrom||!cTo||cFrom===cTo){ showToast('Choisis 2 personnes différentes',C.orange); return } setBusy('send'); try{
-    const p=COCK_PLACES[cPlace]
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cFrom).eq('receiver_id',cTo).in('status',ACT)
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',cTo).eq('receiver_id',cFrom).in('status',ACT)
-    const { error } = await supabase.from('clutches').insert({ sender_id:cFrom, receiver_id:cTo, venue:p.n, venue_lat:p.lat, venue_lng:p.lng, proposed_time:tISO(cH,cM), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', is_quick_date:cQuick, duration_minutes:cQuick?60:120, message:`(cockpit) ${p.n} à ${String(cH).padStart(2,'0')}h${String(cM).padStart(2,'0')}` })
-    try{ window.dispatchEvent(new Event('clutch:refresh')) }catch{}
-    showToast(error?('❌ '+error.message):`✓ ${nameOf(cFrom)} → ${nameOf(cTo)} · ${p.n} ${String(cH).padStart(2,'0')}:${String(cM).padStart(2,'0')}`, error?C.red:C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── EVENT : création paramétrée (heure, places, spontané/planifié) ──
-  const createEvent=async()=>{ if(!eTitle.trim()){ showToast('Donne un titre',C.orange); return } setBusy('mkev'); try{
-    const p=COCK_PLACES[ePlace]
-    const { error } = await supabase.from('events').insert({ title:eTitle.trim(), emoji:'🎟️', lieu:p.n, event_time:`${String(eH).padStart(2,'0')}:00`, event_date:'Aujourd\'hui', starts_at:tISO(eH), duration_minutes:180, spots:eSpots, taken:0, description:'(cockpit)', tags:['test'], ev_gender:'X', type:ePlanned?'partner':'user', status:'pending', active:true, created_by:userId, creator:'Cockpit' })
-    showToast(error?('❌ '+error.message):`✓ Event « ${eTitle.trim()} » · ${p.n} ${eH}h · ${ePlanned?'planifié':'spontané'}`, error?C.red:C.green)
-  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── ÉVÉNEMENTS : bibliothèque de CAS (le « Coq » — chaque possibilité du gate = 1 bouton auto-configuré) ──
-  const firstBot=()=> bots.find(b=>b.is_bot)?.id || userId
-  const mkDispo=async(sMin:number,eMin:number,placeIdx=0)=>{ const p=COCK_PLACES[placeIdx]
-    await supabase.from('availabilities').update({active:false}).eq('user_id',userId).eq('active',true)
-    await supabase.from('availabilities').insert({ user_id:userId, start_at:new Date(Date.now()+sMin*60e3).toISOString(), end_at:new Date(Date.now()+eMin*60e3).toISOString(), place:p.n, lat:p.lat, lng:p.lng, radius_km:10, active:true })
-    await supabase.from('profiles').update({ is_available:true, available_from:new Date(Date.now()+sMin*60e3).toISOString(), available_until:new Date(Date.now()+eMin*60e3).toISOString(), center_lat:p.lat, center_lng:p.lng, available_radius_km:10 }).eq('id',userId)
-  }
-  const mkEvent=async(o:{offsetMin:number;planned?:boolean;placeIdx?:number;full?:boolean;title:string})=>{ const p=COCK_PLACES[o.placeIdx??0]; const st=new Date(Date.now()+o.offsetMin*60e3)
-    await supabase.from('events').insert({ title:o.title, emoji:'🎟️', lieu:p.n, event_time:`${String(st.getHours()).padStart(2,'0')}:00`, event_date:'Test', starts_at:st.toISOString(), duration_minutes:180, spots:o.full?6:8, taken:o.full?6:0, description:'(cockpit)', tags:['test'], ev_gender:'X', type:o.planned?'partner':'user', status:'pending', active:true, created_by:firstBot(), creator:'Cockpit' })
-  }
-  const evCase=(k:string,setup:()=>Promise<void>,expected:string)=>async()=>{ setBusy(k); try{ await setup(); showToast(`✓ Cas prêt → onglet Événements · ATTENDU : ${expected}`, C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  const clearTestEvents=async()=>{ setBusy('clrev'); try{ await supabase.from('events').update({active:false}).eq('creator','Cockpit'); showToast('✓ Events de test masqués',C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── CLUTCH : bibliothèque de CAS auto-vérifiés (fabrique la situation PUIS révèle la vraie raison) ──
-  const secondBot=()=> bots.filter(b=>b.is_bot)[1]?.id || firstBot()
-  const cleanPair=async(b:string)=>{
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',userId).eq('receiver_id',b).in('status',ACT)
-    await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b).eq('receiver_id',userId).in('status',ACT)
-    try{ await supabase.from('blocks').delete().eq('blocker_id',userId).eq('blocked_id',b) }catch{}
-  }
-  const insClutch=(s:string,r:string)=> supabase.from('clutches').insert({ sender_id:s, receiver_id:r, venue:'Lausanne', venue_lat:46.5197, venue_lng:6.6323, proposed_time:tISO(20), expires_at:new Date(Date.now()+2*3600e3).toISOString(), status:'pending', message:'(cockpit)' })
-  const runCase=(k:string,fn:()=>Promise<{s:string;r:string}>)=>async()=>{ setBusy(k); setCRes(null); try{
-    const { s, r } = await fn()
-    const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:s, p_receiver:r })
-    setCRes(error ? ('__err__'+(/function|does not exist|schema/i.test(error.message)?'Migration qa_test_clutch pas posée':error.message)) : String(data))
-  }catch(e:any){ setCRes('__err__'+e.message) } setBusy(null) }
-  const resetPair=async()=>{ setBusy('c_reset'); try{ const b=firstBot(); await cleanPair(b); await supabase.from('profiles').update({max_received_clutchs:5}).eq('id',b); setCRes(null); showToast('✓ Paire nettoyée (cooldown : via SQL delete clutch_pairs si besoin)',C.green) }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
-  // ── DIAGNOSTIC ──
-  const runDiag=async()=>{ setBusy('diag'); setDiag(null); try{
-    const { data, error } = await supabase.rpc('qa_test_clutch',{ p_sender:fromId, p_receiver:toId })
-    if(error) setDiag(/function|does not exist|schema/i.test(error.message)?'__nomig__':('❌ '+error.message))
-    else setDiag(String(data))
-  }catch(e:any){ setDiag('❌ '+e.message) } setBusy(null) }
-  const REASON:Record<string,string>={ ok:'✅ passerait', self_clutch:'soi-même', blocked:'bloqué (2 sens)', cooldown:'cooldown actif', pair_busy:'déjà un clutch actif', inbox_full:'boîte pleine', forbidden:'pas admin' }
-  // ── helpers UI ──
-  const Btn=(k:string,label:string,fn:()=>void)=>(<button onClick={fn} disabled={!!busy} style={{width:'100%',padding:'10px',marginBottom:6,borderRadius:9,border:`1px solid ${C.border}`,background:busy===k?C.orange:C.bgCard,color:C.white,fontSize:12,fontWeight:700,cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy&&busy!==k?.45:1}}>{busy===k?'…':label}</button>)
-  const Lbl=(t:string)=>(<div style={{fontSize:9.5,fontWeight:700,letterSpacing:'.04em',color:C.whiteMid,margin:'8px 0 3px'}}>{t}</div>)
-  const ActorSel=(v:string,on:(s:string)=>void)=>(<select value={v} onChange={e=>on(e.target.value)} style={cockSel}>{bots.map(b=><option key={b.id} value={b.id}>{(b.is_bot?'🤖 ':'👤 ')+b.name}</option>)}</select>)
-  const PlaceSel=(v:number,on:(n:number)=>void)=>(<select value={v} onChange={e=>on(+e.target.value)} style={cockSel}>{COCK_PLACES.map((p,i)=><option key={p.n} value={i}>📍 {p.n}</option>)}</select>)
-  const HourSel=(v:number,on:(n:number)=>void)=>(<select value={v} onChange={e=>on(+e.target.value)} style={{...cockSel,width:'auto',flex:1}}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{String(h).padStart(2,'0')}h</option>)}</select>)
-  if(!open) return (
-    <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={()=>{ const m=dragRef.current?.moved; onUp(); if(!m) setOpen(true) }}
-      style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:44,height:44,borderRadius:22,background:C.bgCard,border:`1.5px solid ${C.orange}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,cursor:'grab',boxShadow:'0 6px 20px rgba(0,0,0,.45)',touchAction:'none'}}>🎮</div>
-  )
-  const TABS:[CockTab,string,string][] = [['world','👥','Monde'],['express','⚡','Vite'],['acteur','🎭','Régler'],['clutch','☕','Clutch'],['event','🎟️','Event'],['diag','🩺','Test']]
-  return (
-    <div style={{position:'fixed',left:pos.x,top:pos.y,zIndex:6000,width:300,background:C.bg,border:`1.5px solid ${C.orange}`,borderRadius:14,boxShadow:'0 12px 34px rgba(0,0,0,.5)',touchAction:'none',overflow:'hidden'}}>
-      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:C.bgCard,cursor:'grab',borderBottom:`1px solid ${C.border}`}}>
-        <span style={{fontSize:14}}>🎮</span>
-        <span style={{fontSize:12.5,fontWeight:800,color:C.white,flex:1}}>Cockpit QA <span style={{fontSize:9,color:C.whiteMid}}>· glisse-moi</span></span>
-        <button onClick={()=>setOpen(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:18,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>×</button>
-      </div>
-      <div style={{display:'flex'}}>
-        {TABS.map(([k,emo,lab])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'7px 0 5px',background:tab===k?C.bg:C.bgCard,border:'none',borderBottom:tab===k?`2px solid ${C.orange}`:`2px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit',opacity:tab===k?1:.5,display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
-            <span style={{fontSize:15}}>{emo}</span>
-            <span style={{fontSize:8.5,fontWeight:tab===k?800:600,color:tab===k?C.orange:C.whiteMid}}>{lab}</span>
-          </button>
-        ))}
-      </div>
-      {!demoOn() && <div style={{margin:'8px 12px 0',padding:'8px 10px',borderRadius:9,background:'rgba(232,49,122,.12)',border:`1px solid ${C.salmon}66`,fontSize:11,color:C.salmon,lineHeight:1.4}}>⚠️ Tu es en <b>RÉEL</b> → les bots sont <b>cachés</b>. Pour les voir et les piloter, passe en <b>DÉMO</b> (Profil → 🧪 → mode Démo).</div>}
-      <div style={{padding:'12px',maxHeight:'52vh',overflowY:'auto'}}>
-        {tab==='world' && (<>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-            <div style={{fontSize:10,color:C.whiteMid}}>Toutes les personnes · 🟢 = en ligne</div>
-            <div style={{display:'flex',gap:6}}>
-              <button onClick={loadWorld} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.whiteMid,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>↻</button>
-              <button onClick={async()=>{ await botsOnline(); loadWorld(); refreshAll() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.green}55`,borderRadius:8,color:C.green,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout allumer</button>
-              <button onClick={async()=>{ await resetBots(); loadWorld() }} disabled={!!busy} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.salmon,fontSize:11,padding:'3px 8px',cursor:'pointer',fontFamily:'inherit'}}>Tout éteindre</button>
-            </div>
-          </div>
-          {bots.filter(b=>b.is_bot).length===0 && <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',padding:'14px 0'}}>Aucun bot — génère-en dans le BotLab.</div>}
-          {bots.filter(b=>b.is_bot).map(b=>{ const live=isLive(b); const place=b.center_lat?COCK_PLACES.find(p=>Math.abs(p.lat-b.center_lat)<0.05)?.n:null
-            return (
-              <div key={b.id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 10px',borderRadius:10,border:`1px solid ${C.border}`,marginBottom:6,background:C.bgCard}}>
-                <span style={{width:9,height:9,borderRadius:'50%',background:live?C.green:C.whiteMid,flexShrink:0,boxShadow:live?`0 0 6px ${C.green}`:'none'}}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12.5,fontWeight:700,color:C.white,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.name}{evBots.has(b.id)&&' 🎟️'}</div>
-                  <div style={{fontSize:9.5,color:C.whiteMid}}>{live?`en ligne${place?' · '+place:''}`:'hors-ligne'}</div>
-                </div>
-                <button onClick={()=>toggleActor(b)} disabled={!!busy} style={{flexShrink:0,minWidth:74,padding:'6px 8px',borderRadius:8,border:`1px solid ${live?C.salmon:C.green}66`,background:busy===('t'+b.id)?C.orange:(live?`${C.salmon}1a`:`${C.green}1a`),color:live?C.salmon:C.green,fontSize:11,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{busy===('t'+b.id)?'…':(live?'⏻ Éteindre':'▶ Allumer')}</button>
-              </div>
-            )})}
-        </>)}
-        {tab==='express' && (<>
-          <button onClick={()=>{ try{ localStorage.setItem('clutch_lab_clean', labClean()?'0':'1') }catch{}; window.location.reload() }}
-            style={{width:'100%',padding:'10px',marginBottom:8,borderRadius:9,border:`1.5px solid ${labClean()?C.green:C.border}`,background:labClean()?`${C.green}1a`:C.bgCard,color:labClean()?C.green:C.white,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-            🧪 Labo propre : {labClean()?'ON ✓ (décor bidon coupé)':'OFF — appuie pour couper le décor bidon'}
-          </button>
-          {Btn('on','📡 Bots en ligne sur moi',botsOnline)}
-          {Btn('fill','📥 Remplir ma boîte (5)',fillInbox)}
-          {Btn('acc','🤝 Les bots acceptent mes clutchs (→ Verrou)',botsAccept)}
-          {Btn('acc1','🏰 UN bot accepte (teste la forteresse → autres en pause)',botAcceptOne)}
-          {Btn('reset','🧹 Reset bots',resetBots)}
-        </>)}
-        {tab==='acteur' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:2}}>Rends un acteur dispo sur une fenêtre précise.</div>
-          {Lbl('ACTEUR')}{ActorSel(aId,setAId)}
-          {Lbl('FENÊTRE')}
-          <div style={{display:'flex',alignItems:'center',gap:6}}>{HourSel(aFrom,setAFrom)}<span style={{color:C.whiteMid,fontSize:12}}>→</span>{HourSel(aTo,setATo)}</div>
-          {Lbl('LIEU')}{PlaceSel(aPlace,setAPlace)}
-          {Lbl(`RAYON · ${aRad} km`)}<input type="range" min={1} max={50} value={aRad} onChange={e=>setARad(+e.target.value)} style={{width:'100%',accentColor:C.orange}}/>
-          <div style={{height:6}}/>
-          {Btn('av','✅ Mettre dispo',()=>setActorOnline(true))}
-          {Btn('avoff','🔴 Désactiver (elle + ses events)',()=>setActorOnline(false))}
-        </>)}
-        {tab==='clutch' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:4,lineHeight:1.4}}>« Si j'envoie un Clutch à cette personne, est-ce que ça passe — et sinon, pourquoi ? » (rien n'est envoyé)</div>
-          {ActorSel(cbId||firstBot(), setCbId)}
-          <div style={{height:4}}/>
-          {Btn('c_ok','✅ Cas normal (doit passer)', runCase('c_ok', async()=>{ const b=cbId||firstBot(); await cleanPair(b); return {s:userId,r:b} }))}
-          {Btn('c_busy','❌ Déjà un clutch en cours', runCase('c_busy', async()=>{ const b=cbId||firstBot(); await cleanPair(b); await insClutch(userId,b); return {s:userId,r:b} }))}
-          {Btn('c_block','❌ Personne bloquée', runCase('c_block', async()=>{ const b=cbId||firstBot(); await cleanPair(b); try{ await supabase.from('blocks').insert({blocker_id:userId,blocked_id:b}) }catch{}; return {s:userId,r:b} }))}
-          {Btn('c_cd','❌ Cooldown (après un refus)', runCase('c_cd', async()=>{ const b=cbId||firstBot(); await cleanPair(b); const ins=await insClutch(b,userId); const id=(ins as any)?.data?.[0]?.id; const got=await supabase.from('clutches').select('id').eq('sender_id',b).eq('receiver_id',userId).eq('status','pending').order('created_at',{ascending:false}).limit(1); const cid=id||(got.data as any)?.[0]?.id; if(cid) await supabase.from('clutches').update({status:'declined'}).eq('id',cid); return {s:b,r:userId} }))}
-          {Btn('c_full','❌ Boîte pleine (plafond)', runCase('c_full', async()=>{ const b=cbId||firstBot(), b2=secondBot(); await supabase.from('profiles').update({max_received_clutchs:1}).eq('id',b); await supabase.from('clutches').update({status:'cancelled'}).eq('sender_id',b2).eq('receiver_id',b).in('status',ACT); await insClutch(b2,b); return {s:userId,r:b} }))}
-          {cRes && (cRes.startsWith('__err__')
-            ? <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ {cRes.slice(7)}</div>
-            : <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>
-                <div style={{fontSize:10,color:C.whiteMid}}>Raison réelle (admin) :</div>
-                <div style={{fontSize:13,fontWeight:800,color:cRes==='ok'?C.green:C.orange,marginBottom:6}}>{REASON[cRes]||cRes}</div>
-                {['blocked','cooldown','inbox_full','pair_busy'].includes(cRes) && (<><div style={{fontSize:10,color:C.whiteMid}}>Vu par l'expéditeur :</div><div style={{fontSize:12,color:C.salmon}}>« Cette proposition n'est pas disponible. » <span style={{color:C.green,fontWeight:700}}>✓ anti-sonde OK</span></div></>)}
-              </div>)}
-          <div style={{height:4}}/>
-          {Btn('c_reset','🧹 Reset paire',resetPair)}
-        </>)}
-        {tab==='event' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>« Qui peut s'inscrire à un event ? » Clique un cas (l'heure/la dispo se règlent seules) → va dans Événements, essaie de t'inscrire, et vois si ça colle au résultat ✅/❌ annoncé.</div>
-          {Btn('e1','✅ Spontané DANS ma dispo', evCase('e1', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:120,placeIdx:0,title:'Spontané · dans dispo'}) }, 'inscriptible'))}
-          {Btn('e2','❌ Spontané HORS dispo (horaire)', evCase('e2', async()=>{ await mkDispo(0,60,0); await mkEvent({offsetMin:180,placeIdx:0,title:'Spontané · hors dispo'}) }, 'bloqué : hors de ta dispo'))}
-          {Btn('e3','❌ Spontané trop loin (>18h)', evCase('e3', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:20*60,placeIdx:0,title:'Spontané · +20h'}) }, 'bloqué : trop loin'))}
-          {Btn('e4','✅ Planifié (partenaire) dans 3j', evCase('e4', async()=>{ await mkEvent({offsetMin:3*24*60,planned:true,title:'Planifié · +3j'}) }, 'inscriptible (libre de dispo)'))}
-          {Btn('e5','❌ Planifié trop loin (>7j)', evCase('e5', async()=>{ await mkEvent({offsetMin:8*24*60,planned:true,title:'Planifié · +8j'}) }, 'bloqué : trop loin'))}
-          {Btn('e6','⛔ Event COMPLET (liste d\'attente)', evCase('e6', async()=>{ await mkDispo(0,360,0); await mkEvent({offsetMin:120,full:true,title:'Complet'}) }, 'complet / liste d\'attente'))}
-          <div style={{height:4}}/>
-          {Btn('clrev','🧹 Masquer les events de test',clearTestEvents)}
-        </>)}
-        {tab==='diag' && (<>
-          <div style={{fontSize:10,color:C.whiteMid,marginBottom:6,lineHeight:1.4}}>Simule un envoi A→B (ne crée rien) et révèle la VRAIE raison vs le message anti-sonde.</div>
-          {Lbl('DE')}{ActorSel(fromId,setFromId)}
-          <div style={{textAlign:'center',color:C.whiteMid,fontSize:11,margin:'2px 0'}}>↓ envoie à ↓</div>
-          {Lbl('VERS')}{ActorSel(toId,setToId)}
-          {Btn('diag','🩺 Tester l\'envoi',runDiag)}
-          {diag==='__nomig__' && <div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.orange}55`,fontSize:11,color:C.salmon}}>⚠️ Migration <code>qa_test_clutch</code> pas posée.</div>}
-          {diag && diag!=='__nomig__' && (<div style={{marginTop:8,padding:'10px',borderRadius:9,background:C.bgCard,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.whiteMid}}>Raison réelle (admin) :</div>
-            <div style={{fontSize:13,fontWeight:800,color:diag==='ok'?C.green:C.orange,marginBottom:6}}>{REASON[diag]||diag}</div>
-            {['blocked','cooldown','inbox_full','pair_busy'].includes(diag) && (<><div style={{fontSize:10,color:C.whiteMid}}>Vu par l'expéditeur :</div><div style={{fontSize:12,color:C.salmon}}>« Cette proposition n'est pas disponible. » <span style={{color:C.green,fontWeight:700}}>✓ anti-sonde OK</span></div></>)}
-          </div>)}
-        </>)}
-      </div>
-    </div>
-  )
-}
 
 // ── CONTACT CLUTCH MODAL — RDV sans filtre dispo/geo, jusqu'à 14j ──
 function ContactClutchModal({ from, to, onClose, onSent, showToast }: {

@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d1'  // Versionnage HEXADÉCIMAL. ~311e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 205   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d2'  // Versionnage HEXADÉCIMAL. ~311e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 206   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3485,40 +3485,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     // un PLANIFIÉ (partenaire) est libre. Fail-open si pas de starts_at OU pas de dispo → jamais de blocage parasite.
     // B7 — si pas de starts_at (mock/demo), on le DÉRIVE de ev.time (aujourd'hui, ou demain si l'heure est passée)
     // → le gate spontané s'applique à TOUS les events, pas seulement à ceux qui ont un vrai timestamp.
-    const evStart = (()=>{
-      if ((ev as any).starts_at) return new Date((ev as any).starts_at).getTime()
-      const m = parseEventMinutes(ev.time); if (m==null) return null
-      const d = new Date(); d.setHours(Math.floor(m/60), m%60, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate()+1)
-      return d.getTime()
-    })()
-    // 🔒 BUG David : on pouvait rejoindre un event SPONTANÉ alors qu'on n'a AUCUNE dispo (fail-open). Corrigé :
-    //    un event spontané (pas planifié/partenaire) avec une heure → il FAUT un créneau. Zéro dispo = bloqué.
-    const isPlanned = (ev as any).type==='partner' || (ev as any).mode==='open'
-    if (evStart && !isPlanned && availSlots.length===0) {
-      const m = EN ? '⏱️ Outside your availability — open a slot to join' : '⏱️ Hors de ta dispo — ouvre un créneau qui couvre cette heure pour rejoindre'
-      setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),6000)
-      return
-    }
-    if (evStart && availSlots.length) {
-      const evEnd = evStart + (eventDurH(ev) || 3) * 3600000
-      const gate = canRegisterEvent({ mode: eventMode((ev as any).type), eventStart: evStart, eventEnd: evEnd, now: Date.now(), availSlots })
-      if (!gate.ok) {
-        const v = getVeneritude()
-        const m = gate.reason === 'beyond_horizon'
-          ? (EN ? '⏱️ Too far ahead — Clutch is for soon (within 18h)' : vibe(v,{
-              soft:'⏱️ Trop loin — Clutch c\'est pour bientôt (dans les 18h)',
-              taquin:'⏱️ Hé, pas si vite — Clutch c\'est dans les 18h max 😏',
-              drole:'⏱️ Tu planifies à la NASA ? 🚀 Clutch c\'est pour bientôt (18h max)',
-              trash:'⏱️ 18h MAX. T\'as vu la taille du mot « spontané » ? Reviens sur Terre 🔥' }))
-          : (EN ? '⏱️ Outside your availability — get available then to join' : vibe(v,{
-              soft:'⏱️ Hors de ta dispo — mets-toi dispo sur ce créneau pour rejoindre',
-              taquin:'⏱️ C\'est hors de ta dispo 😏 ouvre un créneau pour rejoindre',
-              drole:'⏱️ Rejoindre un truc où t\'es même pas dispo ? 🤔 Ouvre un créneau d\'abord',
-              trash:'⏱️ T\'es PAS dispo à cette heure, génie. Ouvre un créneau d\'abord 🧠🔥' }))
-        setRegBlock(m); showToast?.(m, C.orange); setTimeout(()=>setRegBlock(''),6000)
-        return
-      }
-    }
+    // ✅ OPTION A (David 28.06) : REJOINDRE UN EVENT = S'ENGAGER pour son heure. Plus de gate « ouvre un créneau d'abord » :
+    //    un event a sa propre heure (planifiée), s'y inscrire crée l'engagement pour ce moment-là. Zéro friction de dispo.
+    //    (La cohérence forteresse « occupé pendant l'event » se fait côté serveur / Phase 2.)
     // « occupé » = inscrit, NON annulé. (a) plafond ne compte PAS mes propres events (organiser ≠ consommer une place)
     const myBusy = events.filter((e:any)=> registered.has(e.id) && e.status!=='cancelled')
     const myJoined = myBusy.filter((e:any)=> !isMine(e))

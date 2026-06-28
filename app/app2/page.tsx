@@ -9286,6 +9286,27 @@ export default function App2() {
     }
   }, [flow])
 
+  // ⏰ ANTI-HEURE-PASSÉE (bug David : resté la nuit sur la page → réouverture avec 8h35 alors qu'il est 9h35, bloqué).
+  //    Quand l'app revient au 1er plan / périodiquement, si le DÉBUT choisi est dans le passé → on le re-cale à maintenant+1h.
+  useEffect(() => {
+    const clampPast = () => {
+      if (flow!=='carte' && flow!=='options') return
+      if (presetWin || editingSlotRef.current) return
+      const [h,m] = (fromTime||'').split(':').map(Number)
+      if (isNaN(h)) return
+      const d = new Date(); d.setHours(h,m,0,0)
+      if (d.getTime() < Date.now() - 60_000) {   // début dans le passé → on recale
+        setFromTime(makeSlots(new Date(Date.now()+60*60_000))[0])
+        setUntilTime(makeSlots(new Date(Date.now()+120*60_000))[0])
+      }
+    }
+    clampPast()
+    const onVis = () => { if (document.visibilityState==='visible') clampPast() }
+    document.addEventListener('visibilitychange', onVis)
+    const t = setInterval(clampPast, 60_000)
+    return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
+  }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
     import('@/lib/onesignal').then(({ initOneSignal }) => initOneSignal()).catch(() => {})

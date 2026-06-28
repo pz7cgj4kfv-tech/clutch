@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d6'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 210   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d7'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 211   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9192,6 +9192,10 @@ export default function App2() {
     try{const s=localStorage.getItem('clutch_waitlist');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()}
   })
   const [chatClutch,setChatClutch] = useState<any>(null)
+  // 🛰️ FORTERESSE GPS DYNAMIQUE (Phase 2, #10) — dérive détectée quand je m'éloigne de ma zone publiée.
+  //    Éthique (audit GPS) : on DÉTECTE auto + on EXPLIQUE, mais le recalage est en 1 tap (jamais de mutation
+  //    silencieuse de la position publiée). Foreground only · dernière position seulement · zéro historique.
+  const [gpsDrift,setGpsDrift] = useState<{km:number;lat:number;lng:number}|null>(null)
   const [openEventId,setOpenEventId] = useState<string|null>(null)
   const [userScore,setUserScore] = useState<number|null>(null) // Score local (sync avec DB)
   const [lang,setLang] = useState<Lang>(() => {
@@ -9631,6 +9635,43 @@ export default function App2() {
       setProfiles(real)
     }
   },[user?.id])
+
+  // 🛰️ FORTERESSE GPS DYNAMIQUE (Phase 2, #10) — DÉTECTION de dérive (foreground only).
+  //    Quand je suis LIVE et que je m'éloigne (>0.7 km) du centre que j'ai publié, on le détecte et on PROPOSE
+  //    de recaler (cf. recenterMyZone). Conforme audit GPS : pas de background, dernière position seulement,
+  //    zéro historique, on EXPLIQUE et l'user décide (jamais de mutation silencieuse de sa position publiée).
+  const driftPubLat = (user as any)?.center_lat, driftPubLng = (user as any)?.center_lng
+  useEffect(() => {
+    if (!availableRef || screen !== 'main' || driftPubLat==null || driftPubLng==null) { setGpsDrift(null); return }
+    if (typeof navigator==='undefined' || !navigator.geolocation) return
+    let cancelled = false
+    const sample = () => {
+      if (typeof document!=='undefined' && document.visibilityState!=='visible') return
+      navigator.geolocation.getCurrentPosition(pos => {
+        if (cancelled) return
+        const km = haversineKm(driftPubLat, driftPubLng, pos.coords.latitude, pos.coords.longitude)
+        setGpsDrift(km > 0.7 ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
+      }, () => {}, { enableHighAccuracy:false, timeout:8000, maximumAge:60000 })
+    }
+    sample()
+    const onVis = () => { if (document.visibilityState==='visible') sample() }
+    document.addEventListener('visibilitychange', onVis)
+    const t = setInterval(sample, 90_000)   // foreground only, échantillon doux (batterie)
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
+  }, [availableRef, screen, driftPubLat, driftPubLng]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recalage EN 1 TAP de ma zone publiée sur ma position actuelle (override visible — jamais auto-silencieux).
+  const recenterMyZone = async () => {
+    if (!gpsDrift || !user?.id) return
+    const { lat, lng } = gpsDrift
+    await supabase.from('profiles').update({ center_lat:lat, center_lng:lng }).eq('id', user.id)
+    try { await supabase.from('availabilities').update({ lat, lng }).eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()) } catch {}
+    setUser(prev => prev ? ({ ...prev, center_lat:lat, center_lng:lng } as any) : prev)
+    setGpsDrift(null)
+    reloadAvail(); loadProfiles()
+    showToast(lang==='fr' ? '📍 Zone recalée sur ta position' : '📍 Zone recentered on your spot', C.green)
+    hap('success')
+  }
 
   // 🎟️ MES ENGAGEMENTS EVENT (= des clutchs). Décision David 27.06 : « l'event EST un clutch »
   // → tout ce que je reçois/envoie/confirme (clutch OU event) est centralisé dans la boîte Clutchs,
@@ -11315,6 +11356,19 @@ export default function App2() {
 
                   {/* ── LISTE ── */}
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
+
+                    {/* 🛰️ FORTERESSE GPS DYNAMIQUE — tu t'es éloigné·e de ta zone publiée → recalage en 1 tap (explicite). */}
+                    {gpsDrift && (
+                      <div style={{display:'flex',alignItems:'center',gap:10,background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
+                        <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu t'es éloigné·e de ~${fmtKm(gpsDrift.km)} de ta zone`:`You've moved ~${fmtKm(gpsDrift.km)} from your zone`}</div>
+                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Recale ta zone sur ta position pour rester atteignable.':'Recenter your zone on your spot to stay reachable.'}</div>
+                        </div>
+                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Garder':'Keep'}</button>
+                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler ici':'Recenter'}</button>
+                      </div>
+                    )}
 
                     {/* Pastille Clutch Night DÉPLACÉE → c'est maintenant un MODE dans l'onglet Événements (David : « ne va pas du tout là-haut »). */}
 

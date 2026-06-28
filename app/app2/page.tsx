@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1da'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 214   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1db'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 215   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -767,10 +767,11 @@ function makeStars(centerLat:number, centerLng:number, radiusKm:number, genders:
   })
 }
 
-function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate, onCenterChange }:{
+function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate, onCenterChange, gpsPos, reachKm }:{
   rayon:number; userPhoto?:string|null; profiles?:Profile[];
   showPin?:boolean; onReady?:(getCenter:()=>[number,number], recenter:()=>void, setCenter:(lat:number,lng:number)=>void)=>void;
   onGpsUpdate?:(pos:[number,number])=>void; onCenterChange?:(lat:number,lng:number)=>void;
+  gpsPos?:[number,number]|null; reachKm?:number|null;
 }) {
   const divRef    = useRef<HTMLDivElement>(null)
   const mapRef    = useRef<any>(null)
@@ -778,6 +779,8 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
   const haloRef    = useRef<any>(null)
   const fillRef    = useRef<any>(null)
   const gpsRef     = useRef<[number,number]>(ME) // Position GPS réelle (màj par geolocation)
+  const lRef       = useRef<any>(null)           // instance Leaflet (pour dessiner après l'init)
+  const reachRef   = useRef<any>(null)           // 🛰️ cercle « zone atteignable depuis ma position pour cette heure »
   const night = isNightNow()
   const [starTooltip, setStarTooltip] = useState<{profile:Profile;x:number;y:number}|null>(null)
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout>|null>(null)
@@ -797,6 +800,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
       import('leaflet').then(mod => {
         if (!mounted || !divRef.current) return
         const L = mod.default
+        lRef.current = L
         delete (L.Icon.Default.prototype as any)._getIconUrl
         L.Icon.Default.mergeOptions({ iconUrl:'', shadowUrl:'' })
 
@@ -1033,6 +1037,22 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
       fillRef.current?.setLatLng(c)
     }, 500)
   }, [rayon])
+
+  // 🛰️ ZONE ATTEIGNABLE depuis MA position pour l'heure choisie (David 28.06) — cercle pointillé prune autour
+  //    du GPS : « tu peux poser ton lieu DANS cette zone pour ce départ ». Se resserre quand l'heure approche.
+  //    Décoratif/pédago (le blocage réel = banner + Suivant). Caché si pas de GPS, pas limitant, ou zone géante.
+  useEffect(() => {
+    const map = mapRef.current, L = lRef.current
+    if (!map || !L) return
+    const show = gpsPos && reachKm!=null && isFinite(reachKm) && reachKm > 0.2 && reachKm < 49
+    if (!show) { if (reachRef.current){ try{reachRef.current.remove()}catch{}; reachRef.current=null } return }
+    const m = (reachKm as number) * 1000
+    if (!reachRef.current) {
+      reachRef.current = L.circle(gpsPos as [number,number], { radius:m, color:'#532943', weight:1.5, dashArray:'5,7', opacity:0.55, fillColor:'#532943', fillOpacity:0.05, interactive:false, className:'clutch-reach' }).addTo(map)
+    } else {
+      reachRef.current.setLatLng(gpsPos as [number,number]); reachRef.current.setRadius(m)
+    }
+  }, [gpsPos, reachKm])
 
   // Map size dynamique — déclenché par un ResizeObserver sur le container
   useEffect(() => {
@@ -10882,7 +10902,8 @@ export default function App2() {
                   showPin={true}
                   onReady={(fn,rc,sc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc; mapSetCenterRef.current=sc }}
                   onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}
-                  onCenterChange={(lat,lng)=>setMeetupPos([lat,lng])}/>
+                  onCenterChange={(lat,lng)=>setMeetupPos([lat,lng])}
+                  gpsPos={realGps} reachKm={realGps ? pinReachInfo().reach : null}/>
                 {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
                   title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}

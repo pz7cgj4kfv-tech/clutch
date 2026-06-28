@@ -25,7 +25,7 @@ function PresenceCard({
   const dotCx = [220.931, 231.762, 242.593, 253.423, 264.254]
   const starX = [282.911, 294.381, 305.853, 317.325, 328.794]
   return (
-    <div style={{ borderRadius: 11, boxShadow: '0 2px 4px rgba(120,115,125,.18), 0 8px 20px rgba(120,115,125,.16)' }}>
+    <div style={{ borderRadius: 11, boxShadow: '0 3px 6px rgba(83,41,67,.10), 0 12px 26px rgba(120,115,125,.26)' }}>
     <svg viewBox="0 0 340 70" width="100%" style={{ display: 'block', fontFamily: SF }} xmlns="http://www.w3.org/2000/svg">
       <defs>
         <clipPath id="ava"><path d="M63.001,56.777c0,3.437-2.787,6.223-6.226,6.223h-43.55C9.787,63,7,60.213,7,56.777V13.224C7,9.787,9.787,7,13.226,7h43.55c3.439,0,6.226,2.787,6.226,6.224V56.777z" /></clipPath>
@@ -42,9 +42,11 @@ function PresenceCard({
       {/* icône genre (SVG de Mel) à la position de la maquette, teintée #7C7B7C */}
       <svg x="72.5" y="5.5" width="15" height="15" viewBox="0 0 28 28" fill="#7C7B7C">{GENDER[gender] || GENDER.female}</svg>
 
-      {/* prénom · âge */}
-      <text transform="matrix(1 0 0 1 88.5 20.6138)" fill="#706F6F" fontFamily={SF} fontWeight={700} fontSize="18.1023">{name}</text>
-      <text transform="matrix(1 0 0 1 164.355 20.6138)" fill="#706F6F" fontFamily={SF} fontWeight={700} fontSize="8.8116">{age}</text>
+      {/* prénom · âge — âge collé au prénom avec un ESPACE FIXE (dx), le même pour tous (pas de colonne figée) */}
+      <text transform="matrix(1 0 0 1 88.5 20.6138)" fill="#706F6F" fontFamily={SF} fontWeight={700}>
+        <tspan fontSize="18.1023">{name}</tspan>
+        <tspan fontSize="8.8116" dx="4">{age}</tspan>
+      </text>
 
       {/* commentaire (2 lignes) */}
       <text fill="#707070" fontFamily={SF} fontWeight={700} fontSize="8.7999"><tspan x="73.1387" y="36.8667">{line1}</tspan><tspan x="73.1387" y="47.43">{line2}</tspan></text>
@@ -77,10 +79,10 @@ function PresenceCard({
 
 export default function MelTest() {
   return (
-    <div style={{ minHeight: '100vh', background: '#6E6E6E', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: '28px 16px', fontFamily: SF }}>
-      <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, opacity: .9, textAlign: 'center', maxWidth: 560, lineHeight: 1.5 }}>
-        ✅ v2 — carte rendue depuis la <strong>géométrie EXACTE</strong> du SVG de Mel (pas de reconstruction).<br />
-        <span style={{ opacity: .7, fontSize: 11.5, fontWeight: 600 }}>Ses vecteurs · ses coords · ses couleurs · sa police. On ne remplace que photo + textes + genre + pin.</span>
+    <div style={{ minHeight: '100vh', background: '#F2F0F2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: '28px 16px', fontFamily: SF }}>
+      <div style={{ color: '#4A2A3D', fontSize: 13, fontWeight: 700, opacity: .9, textAlign: 'center', maxWidth: 560, lineHeight: 1.5 }}>
+        ✅ v2 — carte rendue depuis la <strong>géométrie EXACTE</strong> du SVG de Mel (sur fond clair = l'ombre ressort, comme dans l'app).<br />
+        <span style={{ opacity: .65, fontSize: 11.5, fontWeight: 600 }}>Ses vecteurs · ses coords · ses couleurs · sa police. On ne remplace que photo + textes + genre + pin.</span>
       </div>
 
       {/* Placeholder Mel (aplat avatar) */}
@@ -92,7 +94,7 @@ export default function MelTest() {
           photo="https://randomuser.me/api/portraits/women/44.jpg" />
       </div>
 
-      <div style={{ color: '#fff', fontSize: 10.5, opacity: .55, textAlign: 'center', maxWidth: 560, lineHeight: 1.6 }}>
+      <div style={{ color: '#6F6F6E', fontSize: 10.5, opacity: .8, textAlign: 'center', maxWidth: 560, lineHeight: 1.6 }}>
         Carte du haut = placeholder de Mel · carte du bas = mêmes vecteurs avec une vraie photo + autres données.<br />
         Géométrie 100% issue de PresenceCard.svg · icônes genre + pin = ses SVG · police SF UI Text Bold.
       </div>

@@ -10802,7 +10802,10 @@ export default function App2() {
                   // 🎨 Couleur CONTINUE (David 28.06) : vert → rose → bordeaux selon la tension (gradient, plus par palier).
                   const lerpHex=(a:string,b:string,t:number)=>{ const pa=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),pb=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16)); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('') }
                   const tN = Math.min(1, Math.max(0, tension/10))
-                  const fillCol = !flag ? C.orange : (tN<0.5 ? lerpHex(C.green, C.orange, tN*2) : lerpHex(C.orange, C.bordeaux, (tN-0.5)*2))
+                  // 🎨 Dégradé CONTINU vert → ambre → rouge (verdict design GPT+Grok 28.06 : « tu pousses les limites », jamais punitif).
+                  const fillCol = !flag ? C.orange : (tN<0.5 ? lerpHex('#77BC1F', '#FFB300', tN*2) : lerpHex('#FFB300', '#E53935', (tN-0.5)*2))
+                  const trackH = 6 + Math.round(tN*5)        // épaisseur croît avec la tension (canal redondant accessibilité)
+                  const thumbS = 20 + Math.round(tN*8)       // thumb grossit un peu avec la tension
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
@@ -10830,26 +10833,25 @@ export default function App2() {
                   // (Plus de message sous le curseur — l'info du Cône vit uniquement sur la carte.)
                   return (
                     <>
+                    <style>{`@keyframes coneMarkPulse{0%,100%{opacity:.9;transform:translateY(-50%) scaleY(1)}50%{opacity:.5;transform:translateY(-50%) scaleY(1.25)}}
+                      @keyframes coneThumbPulse{0%,100%{box-shadow:0 0 0 1px ${fillCol}55,0 2px 8px ${fillCol}66}50%{box-shadow:0 0 0 5px ${fillCol}22,0 2px 10px ${fillCol}88}}
+                      @media (prefers-reduced-motion: reduce){[style*="coneMarkPulse"],[style*="coneThumbPulse"]{animation:none !important}}`}</style>
                     <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
                       <span style={{fontSize:11,color:fillCol,flexShrink:0,fontWeight:600,transition:'color .12s'}}>📍 {fmtKm(rayon)}</span>
                       <div ref={sliderRef}
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
                         onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
-                        {/* track de base */}
-                        <div style={{position:'absolute',left:0,right:0,height:6,borderRadius:3,background:'#E3E3E3',pointerEvents:'none'}}/>
-                        {/* zones du Cône (faibles, sous le fill) : vert → rose → bordeaux */}
-                        {flag && r10>0 && <>
-                          {p4>0 && <div style={{position:'absolute',left:0,width:`${p4}%`,height:6,borderRadius:3,background:'rgba(119,188,31,.20)',pointerEvents:'none'}}/>}
-                          {p7>p4 && <div style={{position:'absolute',left:`${p4}%`,width:`${p7-p4}%`,height:6,background:'rgba(235,107,175,.18)',pointerEvents:'none'}}/>}
-                          {p10>p7 && <div style={{position:'absolute',left:`${p7}%`,width:`${p10-p7}%`,height:6,background:'rgba(83,41,67,.20)',pointerEvents:'none'}}/>}
-                        </>}
-                        {/* fill (couleur = zone courante) */}
-                        <div style={{position:'absolute',left:0,width:`${pct}%`,height:6,borderRadius:3,background:fillCol,pointerEvents:'none',transition:'background .12s'}}/>
-                        {/* marqueur de la limite crédible (« le mur » du cône) */}
-                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,width:2,height:16,borderRadius:1,background:C.bordeaux,opacity:.55,pointerEvents:'none'}}/>}
-                        {/* thumb — BLANC + anneau fluo (couleur de zone), bien visible (David 28.06) */}
-                        <div style={{position:'absolute',left:`calc(${pct}% - 10px)`,width:20,height:36,borderRadius:7,background:'#fff',border:`3.5px solid ${fillCol}`,pointerEvents:'none',transition:'border-color .12s',boxShadow:`0 0 0 1.5px rgba(255,255,255,.9), 0 2px 8px ${fillCol}66`}}/>
+                        {/* track de base (neutre) — centrée */}
+                        <div style={{position:'absolute',left:0,right:0,top:'50%',transform:'translateY(-50%)',height:6,borderRadius:3,background:'#E3E3E3',pointerEvents:'none'}}/>
+                        {/* portion AU-DELÀ du crédible : teinte rouge légère (zone tendue, sans texte) */}
+                        {flag && r10>0 && p10<100 && <div style={{position:'absolute',left:`${p10}%`,right:0,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:3,background:'rgba(229,57,53,.14)',pointerEvents:'none'}}/>}
+                        {/* fill : dégradé continu vert→ambre→rouge, ÉPAISSIT avec la tension (canal accessibilité redondant) */}
+                        <div style={{position:'absolute',left:0,width:`${pct}%`,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:4,background:fillCol,pointerEvents:'none',transition:'background .12s, height .12s'}}/>
+                        {/* repère de la limite crédible — pulse quand on le dépasse */}
+                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,top:'50%',transform:'translateY(-50%)',width:2,height:18,borderRadius:1,background:'#E53935',opacity:overWindow?0.9:0.5,pointerEvents:'none',animation:overWindow?'coneMarkPulse .8s ease-in-out infinite':undefined}}/>}
+                        {/* thumb — COLORÉ (suit la tension), grossit, pulse quand tendu (David : plus blanc) */}
+                        <div style={{position:'absolute',left:`calc(${pct}% - ${thumbS/2}px)`,top:'50%',transform:'translateY(-50%)',width:thumbS,height:thumbS,borderRadius:'50%',background:fillCol,border:'3px solid #fff',pointerEvents:'none',transition:'all .12s',boxShadow:`0 0 0 1px ${fillCol}55, 0 2px 8px ${fillCol}66`,animation:tN>0.7?'coneThumbPulse .9s ease-in-out infinite':undefined}}/>
                       </div>
                     </div>
                     {/* Plus de texte SOUS le curseur (David 28.06) — l'info du Cône vit UNIQUEMENT sur la carte (compacte, grossit avec la tension). */}

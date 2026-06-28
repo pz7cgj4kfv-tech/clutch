@@ -10339,6 +10339,8 @@ export default function App2() {
     } as any).eq('id',user.id).select()
 
     if (error) {
+      // 🛡️ Le trigger serveur de modération a rejeté → message bienveillant (pas une erreur technique).
+      if (/INTENT_BLOCKED/i.test(error.message)) { showToast(intentRefusal('explicit', lang==='en'?'en':'fr'), C.orange); hap('warning'); return }
       showToast(`Erreur DB : ${error.message}`, C.red)
       return
     }

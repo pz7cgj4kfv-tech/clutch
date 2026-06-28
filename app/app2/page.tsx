@@ -9188,6 +9188,9 @@ export default function App2() {
   const [showHistory,setShowHistory] = useState(false)   // Section historique collapsible (fermé par défaut)
   // Position RDV voulue — initialisée depuis GPS si disponible
   const [meetupPos,setMeetupPos] = useState<[number,number]>(ME)
+  // 🛰️ FORTERESSE GPS — ma VRAIE position (distincte du pin meetupPos qui est le LIEU du RDV). Sert à coupler
+  //    position↔temps : plus le pin est loin de là où je suis, plus l'heure de départ min recule (anti « Lyon dans 20 min »).
+  const [realGps,setRealGps] = useState<[number,number]|null>(null)
   useEffect(()=>{
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
     // maximumAge:0 = toujours une position fraîche (évite le cache iPhone)
@@ -10299,17 +10302,27 @@ export default function App2() {
     //    Sinon → on décale au prochain créneau crédible, on prévient, et on NE sauve PAS (l'user voit la nouvelle heure et reconfirme).
     if (CONE_RAYON_HEURE_LIVE) {
       const nowMs = Date.now()
-      const minStart = earliestCredibleStart(nowMs, rayon)   // now + trajet(rayon) + 15 min
+      // 🛰️ FORTERESSE GPS : le début doit être atteignable POUR LE RAYON **ET** POUR LE TRAJET depuis ma vraie position
+      //    jusqu'au lieu (pin). Plus le pin est loin de là où je suis, plus l'heure min recule (anti « Lyon dans 20 min »).
+      const distToPin = realGps ? haversineKm(realGps[0], realGps[1], meetupPos[0], meetupPos[1]) : 0
+      const minStartRayon = earliestCredibleStart(nowMs, rayon)
+      const minStartPos   = distToPin > 0.3 ? earliestCredibleStart(nowMs, distToPin) : nowMs
+      const posBound = minStartPos > minStartRayon            // c'est le DÉPLACEMENT qui contraint, pas le rayon
+      const minStart = Math.max(minStartRayon, minStartPos)
       if (from.getTime() < minStart - 60_000) {              // 60 s de tolérance
         const nextSlot = makeSlots(new Date(minStart))[0]    // 1er créneau de la grille ≥ minStart (5 min test / 15 min prod)
         setPresetWin(null); setFromTime(nextSlot)
         const [nh,nm] = nextSlot.split(':').map(Number)
         const [uh,um] = (untilTime||'').split(':').map(Number)
         if (!isNaN(uh) && (uh*60+um) <= (nh*60+nm)) { const u2 = makeSlots(new Date(minStart + 60*60_000))[0]; setUntilTime(u2) }
-        const need = Math.round(coneTravelMs(rayon)/60000) + 15
-        showToast?.(lang==='en'
-          ? `You still need ~${need} min to reach ${fmtKm(rayon)} — start moved to ${nextSlot}, confirm again`
-          : `Il te faut encore ~${need} min pour aller à ${fmtKm(rayon)} — début décalé à ${nextSlot}, reconfirme`, C.orange)
+        const need = Math.round((posBound ? coneTravelMs(distToPin) : coneTravelMs(rayon))/60000) + 15
+        showToast?.(posBound
+          ? (lang==='en'
+              ? `~${need} min to reach the spot (${Math.round(distToPin)} km away) — start moved to ${nextSlot}, confirm again`
+              : `~${need} min pour rejoindre le lieu (à ${Math.round(distToPin)} km de toi) — début décalé à ${nextSlot}, reconfirme`)
+          : (lang==='en'
+              ? `You still need ~${need} min to reach ${fmtKm(rayon)} — start moved to ${nextSlot}, confirm again`
+              : `Il te faut encore ~${need} min pour aller à ${fmtKm(rayon)} — début décalé à ${nextSlot}, reconfirme`), C.orange)
         hap('warning')
         return
       }
@@ -10706,7 +10719,7 @@ export default function App2() {
                 <MapLeaflet rayon={rayon} userPhoto={user.photo_url} profiles={profiles}
                   showPin={true}
                   onReady={(fn,rc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc }}
-                  onGpsUpdate={(loc)=>setMeetupPos(loc)}/>
+                  onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}/>
                 {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
                   title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}

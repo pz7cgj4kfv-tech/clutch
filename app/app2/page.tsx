@@ -9304,8 +9304,11 @@ export default function App2() {
       if (editingSlotRef.current) { editingSlotRef.current = null; return }  // édition en cours → garder le pré-rempli
       const fresh = makeSlots()
       setInitSlots(fresh)
-      setFromTime(fresh[0] || '18:00')
-      setUntilTime(fresh[4] || fresh[0] || '20:00')
+      // ⏰ DÉFAUT = créneau dans 1h → 2h (David 28.06). Évite que le Cône bloque (rayon 10km a besoin de ~42min de marge)
+      //    et rend la molette claire/manipulable. L'user peut toujours tirer plus tôt (initSlots part de maintenant).
+      setFromTime(makeSlots(new Date(Date.now()+60*60_000))[0] || fresh[0] || '18:00')
+      setUntilTime(makeSlots(new Date(Date.now()+120*60_000))[0] || fresh[4] || fresh[0] || '20:00')
+      setPickedMoments([])   // pas de moments présélectionnés en ouvrant le flow
       // 🎭 Phase 3 — préremplissage depuis mes défauts : modes (available_modes) + mood (default_moods[0]).
       const dm = (user as any)?.available_modes; if(Array.isArray(dm)&&dm.length) setSeekModes(dm)
       const dmood = (user as any)?.default_moods; if(Array.isArray(dmood)&&dmood.length) setSeekMood(dmood[0]); else setSeekMood(null)
@@ -11126,17 +11129,31 @@ export default function App2() {
 
               {/* Boutons CTA — ANNULER (gris) + SUIVANT VERT (design Mel) */}
               <div style={{padding:'12px 16px 40px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+                {/* ✋ Indique CLAIREMENT ce qui manque pour ouvrir (intention obligatoire + genre) — David 28.06. */}
+                {(()=>{
+                  const intentOk = checkIntent(intentMsg,10).ok
+                  const miss:string[] = []
+                  if (!intentOk) miss.push(lang==='en'?'your intention':'ton intention')
+                  if (!seekGender) miss.push(lang==='en'?'who you want to meet':'qui tu cherches')
+                  if (!miss.length) return null
+                  return <div style={{textAlign:'center',marginBottom:8,fontSize:11.5,fontWeight:800,color:C.orange}}>
+                    {(lang==='en'?'To open, add: ':'Pour ouvrir, ajoute : ')+miss.join(lang==='en'?' & ':' et ')}
+                  </div>
+                })()}
                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <button onClick={()=>{setFlow('app');setTab('presences')}} style={{padding:'15px 22px',borderRadius:24,background:'transparent',border:`1.5px solid ${C.border}`,color:C.whiteMid,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0,letterSpacing:'.02em'}}>{lang==='en'?'CANCEL':'ANNULER'}</button>
+                  {(()=>{ const canOpen = checkIntent(intentMsg,10).ok && !!seekGender; return (
                   <button onClick={handleOuvrirFenetre} style={{
                     flex:1,padding:'16px',
-                    background:C.green,
+                    background: canOpen ? C.green : C.borderStrong,
                     border:'none',borderRadius:24,color:'#fff',
                     fontSize:16,fontWeight:900,cursor:'pointer',fontFamily:'inherit',
-                    letterSpacing:'-.02em',boxShadow:'0 5px 16px rgba(119,188,31,.32)',
+                    letterSpacing:'-.02em',boxShadow: canOpen ? '0 5px 16px rgba(119,188,31,.32)' : 'none',
+                    opacity: canOpen ? 1 : .6, transition:'all .2s',
                   }}>
                     {t('page2.cta')}
                   </button>
+                  )})()}
                 </div>
                 <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.whiteMid}}>
                   {lang==='fr'?`Visible dans un rayon de ${fmtKm(rayon)} autour de ${nearestCity(meetupPos[0],meetupPos[1])}`:`Visible within ${fmtKm(rayon)} of ${nearestCity(meetupPos[0],meetupPos[1])}`}

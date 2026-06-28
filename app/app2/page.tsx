@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d2'  // Versionnage HEXADÉCIMAL. ~311e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 206   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d3'  // Versionnage HEXADÉCIMAL. ~312e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 207   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10838,8 +10838,19 @@ export default function App2() {
                     <style>{`@keyframes coneMarkPulse{0%,100%{opacity:.9;transform:translateY(-50%) scaleY(1)}50%{opacity:.5;transform:translateY(-50%) scaleY(1.25)}}
                       @keyframes coneThumbPulse{0%,100%{box-shadow:0 0 0 1px ${fillCol}55,0 2px 8px ${fillCol}66}50%{box-shadow:0 0 0 5px ${fillCol}22,0 2px 10px ${fillCol}88}}
                       @media (prefers-reduced-motion: reduce){[style*="coneMarkPulse"],[style*="coneThumbPulse"]{animation:none !important}}`}</style>
-                    <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
-                      <span style={{fontSize:11,color:fillCol,flexShrink:0,fontWeight:600,transition:'color .12s'}}>📍 {fmtKm(rayon)}</span>
+                    <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:8}}>
+                      {/* 🧭 Boussole micro-signal (favori GPT) : l'aiguille s'incline avec la tension (calme=verticale, tendu=penchée),
+                          se teinte de la couleur du Cône. Pur ressenti, AUCUN texte. */}
+                      {flag && (
+                        <svg width={17} height={17} viewBox="0 0 16 16" style={{flexShrink:0,transition:'transform .15s'}} aria-hidden="true">
+                          <circle cx="8" cy="8" r="7" fill="none" stroke={fillCol} strokeWidth="1.3" opacity="0.55"/>
+                          <g transform={`rotate(${(tN*52).toFixed(0)} 8 8)`} style={{transition:'transform .18s ease'}}>
+                            <path d="M8 2.5 L9.6 8 L8 7 L6.4 8 Z" fill={fillCol}/>
+                            <circle cx="8" cy="8" r="1.2" fill={fillCol}/>
+                          </g>
+                        </svg>
+                      )}
+                      <span style={{fontSize:11,color:fillCol,flexShrink:0,fontWeight:600,transition:'color .12s'}}>{fmtKm(rayon)}</span>
                       <div ref={sliderRef}
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
@@ -12925,7 +12936,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
 
   useEffect(()=>{ const h=()=>setOpen(true); window.addEventListener('clutch:open-testlab',h); return ()=>window.removeEventListener('clutch:open-testlab',h) },[])
   const loadBots=async()=>{
-    const { data } = await supabase.from('profiles').select('id,name,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
+    const { data } = await supabase.from('profiles').select('id,name,age,gender,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
     const arr=((data as any[])||[])
     const seen=new Set<string>(); const uniq:any[]=[]
     for(const b of arr){ const k=(b.name||'').replace(/\s*test\s*$/i,'').trim().toLowerCase(); if(k&&seen.has(k))continue; seen.add(k); uniq.push({...b,name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
@@ -13181,6 +13192,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
             <button key={b.id} onClick={()=>setSel(b.id)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'7px 12px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',
               border:`1.5px solid ${sel===b.id?C.bordeaux:C.border}`, background:sel===b.id?C.bordeaux:C.bgCard, color:sel===b.id?'#fff':C.white, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap'}}>
               <span style={{width:7,height:7,borderRadius:'50%',background:isLive(b)?C.green:C.salmonMid,flexShrink:0}}/>{b.name||'Bot'}
+              {(b.gender||b.age)&&<span style={{fontSize:10.5,fontWeight:600,opacity:.7,marginLeft:1}}>{[b.gender==='woman'?'♀':b.gender==='man'?'♂':'',b.age?`${b.age}a`:''].filter(Boolean).join(' ')}</span>}
             </button>
           ))}
           {!bots.length && <span style={{fontSize:12,color:C.whiteMid}}>Aucun bot — tape « Tout mettre en ligne »</span>}

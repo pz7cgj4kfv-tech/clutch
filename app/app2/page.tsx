@@ -17,7 +17,7 @@ import { canRegisterEvent, eventMode, shouldNudgeGroupEvent } from '@/lib/clutch
 import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, sweepExpired as evSweepExpired } from '@/lib/events-engine'  // modèle d'inscription events (moteur pur prouvé)
 import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
-import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
+import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d7'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 211   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d8'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 212   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9374,9 +9374,18 @@ export default function App2() {
   const [, setConeTick] = useState(0)
   useEffect(() => {
     if (flow !== 'carte') return
-    const t = setInterval(() => setConeTick(x => x + 1), 30_000)
+    // 📉 RÉTRÉCISSEMENT DYNAMIQUE (David) : à chaque tick on re-clamp le rayon au plafond crédible RECALCULÉ
+    //    pour MAINTENANT → quand l'heure de départ approche, le rayon diminue tout seul (moins de temps = moins loin).
+    const reclamp = () => {
+      const now = Date.now()
+      const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
+      const winMin = Math.max(1, (untilAt - now)/60000)
+      const maxOk = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10)))
+      setRayon(r => r > maxOk + 0.05 ? maxOk : r)
+    }
+    const t = setInterval(() => { setConeTick(x => x + 1); reclamp() }, 30_000)
     return () => clearInterval(t)
-  }, [flow])
+  }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
@@ -10951,18 +10960,13 @@ export default function App2() {
                     const rect = el.getBoundingClientRect()
                     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
                     let target = sliderToRayon(ratio * 100)
-                    if (flag && r6>0) {
-                      // 💪 RÉSISTANCE EXPONENTIELLE dès ~6/10 (David 28.06) : CONTINUE, qu'on la SENTE — jamais un mur.
-                      //    De r6 à r10 le frein durcit (quadratique) ; au-delà de r10 (crédible) c'est un rubber-band très dur.
-                      if (target > r10) {
-                        const over = target - r10
-                        target = r10 + over * 0.15 / (1 + over*0.25)
-                      } else if (target > r6) {
-                        const frac = (target - r6) / Math.max(0.5, r10 - r6)   // 0 à r6 → 1 à r10
-                        const ease = 1 - frac*frac*0.78                         // frein qui durcit en continu
-                        target = r6 + (target - r6) * ease
-                      }
-                      target = Math.min(RAYON_MAX_KM, Math.max(RAYON_MIN_KM, target))
+                    if (flag) {
+                      // 🔒 PLAFOND DUR = limite crédible pour le DÉBUT du créneau (David 28.06 : « je ne dois pas pouvoir
+                      //    mettre 50 km pour tout de suite »). TOUJOURS appliqué (le bug = le cap était sauté quand r6=0,
+                      //    donc le curseur filait à 50 km pour un départ proche). Léger frein décoratif en approchant, puis STOP net.
+                      const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, r10))
+                      if (r6>0 && target>r6 && r6<cap) { const frac=Math.min(1,(target-r6)/Math.max(0.5,cap-r6)); target=r6+(target-r6)*(1-frac*0.35) }
+                      target = Math.min(cap, Math.max(RAYON_MIN_KM, target))
                     }
                     if (flag && typeof navigator!=='undefined' && (navigator as any).vibrate) {
                       const cross=(a:number,b:number,th:number)=> th>0 && a<th && b>=th
@@ -11003,10 +11007,10 @@ export default function App2() {
                               <div style={{position:'absolute',left:0,top:0,height:'100%',width:`${innerW.toFixed(1)}%`,background:railGrad}}/>
                             </div>
                           : <div style={{position:'absolute',left:0,width:`${pct}%`,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:4,background:fillCol,pointerEvents:'none'}}/>}
-                        {/* repère de la limite crédible — prune (charte), pulse quand on le dépasse */}
-                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,top:'50%',transform:'translateY(-50%)',width:2,height:18,borderRadius:1,background:'#532943',opacity:overWindow?0.9:0.5,pointerEvents:'none',animation:overWindow?'coneMarkPulse .8s ease-in-out infinite':undefined}}/>}
-                        {/* thumb — COLORÉ (suit la tension, charte vert→rose→violet), grossit, pulse quand tendu */}
-                        <div style={{position:'absolute',left:`calc(${pct}% - ${thumbS/2}px)`,top:'50%',transform:'translateY(-50%)',width:thumbS,height:thumbS,borderRadius:'50%',background:fillCol,border:'3px solid #fff',pointerEvents:'none',transition:'all .12s',boxShadow:`0 0 0 1px ${fillCol}55, 0 2px 8px ${fillCol}66`,animation:tN>0.7?'coneThumbPulse .9s ease-in-out infinite':undefined}}/>
+                        {/* repère de la limite (= plafond crédible pour ce départ) — prune discret, DÉCORATIF (plus de pulse anxiogène) */}
+                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,top:'50%',transform:'translateY(-50%)',width:2,height:16,borderRadius:1,background:'#532943',opacity:.32,pointerEvents:'none'}}/>}
+                        {/* thumb — COLORÉ (suit la tension, charte vert→rose→violet), grossit doucement. DÉCORATIF : plus de pulse (David 28.06 : pas anxiogène) */}
+                        <div style={{position:'absolute',left:`calc(${pct}% - ${thumbS/2}px)`,top:'50%',transform:'translateY(-50%)',width:thumbS,height:thumbS,borderRadius:'50%',background:fillCol,border:'3px solid #fff',pointerEvents:'none',transition:'all .12s',boxShadow:`0 0 0 1px ${fillCol}55, 0 2px 8px ${fillCol}66`}}/>
                       </div>
                     </div>
                     {/* Plus de texte SOUS le curseur (David 28.06) — l'info du Cône vit UNIQUEMENT sur la carte (compacte, grossit avec la tension). */}
@@ -12761,12 +12765,18 @@ export default function App2() {
                 {myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
                 {[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>{
                   const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
+                  // Rayon affiché : celui du créneau (fallback profil). + 📉 effectif DYNAMIQUE pour un créneau À VENIR
+                  //    (la limite crédible diminue à l'approche du début → David « plus j'approche, moins je vais loin »).
+                  const setRad = s.radius_km!=null ? s.radius_km : (user as any)?.available_radius_km
+                  const startMs = f.getTime(); const nowMs = Date.now()
+                  const effRad = (startMs>nowMs && setRad!=null) ? Math.min(setRad, credibleRadiusKm(nowMs, startMs)) : null
+                  const shrunk = effRad!=null && effRad < setRad - 1
                   return (
                     <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,background:C.bgCard}}>
                       <span style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
-                        <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{s.radius_km!=null?` · ${Math.round(s.radius_km)} km`:''}</div>
+                        <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{setRad!=null?` · ${Math.round(setRad)} km`:''}{shrunk?<span style={{color:C.bordeaux,fontWeight:700}}> · ↓ {fmtKm(effRad!)} maintenant</span>:''}</div>
                         {/* 🎭 Badges mode + mood DU CRÉNEAU (décision 28.06 : chaque créneau porte son intention) */}
                         {(Array.isArray(s.modes)&&s.modes.length>0)||s.mood ? (
                           <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>

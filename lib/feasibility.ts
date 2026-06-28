@@ -13,8 +13,9 @@
 export interface Interval { start: number; end: number } // epoch ms
 const MIN = 60_000
 
-// Trajet estimé (ms) depuis une distance km : vol d'oiseau × 1.35 ÷ 30 km/h (cohérent avec l'alerte trajet).
-export function travelMs(km: number): number { return Math.round((km * 1.35) / 30 * 3_600_000) }
+// Trajet estimé (ms) depuis une distance km : vol d'oiseau × 1.35 ÷ 47 (≈ 35 km/h effectif).
+// 📌 Recalibré 28.06 (22→35 km/h) — DOIT rester identique à cone.travelMs (drift testé dans test-cone).
+export function travelMs(km: number): number { return Math.round((km * 1.35) / 47 * 3_600_000) }
 
 // Soustraction d'intervalles : base − holes.
 export function subtract(base: Interval[], holes: Interval[]): Interval[] {

@@ -10276,7 +10276,9 @@ export default function App2() {
   const handleOuvrirFenetre = async () => {
     if (!user?.id) return
     // ✋ Garde page 2 ÉPURÉE (David 28.06) : INTENTION obligatoire + MODÉRÉE, et genre. (Les modes/tuiles ont disparu.)
-    const mod = checkIntent(intentMsg, 10)
+    // 🆓 Intention NON obligatoire (David 28.06 : « cette histoire d'intention obligatoire, je trouve bizarre »).
+    //    Vide = OK. Si l'user a écrit quelque chose, on garde la modération (blocklist) — minLen 0 = pas d'exigence de longueur.
+    const mod = checkIntent(intentMsg, 0)
     if (!mod.ok) { showToast?.(intentRefusal(mod.reason, lang==='en'?'en':'fr'), C.orange); hap('warning'); return }
     if (!seekGender) { showToast?.(lang==='en'?'Pick who you want to meet':'Choisis qui tu veux rencontrer', C.orange); hap('warning'); return }
     // NB : pas de window.confirm (BLOQUÉ dans la WebView iOS). Ouvrir un nouveau créneau remplace l'ancien = comportement
@@ -10748,21 +10750,16 @@ export default function App2() {
                   const lvl = (over||tension>=7) ? 'high' : tension>=4 ? 'mid' : 'ok'
                   // 🟢 Souplesse Clutch Live (décision David 29.06) : petit rayon (≤1.5km) = dispo maintenant, hyper-local.
                   //    On NE met PAS l'alerte « trop loin » sur la carte — la personne peut physiquement y être à pied/vélo.
-                  if (rayon<1 || rayon<=1.5 || lvl==='ok') return null
-                  const col = lvl==='high' ? C.bordeaux : C.orange
-                  // Bannière COMPACTE qui grossit un peu avec la tension (David : « beaucoup trop grosse »). Base petite.
-                  const scale = 1 + Math.min(1, tension/10)*0.35
+                  // 🚫 PLUS de « monstre phrase » sur la carte (David 28.06). La forteresse se RESSENT (slider vert→rose→
+                  //    violet + thumb qui pulse + cercle qui devient énorme). On ne montre RIEN tant que ce n'est pas vraiment
+                  //    tendu ; au-delà du crédible = une petite pastille ICÔNE seule (sans texte), prune, discrète.
+                  if (rayon<1.5 || lvl!=='high' || !over) return null
                   return (
                     <div style={{position:'absolute',top:54,left:0,right:0,zIndex:1150,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
-                      <style>{`@keyframes coneMapPulse{0%,100%{transform:scale(${scale})}50%{transform:scale(${(scale*1.06).toFixed(3)})}}`}</style>
-                      <div style={{display:'flex',alignItems:'center',gap:5,background:col,color:'#fff',borderRadius:999,
-                        padding:'5px 12px',fontSize:11.5,fontWeight:800,whiteSpace:'nowrap',boxShadow:`0 3px 12px ${col}88`,
-                        transformOrigin:'center top', transform:`scale(${scale})`, transition:'background .15s',
-                        animation: lvl==='high' ? 'coneMapPulse 0.9s ease-in-out infinite' : undefined}}>
-                        <span style={{fontSize:13}}>{lvl==='high'?'⚠️':'🌀'}</span>
-                        {lvl==='high'
-                          ? (lang==='en'?'Too far for this time':'Trop loin pour cette heure')
-                          : (lang==='en'?'A bit tight for this time':'Un peu juste pour cette heure')}
+                      <style>{`@keyframes coneMapPulse{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.12);opacity:1}}`}</style>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,background:C.bordeaux,color:'#fff',borderRadius:'50%',
+                        fontSize:15,boxShadow:`0 3px 12px ${C.bordeaux}88`, animation:'coneMapPulse 0.9s ease-in-out infinite'}}>
+                        🌀
                       </div>
                     </div>
                   )
@@ -10802,8 +10799,13 @@ export default function App2() {
                   // 🎨 Couleur CONTINUE (David 28.06) : vert → rose → bordeaux selon la tension (gradient, plus par palier).
                   const lerpHex=(a:string,b:string,t:number)=>{ const pa=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),pb=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16)); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('') }
                   const tN = Math.min(1, Math.max(0, tension/10))
-                  // 🎨 Dégradé CONTINU vert → ambre → rouge (verdict design GPT+Grok 28.06 : « tu pousses les limites », jamais punitif).
-                  const fillCol = !flag ? C.orange : (tN<0.5 ? lerpHex('#77BC1F', '#FFB300', tN*2) : lerpHex('#FFB300', '#E53935', (tN-0.5)*2))
+                  // 🎨 Dégradé CONTINU — UNIQUEMENT les couleurs de l'app (David 28.06) : VERT → ROSE → VIOLET (prune).
+                  //    Plus d'ambre/rouge étranger à la charte. Jamais punitif, juste « tu pousses les limites ».
+                  const fillCol = !flag ? C.orange : (tN<0.5 ? lerpHex('#77BC1F', '#EB6BAF', tN*2) : lerpHex('#EB6BAF', '#532943', (tN-0.5)*2))
+                  // Dégradé ANCRÉ sur la course entière : la couleur à chaque rayon = sa vraie tension (vert près de 0,
+                  //    rose à la zone serrée, violet à la limite crédible). « Toute la course » montre la carte de tension.
+                  const railGrad = `linear-gradient(90deg, #77BC1F 0%, #77BC1F ${p4.toFixed(1)}%, #EB6BAF ${p7.toFixed(1)}%, #532943 ${p10.toFixed(1)}%, #3a1d2e 100%)`
+                  const innerW = pct>0 ? 10000/pct : 100   // largeur de l'enfant pour que le dégradé reste ancré à TOUTE la course
                   const trackH = 6 + Math.round(tN*5)        // épaisseur croît avec la tension (canal redondant accessibilité)
                   const thumbS = 20 + Math.round(tN*8)       // thumb grossit un peu avec la tension
                   const updateFromEvent = (clientX: number) => {
@@ -10844,13 +10846,17 @@ export default function App2() {
                         onPointerMove={e=>{if(e.buttons===0)return;updateFromEvent(e.clientX)}}>
                         {/* track de base (neutre) — centrée */}
                         <div style={{position:'absolute',left:0,right:0,top:'50%',transform:'translateY(-50%)',height:6,borderRadius:3,background:'#E3E3E3',pointerEvents:'none'}}/>
-                        {/* portion AU-DELÀ du crédible : teinte rouge légère (zone tendue, sans texte) */}
-                        {flag && r10>0 && p10<100 && <div style={{position:'absolute',left:`${p10}%`,right:0,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:3,background:'rgba(229,57,53,.14)',pointerEvents:'none'}}/>}
-                        {/* fill : dégradé continu vert→ambre→rouge, ÉPAISSIT avec la tension (canal accessibilité redondant) */}
-                        <div style={{position:'absolute',left:0,width:`${pct}%`,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:4,background:fillCol,pointerEvents:'none',transition:'background .12s, height .12s'}}/>
-                        {/* repère de la limite crédible — pulse quand on le dépasse */}
-                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,top:'50%',transform:'translateY(-50%)',width:2,height:18,borderRadius:1,background:'#E53935',opacity:overWindow?0.9:0.5,pointerEvents:'none',animation:overWindow?'coneMarkPulse .8s ease-in-out infinite':undefined}}/>}
-                        {/* thumb — COLORÉ (suit la tension), grossit, pulse quand tendu (David : plus blanc) */}
+                        {/* carte de tension FANTÔME sur TOUTE la course (vert→rose→violet ancré aux seuils, faible opacité) */}
+                        {flag && <div style={{position:'absolute',left:0,right:0,top:'50%',transform:'translateY(-50%)',height:6,borderRadius:3,background:railGrad,opacity:.28,pointerEvents:'none'}}/>}
+                        {/* fill : la portion choisie, MÊME dégradé mais pleine opacité, ancré à toute la course (overflow clip) */}
+                        {flag
+                          ? <div style={{position:'absolute',left:0,width:`${pct}%`,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:4,overflow:'hidden',pointerEvents:'none',transition:'height .12s'}}>
+                              <div style={{position:'absolute',left:0,top:0,height:'100%',width:`${innerW.toFixed(1)}%`,background:railGrad}}/>
+                            </div>
+                          : <div style={{position:'absolute',left:0,width:`${pct}%`,top:'50%',transform:'translateY(-50%)',height:trackH,borderRadius:4,background:fillCol,pointerEvents:'none'}}/>}
+                        {/* repère de la limite crédible — prune (charte), pulse quand on le dépasse */}
+                        {flag && r10>0 && p10<99.5 && <div style={{position:'absolute',left:`calc(${p10}% - 1px)`,top:'50%',transform:'translateY(-50%)',width:2,height:18,borderRadius:1,background:'#532943',opacity:overWindow?0.9:0.5,pointerEvents:'none',animation:overWindow?'coneMarkPulse .8s ease-in-out infinite':undefined}}/>}
+                        {/* thumb — COLORÉ (suit la tension, charte vert→rose→violet), grossit, pulse quand tendu */}
                         <div style={{position:'absolute',left:`calc(${pct}% - ${thumbS/2}px)`,top:'50%',transform:'translateY(-50%)',width:thumbS,height:thumbS,borderRadius:'50%',background:fillCol,border:'3px solid #fff',pointerEvents:'none',transition:'all .12s',boxShadow:`0 0 0 1px ${fillCol}55, 0 2px 8px ${fillCol}66`,animation:tN>0.7?'coneThumbPulse .9s ease-in-out infinite':undefined}}/>
                       </div>
                     </div>
@@ -10870,27 +10876,26 @@ export default function App2() {
                   if (!parts.length) return null
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
                   const keyOf = (p:any)=>p.key+p.dayOffset
-                  const toggle = (p:any)=>{
+                  // 🎯 EXCLUSIF (David 28.06) : un SEUL moment à la fois — cliquer en remplace un autre (jamais soir + nuit
+                  //    qui se chevauchent). Pour ouvrir PLUSIEURS créneaux : bouton « + Créneau ». Le moment règle DIRECTEMENT
+                  //    la fenêtre (from = début réel du moment, pas now+1h) → fini « cet après-midi = 12h25 ».
+                  const pick = (p:any)=>{
                     const k = keyOf(p)
-                    const exists = pickedMoments.some(x=>x.key===k)
-                    let next = exists ? pickedMoments.filter(x=>x.key!==k)
-                                      : [...pickedMoments, {key:k, start:p.start, end:p.end, fr:p.fr, en:p.en}]
-                    next = next.sort((a,b)=>a.start-b.start)
-                    setPickedMoments(next)
-                    // Le créneau le plus TÔT pilote le principal (presetWin + molettes) ; les autres = créneaux en plus.
-                    if (next.length) { const m=next[0]; setPresetWin({from:m.start, until:m.end}); setFromTime(hhmm(m.start)); setUntilTime(hhmm(m.end)) }
-                    else setPresetWin(null)
+                    const active = pickedMoments.length===1 && pickedMoments[0].key===k
+                    if (active) { setPickedMoments([]); setPresetWin(null) }       // re-clic = désélection
+                    else {
+                      setPickedMoments([{key:k, start:p.start, end:p.end, fr:p.fr, en:p.en}])
+                      setPresetWin({from:p.start, until:p.end}); setFromTime(hhmm(p.start)); setUntilTime(hhmm(p.end))
+                    }
                     if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
                   }
-                  const n = pickedMoments.length
                   return (
-                    <>
                     <div style={{display:'flex',gap:6,padding:'2px 12px 6px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}
                       onTouchStart={e=>e.stopPropagation()} onTouchEnd={e=>e.stopPropagation()}>
                       {parts.map(p=>{
-                        const active = pickedMoments.some(x=>x.key===keyOf(p))
+                        const active = pickedMoments.length===1 && pickedMoments[0].key===keyOf(p)
                         return (
-                          <button key={keyOf(p)} onClick={()=>toggle(p)} style={{
+                          <button key={keyOf(p)} onClick={()=>pick(p)} style={{
                             flexShrink:0,padding:'7px 13px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',
                             fontSize:12,fontWeight:active?900:700,whiteSpace:'nowrap',
                             background:active?C.green:C.bg, color:active?'#fff':C.whiteMid,
@@ -10899,13 +10904,6 @@ export default function App2() {
                         )
                       })}
                     </div>
-                    {n>=2 && (
-                      <div style={{padding:'0 14px 6px',fontSize:11.5,fontWeight:800,color: n>3?C.orange:C.green}}>
-                        {n>3 ? (lang==='en'?'Max 3 slots — keep the 3 most important':'Max 3 créneaux — garde les 3 plus importants')
-                             : (lang==='en'?`${n} slots will be created`:`${n} créneaux seront créés`)}
-                      </div>
-                    )}
-                    </>
                   )
                 })()}
                 {/* 2 roues temps */}
@@ -11080,10 +11078,10 @@ export default function App2() {
 
                 {/* 4. (Menu « J'ai envie de » retiré — design Mel 22.06. L'intention passe par le message libre ci-dessous.) */}
 
-                {/* INTENTION — désormais OBLIGATOIRE + suggestions cliquables (épuré, David 28.06). Le mood en est déduit (lib/mood.ts). */}
+                {/* INTENTION — OPTIONNELLE (David 28.06 : « obligatoire, je trouve ça bizarre ») + suggestions cliquables. Le mood en est déduit (lib/mood.ts). */}
                 <div style={{marginBottom:16}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{lang==='en'?'Your intention':'Ton intention'} <span style={{fontWeight:800,textTransform:'none',color:C.pink}}>· {lang==='en'?'required':'obligatoire'}</span></div>
+                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>{lang==='en'?'Your intention':'Ton intention'} <span style={{fontWeight:700,textTransform:'none',color:C.whiteMid,opacity:.8}}>· {lang==='en'?'optional':'optionnel'}</span></div>
                     <div style={{fontSize:9,color:intentMsg.length>110?C.orange:C.whiteMid}}>{intentMsg.length}/120</div>
                   </div>
                   <div style={{fontSize:10.5,color:C.whiteMid,marginBottom:8,lineHeight:1.4}}>{lang==='en'?'Describe what you’re up for — we’ll find the right people.':'Décris ton envie du moment — on trouve les bonnes personnes.'}</div>
@@ -11122,9 +11120,9 @@ export default function App2() {
               <div style={{padding:'12px 16px 40px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
                 {/* ✋ Indique CLAIREMENT ce qui manque pour ouvrir (intention obligatoire + genre) — David 28.06. */}
                 {(()=>{
-                  const intentOk = checkIntent(intentMsg,10).ok
+                  const intentOk = checkIntent(intentMsg,0).ok   // intention optionnelle : seul le contenu interdit bloque
                   const miss:string[] = []
-                  if (!intentOk) miss.push(lang==='en'?'your intention':'ton intention')
+                  if (!intentOk) miss.push(lang==='en'?'a cleaner intention':'une intention correcte')
                   if (!seekGender) miss.push(lang==='en'?'who you want to meet':'qui tu cherches')
                   if (!miss.length) return null
                   return <div style={{textAlign:'center',marginBottom:8,fontSize:11.5,fontWeight:800,color:C.orange}}>
@@ -11133,7 +11131,7 @@ export default function App2() {
                 })()}
                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <button onClick={()=>{setFlow('app');setTab('presences')}} style={{padding:'15px 22px',borderRadius:24,background:'transparent',border:`1.5px solid ${C.border}`,color:C.whiteMid,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0,letterSpacing:'.02em'}}>{lang==='en'?'CANCEL':'ANNULER'}</button>
-                  {(()=>{ const canOpen = checkIntent(intentMsg,10).ok && !!seekGender; return (
+                  {(()=>{ const canOpen = checkIntent(intentMsg,0).ok && !!seekGender; return (
                   <button onClick={handleOuvrirFenetre} style={{
                     flex:1,padding:'16px',
                     background: canOpen ? C.green : C.borderStrong,
@@ -11193,12 +11191,14 @@ export default function App2() {
                               l'état « actif » est déjà montré par le point vert + l'heure + le badge 📍N/3 à côté. */}
                           {rdvBlocked ? '🔒 RDV' : (isPremium ? '+ Disponibilité' : '+ Créneau')}
                         </button>
-                        {myAvail.length>0 && (
+                        {/* 📍 Badge créneaux TOUJOURS visible (David 28.06 : « même si j'en ai pas, ça doit marquer 0/3 »).
+                            Vert quand actif · gris discret à 0/3 (rien d'ouvert). */}
+                        {(()=>{ const has=myAvail.length>0; return (
                           <button onClick={()=>setShowSlots(true)} title={lang==='en'?'Your active availability slots (max 3)':'Tes créneaux de disponibilité actifs (max 3)'}
-                            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'6px 9px',borderRadius:20,border:`1px solid ${C.green}55`,background:`${C.green}1a`,color:C.green,fontSize:11,fontWeight:800,whiteSpace:'nowrap',cursor:'pointer',fontFamily:'inherit'}}>
+                            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'6px 9px',borderRadius:20,border:`1px solid ${has?`${C.green}55`:C.border}`,background:has?`${C.green}1a`:'transparent',color:has?C.green:C.whiteMid,fontSize:11,fontWeight:800,whiteSpace:'nowrap',cursor:'pointer',fontFamily:'inherit'}}>
                             📍 {myAvail.length}/3
                           </button>
-                        )}
+                        )})()}
                       </div>
                     </div>
 

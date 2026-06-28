@@ -10919,25 +10919,8 @@ export default function App2() {
                   <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setPickedMoments([]); setUntilTime(v) }}/>
                 </div>
 
-                {/* ⚡ QUICK CLUTCH — PAGE 1, sous les molettes (David 29.06). « Je veux que ça se passe dans l'heure. »
-                    À l'activation : raccourcit la fenêtre à maintenant→+1h (slots de 5 min) — l'éclair = le présent immédiat. */}
-                <div style={{padding:'4px 16px 2px'}}>
-                  <button onClick={()=>{ hap('light'); setQuickClutch(v=>{
-                      const nv=!v
-                      if (nv) { const sl=makeSlots(); setPresetWin(null); setFromTime(sl[0]); setUntilTime(sl[12]||sl[0]) }  // maintenant → +1h
-                      return nv
-                    }) }}
-                    style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 11px',borderRadius:14,
-                      border:`1.5px solid ${quickClutch?'#EB6BB0':C.border}`,background:quickClutch?'rgba(235,107,176,.09)':'transparent',
-                      cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
-                    <img src={quickClutch?'/icons/quickclutch_on.svg':'/icons/quickclutch_off.svg'} width={36} height={36} alt=""
-                      style={{flexShrink:0,transition:'transform .25s cubic-bezier(.22,1,.36,1)',transform:quickClutch?'scale(1.06)':'none'}}/>
-                    <div style={{flex:1,textAlign:'left'}}>
-                      <div style={{fontSize:13,fontWeight:800,color:quickClutch?'#EB6BB0':C.white}}>Quick Clutch · 1h</div>
-                      <div style={{fontSize:10,color:C.whiteMid,marginTop:1,lineHeight:1.3}}>{lang==='en'?'I want it within the hour — short & spontaneous':'Je veux que ça se passe dans l\'heure — court & spontané'}</div>
-                    </div>
-                  </button>
-                </div>
+                {/* QUICK CLUTCH RETIRÉ de la page 1 (David 28.06) : mal placé. Son sens = la DURÉE du RDV (1h),
+                    ça appartient à l'ENVOI d'un clutch (où il y a déjà is_quick/durée 60min), pas à la déclaration de dispo. */}
 
                 {/* CTA bas — Annuler (gauche) · étape 1—2 (centre) · Suivant (droite). David 29.06. */}
                 <div style={{padding:'8px 20px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>

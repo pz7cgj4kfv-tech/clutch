@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d9'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 213   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1da'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 214   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -767,10 +767,10 @@ function makeStars(centerLat:number, centerLng:number, radiusKm:number, genders:
   })
 }
 
-function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate }:{
+function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate, onCenterChange }:{
   rayon:number; userPhoto?:string|null; profiles?:Profile[];
   showPin?:boolean; onReady?:(getCenter:()=>[number,number], recenter:()=>void, setCenter:(lat:number,lng:number)=>void)=>void;
-  onGpsUpdate?:(pos:[number,number])=>void;
+  onGpsUpdate?:(pos:[number,number])=>void; onCenterChange?:(lat:number,lng:number)=>void;
 }) {
   const divRef    = useRef<HTMLDivElement>(null)
   const mapRef    = useRef<any>(null)
@@ -852,14 +852,15 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
           fill.setLatLng(pos)
         }
         // Verrouiller le centre pendant le zoom (pinch ne déplace pas le curseur)
+        const emitCenter = () => { const c2 = lockedCenter || map.getCenter(); onCenterChange?.(c2.lat, c2.lng) }  // 🛰️ centre LIVE → forteresse pin↔GPS
         map.on('zoomstart', () => { lockedCenter = map.getCenter() })
         map.on('zoomend',   () => {
           if (lockedCenter) map.panTo(lockedCenter, {animate:false})
           lockedCenter = null
-          syncCircle()
+          syncCircle(); emitCenter()
         })
         map.on('move', syncCircle)
-        map.on('moveend', syncCircle)
+        map.on('moveend', () => { syncCircle(); emitCenter() })
 
         // Long-press sur la carte → déplace le point de rencontre
         // user-select:none pour éviter la sélection de texte pendant l'appui long
@@ -9387,6 +9388,18 @@ export default function App2() {
     return () => clearInterval(t)
   }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 🛰️ FORTERESSE PIN↔GPS (David 28.06 : « je suis à Morges, je pose le lieu à Genève dans 30 min → impossible »).
+  //    Le LIEU (pin) doit être atteignable depuis MA position GPS d'ici le DÉBUT du créneau. reach = ce que je peux
+  //    couvrir d'ici le début ; si le pin est plus loin → trop loin pour cette heure. Sans GPS → on ne contraint pas.
+  const pinReachInfo = () => {
+    if (!realGps) return { tooFar:false, dist:0, reach:Infinity }
+    const now = Date.now()
+    const startAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
+    const reach = credibleRadiusKm(now, startAt)
+    const dist = haversineKm(realGps[0], realGps[1], meetupPos[0], meetupPos[1])
+    return { tooFar: dist > reach + 0.3, dist, reach }
+  }
+
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
     import('@/lib/onesignal').then(({ initOneSignal }) => initOneSignal()).catch(() => {})
@@ -10868,7 +10881,8 @@ export default function App2() {
                 <MapLeaflet rayon={rayon} userPhoto={user.photo_url} profiles={profiles}
                   showPin={true}
                   onReady={(fn,rc,sc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc; mapSetCenterRef.current=sc }}
-                  onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}/>
+                  onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}
+                  onCenterChange={(lat,lng)=>setMeetupPos([lat,lng])}/>
                 {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}
                   title={lang==='en'?'Recenter on my position':'Recentrer sur ma position'}
@@ -10911,6 +10925,15 @@ export default function App2() {
                     </div>
                   )
                 })()}
+                {/* 🛰️ LIEU TROP LOIN DE MA POSITION pour cette heure — vrai blocage physique (≠ cône décoratif) → message clair. */}
+                {(()=>{ const pr = pinReachInfo(); if (!pr.tooFar) return null; return (
+                  <div style={{position:'absolute',top:54,left:0,right:0,zIndex:1160,display:'flex',justifyContent:'center',padding:'0 16px',pointerEvents:'none'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,background:C.bordeaux,color:'#fff',borderRadius:14,padding:'8px 13px',fontSize:11.5,fontWeight:700,boxShadow:`0 4px 14px ${C.bordeaux}99`,maxWidth:300,lineHeight:1.3}}>
+                      <span style={{fontSize:15,flexShrink:0}}>📍</span>
+                      {lang==='en' ? `Too far from you (${Math.round(pr.dist)} km) for this time — bring the spot closer or start later.` : `Trop loin de toi (${Math.round(pr.dist)} km) pour cette heure — rapproche le lieu ou décale plus tard.`}
+                    </div>
+                  </div>
+                )})()}
               </div>
 
               {/* Zone roues + CTA — fixe en bas, hauteur compacte
@@ -11094,20 +11117,23 @@ export default function App2() {
                     <div style={{width:11,height:2,borderRadius:1,background:C.salmonMid}}/>
                     <div style={{width:18,height:18,borderRadius:'50%',border:`1.5px solid ${C.salmonMid}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:C.salmonMid}}>2</div>
                   </div>
+                  {(()=>{ const tooFar = pinReachInfo().tooFar; return (
                   <button onClick={()=>{
+                    if (tooFar) { hap('warning'); showToast(lang==='en'?'This spot is too far from you for that time — bring it closer or start later':'Ce lieu est trop loin de toi pour cette heure — rapproche-le ou décale plus tard', C.bordeaux); return }
                     const center = mapGetCenterRef.current?.() || ME
                     setMeetupPos(center)
                     setFlow('options')
                   }} style={{
                     padding:'13px 32px',
-                    background:C.green,border:'none',
+                    background: tooFar ? C.borderStrong : C.green, border:'none',
                     borderRadius:24,color:'#fff',
                     fontSize:15,fontWeight:900,
-                    cursor:'pointer',fontFamily:'inherit',
-                    letterSpacing:'-.02em',boxShadow:'0 5px 16px rgba(119,188,31,.32)',
+                    cursor:'pointer',fontFamily:'inherit',opacity: tooFar?.6:1,
+                    letterSpacing:'-.02em',boxShadow: tooFar?'none':'0 5px 16px rgba(119,188,31,.32)',
                   }}>
                     {lang==='en'?'Next →':'Suivant →'}
                   </button>
+                  )})()}
                 </div>
               </div>
             </div>

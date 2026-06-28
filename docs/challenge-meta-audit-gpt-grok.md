@@ -52,7 +52,7 @@ si elle a une brique « causalité physique » comme la Forteresse (probablement
 ou est-ce un cimetière d'apps mortes ?** Soyez francs.
 
 ### 2. FAISABILITÉ & COMPLEXITÉ TECHNIQUE
-Le fondateur dit 8/10 (Uber 2/10). **Vrai ou prétentieux ?** Situez la complexité réelle de Clutch (moteur géo
+Le fondateur estime Clutch à 8/10. **Challengez cette note honnêtement** face à Uber, Tinder, BlaBlaCar, Citymapper. Situez la complexité réelle de Clutch (moteur géo
 temps-réel + cône de causalité + sécurité + anti-abus) par rapport à : Uber, Tinder, Doodle, BlaBlaCar, Citymapper.
 Qu'est-ce qui est DÉJÀ résolu par des libs/services (geocoding, maps, push, RLS) vs ce qui est vraiment dur
 (estimation de trajet multimodale, forteresse dynamique GPS, anti-triangulation, modération à l'échelle) ? Le risque
@@ -67,7 +67,8 @@ comment d'autres l'ont résolu (events comme amorce ? heures « golden » ? vill
 
 ### 4. POTENTIEL & PRÉVISIONS CHIFFRÉES par région (⚠️ partie LA PLUS IMPORTANTE — soyez RIGOUREUX, pas de chiffres ronds en l'air)
 Donnez de VRAIES prévisions, pas des estimations vagues. Pour CHAQUE échelle (Lausanne · Canton de Vaud · Suisse
-romande · Suisse · pays francophones · Europe occidentale · monde), donnez **4 scénarios — MAUVAIS / MOYEN / BON /
+romande · Suisse · **pays francophones (= France + Belgique francophone + Suisse romande + Luxembourg + Québec francophone)** ·
+Europe occidentale · monde), donnez **4 scénarios — MAUVAIS / MOYEN / BON /
 EXCELLENT** avec, pour chacun :
 - **MAU (utilisateurs actifs mensuels)** à **M3 · M6 · M12 · M24** (4 échéances, courbe de croissance, pas un seul chiffre).
 - **% de probabilité** que vous assignez à CHAQUE scénario (les 4 doivent sommer à 100 %).
@@ -78,6 +79,7 @@ EXCELLENT** avec, pour chacun :
 - Le **point de bascule** chiffré : masse critique minimale par ville (inscrits ET dispo simultanés un soir) en dessous
   de laquelle l'app meurt, et au-dessus de laquelle elle s'auto-entretient.
 **Si vous donnez des chiffres ronds sans méthode, c'est un échec.** On veut une fourchette défendable + l'hypothèse derrière.
+**Si une donnée réelle manque, donnez une hypothèse EXPLICITE et écrivez « hypothèse » — pas une pseudo-certitude.**
 
 ### 5. LANCEMENT 2026 — la meilleure stratégie
 On n'achète plus des affiches à 1M. En 2026, pour une app sociale locale à effet de réseau, quelle est la MEILLEURE
@@ -107,7 +109,7 @@ et dites **LAQUELLE est la plus probable** + ce qu'il faudrait pour la désamorc
 2. **Concurrents** : tableau (nom · ce qu'ils font · forces · faiblesses · ont-ils la « forteresse » ?).
 3. **Complexité** : note /10 justifiée + comparaison Uber/Tinder + risque technique #1.
 4. **Adoption** : 3 freins majeurs + 3 leviers + la réponse au problème masse critique.
-5. **Scénarios** : tableau 4 scénarios × 7 régions (chiffres d'actifs + condition pour y arriver).
+5. **Scénarios** : tableau 4 scénarios × 7 régions. **Inclure M3/M6/M12/M24 dans CHAQUE cellule** (ou un sous-tableau par région) + la proba de chaque scénario + la condition de bascule. Ne PAS simplifier.
 6. **Lancement** : la séquence recommandée (numérotée) + le piège à éviter.
 7. **Budget** : fourchettes CHF (acquisition / contenu / maintenance) pour Lausanne 3-6 mois.
 8. **Les 3 vérités dures** que le fondateur ne veut pas entendre.

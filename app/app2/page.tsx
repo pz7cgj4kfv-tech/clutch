@@ -3106,9 +3106,10 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const loadEvents = async () => {
     const { data } = await supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
     let rows = data || []
-    // B8 — cohérence Démo/Réel : en Réel, on masque AUSSI les events créés par des bots (sinon on voyait
-    // leurs events sans voir les gens — incohérent). Les events de partenaires/vrais users restent.
-    if (!demoOn() && rows.length) {
+    // 🤖 Events créés par des bots = TOUJOURS masqués de l'onglet Événements (David 28.06 : « c'est fini avec ces robots »).
+    //   Avant : masqués seulement en Réel → en mode Test Lab ils polluaient (+ donnaient « hors de ta dispo » au clic).
+    //   Le Test Lab vérifie la création d'event par ses propres fonctions admin, pas via cette liste user-facing.
+    if (rows.length) {
       try {
         const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot', true)
         const botIds = new Set((bots||[]).map((b:any)=>b.id))

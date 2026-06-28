@@ -10716,18 +10716,19 @@ export default function App2() {
                   //    On NE met PAS l'alerte « trop loin » sur la carte — la personne peut physiquement y être à pied/vélo.
                   if (rayon<1 || rayon<=1.5 || lvl==='ok') return null
                   const col = lvl==='high' ? C.bordeaux : C.orange
-                  const scale = 1 + Math.min(1, tension/10)*0.7   // plus la tension monte, plus c'est GROS
+                  // Bannière COMPACTE qui grossit un peu avec la tension (David : « beaucoup trop grosse »). Base petite.
+                  const scale = 1 + Math.min(1, tension/10)*0.35
                   return (
                     <div style={{position:'absolute',top:54,left:0,right:0,zIndex:1150,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
-                      <style>{`@keyframes coneMapPulse{0%,100%{transform:scale(${scale})}50%{transform:scale(${(scale*1.08).toFixed(3)})}}`}</style>
-                      <div style={{display:'flex',alignItems:'center',gap:7,background:col,color:'#fff',borderRadius:999,
-                        padding:'9px 18px',fontSize:13.5,fontWeight:900,whiteSpace:'nowrap',boxShadow:`0 6px 22px ${col}aa`,
+                      <style>{`@keyframes coneMapPulse{0%,100%{transform:scale(${scale})}50%{transform:scale(${(scale*1.06).toFixed(3)})}}`}</style>
+                      <div style={{display:'flex',alignItems:'center',gap:5,background:col,color:'#fff',borderRadius:999,
+                        padding:'5px 12px',fontSize:11.5,fontWeight:800,whiteSpace:'nowrap',boxShadow:`0 3px 12px ${col}88`,
                         transformOrigin:'center top', transform:`scale(${scale})`, transition:'background .15s',
-                        animation: lvl==='high' ? 'coneMapPulse 0.85s ease-in-out infinite' : undefined}}>
-                        <span style={{fontSize:16}}>{lvl==='high'?'⚠️':'🌀'}</span>
+                        animation: lvl==='high' ? 'coneMapPulse 0.9s ease-in-out infinite' : undefined}}>
+                        <span style={{fontSize:13}}>{lvl==='high'?'⚠️':'🌀'}</span>
                         {lvl==='high'
                           ? (lang==='en'?'Too far for this time':'Trop loin pour cette heure')
-                          : (lang==='en'?`Edge ~${Math.round(coneTravelMs(rayon)/60000)} min`:`Bord à ~${Math.round(coneTravelMs(rayon)/60000)} min`)}
+                          : (lang==='en'?'A bit tight for this time':'Un peu juste pour cette heure')}
                       </div>
                     </div>
                   )
@@ -10763,46 +10764,36 @@ export default function App2() {
                   // ⚠️ NE PAS exiger r10>0 : si la fenêtre est trop courte, r10 tombe à 0 et TOUT le Cône
                   //    disparaissait (bug David). r10=0 = rien d'atteignable → tension max, pas disparition.
                   const overWindow = flag && rayon > Math.max(r10,0) + 0.01
-                  // 🟢 Zone Clutch Live (petit rayon = dispo maintenant) : on reste SOUPLE → couleur apaisée (vert), pas d'alarme.
-                  const isClutchLive = flag && rayon <= 1.5
-                  const fillCol = !flag ? C.orange : isClutchLive ? C.green : (tension>=7||overWindow ? C.bordeaux : tension>=4 ? C.orange : C.green)
+                  const r6 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 6))
+                  // 🎨 Couleur CONTINUE (David 28.06) : vert → rose → bordeaux selon la tension (gradient, plus par palier).
+                  const lerpHex=(a:string,b:string,t:number)=>{ const pa=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),pb=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16)); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('') }
+                  const tN = Math.min(1, Math.max(0, tension/10))
+                  const fillCol = !flag ? C.orange : (tN<0.5 ? lerpHex(C.green, C.orange, tN*2) : lerpHex(C.orange, C.bordeaux, (tN-0.5)*2))
                   const updateFromEvent = (clientX: number) => {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
                     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
                     let target = sliderToRayon(ratio * 100)
-                    if (flag) {
-                      // RÉSISTANCE PROGRESSIVE (David : « plus dur encore sur les bords »). On lutte contre le slider
-                      // quand la tension monte dans le cône — jamais un mur, mais de plus en plus dur.
+                    if (flag && r6>0) {
+                      // 💪 RÉSISTANCE EXPONENTIELLE dès ~6/10 (David 28.06) : CONTINUE, qu'on la SENTE — jamais un mur.
+                      //    De r6 à r10 le frein durcit (quadratique) ; au-delà de r10 (crédible) c'est un rubber-band très dur.
                       if (target > r10) {
-                        // au-delà du rayon crédible : très dur, ET de plus en plus dur plus on pousse loin.
                         const over = target - r10
-                        target = r10 + over * 0.22 / (1 + over*0.18)
-                      } else if (target > r7) {
-                        // zone bordeaux (tension 7-10) : léger frein, ça commence à accrocher.
-                        target = r7 + (target - r7) * 0.6
+                        target = r10 + over * 0.15 / (1 + over*0.25)
+                      } else if (target > r6) {
+                        const frac = (target - r6) / Math.max(0.5, r10 - r6)   // 0 à r6 → 1 à r10
+                        const ease = 1 - frac*frac*0.78                         // frein qui durcit en continu
+                        target = r6 + (target - r6) * ease
                       }
                       target = Math.min(RAYON_MAX_KM, Math.max(RAYON_MIN_KM, target))
                     }
                     if (flag && typeof navigator!=='undefined' && (navigator as any).vibrate) {
                       const cross=(a:number,b:number,th:number)=> th>0 && a<th && b>=th
-                      if (cross(rayon,target,r7) || cross(rayon,target,r10)) (navigator as any).vibrate(10)
+                      if (cross(rayon,target,r6) || cross(rayon,target,r10)) (navigator as any).vibrate(12)
                     }
                     setRayon(target)
                   }
-                  // Message qui EXPLIQUE + propose le fix (jamais juste « non »).
-                  const edgeMin = Math.round(coneTravelMs(rayon)/60000)
-                  const earliest = earliestCredibleStart(now, rayon)
-                  let msg:string|null = null, msgCol = C.whiteMid
-                  const high = flag && !isClutchLive && rayon>=1 && (overWindow || tension>=7)   // alerte forte = dynamique (jamais en zone Live)
-                  if (flag && rayon>1.5) {  // ≤1.5km = Clutch Live → le nudge Live remplace tout message de cône
-                    if (high) { msgCol=C.bordeaux
-                      msg = lang==='en' ? `Too far for this time — push it later` : `Trop loin pour cette heure — décale plus tard` }
-                    else if (tension>=4) { msgCol=C.orange
-                      msg = lang==='en' ? `Edge ~${edgeMin} min · from ${hhmm(earliest)}` : `Bord à ~${edgeMin} min · dès ${hhmm(earliest)}` }
-                    else {
-                      msg = lang==='en' ? `Edge ~${edgeMin} min away` : `Bord du rayon à ~${edgeMin} min` }
-                  }
+                  // (Plus de message sous le curseur — l'info du Cône vit uniquement sur la carte.)
                   return (
                     <>
                     <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',gap:10}}>
@@ -10827,23 +10818,7 @@ export default function App2() {
                         <div style={{position:'absolute',left:`calc(${pct}% - 10px)`,width:20,height:36,borderRadius:7,background:'#fff',border:`3.5px solid ${fillCol}`,pointerEvents:'none',transition:'border-color .12s',boxShadow:`0 0 0 1.5px rgba(255,255,255,.9), 0 2px 8px ${fillCol}66`}}/>
                       </div>
                     </div>
-                    {high && <style>{`@keyframes coneBreathe{0%,100%{box-shadow:0 0 0 0 rgba(83,41,67,0)}50%{box-shadow:0 0 0 5px rgba(83,41,67,.07)}}`}</style>}
-                    {/* Alerte du Cône en PASTILLE (polish temporaire avant le design Mel) : badge rond + texte,
-                        fond teinté de la zone, respiration douce quand c'est tendu (plus de texte gras qui saute). */}
-                    {msg && (
-                      <div style={{padding: high?'3px 14px 10px':'0 14px 7px'}}>
-                        <span style={{display:'inline-flex',alignItems:'center',gap:8,
-                          padding: high?'6px 12px 6px 7px':'4px 11px 4px 6px', borderRadius:999,
-                          background:`${fillCol}14`, border:`1px solid ${fillCol}38`,
-                          transition:'background .2s,border-color .2s',
-                          animation: high?'coneBreathe 2s ease-in-out infinite':undefined}}>
-                          <span style={{flexShrink:0,width:high?20:16,height:high?20:16,borderRadius:'50%',
-                            display:'grid',placeItems:'center',fontSize:high?12:9,fontWeight:800,
-                            background:fillCol,color:'#fff',lineHeight:1}}>{high?'!':'›'}</span>
-                          <span style={{fontSize:high?12.5:11,fontWeight:high?700:500,color:msgCol,lineHeight:1.2}}>{msg}</span>
-                        </span>
-                      </div>
-                    )}
+                    {/* Plus de texte SOUS le curseur (David 28.06) — l'info du Cône vit UNIQUEMENT sur la carte (compacte, grossit avec la tension). */}
                     </>
                   )
                 })()}
@@ -10995,8 +10970,34 @@ export default function App2() {
 
                 {/* ⚡ QUICK CLUTCH déplacé en PAGE 1, sous les molettes d'heure (David 29.06 + GPT/Grok : c'est du « quand », pas de l'intention). */}
 
-                {/* ÉPURÉ (David 28.06) — tuiles MODE + MOOD RETIRÉES. Le tri se fait sur l'INTENTION obligatoire (1 input riche
-                    au lieu de 2 redondants). Le mood (dont l'axe nature romantique/amical) est DÉDUIT du texte via lib/mood.ts. */}
+                {/* 1. MODE — REMIS (David 28.06, revirement : « il faut le remettre, au-dessus de Je cherche »). Multi-select. */}
+                <div style={{marginBottom:16}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                    <div style={{fontSize:9,fontWeight:800,letterSpacing:'.16em',textTransform:'uppercase',color:C.whiteMid}}>Mode <span style={{fontWeight:400,textTransform:'none'}}>— {lang==='en'?'multiple choices allowed':'plusieurs choix possibles'}</span></div>
+                  </div>
+                  <div style={{display:'flex',gap:9}}>
+                    {([
+                      {k:'romantic',icon:'/icons/mel/rencontre_amour.svg',  l:lang==='en'?'Romance':'Rencontre'},
+                      {k:'friend',  icon:'/icons/mel/rencontre_amis.svg',   l:lang==='en'?'Friendship':'Amitié'},
+                      {k:'pro',     icon:'/icons/mel/rencontre_pro.svg',    l:'Pro'},
+                      {k:'parent',  icon:'/icons/mel/rencontre_parents.svg',l:lang==='en'?'Family':'Enfant'},
+                    ] as const).map(m=>{
+                      const on=seekModes.includes(m.k)
+                      return <button key={m.k} onClick={()=>{
+                        if (m.k==='parent') { setSeekModes(on ? [] : ['parent']) }       // Mode Famille = exclusif
+                        else { const without = seekModes.filter(x=>x!==m.k&&x!=='parent'); setSeekModes(on ? without : [...without, m.k]) }
+                      }}
+                        style={{flex:1,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:0}}>
+                        <div style={{width:'100%',height:58,borderRadius:15,display:'flex',alignItems:'center',justifyContent:'center',
+                          background:on?C.bordeaux:'#fff',border:on?'none':`1px solid ${C.border}`,
+                          boxShadow:on?'0 2px 4px rgba(120,115,125,.22), 0 8px 18px rgba(120,115,125,.30)':'0 1px 3px rgba(120,115,125,.18), 0 4px 11px rgba(120,115,125,.20)',transition:'all .15s'}}>
+                          {on ? <img src={m.icon.replace('.svg','_color.svg')} width={32} height={32} alt="" style={{display:'block'}}/> : <MelIcon src={m.icon} color={C.borderStrong} size={28}/>}
+                        </div>
+                        <div style={{fontSize:10.5,fontWeight:on?900:600,color:on?C.pink:C.whiteMid,whiteSpace:'nowrap'}}>{m.l}</div>
+                      </button>
+                    })}
+                  </div>
+                </div>
 
                 {/* 2. GENRE RECHERCHÉ */}
                 <div style={{marginBottom:16}}>

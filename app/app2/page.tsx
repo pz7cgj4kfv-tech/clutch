@@ -18,6 +18,7 @@ import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, swee
 import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
+import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -9388,14 +9389,10 @@ export default function App2() {
   //    à 50km → ramener l'heure à maintenant ne doit PAS laisser un rayon impossible). On clamp au max crédible.
   useEffect(() => {
     if (!CONE_RAYON_HEURE_LIVE) return
-    const now = Date.now()
-    // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
-    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
-    const winMin = Math.max(1, (untilAt - now)/60000)
-    const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
-    const maxOk = r10 > RAYON_MIN_KM ? r10 : RAYON_MIN_KM
+    // 🏰 MOTEUR UNIQUE : plafond = ce que je peux couvrir d'ici le début, MOINS la distance du pin (foMaxRadius).
+    const maxOk = foMaxRadius()
     setRayon(r => r > maxOk + 0.05 ? maxOk : r)
-  }, [fromTime, untilTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fromTime, untilTime, presetWin, realGps, meetupPos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const untilSlots = useMemo(() => {
     const [h,m] = fromTime.split(':').map(Number)
@@ -9460,27 +9457,27 @@ export default function App2() {
     // 📉 RÉTRÉCISSEMENT DYNAMIQUE (David) : à chaque tick on re-clamp le rayon au plafond crédible RECALCULÉ
     //    pour MAINTENANT → quand l'heure de départ approche, le rayon diminue tout seul (moins de temps = moins loin).
     const reclamp = () => {
-      const now = Date.now()
-      const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
-      const winMin = Math.max(1, (untilAt - now)/60000)
-      const maxOk = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10)))
+      const maxOk = foMaxRadius()   // 🏰 moteur unique (intègre pin + temps restant)
       setRayon(r => r > maxOk + 0.05 ? maxOk : r)
     }
     const t = setInterval(() => { setConeTick(x => x + 1); reclamp() }, 30_000)
     return () => clearInterval(t)
   }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 🛰️ FORTERESSE PIN↔GPS (David 28.06 : « je suis à Morges, je pose le lieu à Genève dans 30 min → impossible »).
-  //    Le LIEU (pin) doit être atteignable depuis MA position GPS d'ici le DÉBUT du créneau. reach = ce que je peux
-  //    couvrir d'ici le début ; si le pin est plus loin → trop loin pour cette heure. Sans GPS → on ne contraint pas.
-  const pinReachInfo = () => {
-    if (!realGps) return { tooFar:false, dist:0, reach:Infinity }
+  // 🏰 FORTERESSE — POINT D'ENTRÉE UNIQUE (29.06). Tout le démarrage passe par CES helpers → un seul calcul,
+  //    plus de contradictions. foStartAt = le DÉBUT du créneau (epoch). foEval = le verdict du moteur prouvé.
+  const foStartAt = (): number => {
     const now = Date.now()
-    const startAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
-    const reach = credibleRadiusKm(now, startAt)
-    const dist = haversineKm(realGps[0], realGps[1], meetupPos[0], meetupPos[1])
-    return { tooFar: dist > reach + 0.3, dist, reach }
+    return presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
   }
+  const foEval = (radiusKm: number = rayon) => {
+    const now = Date.now(), start = foStartAt()
+    return foEvaluate({ now, gps: realGps, pin: meetupPos, start, end: start + FO_MIN_DUR * 60000, radiusKm })
+  }
+  // Plafond de rayon prêt pour le curseur (intègre la distance du pin) — borné 1..50.
+  const foMaxRadius = (): number => foMaxRadiusFor(Date.now(), realGps, meetupPos, foStartAt(), RAYON_MIN_KM, RAYON_MAX_KM)
+  // Compat : pinReachInfo conservé (utilisé ailleurs) mais ALIMENTÉ par le moteur (pinTooFar/dist/budget).
+  const pinReachInfo = () => { const e = foEval(0); return { tooFar: e.pinTooFar, dist: e.pinDistKm, reach: e.budgetKm } }
 
   // Init OneSignal au démarrage (natif iOS/Android uniquement)
   useEffect(() => {
@@ -10513,27 +10510,21 @@ export default function App2() {
     //    Sinon → on décale au prochain créneau crédible, on prévient, et on NE sauve PAS (l'user voit la nouvelle heure et reconfirme).
     if (CONE_RAYON_HEURE_LIVE) {
       const nowMs = Date.now()
-      // 🛰️ FORTERESSE GPS : le début doit être atteignable POUR LE RAYON **ET** POUR LE TRAJET depuis ma vraie position
-      //    jusqu'au lieu (pin). Plus le pin est loin de là où je suis, plus l'heure min recule (anti « Lyon dans 20 min »).
-      const distToPin = realGps ? haversineKm(realGps[0], realGps[1], meetupPos[0], meetupPos[1]) : 0
-      const minStartRayon = earliestCredibleStart(nowMs, rayon)
-      const minStartPos   = distToPin > 0.3 ? earliestCredibleStart(nowMs, distToPin) : nowMs
-      const posBound = minStartPos > minStartRayon            // c'est le DÉPLACEMENT qui contraint, pas le rayon
-      const minStart = Math.max(minStartRayon, minStartPos)
-      if (from.getTime() < minStart - 60_000) {              // 60 s de tolérance
-        const nextSlot = makeSlots(new Date(minStart))[0]    // 1er créneau de la grille ≥ minStart (5 min test / 15 min prod)
+      // 🏰 MOTEUR UNIQUE au CONFIRM : même verdict que le curseur/banner (D + R ≤ portée). Si pas crédible
+      //    (l'user a traîné sur la page 2, le temps a avancé) → on décale au 1er début crédible et on reconfirme.
+      const ev = foEval(rayon)
+      if (ev.pinTooFar || !ev.feasible) {
+        const minStart = earliestCredibleStart(nowMs, ev.pinDistKm + rayon)   // début min pour couvrir pin + rayon
+        const nextSlot = makeSlots(new Date(minStart))[0]
         setPresetWin(null); setFromTime(nextSlot)
         const [nh,nm] = nextSlot.split(':').map(Number)
         const [uh,um] = (untilTime||'').split(':').map(Number)
         if (!isNaN(uh) && (uh*60+um) <= (nh*60+nm)) { const u2 = makeSlots(new Date(minStart + 60*60_000))[0]; setUntilTime(u2) }
-        const need = Math.round((posBound ? coneTravelMs(distToPin) : coneTravelMs(rayon))/60000) + 15
-        showToast?.(posBound
-          ? (lang==='en'
-              ? `~${need} min to reach the spot (${Math.round(distToPin)} km away) — start moved to ${nextSlot}, confirm again`
-              : `~${need} min pour rejoindre le lieu (à ${Math.round(distToPin)} km de toi) — début décalé à ${nextSlot}, reconfirme`)
-          : (lang==='en'
-              ? `You still need ~${need} min to reach ${fmtKm(rayon)} — start moved to ${nextSlot}, confirm again`
-              : `Il te faut encore ~${need} min pour aller à ${fmtKm(rayon)} — début décalé à ${nextSlot}, reconfirme`), C.orange)
+        showToast?.(ev.pinTooFar
+          ? (lang==='en' ? `Spot too far from you (${Math.round(ev.pinDistKm)} km) — start moved to ${nextSlot}, confirm again`
+                         : `Lieu trop loin de toi (${Math.round(ev.pinDistKm)} km) — début décalé à ${nextSlot}, reconfirme`)
+          : (lang==='en' ? `Zone too wide for this time — start moved to ${nextSlot}, confirm again`
+                         : `Zone trop large pour cette heure — début décalé à ${nextSlot}, reconfirme`), C.orange)
         hap('warning')
         return
       }
@@ -10984,13 +10975,10 @@ export default function App2() {
                 </div>
                 {/* 🌀 ALERTE DU CÔNE — SUR la carte, et qui GROSSIT + pulse quand la tension monte (idée David). */}
                 {CONE_RAYON_HEURE_LIVE && (()=>{
-                  const now=Date.now()
-                  // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
-    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
-                  const winMin = Math.max(1,(untilAt-now)/60000)
-                  const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin,10))
-                  const tension = coneTension({ now, startAt:untilAt, radiusKm:rayon })
-                  const over = rayon > Math.max(r10,0)+0.01
+                  // 🏰 moteur unique : tension + dépassement du plafond, cohérents avec le curseur/Suivant/confirm.
+                  const ev = foEval(rayon)
+                  const tension = ev.tension
+                  const over = rayon > ev.maxRadiusKm + 0.01
                   const lvl = (over||tension>=7) ? 'high' : tension>=4 ? 'mid' : 'ok'
                   // 🟢 Souplesse Clutch Live (décision David 29.06) : petit rayon (≤1.5km) = dispo maintenant, hyper-local.
                   //    On NE met PAS l'alerte « trop loin » sur la carte — la personne peut physiquement y être à pied/vélo.
@@ -11032,25 +11020,20 @@ export default function App2() {
                 {(()=>{
                   const now = Date.now()
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
-                  // Fin de fenêtre choisie (presetWin ou molette « until ») → minutes de marge dispo.
-                  // ⚠️ L'heure qui LIE le rayon = le DÉBUT du créneau (validé GPT+Grok 29.06). Passé → maintenant.
-    const untilAt = presetWin?.from ?? (()=>{ const [h,m]=(fromTime||'00:00').split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const e=d.getTime(); return e<now?now:e })()
-                  const winMin = Math.max(1, (untilAt - now)/60000)
-                  // Seuils de zones (km), bornés au max du slider. r10 = rayon crédible (la « limite »).
-                  const r4  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 4))
-                  const r7  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 7))
-                  const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
-                  const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, r10))   // plafond DUR du rayon (lié au début)
+                  // 🏰 MOTEUR UNIQUE (29.06) : budget = ce que j'atteins d'ici le DÉBUT ; D = distance du pin.
+                  //    Plafond = budget − D. Zones du dégradé = rayon à tension T : r(T) = budget·T/10 − D.
+                  const e0 = foEval(0)
+                  const budget = e0.budgetKm, D = e0.pinDistKm
+                  const rT = (T:number)=> Math.max(0, Math.min(RAYON_MAX_KM, budget * T / 10 - D))
+                  const r4 = rT(4), r6 = rT(6), r7 = rT(7), r10 = rT(10)
+                  const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, budget - D))   // = foMaxRadius (plafond DUR)
                   const capLimiting = cap < RAYON_MAX_KM - 0.5 && rayon >= cap - 0.4   // on bute contre le plafond → on explique
                   const flag = CONE_RAYON_HEURE_LIVE
                   const p = (km:number)=> Math.max(0, Math.min(100, rayonToSlider(km)))
                   const pct = rayonToSlider(rayon)
                   const p4=p(r4), p7=p(r7), p10=p(r10)
-                  const tension = coneTension({ now, startAt: untilAt, radiusKm: rayon })
-                  // ⚠️ NE PAS exiger r10>0 : si la fenêtre est trop courte, r10 tombe à 0 et TOUT le Cône
-                  //    disparaissait (bug David). r10=0 = rien d'atteignable → tension max, pas disparition.
+                  const tension = foEval(rayon).tension
                   const overWindow = flag && rayon > Math.max(r10,0) + 0.01
-                  const r6 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 6))
                   // 🎨 Couleur CONTINUE (David 28.06) : vert → rose → bordeaux selon la tension (gradient, plus par palier).
                   const lerpHex=(a:string,b:string,t:number)=>{ const pa=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),pb=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16)); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('') }
                   const tN = Math.min(1, Math.max(0, tension/10))

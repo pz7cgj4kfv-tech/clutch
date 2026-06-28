@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { HomeFabGate } from "@/lib/HomeFabGate";
+// HomeFab (🏠 flottant) RETIRÉ (David 28.06) — l'accès au Hub est le lien « Toutes les pages » en bas du Profil.
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,7 +64,7 @@ export default function RootLayout({
           });
         `}}/>
       </head>
-      <body className="min-h-full flex flex-col">{children}<HomeFabGate /></body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

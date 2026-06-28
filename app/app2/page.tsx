@@ -1518,7 +1518,7 @@ type TabBadge =
   | {type:'contact-msg'; count:number}  // message contact → orange dot
   | {type:'contact-new'}               // nouveau contact mutuel → vert pulse
   | null
-function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t:MainTab)=>void;lang:Lang;badges?:Partial<Record<MainTab,TabBadge>>;availInfo?:{isAvail:boolean;until?:string;city?:string;rayon?:number};onAvailClick?:()=>void}) {
+function TabBar({tab,set,lang,badges,availInfo,onAvailClick,hidePill}:{tab:MainTab;set:(t:MainTab)=>void;lang:Lang;badges?:Partial<Record<MainTab,TabBadge>>;availInfo?:{isAvail:boolean;until?:string;city?:string;rayon?:number};onAvailClick?:()=>void;hidePill?:boolean}) {
   const t = useT(lang)
   const tabs:[MainTab,string][]=[['presences',t('tab.presences')],['evenements',t('tab.events')],['clutchs',t('tab.clutchs')],['contacts',t('tab.contacts')],['profil',t('tab.profil')]]
   const [showAvailTooltip,setShowAvailTooltip]=useState(false)
@@ -1591,8 +1591,9 @@ function TabBar({tab,set,lang,badges,availInfo,onAvailClick}:{tab:MainTab;set:(t
           )
         })}
       </div>
-      {/* Version — pastille LISIBLE en bas à gauche (hex + décimal), flottante au-dessus de la nav, sur toutes les pages */}
-      <div style={{position:'fixed',left:9,bottom:'calc(72px + var(--sab) + 6px)',zIndex:1001,fontSize:10.5,fontWeight:800,color:'rgba(83,41,67,.72)',background:'rgba(255,255,255,.85)',border:'1px solid rgba(83,41,67,.12)',borderRadius:9,padding:'2px 8px',pointerEvents:'none',letterSpacing:'.03em',backdropFilter:'blur(6px)',boxShadow:'0 1px 5px rgba(83,41,67,.12)'}}>{V} · build {BUILD}</div>
+      {/* Version — pastille LISIBLE en bas à gauche (hex + décimal). MASQUÉE quand une fiche/sheet est ouverte
+          (sinon elle chevauche les boutons du bas — bug David 28.06). */}
+      {!hidePill && <div style={{position:'fixed',left:9,bottom:'calc(72px + var(--sab) + 6px)',zIndex:1001,fontSize:10.5,fontWeight:800,color:'rgba(83,41,67,.72)',background:'rgba(255,255,255,.85)',border:'1px solid rgba(83,41,67,.12)',borderRadius:9,padding:'2px 8px',pointerEvents:'none',letterSpacing:'.03em',backdropFilter:'blur(6px)',boxShadow:'0 1px 5px rgba(83,41,67,.12)'}}>{V} · build {BUILD}</div>}
     </>
   )
 }
@@ -12460,6 +12461,7 @@ export default function App2() {
                 const contactsBadge: TabBadge = contactsUnread > 0 ? {type:'contact-msg', count:contactsUnread} : null
 
                 return <TabBar tab={tab} set={setTab} lang={lang}
+                  hidePill={!!(selPartner||selEv||selProfile||showProfileSheet||showCreateGroup||showSlots)}
                   badges={{clutchs: clutchBadge, evenements: evBadge, presences: presenceBadge, contacts: contactsBadge}}
                   availInfo={{
                     isAvail: !!availableRef,

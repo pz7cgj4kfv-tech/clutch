@@ -39,8 +39,8 @@ Différences assumées vs Tinder/Bumble/Thursday/Timeleft :
 
 État actuel : **app fonctionnelle en TestFlight** (auth, profils, carte, flow Clutch complet, Verrou, feedback,
 modération de contenu client+serveur, events de groupe, Test Lab interne). Built en solo (fondateur non-dev + IA).
-Réseau encore froid (0 utilisateur réel — test avec des bots). **Le fondateur estime la complexité technique à 8/10,
-contre 2/10 pour Uber.** Challengez cette estimation.
+Réseau encore froid (0 utilisateur réel — test avec des bots). **Le fondateur estime la complexité de Clutch comme
+élevée (8/10).** Challengez honnêtement cette estimation en la comparant à Uber, Tinder, BlaBlaCar et Citymapper.
 
 ## CE QU'ON VEUT DE VOUS (audit en 6 volets)
 
@@ -65,12 +65,19 @@ sécurité femmes, « je ne suis jamais prêt là maintenant ») ? Quels critèr
 seule un soir, l'ouvre une 2e fois ? Le problème de l'**œuf-poule masse critique** (sans gens dispo = vide = on part) :
 comment d'autres l'ont résolu (events comme amorce ? heures « golden » ? villes denses ?) ?
 
-### 4. POTENTIEL & SCÉNARIOS par région
-Donnez **4 scénarios chiffrés — MAUVAIS / MOYEN / BON / EXCELLENT** (utilisateurs actifs, rétention, et ce qu'il
-faudrait pour y arriver) pour CHAQUE échelle :
-Lausanne · Canton de Vaud · Suisse romande · Suisse · pays francophones · Europe occidentale · (monde = bonus).
-Où est le **point de bascule** réaliste (masse critique minimale par ville : combien d'inscrits / combien de dispo
-simultanés pour que ça « vive » un soir) ?
+### 4. POTENTIEL & PRÉVISIONS CHIFFRÉES par région (⚠️ partie LA PLUS IMPORTANTE — soyez RIGOUREUX, pas de chiffres ronds en l'air)
+Donnez de VRAIES prévisions, pas des estimations vagues. Pour CHAQUE échelle (Lausanne · Canton de Vaud · Suisse
+romande · Suisse · pays francophones · Europe occidentale · monde), donnez **4 scénarios — MAUVAIS / MOYEN / BON /
+EXCELLENT** avec, pour chacun :
+- **MAU (utilisateurs actifs mensuels)** à **M3 · M6 · M12 · M24** (4 échéances, courbe de croissance, pas un seul chiffre).
+- **% de probabilité** que vous assignez à CHAQUE scénario (les 4 doivent sommer à 100 %).
+- **La rétention** (D1 / D30) supposée et le **ratio dispo-simultanés / inscrits** un soir typique.
+- **La MÉTHODE** : sur quelles données réelles vous basez-vous (population de la zone, % cible 18-35 célibataires,
+  taux de pénétration observé sur des apps comparables — Tinder, Thursday, Timeleft — à un stade équivalent, CAC, viralité k).
+  Citez les chiffres réels des comparables quand vous les connaissez.
+- Le **point de bascule** chiffré : masse critique minimale par ville (inscrits ET dispo simultanés un soir) en dessous
+  de laquelle l'app meurt, et au-dessus de laquelle elle s'auto-entretient.
+**Si vous donnez des chiffres ronds sans méthode, c'est un échec.** On veut une fourchette défendable + l'hypothèse derrière.
 
 ### 5. LANCEMENT 2026 — la meilleure stratégie
 On n'achète plus des affiches à 1M. En 2026, pour une app sociale locale à effet de réseau, quelle est la MEILLEURE
@@ -83,6 +90,17 @@ lancement recommandée, étape par étape.
 Proposez un budget réaliste pour un lancement Lausanne (3-6 mois) : acquisition (social/TikTok/Insta/micro-influenceurs,
 CAC estimé), création de contenu, et **maintenance** (serveurs Supabase, push, modération, support). Fourchettes en CHF.
 Quel est le coût RÉEL de « faire vivre » la masse critique d'une première ville ?
+
+### 7. LA FORTERESSE est-elle un vrai MOAT, ou juste un outil interne ?
+Techniquement la Forteresse est originale. Mais **commercialement** : est-ce une vraie barrière à l'entrée (un
+concurrent ne peut pas copier), ou surtout un **outil de qualité produit interne que l'utilisateur ne percevra
+jamais** ? Donnez : valeur perçue utilisateur (faible/moyenne/forte) · valeur produit interne · défendabilité du moat.
+Le fondateur surestime-t-il l'avantage compétitif de la Forteresse ?
+
+### 8. POURQUOI Clutch pourrait MOURIR malgré un bon produit ? (la question qui tue)
+Donnez les **5 raisons d'échec les plus probables** (liquidité/masse critique · sécurité femmes · comportement humain
+& habitude · économie unitaire/CAC · concurrence indirecte : WhatsApp, Insta, amis, Meetup), **classées par probabilité**,
+et dites **LAQUELLE est la plus probable** + ce qu'il faudrait pour la désamorcer.
 
 ## FORMAT DE SORTIE (impératif)
 1. **Verdict en 3 lignes** (le projet a-t-il une vraie chance ? oui/non/à conditions).

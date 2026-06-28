@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d8'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 212   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d9'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 213   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10934,6 +10934,8 @@ export default function App2() {
                   const r4  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 4))
                   const r7  = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 7))
                   const r10 = Math.min(RAYON_MAX_KM, radiusAtTension(winMin, 10))
+                  const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, r10))   // plafond DUR du rayon (lié au début)
+                  const capLimiting = cap < RAYON_MAX_KM - 0.5 && rayon >= cap - 0.4   // on bute contre le plafond → on explique
                   const flag = CONE_RAYON_HEURE_LIVE
                   const p = (km:number)=> Math.max(0, Math.min(100, rayonToSlider(km)))
                   const pct = rayonToSlider(rayon)
@@ -10964,7 +10966,6 @@ export default function App2() {
                       // 🔒 PLAFOND DUR = limite crédible pour le DÉBUT du créneau (David 28.06 : « je ne dois pas pouvoir
                       //    mettre 50 km pour tout de suite »). TOUJOURS appliqué (le bug = le cap était sauté quand r6=0,
                       //    donc le curseur filait à 50 km pour un départ proche). Léger frein décoratif en approchant, puis STOP net.
-                      const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, r10))
                       if (r6>0 && target>r6 && r6<cap) { const frac=Math.min(1,(target-r6)/Math.max(0.5,cap-r6)); target=r6+(target-r6)*(1-frac*0.35) }
                       target = Math.min(cap, Math.max(RAYON_MIN_KM, target))
                     }
@@ -11013,7 +11014,13 @@ export default function App2() {
                         <div style={{position:'absolute',left:`calc(${pct}% - ${thumbS/2}px)`,top:'50%',transform:'translateY(-50%)',width:thumbS,height:thumbS,borderRadius:'50%',background:fillCol,border:'3px solid #fff',pointerEvents:'none',transition:'all .12s',boxShadow:`0 0 0 1px ${fillCol}55, 0 2px 8px ${fillCol}66`}}/>
                       </div>
                     </div>
-                    {/* Plus de texte SOUS le curseur (David 28.06) — l'info du Cône vit UNIQUEMENT sur la carte (compacte, grossit avec la tension). */}
+                    {/* 💡 CONSEIL contextuel (David 28.06 : « il faut que ça explique un peu, c'est déjà compliqué ») —
+                        UNE ligne, seulement quand tu butes contre le plafond, pour enseigner le modèle dans le contexte. */}
+                    {flag && capLimiting && (
+                      <div style={{padding:'0 18px 4px',fontSize:11,color:C.whiteMid,display:'flex',alignItems:'center',gap:5}}>
+                        <span>⏰</span>{lang==='en'?'Want to reach further? Make yourself available a bit later.':'Pour aller plus loin, ouvre-toi un peu plus tard.'}
+                      </div>
+                    )}
                     </>
                   )
                 })()}
@@ -12804,6 +12811,10 @@ export default function App2() {
                     </div>
                   )
                 })}
+                {/* 💡 Conseil doux (David : « il faut que ça explique un peu ») — explique le « ↓ X km maintenant ». */}
+                {myAvail.some((s:any)=>{ const ms=new Date(s.start_at).getTime(); const rad=s.radius_km!=null?s.radius_km:(user as any)?.available_radius_km; return ms>Date.now() && rad!=null && Math.min(rad,credibleRadiusKm(Date.now(),ms))<rad-1 }) && (
+                  <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.4,margin:'2px 2px 10px'}}>{lang==='en'?'↓ Your reach shrinks as the start nears — less time to get there.':'↓ Ta portée se réduit à l’approche du début — moins de temps pour s’y rendre.'}</div>
+                )}
                 {myAvail.length<3
                   ? <button onClick={()=>{setShowSlots(false);setFlow('carte')}} style={{width:'100%',marginTop:6,padding:'13px',borderRadius:13,border:'none',background:C.orange,color:'#fff',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>+ {lang==='en'?'Add a slot':'Ajouter un créneau'}</button>
                   : <div style={{textAlign:'center',color:C.whiteMid,fontSize:12,marginTop:8}}>{lang==='en'?'Max 3 slots reached':'Maximum 3 créneaux atteint'}</div>}

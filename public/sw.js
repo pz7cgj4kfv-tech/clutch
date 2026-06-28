@@ -1,5 +1,9 @@
-// Clutch Service Worker — cache désactivé, push notifications uniquement
-const CACHE_VERSION = 'clutch-v18z30-nocache'
+// Clutch Service Worker — PUSH UNIQUEMENT. Plus de handler 'fetch' (29.06).
+// ⚠️ L'ancien handler faisait `fetch().catch(() => Response.error())` → le moindre fetch raté
+//    (VPN, blip réseau, page neuve) devenait une ERREUR DURE « This page couldn't load » qui tuait
+//    la navigation. On NE touche plus aux fetchs : le navigateur fait son réseau normalement (avec
+//    ses propres retries). Le SW ne sert QUE les notifications push.
+const CACHE_VERSION = 'clutch-v19-pushonly'
 
 self.addEventListener('install', e => { self.skipWaiting() })
 self.addEventListener('activate', e => {
@@ -8,11 +12,7 @@ self.addEventListener('activate', e => {
       .then(() => clients.claim())
   )
 })
-self.addEventListener('fetch', e => {
-  // Aucun cache — réseau direct
-  if (!e.request.url.startsWith(self.location.origin)) return
-  e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => Response.error()))
-})
+// (pas de listener 'fetch' → réseau natif du navigateur, jamais d'erreur dure forcée)
 self.addEventListener('push', e => {
   if (!e.data) return
   let payload = {}

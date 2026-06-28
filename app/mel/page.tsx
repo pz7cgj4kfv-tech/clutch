@@ -84,16 +84,17 @@ export default function MelAtelier() {
             <div style={{ fontSize: 11.5, color: C.ink60, marginTop: 8, lineHeight: 1.5 }}>→ Je le pose <strong>tel quel</strong> dans l'app. Net à toutes les tailles, recolorable, zéro réinterprétation.</div>
           </Card>
 
-          {/* PNG — écrans complets */}
+          {/* SVG À CALQUES — écrans complets */}
           <Card accent={C.plum}>
-            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum, marginBottom: 8 }}>🖼️ Écrans complets (mise en page) → <span style={{ color: C.pink }}>PNG</span></div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum, marginBottom: 8 }}>🖼️ Écrans complets → <span style={{ color: C.pink }}>SVG à calques nommés</span> ⭐</div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.65, color: C.ink }}>
-              <li>Travaille sur un <strong>plan de travail iPhone</strong> (par ex. <strong>390 × 844</strong>).</li>
-              <li>Exporte l'écran en <strong>PNG à 2× ou 3×</strong> → c'est ma <strong>cible visuelle</strong>.</li>
-              <li>Si tu as des valeurs précises (un <strong>code couleur</strong>, une <strong>police</strong>, un <strong>espacement</strong>), dis-les-moi ; sinon je <strong>mesure sur l'image</strong>.</li>
-              <li>Optionnel mais top : exporte <strong>aussi les éléments en SVG</strong> (icônes, photo-cadre…) pour que je les pose pile.</li>
+              <li>Plan de travail <strong>iPhone</strong> (par ex. <strong>390 × 844</strong>).</li>
+              <li><strong>Un calque (ou groupe) par élément</strong>, nommé clair : <code>carte_presence</code>, <code>photo_profil</code>, <code>prenom</code>, <code>age</code>, <code>badge_fiabilite</code>… (underscores plutôt qu'espaces).</li>
+              <li>À l'export SVG, mets <strong>« ID des objets → Noms des calques »</strong> — c'est le réglage qui garde tes noms (sinon Illustrator les remplace par des codes).</li>
+              <li>Les <strong>textes dynamiques</strong> (prénom, âge, score) : <strong>laisse-les en texte</strong>, ne les vectorise pas → je vois que c'est un champ.</li>
+              <li>Ajoute un <strong>PNG</strong> de l'écran (juste pour vérifier d'un coup d'œil). Le <strong>.ai</strong> = backup optionnel.</li>
             </ol>
-            <div style={{ fontSize: 11.5, color: C.ink60, marginTop: 8, lineHeight: 1.5 }}>→ Je reconstruis l'écran <strong>au pixel</strong> avec les vraies données, et je ne bouge <strong>que</strong> ce que tu demandes.</div>
+            <div style={{ fontSize: 11.5, color: C.ink60, marginTop: 8, lineHeight: 1.5 }}>→ Je récupère la <strong>position ET le nom</strong> de chaque morceau → reconstruction <strong>au pixel</strong>, fixe, avec les vraies données.</div>
           </Card>
         </div>
 
@@ -140,7 +141,7 @@ export default function MelAtelier() {
         <div style={{ background: C.plum, color: '#fff', borderRadius: 14, padding: '16px 18px', marginTop: 14 }}>
           <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>🚀 On le prouve sur UN écran</div>
           <div style={{ fontSize: 13, lineHeight: 1.55, opacity: .95 }}>
-            Choisis ton écran préféré (ex. la <strong>carte de présence</strong>). Exporte le <strong>PNG</strong> de l'écran + les <strong>SVG</strong> des éléments, envoie à David. Je le reconstruis au pixel et on regarde ensemble. Si ça marche du premier coup, on a notre méthode.
+            Choisis ton écran préféré (ex. la <strong>carte de présence</strong>). Exporte-le en <strong>SVG à calques nommés</strong> (+ un PNG), envoie à David. Je le reconstruis au pixel et on regarde ensemble. Si ça marche du premier coup, on a notre méthode.
           </div>
         </div>
 

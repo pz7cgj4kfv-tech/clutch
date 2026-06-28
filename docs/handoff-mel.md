@@ -14,9 +14,10 @@ GPT n'intervient **plus** dans la conversion (c'était la cause des bugs : son m
 | Type | Format | Détail |
 |------|--------|--------|
 | Icône · bouton · petit graphisme | **SVG** | 1 fichier/élément, nom clair. Même nom = remplace l'existant. |
-| Écran complet (mise en page) | **PNG** 2× ou 3× | plan de travail iPhone ~390×844. C'est la cible visuelle. |
-| (optionnel) éléments de l'écran | **SVG** | pour les poser pile (photo-cadre, icônes…) |
-| (optionnel) valeurs précises | texte | hex, police, espacements si elle les a ; sinon Claude mesure sur le PNG. |
+| Écran complet (mise en page) | **SVG à calques nommés** ⭐ | plan iPhone ~390×844. Export avec « ID des objets → Noms des calques ». Chaque calque = `carte_presence`, `photo_profil`, `prenom`, `age`… → positions + identités exactes. |
+| Écran : cross-check visuel | **PNG** 2×/3× | pour vérifier d'un coup d'œil + rattraper si l'export SVG déforme. |
+| (optionnel) source | **.ai** | backup ; Claude ne lit pas l'.ai directement, il bosse sur le SVG. |
+| Textes dynamiques (prénom, âge, score) | — | **laissés en texte** dans le SVG (pas vectorisés) → Claude voit que c'est un champ. |
 
 ## Côté David — quoi faire en recevant les fichiers
 1. **Les SVG** → les déposer dans `public/icons/mel/` (la convention actuelle ; déjà ~30 icônes Mel là).

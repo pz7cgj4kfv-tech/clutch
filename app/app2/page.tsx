@@ -28,8 +28,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1d5'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 209   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1d6'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 210   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2039,8 +2039,25 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
     return parts.join(', ')
   }
 
+  // 🏰 FORTERESSE CÔTÉ RÉCEPTEUR (David 28.06) : le lieu proposé ne doit PAS sortir de la zone où l'AUTRE a
+  //    déclaré être dispo (son centre + son rayon). Sécurité : on n'attire personne hors de SA zone choisie.
+  //    Tolérance 150 m (imprécision géocodage). Si on ne connaît pas le lieu géocodé ou sa zone → pas de blocage.
+  const rcLat = (to as any).center_lat, rcLng = (to as any).center_lng, rcRad = (to as any).available_radius_km
+  const venueDistToZone = (venueLat!=null && venueLng!=null && rcLat!=null && rcLng!=null)
+    ? haversineKm(rcLat, rcLng, venueLat, venueLng) : null
+  const venueOutOfZone = venueDistToZone!=null && rcRad!=null && venueDistToZone > rcRad + 0.15
+  const rcFirst = (to.name||'').split(' ')[0] || (lang==='fr'?'cette personne':'this person')
+
   const send=async()=>{
     if (!venueInput.trim()){setVenueError(true);return}
+    // 🏰 Bloque un lieu hors de la zone de l'autre (sa dispo = son centre + rayon).
+    if (venueOutOfZone) {
+      hap('warning')
+      showToast(lang==='fr'
+        ? `📍 ${rcFirst} s'est rendu·e dispo sur ${fmtKm(rcRad)} autour de sa zone — choisis un lieu DANS son cercle.`
+        : `📍 ${rcFirst} is available within ${fmtKm(rcRad)} of their spot — pick a place INSIDE their circle.`, C.orange)
+      return
+    }
     setLoading(true)
     // Bots GPS de test hardcodés — toujours disponibles, bypass Supabase
     const isGpsBot = (to as any)._isGpsTestBot === true
@@ -2235,6 +2252,14 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
               📍 {venueAddress}
             </div>
           )}
+          {/* 🏰 Lieu hors de la zone de l'autre → message doux + bloque l'envoi (forteresse côté récepteur) */}
+          {venueOutOfZone && (
+            <div style={{fontSize:11,color:C.bordeaux,background:`${C.bordeaux}10`,border:`1px solid ${C.bordeaux}33`,borderRadius:10,marginTop:6,padding:'8px 11px',lineHeight:1.45,fontWeight:600}}>
+              📍 {lang==='fr'
+                ? <>Ce lieu est à <b>{fmtKm(venueDistToZone!)}</b> du centre de {rcFirst}, mais {rcFirst} s'est rendu·e dispo sur <b>{fmtKm(rcRad)}</b>. Choisis un lieu <b>dans sa zone</b> — c'est plus sûr et plus respectueux de ce qu'iel a accepté.</>
+                : <>This spot is <b>{fmtKm(venueDistToZone!)}</b> from {rcFirst}'s centre, but {rcFirst} is available within <b>{fmtKm(rcRad)}</b>. Pick a place <b>inside their zone</b> — safer and truer to what they signed up for.</>}
+            </div>
+          )}
           {/* Résultats Nominatim */}
           {showSugg&&nominatimResults.length>0&&(
             <div style={{marginTop:6,background:C.bgCard,borderRadius:12,border:`1px solid ${C.border}`,overflow:'hidden'}}>
@@ -2332,7 +2357,7 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
             </span>
           </div>
         )}
-        <Btn loading={loading} onClick={send}>{t('modal.sendBtn')} → {H[hi]}</Btn>
+        <Btn loading={loading} onClick={send} disabled={venueOutOfZone}>{venueOutOfZone ? (lang==='fr'?'Lieu hors de sa zone':'Spot outside their zone') : `${t('modal.sendBtn')} → ${H[hi]}`}</Btn>
         <div style={{textAlign:'center',marginTop:10,fontSize:11,color:C.whiteMid}}>
           {lang==='fr'
             ?<>{to.name} a <strong style={{color:C.salmon}}>2h pour répondre</strong> · RDV dans <strong style={{color:C.salmon}}>18h max</strong></>
@@ -3061,11 +3086,16 @@ const DAY_EN:Record<string,string> = {"Aujourd'hui":'Today','Demain':'Tomorrow',
 const locDay = (s:string|undefined, en:boolean):string => { if(!s) return ''; if(!en) return s; if(DAY_EN[s]) return DAY_EN[s]; return s.replace(/^Dim/,'Sun').replace(/^Lun/,'Mon').replace(/^Mar/,'Tue').replace(/^Mer/,'Wed').replace(/^Jeu/,'Thu').replace(/^Ven/,'Fri').replace(/^Sam/,'Sat').replace(/ janvier/,' Jan').replace(/ février/,' Feb').replace(/ mars/,' Mar').replace(/ avril/,' Apr').replace(/ mai/,' May').replace(/ juin/,' Jun').replace(/ juillet/,' Jul').replace(/ août/,' Aug').replace(/ septembre/,' Sep').replace(/ octobre/,' Oct').replace(/ novembre/,' Nov').replace(/ décembre/,' Dec') }
 function fixEventDate(s:string|undefined):string {
   if(!s) return s||''
+  // Labels relatifs (« Ce soir », « Demain », « Demain matin »…) → laissés tels quels, déjà cohérents.
   const m = String(s).match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/i)
   if(!m) return s
   const day=Number(m[1]); const mon=FR_MONTHS.indexOf(m[2].toLowerCase()); if(mon<0) return s
-  const d=new Date(new Date().getFullYear(), mon, day); const wd=FR_WD[d.getDay()]
-  return s.replace(/^(lun\.?|mar\.?|mer\.?|jeu\.?|ven\.?|sam\.?|dim\.?|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*/i,'').replace(/^/,`${wd} `)
+  // 📅 COHÉRENCE (David 28.06) : une date absolue figée dans le PASSÉ (ex. « 14 juin » alors qu'on est le 28)
+  //    est roulée vers le FUTUR par semaines entières → garde le même jour de semaine, devient à venir.
+  const today=new Date(); today.setHours(0,0,0,0)
+  const d=new Date(today.getFullYear(), mon, day)
+  while (d.getTime() < today.getTime()) d.setDate(d.getDate()+7)
+  return `${FR_WD[d.getDay()]} ${d.getDate()} ${FR_MONTHS[d.getMonth()]}`
 }
 // Extrait l'heure de début en minutes depuis minuit depuis une string libre ("19:30", "19h30", "Ce soir 20h")
 function parseEventMinutes(t:string|undefined):number|null {
@@ -10540,11 +10570,14 @@ export default function App2() {
       .filter(c => ['pending','accepted','confirmed','checked_in'].includes(c.status))
       .map(c => c.sender_id===user?.id ? c.receiver_id : c.sender_id)
   )
+  // 🧪 David/Mel (admin) doivent TOUJOURS voir leurs bots du Test Lab dans les présences, même en mode Réel —
+  //    sinon « le testbot disparaît, je ne peux plus tester » (David 28.06 · règle « bots = vraies personnes »).
+  const viewerIsAdmin = isAdminId(user?.id)
   const filtered = (!availableRef ? [] : profiles).filter(p => {
-    // 🤖 Mode RÉEL = on masque TOUS les bots (app vide pour tester avec de vrais amis)
-    if (!demoOn() && (isTestProfile((p as any).id) || (p as any).is_bot || (p as any).account_type==='bot' || (p as any)._isGpsTestBot)) return false
-    // Bots GPS de test (ignorent tous les filtres) — seulement en mode Démo
-    if ((p as any)._isGpsTestBot) return demoOn()
+    // 🤖 Mode RÉEL = on masque TOUS les bots (app vide pour les vrais amis) — SAUF pour l'admin (test).
+    if (!demoOn() && !viewerIsAdmin && (isTestProfile((p as any).id) || (p as any).is_bot || (p as any).account_type==='bot' || (p as any)._isGpsTestBot)) return false
+    // Bots GPS de test (ignorent tous les filtres) — en mode Démo OU pour l'admin
+    if ((p as any)._isGpsTestBot) return demoOn() || viewerIsAdmin
     // Masquer le partenaire de Verrou actif (on a déjà un RDV ensemble)
     if (activeVerrouPartnerId && (p as any).id === activeVerrouPartnerId) return false
     // Masquer les personnes déjà clutchées (clutch en attente ou actif) — évite le doublon

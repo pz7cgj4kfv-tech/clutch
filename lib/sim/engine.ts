@@ -108,11 +108,18 @@ export function runSim(cfg: SimConfig): SimResult {
           if (sc > bestSc) { bestSc = sc; best = b }
         }
         if (best) {
-          const place = mySlot.center, start = Math.max(now + 15 * MIN, mySlot.start), end = start + DEFAULT_RDV_MIN * MIN
-          pendings.push({ from: a.id, to: best.id, place, start, end, born: now }); nSent++; best.receivedToday++
-          if (!genderAllowed(best.seekGender, a.gender)) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `filtre genre de ${best.id} exclut ${a.id} (C1)` })
-          if (best.recepPause) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `${best.id} en mode Pause (C3)` })
-          if (best.gender === 'F' && best.receivedToday > 5) A({ code: 'CAP_RECEIVED', tick, at: now, from: best.id, msg: `${best.id} ♀ a ${best.receivedToday} reçus/jour (>5) (A6/E1)` })
+          // 🛡️ FORTERESSE CORRIGÉE : on n'envoie pas si le filtre de la cible m'exclut (C1), si elle est en
+          //    Pause (C3) ou si sa boîte est pleine (E1 → waitlist, à venir). Permissif : on envoie ET le COQ crie.
+          const symOk = genderAllowed(best.seekGender, a.gender) && !best.recepPause
+          const capOk = !(best.gender === 'F' && best.receivedToday >= 5)
+          if (enforce && (!symOk || !capOk)) { nBlocked++ }
+          else {
+            const place = mySlot.center, start = Math.max(now + 15 * MIN, mySlot.start), end = start + DEFAULT_RDV_MIN * MIN
+            pendings.push({ from: a.id, to: best.id, place, start, end, born: now }); nSent++; best.receivedToday++
+            if (!genderAllowed(best.seekGender, a.gender)) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `filtre genre de ${best.id} exclut ${a.id} (C1)` })
+            if (best.recepPause) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `${best.id} en mode Pause (C3)` })
+            if (best.gender === 'F' && best.receivedToday > 5) A({ code: 'CAP_RECEIVED', tick, at: now, from: best.id, msg: `${best.id} ♀ a ${best.receivedToday} reçus/jour (>5) (A6/E1)` })
+          }
         }
       }
       // répondre
@@ -140,15 +147,24 @@ export function runSim(cfg: SimConfig): SimResult {
         } else if (roll < a.pAccept + a.pRefuse) { byId[mine.from].cooldownUntil[a.id] = now + 48 * 3600 * 1000; nRefuse++ }
         pendings.splice(pendings.indexOf(mine), 1)
       }
-      // events
+      // events — créer (l'event occupe MON agenda → soumis à la forteresse en mode corrigé)
       if (rng() < a.pEvent / 8) {
         const start = now + (30 + rng() * 240) * MIN, end = start + DEFAULT_RDV_MIN * MIN
-        if (end <= now + HORIZON) { events.push({ id: 'g' + egid++, host: a.id, place: [a.lat, a.lng], start, end, maxSeats: 4 + Math.floor(rng() * 8), joined: [a.id] }); a.agenda.push({ place: [a.lat, a.lng], start, end, kind: 'event' }); nEvents++ }
+        const cand = { place: [a.lat, a.lng] as [number, number], start, end }
+        const okSched = !enforce || evaluateSchedule(now, [a.lat, a.lng], a.agenda, cand).ok
+        if (end <= now + HORIZON && okSched) { events.push({ id: 'g' + egid++, host: a.id, place: [a.lat, a.lng], start, end, maxSeats: 4 + Math.floor(rng() * 8), joined: [a.id] }); a.agenda.push({ place: [a.lat, a.lng], start, end, kind: 'event' }); nEvents++ }
+        else if (!okSched) nBlocked++
       }
+      // events — rejoindre : forteresse corrigée = refuse si plus de place (D8) OU si ça casse mon agenda (B1/B2)
       if (events.length && rng() < 0.05) {
         const g = pick(events); if (g.host !== a.id && !g.joined.includes(a.id)) {
-          g.joined.push(a.id); a.agenda.push({ place: g.place, start: g.start, end: g.end, kind: 'event' }); nJoin++
-          if (g.joined.length > g.maxSeats) A({ code: 'EVENT_SEATS', tick, at: now, from: a.id, to: g.id, msg: `event ${g.id}: ${g.joined.length} > ${g.maxSeats} places (D8)` })
+          const seatsOk = g.joined.length < g.maxSeats
+          const schedOk = !enforce || evaluateSchedule(now, [a.lat, a.lng], a.agenda, { place: g.place, start: g.start, end: g.end }).ok
+          if (enforce && (!seatsOk || !schedOk)) { nBlocked++ }
+          else {
+            g.joined.push(a.id); a.agenda.push({ place: g.place, start: g.start, end: g.end, kind: 'event' }); nJoin++
+            if (g.joined.length > g.maxSeats) A({ code: 'EVENT_SEATS', tick, at: now, from: a.id, to: g.id, msg: `event ${g.id}: ${g.joined.length} > ${g.maxSeats} places (D8)` })
+          }
         }
       }
       if (rng() < a.pMove / 12) { a.lat += (rng() - 0.5) * 0.05; a.lng += (rng() - 0.5) * 0.05 }

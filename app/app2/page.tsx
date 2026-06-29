@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e2'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 222   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e3'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 223   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -873,11 +873,14 @@ function makeStars(centerLat:number, centerLng:number, radiusKm:number, genders:
   })
 }
 
-function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate, onCenterChange, gpsPos, reachKm }:{
+function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onGpsUpdate, onCenterChange, gpsPos, reachKm, initialCenter, recenterOnGps=true }:{
   rayon:number; userPhoto?:string|null; profiles?:Profile[];
   showPin?:boolean; onReady?:(getCenter:()=>[number,number], recenter:()=>void, setCenter:(lat:number,lng:number)=>void)=>void;
   onGpsUpdate?:(pos:[number,number])=>void; onCenterChange?:(lat:number,lng:number)=>void;
   gpsPos?:[number,number]|null; reachKm?:number|null;
+  // 📍 initialCenter = centre d'ouverture (ex: position d'un créneau qu'on MODIFIE). recenterOnGps=false →
+  //    on NE recentre PAS sur le GPS au 1er fix (sinon le pin restauré saute sur ma position — bug David).
+  initialCenter?:[number,number]|null; recenterOnGps?:boolean;
 }) {
   const divRef    = useRef<HTMLDivElement>(null)
   const mapRef    = useRef<any>(null)
@@ -911,7 +914,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         L.Icon.Default.mergeOptions({ iconUrl:'', shadowUrl:'' })
 
         const map = L.map(divRef.current!, {
-          center:ME, zoom:13,
+          center: initialCenter || ME, zoom:13,
           zoomControl:false, attributionControl:false,
           dragging:true, scrollWheelZoom:false, doubleClickZoom:false,
           // @ts-expect-error tap exists at runtime
@@ -1087,7 +1090,7 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
               const loc: [number,number] = [pos.coords.latitude, pos.coords.longitude]
               gpsRef.current = loc
               selfMarker.setLatLng(loc)
-              map.panTo(loc, { animate:true })
+              if (recenterOnGps) map.panTo(loc, { animate:true })   // pas de recentrage en mode édition (le pin restauré reste)
               onGpsUpdate?.(loc)
             },
             () => {},
@@ -1099,7 +1102,8 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         if (onReady) onReady(
           () => { const c = map.getCenter(); return [c.lat, c.lng] as [number,number] },
           () => { map.panTo(gpsRef.current, {animate:true}); setTimeout(syncCircle, 400) },
-          (lat:number, lng:number) => { map.setView([lat,lng], Math.max(map.getZoom(), 14), {animate:true}); setTimeout(syncCircle, 400) }
+          // Recherche de lieu (ex: Sion) → on se pose à ~10 km de contexte (zoom 12), pas collé à 1 km (David 30.06).
+          (lat:number, lng:number) => { map.setView([lat,lng], 12, {animate:true}); setTimeout(syncCircle, 400) }
         )
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1128,12 +1132,15 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
     circle.setLatLng(center); circle.setRadius(rm)
     if (haloRef.current) { haloRef.current.setLatLng(center); haloRef.current.setRadius(rm) }
     if (fillRef.current) { fillRef.current.setLatLng(center); fillRef.current.setRadius(rm) }
-    // Zoom optimal : Leaflet calcule lui-même le bon niveau pour que le cercle rentre dans l'écran
+    // Zoom : Leaflet ajuste pour que le cercle rentre… MAIS on PLAFONNE à ~5 km de contexte (David 30.06 :
+    //   « un rayon de 1 km ne doit pas ultra-zoomer ; je veux voir une petite ville, ~5 km autour »).
+    //   → on dézoome pour les grands rayons, mais jamais plus serré que le niveau « petite ville » (zoom 13).
+    const CONTEXT_MAX_ZOOM = 13
     try {
       const bounds = circle.getBounds()
-      const idealZoom = map.getBoundsZoom(bounds, false, [48, 48]) // 48px de padding
+      const idealZoom = Math.min(CONTEXT_MAX_ZOOM, map.getBoundsZoom(bounds, false, [48, 48])) // 48px de padding
       map.setZoom(idealZoom, { animate:true })
-    } catch { map.setZoom(rayonToZoom(rayon), { animate:true }) }
+    } catch { map.setZoom(Math.min(CONTEXT_MAX_ZOOM, rayonToZoom(rayon)), { animate:true }) }
     // Re-sync après animation (iOS)
     setTimeout(() => {
       if (!mapRef.current || !circleRef.current) return
@@ -11005,8 +11012,10 @@ export default function App2() {
                 <MapLeaflet rayon={rayon} userPhoto={user.photo_url} profiles={profiles}
                   showPin={true}
                   onReady={(fn,rc,sc)=>{ mapGetCenterRef.current=fn; mapRecenterRef.current=rc; mapSetCenterRef.current=sc }}
-                  onGpsUpdate={(loc)=>{ setRealGps(loc); setMeetupPos(loc) }}
+                  onGpsUpdate={(loc)=>setRealGps(loc)}
                   onCenterChange={(lat,lng)=>setMeetupPos([lat,lng])}
+                  initialCenter={editingSlotRef.current ? meetupPos : null}
+                  recenterOnGps={!editingSlotRef.current}
                   gpsPos={realGps} reachKm={realGps ? pinReachInfo().reach : null}/>
                 {/* Bouton reset position — bas-gauche, au-dessus du hint (David 28.06) */}
                 <button onClick={(e)=>{e.stopPropagation();mapRecenterRef.current?.()}}

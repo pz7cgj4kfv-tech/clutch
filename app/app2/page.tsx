@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1ea'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 230   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1eb'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 231   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -234,7 +234,7 @@ function melSplitTwo(text: string, maxLen = 46): [string, string] {
   if (l2.length > maxLen) l2 = l2.slice(0, maxLen - 1).trim() + '…'
   return [text.slice(0, cut).trim(), l2]
 }
-function MelPresenceCard({ p, dots = 4, stars, distZone, onClick }: { p: any; dots?: number; stars?: number | null; distZone?: string | null; onClick?: () => void }) {
+function MelPresenceCard({ p, dots = 4, stars, distZone, hasEvent = false, onClick }: { p: any; dots?: number; stars?: number | null; distZone?: string | null; hasEvent?: boolean; onClick?: () => void }) {
   const gk = genderKey(p.gender)
   const gender = gk === 'F' ? 'female' : gk === 'M' ? 'male' : 'nonbinary'
   const name = melTruncName(p.name || 'Anonyme', 14)
@@ -253,6 +253,8 @@ function MelPresenceCard({ p, dots = 4, stars, distZone, onClick }: { p: any; do
         {photo
           ? <image href={photo} x="7" y="7" width="56" height="56" preserveAspectRatio="xMidYMid slice" clipPath={`url(#ava${cid})`} />
           : <path fill="#74C3B4" d="M63.001,56.777c0,3.437-2.787,6.223-6.226,6.223h-43.55C9.787,63,7,60.213,7,56.777V13.224C7,9.787,9.787,7,13.226,7h43.55c3.439,0,6.226,2.787,6.226,6.224V56.777z" />}
+        {/* 📅 Badge « a créé un événement » (David 30.06) — sur le coin bas-droit de l'avatar */}
+        {hasEvent && <><circle cx="55.5" cy="55.5" r="10" fill="#E27C00" stroke="#FFFFFF" strokeWidth="2" /><text x="55.5" y="59.5" textAnchor="middle" fontSize="11">📅</text></>}
         <svg x="72.5" y="5.5" width="15" height="15" viewBox="0 0 28 28" fill="#7C7B7C">{MEL_GENDER[gender]}</svg>
         <text transform="matrix(1 0 0 1 88.5 20.6138)" fill="#706F6F" fontFamily={MEL_SF} fontWeight={700}><tspan fontSize="18.1023">{name}</tspan><tspan fontSize="8.8116" dx="4">{age}</tspan></text>
         <text fill="#707070" fontFamily={MEL_SF} fontWeight={700} fontSize="8.7999"><tspan x="73.1387" y="36.8667">{l1}</tspan><tspan x="73.1387" y="47.43">{l2}</tspan></text>
@@ -812,6 +814,8 @@ function rayonToZoom(km: number): number {
 // Slider logarithmique : val 0-100 → rayon 1-100km (0 = 1km tout à gauche)
 // Rayon d'un créneau. Max 50 km = arc lémanique complet (Genève ~60 km hors champ assumé) — 100 km était trop
 // pour de la rencontre spontanée (David 28.06). À challenger GPT/Grok pour l'Europe/régions. Config = 1 nombre.
+// 🎨 Couleurs des créneaux 1/2/3 (David 30.06) — servent à relier un créneau à ses events (à venir : events triés/colorés par créneau).
+const SLOT_COLORS = ['#EB6BAF', '#77BC1F', '#E27C00']  // créneau 1 = rose · 2 = vert · 3 = orange
 const RAYON_MIN_KM = 1
 const RAYON_MAX_KM = 50
 // Échelle LOGARITHMIQUE pure (fine au début, large à la fin) : 50 % du slider ≈ 7 km (pas 25). Le détail utile
@@ -9256,6 +9260,7 @@ export default function App2() {
   const [registeredEventObjs,setRegisteredEventObjs] = useState<any[]>(()=>{ try{ const s=localStorage.getItem('clutch_registered_objs'); return s?JSON.parse(s):[] }catch{return []} })
   const setRegisteredEventObjsP = useCallback((objs:any[])=>{ setRegisteredEventObjs(objs); try{ localStorage.setItem('clutch_registered_objs', JSON.stringify(objs)) }catch{} }, [])
   const [myOccupancies,setMyOccupancies] = useState<any[]>([]) // forteresse : mes créneaux occupés (RDV confirmés) → pour « ⏸ en pause »
+  const [eventHostIds,setEventHostIds] = useState<Set<string>>(new Set()) // 📅 qui a créé un event actif → badge sur l'avatar en Présences (David 30.06)
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
   const reloadAvail = useCallback(async()=>{ if(!user?.id) return
@@ -9990,6 +9995,9 @@ export default function App2() {
     // Forteresse : mes créneaux occupés (RDV confirmés) → sert à marquer « ⏸ en pause » les pendings qui chevauchent
     supabase.from('occupancies').select('start_at,end_at,source_id').eq('user_id', user.id)
       .then(({data:occ})=>setMyOccupancies(occ||[]))
+    // 📅 Qui a un event actif → badge calendrier sur l'avatar en Présences (David 30.06).
+    supabase.from('events').select('created_by').eq('active', true)
+      .then(({data:evs})=>setEventHostIds(new Set((evs||[]).map((e:any)=>e.created_by).filter(Boolean))))
     // Multi-créneaux : mes créneaux de dispo actifs ET futurs (B1 : les passés dégagent). Pour le compteur 📍 N/3.
     supabase.from('availabilities').select('id,start_at,end_at,place').eq('user_id', user.id).eq('active', true).gt('end_at', new Date().toISOString()).order('start_at',{ascending:true})
       .then(({data:av})=>setMyAvail(av||[]))
@@ -11767,6 +11775,7 @@ export default function App2() {
                           const isBotProfile = isTestProfile(p.id) || (p as any).is_bot || (p as any).account_type==='bot' || (p as any)._isGpsTestBot
                           if (MEL_CARD_FOR_ALL || !isBotProfile) {
                             return <MelPresenceCard key={p.id} p={p} dots={cdScore} stars={fiabStars} distZone={distZone}
+                              hasEvent={eventHostIds.has(p.id)}
                               onClick={()=>{setSelProfile(p);setShowProfileSheet(true)}} />
                           }
 
@@ -13054,7 +13063,8 @@ export default function App2() {
                 </div>
                 <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12}}>{lang==='en'?'When and where you\'re open to spontaneous meetups (next 18h).':'Quand et où tu es ouvert·e aux rencontres spontanées (dans les 18h).'}</div>
                 {myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
-                {[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>{
+                {[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any, slotIdx:number)=>{
+                  const slotCol = SLOT_COLORS[slotIdx % SLOT_COLORS.length]   // 🎨 couleur du créneau 1/2/3
                   const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
                   // Rayon affiché : celui du créneau (fallback profil). + 📉 effectif DYNAMIQUE pour un créneau À VENIR
                   //    (la limite crédible diminue à l'approche du début → David « plus j'approche, moins je vais loin »).
@@ -13063,10 +13073,10 @@ export default function App2() {
                   const effRad = (startMs>nowMs && setRad!=null) ? Math.min(setRad, credibleRadiusKm(nowMs, startMs)) : null
                   const shrunk = effRad!=null && effRad < setRad - 1
                   return (
-                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${C.border}`,marginBottom:8,background:C.bgCard}}>
-                      <span style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
+                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${slotCol}55`,borderLeft:`4px solid ${slotCol}`,marginBottom:8,background:C.bgCard}}>
+                      <span style={{width:9,height:9,borderRadius:'50%',background:slotCol,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)}</div>
+                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)} <span style={{fontSize:10,fontWeight:800,color:slotCol}}>· Créneau {slotIdx+1}</span></div>
                         <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{setRad!=null?` · ${Math.round(setRad)} km`:''}{shrunk?<span style={{color:C.bordeaux,fontWeight:700}}> · ↓ {fmtKm(effRad!)} maintenant</span>:''}</div>
                         {/* 🎭 Badges mode + mood DU CRÉNEAU (décision 28.06 : chaque créneau porte son intention) */}
                         {(Array.isArray(s.modes)&&s.modes.length>0)||s.mood ? (

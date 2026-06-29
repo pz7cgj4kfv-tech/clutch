@@ -29,6 +29,7 @@ export default function ClutchCity() {
   const [speed, setSpeed] = useState(6)        // ticks / seconde
   const [busy, setBusy] = useState(false)
   const [watched, setWatched] = useState<number[]>([])   // 👥 agents suivis (cartes POV)
+  const [focus, setFocus] = useState<number | null>(null) // 👁 personne au centre du POV (carte mise en avant)
   const [customs, setCustoms] = useState<CustomSpec[]>([])  // 👤 profils créés à la main
   const [showCreate, setShowCreate] = useState(false)
   const [nm, setNm] = useState(''), [cg, setCg] = useState<'F' | 'M'>('F'), [cage, setCage] = useState(27), [csg, setCsg] = useState<'all' | 'man' | 'woman'>('all')
@@ -95,7 +96,24 @@ export default function ClutchCity() {
       ctx.fillStyle = fl === 0 ? 'rgba(226,124,0,.5)' : '#E27C00'; ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill()
       ctx.fillStyle = '#f5e8de'; ctx.font = 'bold 10px system-ui'; ctx.fillText(r.meta[i].name, x + 11, y + 3.5)
     }
-  }, [res, tick, watched])
+    // 👁 MODE POV : on assombrit la ville et on trace les liens RÉCENTS de la personne (qui la clutche, qui elle clutche, son RDV).
+    if (focus != null && focus < r.meta.length) {
+      ctx.fillStyle = 'rgba(36,16,25,.62)'; ctx.fillRect(0, 0, W, Hh)
+      const [fx, fy] = px(pos[focus * 3], pos[focus * 3 + 1])
+      const recent = (r.life[focus] || []).filter(e => e.tick <= tick && e.tick > tick - 18 && e.otherIdx != null)
+      for (const e of recent) {
+        const o = e.otherIdx!; if (o >= r.meta.length) continue
+        const [ox, oy] = px(pos[o * 3], pos[o * 3 + 1])
+        const col = e.kind === 'sent' ? C.rose : e.kind === 'received' ? '#8fb3e0' : e.kind === 'locked' ? C.green : C.mid
+        ctx.strokeStyle = col + 'cc'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(ox, oy); ctx.stroke()
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ox, oy, 3, 0, 7); ctx.fill()
+        ctx.fillStyle = '#f5e8de'; ctx.font = '9.5px system-ui'; ctx.fillText(r.meta[o].name, ox + 5, oy + 3)
+      }
+      ctx.strokeStyle = '#E27C00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(fx, fy, 11, 0, 7); ctx.stroke()
+      ctx.fillStyle = '#E27C00'; ctx.beginPath(); ctx.arc(fx, fy, 5, 0, 7); ctx.fill()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(`${r.meta[focus].name} 👁`, fx + 13, fy + 4)
+    }
+  }, [res, tick, watched, focus])
 
   // clic sur la carte → suivre/dé-suivre l'agent le plus proche
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -235,15 +253,17 @@ export default function ClutchCity() {
                 const gCol = m.gender === 'F' ? C.rose : '#8fb3e0'
                 const stCol = flag === 2 ? C.green : flag === 1 ? C.rose : C.mid
                 const stLabel = flag === 2 ? 'en RDV' : flag === 1 ? 'en ligne' : 'hors-ligne'
+                const foc = focus === idx, isCustom = idx >= n
                 return (
-                  <div key={idx} style={{ background: C.card, border: `1px solid ${flag === 2 ? C.green + '66' : C.border}`, borderRadius: 14, padding: '11px 12px', boxShadow: '0 2px 10px rgba(0,0,0,.18)' }}>
+                  <div key={idx} style={{ background: foc ? `${C.orange}14` : C.card, border: `1.5px solid ${foc ? C.orange : flag === 2 ? C.green + '66' : C.border}`, borderRadius: 14, padding: '11px 12px', boxShadow: foc ? `0 2px 16px ${C.orange}44` : '0 2px 10px rgba(0,0,0,.18)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
                       <div style={{ width: 38, height: 38, borderRadius: '50%', background: gCol, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#1a0d16', fontSize: 17, flexShrink: 0 }}>{m.name[0]}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 900 }}>{m.name} <span style={{ fontSize: 11, color: C.mid, fontWeight: 600 }}>{m.gender === 'F' ? '♀' : '♂'} {m.age}{m.premium ? ' ⭐' : ''}</span></div>
+                        <div style={{ fontSize: 14, fontWeight: 900 }}>{m.name} {isCustom && <span title="créé par toi" style={{ fontSize: 10 }}>✋</span>} <span style={{ fontSize: 11, color: C.mid, fontWeight: 600 }}>{m.gender === 'F' ? '♀' : '♂'} {m.age}{m.premium ? ' ⭐' : ''}</span></div>
                         <div style={{ fontSize: 10.5, color: stCol, fontWeight: 800 }}>● {stLabel}</div>
                       </div>
-                      <button onClick={() => toggleWatch(idx)} title="ne plus suivre" style={{ background: 'transparent', border: 'none', color: C.mid, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                      <button onClick={() => setFocus(foc ? null : idx)} title="POV — voir qui il/elle voit sur la carte" style={{ background: foc ? C.orange : 'transparent', border: `1px solid ${foc ? C.orange : C.border}`, borderRadius: 8, color: foc ? '#fff' : C.mid, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: '3px 7px' }}>👁</button>
+                      <button onClick={() => { if (foc) setFocus(null); toggleWatch(idx) }} title="ne plus suivre" style={{ background: 'transparent', border: 'none', color: C.mid, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                       {([['📤', nSent, 'envoyés'], ['📥', nRec, 'reçus'], ['🔒', nLock, 'RDV']] as [string, number, string][]).map(([e, v, l]) => (

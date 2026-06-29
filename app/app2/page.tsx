@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e4'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 224   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e5'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 225   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -5077,6 +5077,7 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
   const lang = fbLang||'fr'
   const other = clutch.sender_id===userId ? clutch.receiver : clutch.sender
   const [selected,setSelected] = useState<string|null>(null)
+  const [fav,setFav] = useState(false)          // ⭐ garder en favori (remplace l'ancienne 2ᵉ modale « garder le contact »)
   const [done,setDone] = useState(false)
   const [submitErr,setSubmitErr] = useState(false)
   const gpsVerified = !!(clutch as any).checkin_verified
@@ -5118,6 +5119,8 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
       pts_delta: r.pts,
       gps_verified_by_reporter: gpsVerified,
     }, { onConflict: 'clutch_id,given_by' })
+    // ⭐ Favori (remplace l'ancienne 2ᵉ modale « garder le contact ») — table favorites.
+    if (fav) { try { await supabase.from('favorites').upsert({ user_id: userId, profile_id: otherId }, { onConflict: 'user_id,profile_id' }) } catch {} }
     const ptsDelta = r.pts
     onScore(ptsDelta)
     setDone(true)
@@ -5180,6 +5183,15 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
                 )
               })}
             </div>
+            {/* ⭐ Garder en favori — une seule étape (fini la 2ᵉ modale « contact »). Favoris = gens + events. */}
+            <button onClick={()=>setFav(f=>!f)}
+              style={{display:'flex',alignItems:'center',gap:11,width:'100%',padding:'11px 14px',marginBottom:12,background:fav?'rgba(255,191,158,.12)':'transparent',border:`1.5px solid ${fav?C.salmon:C.border}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',transition:'all .15s'}}>
+              <span style={{fontSize:21,flexShrink:0}}>{fav?'⭐':'☆'}</span>
+              <div style={{flex:1,textAlign:'left'}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.white}}>{lang==='en'?`Add ${other?.name||''} to favorites`:`Garder ${other?.name||''} en favori`}</div>
+                <div style={{fontSize:10,color:C.whiteMid}}>{lang==='en'?'They show up first when you’re both online':'Il·elle remonte en premier quand vous êtes en ligne tous les deux'}</div>
+              </div>
+            </button>
             {submitErr && <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(220,80,80,.12)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,textAlign:'center'}}>{lang==='en'?'Could not save — please try again':'Enregistrement impossible — réessaie'}</div>}
             <button onClick={submit} disabled={!selected}
               style={{width:'100%',padding:'14px',background:selected?C.plum:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
@@ -13072,9 +13084,8 @@ export default function App2() {
               setFeedbackClutch(null)
               setTerminerClutchId(null)
               showToast('✓ RDV terminé — merci !', C.green)
-              // Proposer de garder le contact après le feedback
-              const clutchForContact = (clutches as any[]).find((cl:any)=>cl.id===doneId) || feedbackClutch
-              if (clutchForContact) setTimeout(()=>setKeepContactClutch(clutchForContact), 400)
+              // 🗑️ Plus de 2ᵉ modale « garder le contact » (David 30.06) : l'⭐ favori est DANS le feedback, en 1 geste.
+              //    « Contact » n'existe plus → c'est Favoris (gens + events).
               loadClutches()
               // Si plus de créneau actif → proposer d'en ouvrir un nouveau (toast discret, pas de redirect forcée)
               if (user && !(user.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date())) {

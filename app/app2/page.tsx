@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1df'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 219   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e0'  // Versionnage HEXADÉCIMAL. ~314e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 220   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3797,9 +3797,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               )})}
             </div>
             <div style={{fontSize:9,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase',color:C.whiteMid,marginBottom:5}}>{EN?'Categories':'Catégories'}{catFilter.size>0?` · ${catFilter.size}`:''} <span style={{fontWeight:500,textTransform:'none',letterSpacing:0}}>{EN?'(multi)':'(plusieurs possibles)'}</span></div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {([{k:'sport',e:'🏃',l:'Sport'},{k:'bienetre',e:'🧘',l:EN?'Wellness':'Bien-être'},{k:'culture',e:'🎭',l:'Culture'},{k:'gastro',e:'🍽',l:EN?'Food':'Gastro'},{k:'musique',e:'🎵',l:EN?'Music':'Musique'},{k:'soiree',e:'🌃',l:EN?'Nightlife':'Soirée'},{k:'lifestyle',e:'✨',l:'Lifestyle'},{k:'communaute',e:'🫂',l:EN?'Community':'Communauté'}] as const).map(c=>{ const on=catFilter.has(c.k); return (
-                <button key={c.k} onClick={()=>setCatFilter(prev=>{ const n=new Set(prev); n.has(c.k)?n.delete(c.k):n.add(c.k); return n })} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${on?C.pink:C.border}`,background:on?`${C.pink}12`:'transparent',color:on?C.pink:C.whiteMid,fontSize:11,fontWeight:on?800:500,cursor:'pointer',fontFamily:'inherit'}}>{on&&'✓ '}{c.e} {c.l}</button>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              {/* Icônes catégories de Mel (public/icons/mel/events) — on/off. musique fondue dans culture. */}
+              {([{k:'sport',f:'sport',l:'Sport'},{k:'bienetre',f:'bienetre',l:EN?'Wellness':'Bien-être'},{k:'culture',f:'culture',l:'Culture'},{k:'gastro',f:'gastro',l:EN?'Food':'Gastro'},{k:'soiree',f:'evening',l:EN?'Nightlife':'Soirée'},{k:'lifestyle',f:'lifestyle',l:'Lifestyle'},{k:'communaute',f:'communaute',l:EN?'Community':'Communauté'}] as const).map(c=>{ const on=catFilter.has(c.k); return (
+                <button key={c.k} onClick={()=>setCatFilter(prev=>{ const n=new Set(prev); n.has(c.k)?n.delete(c.k):n.add(c.k); return n })} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:0,border:'none',background:'transparent',cursor:'pointer',fontFamily:'inherit',width:58}}>
+                  <img src={`/icons/mel/events/icone_${c.f}-${on?'on':'off'}.svg`} alt={c.l} width={46} height={46} style={{display:'block'}}/>
+                  <span style={{fontSize:10,fontWeight:on?800:500,color:on?C.pink:C.whiteMid,lineHeight:1.1,textAlign:'center'}}>{c.l}</span>
+                </button>
               )})}
               {catFilter.size>0 && <button onClick={()=>setCatFilter(new Set())} style={{padding:'5px 11px',borderRadius:20,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✕ {EN?'Clear':'Effacer'}</button>}
             </div>

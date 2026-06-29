@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e3'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 223   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e4'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 224   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -11537,11 +11537,11 @@ export default function App2() {
                       <div style={{display:'flex',alignItems:'center',gap:10,background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
                         <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu t'es éloigné·e de ~${fmtKm(gpsDrift.km)} de ta zone`:`You've moved ~${fmtKm(gpsDrift.km)} from your zone`}</div>
-                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Recale ta zone sur ta position pour rester atteignable.':'Recenter your zone on your spot to stay reachable.'}</div>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu as bougé de ~${fmtKm(gpsDrift.km)} depuis ton lieu publié`:`You've moved ~${fmtKm(gpsDrift.km)} from your published spot`}</div>
+                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Tes créneaux pointent encore sur l’ancien endroit. Les recaler sur ta position actuelle ?':'Your slots still point to the old spot. Move them to where you are now?'}</div>
                         </div>
-                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Garder':'Keep'}</button>
-                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler ici':'Recenter'}</button>
+                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Laisser':'Keep'}</button>
+                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler sur moi':'Move here'}</button>
                       </div>
                     )}
 

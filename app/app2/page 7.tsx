@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1df'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 219   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1dd'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 217   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -267,46 +267,6 @@ function MelPresenceCard({ p, dots = 4, stars, distZone, onClick }: { p: any; do
             ? <polygon key={i} points={pts} fill="#B2B2B2" />
             : <polygon key={i} points={pts} fill="none" stroke="#B2B2B2" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10" />
         })}
-      </svg>
-    </div>
-  )
-}
-
-// 🎨 CARTE CLUTCH « MEL » — géométrie exacte de Clutch-card.svg (viewBox 340×70). Clutch REÇU à répondre :
-//    avatar + prénom + âge · 📍 lieu (2 lignes) · heure · 🔒 verrouiller (accepter) · ✕ refuser. Boutons SVG cliquables.
-function MelClutchCard({ photo, name = '', age = '', venue = '', hour = '', onAccept, onRefuse, onClick }:
-  { photo?: string | null; name?: string; age?: string; venue?: string; hour?: string; onAccept?: () => void; onRefuse?: () => void; onClick?: () => void }) {
-  const cid = (name + venue + hour).replace(/[^a-z0-9]/gi, '').slice(0, 10) || 'cl'
-  const [l1, l2] = melSplitTwo(venue, 30)
-  const stop = (e: any, fn?: () => void) => { e.stopPropagation(); fn?.() }
-  return (
-    <div onClick={onClick} style={{ borderRadius: 11, marginBottom: 10, cursor: onClick ? 'pointer' : 'default', boxShadow: '0 2px 5px rgba(83,41,67,.08), 0 9px 22px rgba(120,115,125,.16)' }}>
-      <svg viewBox="0 0 340 70" width="100%" style={{ display: 'block', fontFamily: MEL_SF }} xmlns="http://www.w3.org/2000/svg">
-        <defs><clipPath id={`clav${cid}`}><path d="M63.002,56.777c0,3.437-2.787,6.223-6.227,6.223h-43.55C9.787,63,7,60.213,7,56.777V13.224C7,9.787,9.787,7,13.226,7h43.55c3.439,0,6.227,2.787,6.227,6.224V56.777z" /></clipPath></defs>
-        <path fill="#FFFFFF" d="M340,63.814c0,3.418-2.783,6.186-6.219,6.186H6.218C2.783,70,0,67.232,0,63.814V6.184C0,2.769,2.783,0,6.218,0h327.563C337.216,0,340,2.769,340,6.184V63.814z" />
-        {photo
-          ? <image href={photo} x="7" y="7" width="56" height="56" preserveAspectRatio="xMidYMid slice" clipPath={`url(#clav${cid})`} />
-          : <path fill="#74C3B4" d="M63.002,56.777c0,3.437-2.787,6.223-6.227,6.223h-43.55C9.787,63,7,60.213,7,56.777V13.224C7,9.787,9.787,7,13.226,7h43.55c3.439,0,6.227,2.787,6.227,6.224V56.777z" />}
-        {/* prénom · âge */}
-        <text transform="matrix(1 0 0 1 73.1387 20.6138)" fill="#706F6F" fontFamily={MEL_SF} fontWeight={700}><tspan fontSize="18.1023">{name}</tspan><tspan fontSize="8.8116" dx="4">{age}</tspan></text>
-        {/* 📍 pin (vecteur Mel) + lieu sur 2 lignes */}
-        <g transform="translate(-1.5,0)"><polygon fill="#878787" points="79.17,46.536 79.425,39.028 77.401,39.028 77.656,46.536" /><circle fill="#C6C6C6" cx="78.402" cy="35.079" r="4.451" /><path fill="#9D9D9C" d="M78.401,37.133c-2.175,0-3.987-1.242-4.373-2.879c-0.052,0.267-0.079,0.541-0.079,0.824c0,2.459,1.995,4.449,4.451,4.449c2.459,0,4.452-1.99,4.452-4.449c0-0.283-0.026-0.558-0.079-0.824C82.388,35.891,80.58,37.133,78.401,37.133z" /><path fill="#FFFFFF" d="M79.631,33.028c-0.347-0.139-0.736-0.219-1.145-0.219c-1.223,0-2.266,0.706-2.649,1.692l-0.922-0.996c0.602-1.326,1.936-2.25,3.486-2.25c0.553,0,1.08,0.118,1.554,0.329L79.631,33.028z" /></g>
-        <text fill="#707070" fontFamily={MEL_SF} fontWeight={700} fontSize="8.7612"><tspan x="86" y="36.9644">{l1}</tspan><tspan x="86" y="47.011">{l2}</tspan></text>
-        {/* heure du RDV */}
-        <text transform="matrix(1 0 0 1 73.1387 62.8481)" fill="#707070" fontFamily={MEL_SF} fontWeight={700} fontSize="11.7219">{hour}</text>
-        {/* 🔒 VERROUILLER (accepter) — cliquable */}
-        <g onClick={e => stop(e, onAccept)} style={{ cursor: 'pointer' }}>
-          <circle fill="#B2B2B2" cx="264.281" cy="32.744" r="18.197" />
-          <path fill="#FFFFFF" d="M266.398,34.445c0-1.121-0.906-2.026-2.023-2.026c-1.123,0-2.027,0.905-2.027,2.026c0,0.715,0.369,1.339,0.924,1.702v2.882c0,0.533,0.439,0.971,0.973,0.971h0.258c0.537,0,0.971-0.438,0.971-0.971v-2.882C266.029,35.784,266.398,35.16,266.398,34.445z" />
-          <path fill="#FFFFFF" d="M270.765,27.998h-0.246v-2.444c0-3.388-2.756-6.147-6.145-6.147c-3.393,0-6.148,2.759-6.148,6.147v2.45c-2.23,0.022-4.043,1.841-4.043,4.078v8.211c0,2.252,1.832,4.083,4.084,4.083h12.498c2.25,0,4.082-1.831,4.082-4.083v-8.211C274.847,29.83,273.015,27.998,270.765,27.998z M260.041,25.553c0-2.388,1.943-4.332,4.334-4.332c2.387,0,4.33,1.944,4.33,4.332v2.444h-8.664V25.553z M273.031,40.292c0,1.251-1.018,2.268-2.266,2.268h-12.498c-1.252,0-2.27-1.017-2.27-2.268v-8.211c0-1.251,1.018-2.268,2.27-2.268h12.498c1.248,0,2.266,1.017,2.266,2.268V40.292z" />
-        </g>
-        {/* ✕ REFUSER — cliquable */}
-        <g onClick={e => stop(e, onRefuse)} style={{ cursor: 'pointer' }}>
-          <circle fill="#FFFFFF" cx="314.28" cy="32.744" r="18.196" />
-          <path fill="#B2B2B2" d="M314.281,51.543c-10.367,0-18.799-8.434-18.799-18.799c0-10.367,8.432-18.802,18.799-18.802c10.365,0,18.801,8.435,18.801,18.802C333.082,43.109,324.646,51.543,314.281,51.543z M314.281,15.152c-9.699,0-17.592,7.892-17.592,17.592c0,9.698,7.893,17.59,17.592,17.59s17.59-7.892,17.59-17.59C331.871,23.044,323.98,15.152,314.281,15.152z" />
-          <line fill="none" stroke="#B2B2B2" strokeWidth="2.0411" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10" x1="321.271" y1="25.752" x2="307.289" y2="39.734" />
-          <line fill="none" stroke="#B2B2B2" strokeWidth="2.0411" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10" x1="307.289" y1="25.752" x2="321.271" y2="39.734" />
-        </g>
       </svg>
     </div>
   )
@@ -12053,7 +12013,6 @@ export default function App2() {
                     {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
                     {allItems.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
-                    {allItems.length>0 && tabItems.length===0 && <div style={{textAlign:'center',padding:'34px 20px',color:C.whiteMid}}><div style={{fontSize:24,marginBottom:6,opacity:.7}}>{['🔥','📍','⏳'][subShown]}</div><div style={{fontSize:13,fontWeight:700,color:C.whiteMid}}>{SUB_EMPTY[subShown]}</div></div>}
                     {actifsWithHdrs.map((c:any)=>{
                       if(c.__hdr!==undefined) return (<div key={'sec'+c.__hdr} style={{fontSize:11,fontWeight:800,color:C.salmon,letterSpacing:'.04em',margin:'12px 2px 4px'}}>{SEC_LABELS[c.__hdr]}</div>)
                       // ── 🎟️ CARTE EVENT (= un clutch) dans la boîte ──
@@ -12120,36 +12079,6 @@ export default function App2() {
                       const isNewRec = !isAccepted && isRec && c.status==='pending'
                       const isSent = !isAccepted && !isRec && c.status==='pending'
                       const paused = isPausedClutch(c) // forteresse : chevauche un RDV → en pause (calmé visuellement)
-
-                      // 🎨 CLUTCH REÇU À RÉPONDRE → carte de Mel (géométrie exacte) · 🔒 = verrouiller (accepter) · ✕ = refuser.
-                      if (isNewRec) {
-                        const accept = async () => {
-                          if (paused) { showToast(lang==='en'?'⏸ On hold — you have a meetup at that time':'⏸ En pause — tu as un RDV à cette heure', C.salmon); return }
-                          setLocalConfirmed(prev=>new Set([...prev,c.id]))
-                          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'confirmed'}:cl))
-                          try { localStorage.setItem(`clutch_locked_at_${c.id}`, String(Date.now())); localStorage.setItem(`verrou_shown_${c.id}`, String(Date.now())) } catch {}
-                          setVerrouData({venue:c.venue||'',name:other?.name||'',photo:other?.photo_url||null}); setShowVerrou(true); hap('success')
-                          if(!isMock){ const {error}=await supabase.from('clutches').update({status:'confirmed'}).eq('id',c.id)
-                            if(error){ const conflit=(error as any).code==='23P01'||/occ_no_overlap|exclusion|overlap/i.test(error.message||'')
-                              if(conflit){ setShowVerrou(false); setLocalConfirmed(prev=>{const s=new Set(prev);s.delete(c.id);return s}); setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'pending'}:cl)); try{localStorage.removeItem(`clutch_locked_at_${c.id}`);localStorage.removeItem(`verrou_shown_${c.id}`)}catch{}; showToast(lang==='en'?'⏱️ You already have a meetup at that time':'⏱️ Tu as déjà un rendez-vous à cette heure', C.salmon) }
-                              else showToast('⚠️ Verrou error: '+error.message, C.red) }
-                            loadClutches() }
-                        }
-                        const refuse = async () => {
-                          setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'declined'}:cl))
-                          if(!isMock) await supabase.from('clutches').update({status:'declined'}).eq('id',c.id)
-                          showToast(lang==='en'?'Clutch declined':'Clutch refusé',C.whiteMid); loadClutches()
-                        }
-                        return (
-                          <div key={c.id}>
-                            <MelClutchCard photo={other?.photo_url} name={melTruncName(other?.name||'?',14)} age={other?.age?`${other.age} ans`:''}
-                              venue={c.venue||''} hour={c.proposed_time?new Date(c.proposed_time).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):''}
-                              onClick={()=>setChatClutch(c)} onAccept={accept} onRefuse={refuse}/>
-                            <button onClick={()=>{setCounterClutchId(c.id);setCounterVenue(c.venue||'');setCounterTime('');setCounterMsg('')}}
-                              style={{display:'block',margin:'-4px auto 10px',background:'transparent',border:'none',color:C.salmon,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>↩ {lang==='en'?'Counter-propose (other place/time)':'Contre-proposer (autre lieu/heure)'}</button>
-                          </div>
-                        )
-                      }
                       const hasUnread = (unreadChats[c.id]||0) > 0
                       // Couleurs par état
                       const cardBorder = paused ? `1px solid ${C.border}`

@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e9'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 229   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ea'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 230   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9565,7 +9565,9 @@ export default function App2() {
     return foEvaluate({ now, gps: realGps, pin: meetupPos, start, end: start + FO_MIN_DUR * 60000, radiusKm })
   }
   // Plafond de rayon prêt pour le curseur (intègre la distance du pin) — borné 1..50.
-  const foMaxRadius = (): number => foMaxRadiusFor(Date.now(), realGps, meetupPos, foStartAt(), RAYON_MIN_KM, RAYON_MAX_KM)
+  // 🏰 Plafond rayon = TEMPS SEUL (David 30.06 : déplacer le pin loin ne doit PLUS rétrécir le rayon → la carte
+  //    ne dézoome plus, on reste lisible). Le pin trop loin reste géré à part (pinReachInfo : alerte + Suivant bloqué).
+  const foMaxRadius = (): number => { const leadMin = Math.max(0, (foStartAt() - Date.now())/60000); return Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, foReachKm(leadMin))) }
   // Compat : pinReachInfo conservé (utilisé ailleurs) mais ALIMENTÉ par le moteur (pinTooFar/dist/budget).
   const pinReachInfo = () => { const e = foEval(0); return { tooFar: e.pinTooFar, dist: e.pinDistKm, reach: e.budgetKm } }
 
@@ -11112,19 +11114,20 @@ export default function App2() {
                 {(()=>{
                   const now = Date.now()
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
-                  // 🏰 MOTEUR UNIQUE (29.06) : budget = ce que j'atteins d'ici le DÉBUT ; D = distance du pin.
-                  //    Plafond = budget − D. Zones du dégradé = rayon à tension T : r(T) = budget·T/10 − D.
+                  // 🏰 DÉCOUPLAGE RAYON ↔ PIN (David 30.06) : le RAYON = zone de recherche, plafonné par le TEMPS SEUL
+                  //    (ce que j'atteins d'ici le début). Le PIN trop loin de moi = un AUTRE garde-fou (alerte + Suivant
+                  //    bloqué, cf. pinReachInfo), il NE rétrécit PLUS le rayon (sinon ça dézoome la carte → illisible).
                   const e0 = foEval(0)
-                  const budget = e0.budgetKm, D = e0.pinDistKm
-                  const rT = (T:number)=> Math.max(0, Math.min(RAYON_MAX_KM, budget * T / 10 - D))
+                  const budget = e0.budgetKm
+                  const rT = (T:number)=> Math.max(0, Math.min(RAYON_MAX_KM, budget * T / 10))
                   const r4 = rT(4), r6 = rT(6), r7 = rT(7), r10 = rT(10)
-                  const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, budget - D))   // = foMaxRadius (plafond DUR)
+                  const cap = Math.max(RAYON_MIN_KM, Math.min(RAYON_MAX_KM, budget))   // plafond = TEMPS seul (plus de − D)
                   const capLimiting = cap < RAYON_MAX_KM - 0.5 && rayon >= cap - 0.4   // on bute contre le plafond → on explique
                   const flag = CONE_RAYON_HEURE_LIVE
                   const p = (km:number)=> Math.max(0, Math.min(100, rayonToSlider(km)))
                   const pct = rayonToSlider(rayon)
                   const p4=p(r4), p7=p(r7), p10=p(r10)
-                  const tension = foEval(rayon).tension
+                  const tension = budget>0 ? Math.max(0, Math.min(10, 10*rayon/budget)) : 10   // tension = rayon vs temps (sans le pin)
                   const overWindow = flag && rayon > Math.max(r10,0) + 0.01
                   // 🎨 Couleur CONTINUE (David 28.06) : vert → rose → bordeaux selon la tension (gradient, plus par palier).
                   const lerpHex=(a:string,b:string,t:number)=>{ const pa=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),pb=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16)); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('') }
@@ -11186,7 +11189,7 @@ export default function App2() {
                           </g>
                         </svg>
                       )}
-                      <span style={{fontSize:11,color:fillCol,flexShrink:0,fontWeight:600,transition:'color .12s'}}>{fmtKm(rayon)}</span>
+                      <span style={{fontSize:15,color:fillCol,flexShrink:0,fontWeight:800,transition:'color .12s',minWidth:46}}>{fmtKm(rayon)}</span>
                       <div ref={sliderRef}
                         style={{flex:1,position:'relative',height:44,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}
                         onPointerDown={e=>{(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);updateFromEvent(e.clientX)}}
@@ -11239,8 +11242,12 @@ export default function App2() {
                     const active = pickedMoments.length===1 && pickedMoments[0].key===k
                     if (active) { setPickedMoments([]); setPresetWin(null) }       // re-clic = désélection
                     else {
-                      setPickedMoments([{key:k, start:p.start, end:p.end, fr:p.fr, en:p.en}])
-                      setPresetWin({from:p.start, until:p.end}); setFromTime(hhmm(p.start)); setUntilTime(hhmm(p.end))
+                      // 🔧 FIX (David 30.06) : ARRONDIR au quart d'heure (cran de molette), sinon la molette de gauche
+                      //    ne bouge pas (ex : « cette nuit » à 1h21 → début 2h21 = aucun cran → 2h30). Début ↑, fin ↓.
+                      const R15 = 15*60_000
+                      const s = Math.ceil(p.start / R15) * R15, e = Math.floor(p.end / R15) * R15
+                      setPickedMoments([{key:k, start:s, end:e, fr:p.fr, en:p.en}])
+                      setPresetWin({from:s, until:e}); setFromTime(hhmm(s)); setUntilTime(hhmm(e))
                     }
                     if (typeof navigator!=='undefined' && (navigator as any).vibrate) (navigator as any).vibrate(6)
                   }
@@ -11571,7 +11578,7 @@ export default function App2() {
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'10px 14px 100px'}}>
 
                     {/* 🛰️ FORTERESSE GPS DYNAMIQUE — tu t'es éloigné·e de ta zone publiée → recalage en 1 tap (explicite). */}
-                    {gpsDrift && (
+                    {gpsDrift && myAvail.length>0 && (
                       <div style={{display:'flex',alignItems:'center',gap:10,background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
                         <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
                         <div style={{flex:1,minWidth:0}}>

@@ -37,7 +37,10 @@ export interface SimResult {
 export interface CustomSpec { name: string; gender: Gender; age: number; seekGender: SeekG; lat?: number; lng?: number }
 // enforce = la forteresse CORRIGÉE (evaluateSchedule) refuse les RDV infaisables (B1/B2/REACH/horizon).
 //           false = permissivité actuelle de l'app → le COQ révèle les trous.
-export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean; custom?: CustomSpec[] }
+// 🎮 Geste scripté par David (incarnation C) : à tel tick, l'agent `idx` fait `act` (au lieu de sa policy).
+export type ScriptAct = 'online' | 'clutch' | 'accept' | 'refuse'
+export interface ScriptStep { idx: number; tick: number; act: ScriptAct }
+export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean; custom?: CustomSpec[]; scripted?: ScriptStep[] }
 
 interface Slot { center: [number, number]; start: number; end: number; radiusKm: number }
 interface Eng { place: [number, number]; start: number; end: number; kind: 'clutch' | 'event' }
@@ -63,6 +66,7 @@ const hm = (ms: number) => { const m = Math.round((ms - T0) / 60000); return `${
 export function runSim(cfg: SimConfig): SimResult {
   const N = cfg.n, rng = mulberry32(cfg.seed >>> 0), pick = <T,>(a: T[]) => a[Math.floor(rng() * a.length)]
   const cap = cfg.captureFrames !== false, enforce = !!cfg.enforce
+  const scriptAt = (idx: number, tick: number): ScriptAct[] => (cfg.scripted || []).filter(s => s.idx === idx && s.tick === tick).map(s => s.act)
   const agents: Agent[] = []
   for (let i = 0; i < N; i++) {
     const gender: Gender = rng() * 100 < cfg.pctFemale ? 'F' : 'M'
@@ -107,10 +111,58 @@ export function runSim(cfg: SimConfig): SimResult {
   for (let tick = 0; tick < TICKS; tick++) {
     const now = T0 + tick * STEP
     const aBefore = alerts.length
+    // 🎮 Helpers d'INCARNATION (ferment sur now/tick courants). Forcent un geste demandé par David.
+    const doSend = (a: Agent, force = false) => {
+      if (!a.online || !a.slots.length) return
+      const mySlot = a.slots[0]; let best: Agent | null = null, bestSc = -1
+      for (let s = 0; s < 14; s++) {
+        const b = pick(agents); if (b.id === a.id || !b.online || !b.slots.length) continue
+        if (a.cooldownUntil[b.id] > now) continue
+        if (!genderAllowed(a.seekGender, b.gender)) continue
+        const sc = scoreProfile({ interests: a.interests, lat: a.lat, lng: a.lng }, { id: b.id, name: '', gender: b.gender, age: b.age, interests: b.interests, lat: b.lat, lng: b.lng, reliability: b.reliability, premium: b.premium, capSlots: 5, receivedClutches: b.receivedToday } as any).score
+        if (sc > bestSc) { bestSc = sc; best = b }
+      }
+      if (!best) return
+      const symOk = genderAllowed(best.seekGender, a.gender) && !best.recepPause, capOk = !(best.gender === 'F' && best.receivedToday >= 5)
+      if (enforce && (!symOk || !capOk)) { nBlocked++; if (force) logLife(a.idx, { tick, at: now, kind: 'event', msg: `⛔ Clutch bloqué (filtre/boîte pleine)` }); return }
+      const place = mySlot.center, start = Math.max(now + 15 * MIN, mySlot.start), end = start + DEFAULT_RDV_MIN * MIN
+      pendings.push({ from: a.id, to: best.id, place, start, end, born: now }); nSent++; best.receivedToday++
+      logLife(a.idx, { tick, at: now, kind: 'sent', otherIdx: best.idx, msg: `📤 Tu clutches ${best.name} pour ${hm(start)}` })
+      logLife(best.idx, { tick, at: now, kind: 'received', otherIdx: a.idx, msg: `📥 ${a.name} te clutche pour ${hm(start)}` })
+    }
+    const doRespond = (a: Agent, decision: 'accept' | 'refuse') => {
+      const mine = pendings.find(p => p.to === a.id); if (!mine) return
+      const sender = byId[mine.from]
+      if (decision === 'accept') {
+        const engA: Eng = { place: mine.place, start: mine.start, end: mine.end, kind: 'clutch' }, engB: Eng = { ...engA }
+        const resA = evaluateSchedule(now, [a.lat, a.lng], a.agenda, engA), resB = evaluateSchedule(now, [sender.lat, sender.lng], sender.agenda, engB)
+        if (enforce && (!resA.ok || !resB.ok)) { nBlocked++; logLife(a.idx, { tick, at: now, kind: 'event', msg: `⛔ RDV refusé par la forteresse (${schedMsg(resA.ok ? resB : resA)})` }) }
+        else {
+          a.agenda.push(engA); sender.agenda.push(engB); a.slots = a.slots.filter(s => s.start !== mine.start); nAccept++
+          logLife(a.idx, { tick, at: now, kind: 'locked', otherIdx: sender.idx, msg: `🔒 Tu verrouilles avec ${sender.name} à ${hm(mine.start)}` })
+          logLife(sender.idx, { tick, at: now, kind: 'locked', otherIdx: a.idx, msg: `🔒 ${a.name} a verrouillé · RDV à ${hm(mine.start)}` })
+        }
+      } else { sender.cooldownUntil[a.id] = now + 48 * 3600 * 1000; nRefuse++; logLife(a.idx, { tick, at: now, kind: 'event', msg: `❌ Tu refuses ${sender.name}` }) }
+      pendings.splice(pendings.indexOf(mine), 1)
+    }
     for (let i = pendings.length - 1; i >= 0; i--) if (now - pendings[i].born > 30 * MIN) pendings.splice(i, 1)
     for (const a of agents) { a.slots = a.slots.filter(s => s.end > now); a.agenda = a.agenda.filter(e => e.end > now); if (a.online && !a.slots.length && rng() < 0.3) a.online = false }
 
     for (const a of agents) {
+      // 🎮 INCARNATION (C) : si David a scripté des gestes pour CET agent à CE tick, on les joue À LA PLACE de la
+      //    policy aléatoire (il prend le contrôle). Respecte enforce + nourrit le journal de vie (il voit son geste).
+      const acts = scriptAt(a.idx, tick)
+      if (acts.length) {
+        for (const act of acts) {
+          if (act === 'online' && !a.online) {
+            a.online = true; const start = now + 30 * MIN
+            a.slots = [{ center: [a.lat, a.lng], start, end: start + 120 * MIN, radiusKm: 6 }]; nSlots++
+            logLife(a.idx, { tick, at: now, kind: 'event', msg: `🟢 Tu te mets en ligne` })
+          } else if (act === 'clutch') { doSend(a, true) }
+          else if (act === 'accept' || act === 'refuse') { doRespond(a, act) }
+        }
+        continue   // contrôle manuel ce tick
+      }
       if (!a.online && rng() < a.pOnline / 12) {
         a.online = true; a.slots = []
         for (let s = 0; s < a.nSlots; s++) {

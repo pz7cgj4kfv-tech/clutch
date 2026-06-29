@@ -6,7 +6,7 @@
 //    le film à l'instant du bug. cf. docs/clutch-city-comportements.md + docs/clutch-city-trous.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { runSim, LAUSANNE, type SimResult, type Code, type CustomSpec } from '@/lib/sim/engine'
+import { runSim, LAUSANNE, type SimResult, type Code, type CustomSpec, type ScriptStep, type ScriptAct } from '@/lib/sim/engine'
 
 const C = { bg: '#2a1020', card: '#3a1a2e', ink: '#f5e8de', mid: '#c9a9bd', border: '#5a3048', green: '#77BC1F', rose: '#EB6BAF', plum: '#532943', orange: '#E27C00', red: '#E05353' }
 const CODES: Code[] = ['CHAINING', 'EXCLUSION', 'REACH', 'CAP_RECEIVED', 'FILTER', 'EVENT_SEATS', 'HORIZON', 'COOLDOWN']
@@ -30,21 +30,27 @@ export default function ClutchCity() {
   const [busy, setBusy] = useState(false)
   const [watched, setWatched] = useState<number[]>([])   // 👥 agents suivis (cartes POV)
   const [focus, setFocus] = useState<number | null>(null) // 👁 personne au centre du POV (carte mise en avant)
+  const [scripted, setScripted] = useState<ScriptStep[]>([]) // 🎮 gestes que David a fait faire (incarnation)
   const [customs, setCustoms] = useState<CustomSpec[]>([])  // 👤 profils créés à la main
   const [showCreate, setShowCreate] = useState(false)
   const [nm, setNm] = useState(''), [cg, setCg] = useState<'F' | 'M'>('F'), [cage, setCage] = useState(27), [csg, setCsg] = useState<'all' | 'man' | 'woman'>('all')
   const cv = useRef<HTMLCanvasElement | null>(null)
 
-  const run = (enf = enforce, cst = customs) => {
-    setBusy(true); setPlaying(false)
+  const run = (enf = enforce, cst = customs, scr = scripted, keepTick = false) => {
+    setBusy(true); if (!keepTick) setPlaying(false)
     setTimeout(() => {
-      const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf, custom: cst }); setRes(r); setTick(0); setBusy(false); setPlaying(true)
-      // 👤 mes profils créés (indices n..) TOUJOURS suivis · puis 👥 les plus vivants pour compléter.
-      const customIdx = cst.map((_, j) => n + j)
-      const ranked = Object.keys(r.life).map(k => +k).filter(i => !customIdx.includes(i)).sort((a, b) => (r.life[b]?.length || 0) - (r.life[a]?.length || 0))
-      setWatched([...customIdx, ...ranked].slice(0, 12))
+      const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf, custom: cst, scripted: scr }); setRes(r); setBusy(false)
+      if (!keepTick) {
+        setTick(0); setPlaying(true)
+        // 👤 mes profils créés (indices n..) TOUJOURS suivis · puis 👥 les plus vivants pour compléter.
+        const customIdx = cst.map((_, j) => n + j)
+        const ranked = Object.keys(r.life).map(k => +k).filter(i => !customIdx.includes(i)).sort((a, b) => (r.life[b]?.length || 0) - (r.life[a]?.length || 0))
+        setWatched([...customIdx, ...ranked].slice(0, 12))
+      }
     }, 30)
   }
+  // 🎮 INCARNER : David fait faire un geste à la personne suivie, à l'instant courant → la ville rejoue de là.
+  const incarnate = (act: ScriptAct) => { if (focus == null) return; const next = [...scripted, { idx: focus, tick, act }]; setScripted(next); run(enforce, customs, next, true) }
   const addCustom = () => {
     const spec: CustomSpec = { name: nm.trim() || (cg === 'F' ? 'Elle' : 'Lui'), gender: cg, age: cage, seekGender: csg }
     const next = [...customs, spec]; setCustoms(next); setShowCreate(false); setNm(''); run(enforce, next)
@@ -161,7 +167,7 @@ export default function ClutchCity() {
           <Slider label="Agents" val={n} set={setN} min={100} max={700} step={50} disabled={busy} />
           <Slider label="% femmes" val={pf} set={setPf} min={0} max={100} step={5} disabled={busy} />
           <Slider label="Seed" val={seed} set={setSeed} min={1} max={99} disabled={busy} />
-          <button onClick={() => run()} disabled={busy} style={{ padding: '11px 20px', borderRadius: 12, border: 'none', background: busy ? C.plum : C.green, color: '#fff', fontSize: 14, fontWeight: 900, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit' }}>{busy ? '⏳ calcul…' : '▶︎ Lancer'}</button>
+          <button onClick={() => { setScripted([]); setFocus(null); run(enforce, customs, []) }} disabled={busy} style={{ padding: '11px 20px', borderRadius: 12, border: 'none', background: busy ? C.plum : C.green, color: '#fff', fontSize: 14, fontWeight: 900, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit' }}>{busy ? '⏳ calcul…' : '▶︎ Lancer'}</button>
         </div>
         {/* INTERRUPTEUR FORTERESSE — permissive (app actuelle) ↔ corrigée (evaluateSchedule) */}
         <button onClick={toggleForteresse} disabled={busy} style={{ width: '100%', marginBottom: 12, padding: '10px 14px', borderRadius: 12, border: `1.5px solid ${enforce ? C.green : C.border}`, background: enforce ? `${C.green}1c` : C.card, color: C.ink, fontSize: 13, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
@@ -282,6 +288,17 @@ export default function ClutchCity() {
                         </div>
                       ))}
                     </div>
+                    {/* 🎮 INCARNATION (C) — sur la carte focus : tu fais faire un geste à {nom}, la ville rejoue de cet instant. */}
+                    {foc && (
+                      <div style={{ background: `${C.orange}10`, border: `1px solid ${C.orange}40`, borderRadius: 10, padding: '7px 8px', marginBottom: 8 }}>
+                        <div style={{ fontSize: 9.5, color: C.orange, fontWeight: 800, marginBottom: 5 }}>🎮 INCARNER à {last ? fmtClock(last.now) : '—'} — la ville rejoue de là</div>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {([['online', '🟢 En ligne'], ['clutch', '📤 Clutcher'], ['accept', '✅ Accepter'], ['refuse', '❌ Refuser']] as [ScriptAct, string][]).map(([act, l]) => (
+                            <button key={act} disabled={busy} onClick={() => incarnate(act)} style={{ flex: '1 1 auto', padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.orange}66`, background: 'transparent', color: C.ink, fontSize: 11, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{l}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div style={{ maxHeight: 122, overflowY: 'auto' }}>
                       {feed.length === 0 && <div style={{ fontSize: 11, color: C.mid, padding: '4px 0' }}>Rien encore — laisse tourner ▶︎</div>}
                       {feed.map((e, i) => (

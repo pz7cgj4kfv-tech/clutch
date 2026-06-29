@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1dd'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 217   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1de'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 218   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9305,6 +9305,7 @@ export default function App2() {
     try { const s = localStorage.getItem('clutch_hidden_hist'); return s ? new Set(JSON.parse(s)) : new Set<string>() } catch { return new Set<string>() }
   })
   const [showHistory,setShowHistory] = useState(false)   // Section historique collapsible (fermé par défaut)
+  const [clutchSubTab,setClutchSubTab] = useState(0)     // 🗂️ mini-onglets boîte Clutch (David 29.06) : 0=À répondre · 1=Prochain RDV · 2=En attente
   // Position RDV voulue — initialisée depuis GPS si disponible
   const [meetupPos,setMeetupPos] = useState<[number,number]>(ME)
   // 🛰️ FORTERESSE GPS — ma VRAIE position (distincte du pin meetupPos qui est le LIEU du RDV). Sert à coupler
@@ -11931,9 +11932,17 @@ export default function App2() {
                 const SEC_LABELS:Record<number,string> = lang==='en'
                   ? {0:'🔥 To answer',1:'📍 Upcoming meetups',2:'⏸ On hold (you have a meetup then)',3:'⏳ Waiting',4:'🗂️ Other'}
                   : {0:'🔥 Action requise',1:'📍 Prochains rendez-vous',2:'⏸ En pause (RDV à cette heure)',3:'⏳ En attente',4:'🗂️ Autres'}
-                // Intercale un marqueur d'en-tête {__hdr:g} quand le groupe change (allItems déjà trié par rankOf)
+                // 🗂️ MINI-ONGLETS (David 29.06) : 5 groupes → 3 onglets. 0=À répondre · 1=Prochain RDV · 2(2/3/4)=En attente.
+                const subOf = (r:number)=> r===0?0 : r===1?1 : 2
+                const subCounts = [0,0,0]; allItems.forEach((it:any)=>{ subCounts[subOf(rankOf(it))]++ })
+                const SUB_LABELS = lang==='en' ? ['🔥 To answer','📍 Next meetup','⏳ Waiting'] : ['🔥 À répondre','📍 Prochain RDV','⏳ En attente']
+                const SUB_EMPTY = lang==='en' ? ['Nothing to answer 👌','No upcoming meetup','Nothing pending'] : ['Rien à répondre 👌','Aucun rendez-vous à venir','Rien en attente']
+                const subShown = clutchSubTab
+                const tabItems = allItems.filter((it:any)=> subOf(rankOf(it))===subShown)
+                // En-têtes de section UNIQUEMENT dans l'onglet « En attente » (qui mélange 2/3/4) — sinon l'onglet EST le titre.
                 const actifsWithHdrs:any[] = []
-                { let _pg=-1; allItems.forEach((c:any)=>{ const g=rankOf(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
+                if (subShown===2) { let _pg=-1; tabItems.forEach((c:any)=>{ const g=rankOf(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
+                else { actifsWithHdrs.push(...tabItems) }
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -11989,10 +11998,22 @@ export default function App2() {
                       }} style={{padding:'5px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>{t('clutchs.clear')}</button>}
                     </div>
                   </div>
+                  {/* 🗂️ MINI-ONGLETS (David 29.06) : À répondre · Prochain RDV · En attente */}
+                  <div style={{display:'flex',gap:6,padding:'10px 14px 8px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+                    {SUB_LABELS.map((lab,i)=>{ const on=subShown===i; const n=subCounts[i]; const urgent=i===0&&n>0
+                      return (
+                        <button key={i} onClick={()=>setClutchSubTab(i)} style={{flex:1,minWidth:0,padding:'8px 6px',borderRadius:12,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                          fontSize:12,fontWeight:on?900:700,border:`1.5px solid ${on?(urgent?C.salmon:C.bordeaux):C.border}`,
+                          background:on?(urgent?`${C.salmon}1e`:`${C.bordeaux}12`):'transparent', color:on?(urgent?C.salmon:C.bordeaux):C.whiteMid,transition:'all .12s'}}>
+                          {lab}{n>0?<span style={{marginLeft:5,fontSize:10,fontWeight:900,color:'#fff',background:urgent?C.salmon:C.bordeaux,borderRadius:999,padding:'0px 6px'}}>{n}</span>:''}
+                        </button>
+                      )})}
+                  </div>
                   <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',minHeight:0,padding:'8px 14px',paddingBottom: activeVerrou && !inlineFeedbackId && !radarMin ? 180 : 14}}>
                     {/* « Mes événements » RETIRÉ d'ici (doublon — demande David). Les events inscrits sont dans Événements → filtre « Mes events ». */}
                     {/* Clutchs actifs */}
                     {allItems.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:C.whiteMid}}><div style={{fontSize:28,marginBottom:8}}>⏳</div><div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>{t('clutchs.empty')}</div><div style={{fontSize:11}}>{t('clutchs.empty.sub')}</div></div>}
+                    {allItems.length>0 && tabItems.length===0 && <div style={{textAlign:'center',padding:'34px 20px',color:C.whiteMid}}><div style={{fontSize:24,marginBottom:6,opacity:.7}}>{['🔥','📍','⏳'][subShown]}</div><div style={{fontSize:13,fontWeight:700,color:C.whiteMid}}>{SUB_EMPTY[subShown]}</div></div>}
                     {actifsWithHdrs.map((c:any)=>{
                       if(c.__hdr!==undefined) return (<div key={'sec'+c.__hdr} style={{fontSize:11,fontWeight:800,color:C.salmon,letterSpacing:'.04em',margin:'12px 2px 4px'}}>{SEC_LABELS[c.__hdr]}</div>)
                       // ── 🎟️ CARTE EVENT (= un clutch) dans la boîte ──

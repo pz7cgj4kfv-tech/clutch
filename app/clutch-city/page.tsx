@@ -75,43 +75,49 @@ export default function ClutchCity() {
     const c = cv.current, r = res; if (!c || !r) return
     const ctx = c.getContext('2d'); if (!ctx) return
     const W = c.width, Hh = c.height, fr = r.frames[Math.min(tick, r.frames.length - 1)]; if (!fr) return
-    const px = (lat: number, lng: number): [number, number] => [((lng - BB.lngMin) / (BB.lngMax - BB.lngMin)) * W, (1 - (lat - BB.latMin) / (BB.latMax - BB.latMin)) * Hh]
-    ctx.clearRect(0, 0, W, Hh); ctx.fillStyle = '#241019'; ctx.fillRect(0, 0, W, Hh)
-    // cercle de la ville
-    const [cx, cy] = px(LAUSANNE[0], LAUSANNE[1]); ctx.strokeStyle = C.plum; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, W * 0.36, 0, 7); ctx.stroke()
-    ctx.fillStyle = C.mid; ctx.font = '11px system-ui'; ctx.fillText('Lausanne', cx - 26, cy - W * 0.36 - 6)
-    // agents
     const pos = fr.pos
+    // 🔍 ZOOM B+ : en mode POV, la bbox se RESSERRE autour de la personne (on la voit en gros + son rayon).
+    const focused = focus != null && focus < r.meta.length
+    const bb = focused
+      ? { latMin: pos[focus! * 4] - 0.028, latMax: pos[focus! * 4] + 0.028, lngMin: pos[focus! * 4 + 1] - 0.052, lngMax: pos[focus! * 4 + 1] + 0.052 }
+      : BB
+    const px = (lat: number, lng: number): [number, number] => [((lng - bb.lngMin) / (bb.lngMax - bb.lngMin)) * W, (1 - (lat - bb.latMin) / (bb.latMax - bb.latMin)) * Hh]
+    const pxPerKm = Hh / ((bb.latMax - bb.latMin) * 111)   // échelle km→pixels (vertical)
+    ctx.clearRect(0, 0, W, Hh); ctx.fillStyle = '#241019'; ctx.fillRect(0, 0, W, Hh)
+    if (!focused) { const [cx, cy] = px(LAUSANNE[0], LAUSANNE[1]); ctx.strokeStyle = C.plum; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, W * 0.36, 0, 7); ctx.stroke(); ctx.fillStyle = C.mid; ctx.font = '11px system-ui'; ctx.fillText('Lausanne', cx - 26, cy - W * 0.36 - 6) }
+    // agents
     for (let i = 0; i < r.meta.length; i++) {
-      const flag = pos[i * 3 + 2]; const [x, y] = px(pos[i * 3], pos[i * 3 + 1])
-      if (flag === 0) { ctx.fillStyle = 'rgba(201,169,189,.18)'; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, 7); ctx.fill(); continue }
-      if (flag === 2) { ctx.fillStyle = C.green; ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill(); ctx.strokeStyle = C.green + '66'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.stroke() }
-      else { ctx.fillStyle = r.meta[i].gender === 'F' ? C.rose : '#8fb3e0'; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill() }
+      const flag = pos[i * 4 + 2]; const [x, y] = px(pos[i * 4], pos[i * 4 + 1])
+      if (flag === 0) { ctx.fillStyle = 'rgba(201,169,189,.18)'; ctx.beginPath(); ctx.arc(x, y, focused ? 2.5 : 1.5, 0, 7); ctx.fill(); continue }
+      if (flag === 2) { ctx.fillStyle = C.green; ctx.beginPath(); ctx.arc(x, y, focused ? 4.5 : 3.4, 0, 7); ctx.fill(); ctx.strokeStyle = C.green + '66'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, focused ? 8 : 6, 0, 7); ctx.stroke() }
+      else { ctx.fillStyle = r.meta[i].gender === 'F' ? C.rose : '#8fb3e0'; ctx.beginPath(); ctx.arc(x, y, focused ? 3.6 : 2.6, 0, 7); ctx.fill() }
     }
-    // 👥 SURLIGNAGE des suivis : halo doré + nom, par-dessus tout.
+    // 👥 SURLIGNAGE des suivis : halo doré + nom.
     for (const i of watched) {
       if (i >= r.meta.length) continue
-      const [x, y] = px(pos[i * 3], pos[i * 3 + 1]); const fl = pos[i * 3 + 2]
+      const [x, y] = px(pos[i * 4], pos[i * 4 + 1]); const fl = pos[i * 4 + 2]
       ctx.strokeStyle = '#E27C00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8.5, 0, 7); ctx.stroke()
       ctx.fillStyle = fl === 0 ? 'rgba(226,124,0,.5)' : '#E27C00'; ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill()
       ctx.fillStyle = '#f5e8de'; ctx.font = 'bold 10px system-ui'; ctx.fillText(r.meta[i].name, x + 11, y + 3.5)
     }
-    // 👁 MODE POV : on assombrit la ville et on trace les liens RÉCENTS de la personne (qui la clutche, qui elle clutche, son RDV).
-    if (focus != null && focus < r.meta.length) {
-      ctx.fillStyle = 'rgba(36,16,25,.62)'; ctx.fillRect(0, 0, W, Hh)
-      const [fx, fy] = px(pos[focus * 3], pos[focus * 3 + 1])
-      const recent = (r.life[focus] || []).filter(e => e.tick <= tick && e.tick > tick - 18 && e.otherIdx != null)
+    // 👁 MODE POV : zoomé sur la personne · son RAYON de dispo · ses liens récents (qui la clutche / elle clutche / RDV).
+    if (focused) {
+      ctx.fillStyle = 'rgba(36,16,25,.5)'; ctx.fillRect(0, 0, W, Hh)
+      const [fx, fy] = px(pos[focus! * 4], pos[focus! * 4 + 1]); const rad = pos[focus! * 4 + 3]
+      // son rayon de dispo (cercle pointillé rose)
+      if (rad > 0) { ctx.setLineDash([5, 5]); ctx.strokeStyle = C.rose + 'aa'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(fx, fy, rad * pxPerKm, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = C.rose + '99'; ctx.font = '10px system-ui'; ctx.fillText(`rayon ${rad.toFixed(0)} km`, fx + rad * pxPerKm * 0.7, fy - rad * pxPerKm * 0.7) }
+      const recent = (r.life[focus!] || []).filter(e => e.tick <= tick && e.tick > tick - 18 && e.otherIdx != null)
       for (const e of recent) {
         const o = e.otherIdx!; if (o >= r.meta.length) continue
-        const [ox, oy] = px(pos[o * 3], pos[o * 3 + 1])
+        const [ox, oy] = px(pos[o * 4], pos[o * 4 + 1])
         const col = e.kind === 'sent' ? C.rose : e.kind === 'received' ? '#8fb3e0' : e.kind === 'locked' ? C.green : C.mid
         ctx.strokeStyle = col + 'cc'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(ox, oy); ctx.stroke()
-        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ox, oy, 3, 0, 7); ctx.fill()
-        ctx.fillStyle = '#f5e8de'; ctx.font = '9.5px system-ui'; ctx.fillText(r.meta[o].name, ox + 5, oy + 3)
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ox, oy, 3.5, 0, 7); ctx.fill()
+        ctx.fillStyle = '#f5e8de'; ctx.font = '10px system-ui'; ctx.fillText(r.meta[o].name, ox + 6, oy + 3)
       }
-      ctx.strokeStyle = '#E27C00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(fx, fy, 11, 0, 7); ctx.stroke()
-      ctx.fillStyle = '#E27C00'; ctx.beginPath(); ctx.arc(fx, fy, 5, 0, 7); ctx.fill()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(`${r.meta[focus].name} 👁`, fx + 13, fy + 4)
+      ctx.strokeStyle = '#E27C00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(fx, fy, 12, 0, 7); ctx.stroke()
+      ctx.fillStyle = '#E27C00'; ctx.beginPath(); ctx.arc(fx, fy, 5.5, 0, 7); ctx.fill()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.fillText(`${r.meta[focus!].name} 👁`, fx + 15, fy + 4)
     }
   }, [res, tick, watched, focus])
 
@@ -120,9 +126,13 @@ export default function ClutchCity() {
     const r = res, c = cv.current; if (!r || !c) return
     const rect = c.getBoundingClientRect(); const mx = (e.clientX - rect.left) / rect.width * c.width, my = (e.clientY - rect.top) / rect.height * c.height
     const fr = r.frames[Math.min(tick, r.frames.length - 1)]; if (!fr) return
-    const px = (lat: number, lng: number): [number, number] => [((lng - BB.lngMin) / (BB.lngMax - BB.lngMin)) * c.width, (1 - (lat - BB.latMin) / (BB.latMax - BB.latMin)) * c.height]
+    const focused = focus != null && focus < r.meta.length
+    const bb = focused
+      ? { latMin: fr.pos[focus! * 4] - 0.028, latMax: fr.pos[focus! * 4] + 0.028, lngMin: fr.pos[focus! * 4 + 1] - 0.052, lngMax: fr.pos[focus! * 4 + 1] + 0.052 }
+      : BB
+    const px = (lat: number, lng: number): [number, number] => [((lng - bb.lngMin) / (bb.lngMax - bb.lngMin)) * c.width, (1 - (lat - bb.latMin) / (bb.latMax - bb.latMin)) * c.height]
     let best = -1, bd = 18 * 18
-    for (let i = 0; i < r.meta.length; i++) { const [x, y] = px(fr.pos[i * 3], fr.pos[i * 3 + 1]); const d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; best = i } }
+    for (let i = 0; i < r.meta.length; i++) { const [x, y] = px(fr.pos[i * 4], fr.pos[i * 4 + 1]); const d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; best = i } }
     if (best >= 0) toggleWatch(best)
   }
 
@@ -246,7 +256,7 @@ export default function ClutchCity() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 10 }}>
               {watched.map(idx => {
                 const m = res.meta[idx]; if (!m) return null
-                const flag = last ? last.pos[idx * 3 + 2] : 0
+                const flag = last ? last.pos[idx * 4 + 2] : 0
                 const ev = (res.life[idx] || []).filter(e => e.tick <= tick)
                 const nSent = ev.filter(e => e.kind === 'sent').length, nRec = ev.filter(e => e.kind === 'received').length, nLock = ev.filter(e => e.kind === 'locked').length
                 const feed = ev.slice(-6).reverse()

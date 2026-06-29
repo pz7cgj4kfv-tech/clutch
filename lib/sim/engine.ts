@@ -39,7 +39,7 @@ export interface CustomSpec { name: string; gender: Gender; age: number; seekGen
 //           false = permissivité actuelle de l'app → le COQ révèle les trous.
 export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean; custom?: CustomSpec[] }
 
-interface Slot { center: [number, number]; start: number; end: number }
+interface Slot { center: [number, number]; start: number; end: number; radiusKm: number }
 interface Eng { place: [number, number]; start: number; end: number; kind: 'clutch' | 'event' }
 interface Pending { from: string; to: string; place: [number, number]; start: number; end: number; born: number }
 interface Agent {
@@ -117,8 +117,8 @@ export function runSim(cfg: SimConfig): SimResult {
           const lead = (15 + rng() * 300) * MIN, dur = (30 + rng() * 150) * MIN
           const ang = rng() * Math.PI * 2, rr = Math.sqrt(rng()) * CITY_R
           const center: [number, number] = [a.lat + (rr / 111) * Math.cos(ang), a.lng + (rr / (111 * Math.cos(a.lat * Math.PI / 180))) * Math.sin(ang)]
-          const start = now + lead, end = start + dur
-          if (end <= now + HORIZON) { a.slots.push({ center, start, end }); nSlots++ }
+          const start = now + lead, end = start + dur, radiusKm = 1 + rng() * 14
+          if (end <= now + HORIZON) { a.slots.push({ center, start, end, radiusKm }); nSlots++ }
           if (end > now + HORIZON + MIN) A({ code: 'HORIZON', tick, at: now, from: a.id, msg: `créneau >18h` })
         }
       }
@@ -202,10 +202,11 @@ export function runSim(cfg: SimConfig): SimResult {
     }
 
     let onlineN = 0
-    const pos: number[] = cap ? new Array(TOT * 3) : []
+    // pos = stride 4 : [lat, lng, flag (0 off,1 on,2 rdv), rayon de dispo km (0 si hors-ligne)]
+    const pos: number[] = cap ? new Array(TOT * 4) : []
     for (let i = 0; i < TOT; i++) {
       const a = agents[i]; if (a.online) onlineN++
-      if (cap) { const rdv = a.agenda.some(e => e.start <= now && now < e.end); pos[i * 3] = a.lat; pos[i * 3 + 1] = a.lng; pos[i * 3 + 2] = rdv ? 2 : a.online ? 1 : 0 }
+      if (cap) { const rdv = a.agenda.some(e => e.start <= now && now < e.end); pos[i * 4] = a.lat; pos[i * 4 + 1] = a.lng; pos[i * 4 + 2] = rdv ? 2 : a.online ? 1 : 0; pos[i * 4 + 3] = a.online && a.slots[0] ? a.slots[0].radiusKm : 0 }
     }
     if (onlineN > peak) peak = onlineN
     if (cap) frames.push({ now, pos, online: onlineN, sent: nSent, accept: nAccept, refuse: nRefuse, alerts: alerts.length - aBefore })

@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1eb'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 231   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ec'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 232   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3264,7 +3264,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], suggestGroupEvent=false, onRegisteredObjs }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], suggestGroupEvent=false, onRegisteredObjs }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -3280,10 +3280,19 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   isCertified?:boolean;
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
+  slotsFull?:{lat:number;lng:number;radiusKm:number;start:number;end:number}[];
   suggestGroupEvent?:boolean;
 }) {
   const t = useT(lang)
   const EN = lang==='en'
+  // 🎨 Dans QUEL de mes créneaux (1/2/3) tombe un event ? (cercle qui le contient + chevauchement horaire). David 30.06.
+  const eventSlotIdx = (ev:any):number => {
+    const la = ev?.venue_lat, lo = ev?.venue_lng; if (typeof la!=='number' || typeof lo!=='number') return -1
+    const evMs = ev?.starts_at ? new Date(ev.starts_at).getTime() : null
+    for (let i=0;i<(slotsFull?.length||0);i++){ const s=slotsFull![i]; if(s.lat==null||s.lng==null) continue
+      if (haversineKm(la,lo,s.lat,s.lng) <= s.radiusKm + 0.05 && (evMs==null || (evMs>=s.start-3600000 && evMs<=s.end))) return i }
+    return -1
+  }
   // Nudge bienveillant « event de groupe » : doux, dismissible, max 1×/semaine, jamais culpabilisant.
   const [nudgeHidden,setNudgeHidden] = useState(()=>{ try{ const ts=localStorage.getItem('nudge_grpev_last'); return ts ? (Date.now()-Number(ts) < 7*86400000) : false }catch{ return false } })
   const dismissNudge = ()=>{ try{ localStorage.setItem('nudge_grpev_last', String(Date.now())) }catch{} setNudgeHidden(true) }
@@ -3988,6 +3997,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const km = eventKm(ev, centerLat ?? 46.5197, centerLng ?? 6.6323)
           const cPhoto = (ev as any).creatorPhoto
           const cat = eventCat(ev)  // 🎨 catégorie + couleur (prototype système couleurs)
+          const slotIdx = eventSlotIdx(ev)  // 🎨 dans quel de MES créneaux (1/2/3) tombe l'event
           return (
           <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
             {/* Photo — DUOTONE par catégorie (photo désaturée + voile de la couleur du type). Prototype système couleurs. */}
@@ -4012,7 +4022,11 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               {/* Ligne 1 : créateur (décalé sous l'avatar) + 📡 distance radar à droite */}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:3,marginLeft:cPhoto?40:0,minHeight:cPhoto?16:0}}>
                 <span style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}><span style={{fontSize:11.5,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.creator||''}</span>{(ev as any).pinned && <span title={EN?'Fixed event':'Event fixe'} style={{fontSize:10,flexShrink:0}}>📌</span>}</span>
-                {km!=null && <KmRadar km={km}/>}
+                <span style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
+                  {/* 🎨 Dans quel de MES créneaux tombe l'event (couleur 1/2/3) — David 30.06 */}
+                  {slotIdx>=0 && <span style={{fontSize:8.5,fontWeight:900,color:'#fff',background:SLOT_COLORS[slotIdx%SLOT_COLORS.length],borderRadius:5,padding:'1px 6px',whiteSpace:'nowrap'}}>Créneau {slotIdx+1}</span>}
+                  {km!=null && <KmRadar km={km}/>}
+                </span>
               </div>
               <div style={{fontSize:11,color:C.white,fontWeight:800,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕐 {locDay(fixEventDate(ev.date),EN)} · {ev.time} <span style={{color:C.whiteMid,fontWeight:600}}>· {eventDurLabel(ev)}</span></div>
               <div style={{fontSize:10.5,color:C.whiteMid,fontWeight:600,marginBottom:7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(ev as any).home_private?'🏠 ':'📍 '}{evLieuDisplay(ev,EN)}</div>
@@ -11985,6 +11999,7 @@ export default function App2() {
                 availSlots={(user as any)?.is_available && (user as any)?.available_until
                   ? [{ start: (user as any).available_from ? new Date((user as any).available_from).getTime() : Date.now(), end: new Date((user as any).available_until).getTime() }]
                   : []}
+                slotsFull={[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>({ lat:s.lat, lng:s.lng, radiusKm:(s.radius_km ?? 3), start:new Date(s.start_at).getTime(), end:new Date(s.end_at).getTime() }))}
                 suggestGroupEvent={(()=>{ try{
                   const ageD=(user as any)?.created_at ? (Date.now()-new Date((user as any).created_at).getTime())/86400000 : 0
                   const recv=(clutches as any[]).filter((c:any)=>c.receiver_id===user?.id).length

@@ -18,7 +18,7 @@ import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, swee
 import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
-import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
+import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, evaluateSchedule as foEvaluateSchedule, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e5'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 225   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e6'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 226   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -12168,6 +12168,24 @@ export default function App2() {
                       if (isNewRec) {
                         const accept = async () => {
                           if (paused) { showToast(lang==='en'?'⏸ On hold — you have a meetup at that time':'⏸ En pause — tu as un RDV à cette heure', C.salmon); return }
+                          // 🗓️ FORTERESSE MULTI-ENGAGEMENTS (branchée 30.06) — l'EXCLUSION (chevauchement) est déjà gérée
+                          //    (pause + contrainte DB). Ici on attrape l'ENCHAÎNEMENT : 2 RDV qui ne se chevauchent pas
+                          //    mais trop loin l'un de l'autre (échecs 20h30 → Léa 22h30 ailleurs). Alerte NON bloquante (gradient).
+                          try {
+                            const base = new Date((c as any).counter_time || c.proposed_time).getTime()
+                            if (realGps && (c as any).venue_lat != null && (c as any).venue_lng != null && base) {
+                              const agenda = (clutches as any[])
+                                .filter((x:any)=> x.id!==c.id && ['confirmed','accepted','checked_in'].includes(localConfirmed.has(x.id)?'confirmed':x.status) && x.venue_lat!=null && x.venue_lng!=null && (x.counter_time||x.proposed_time))
+                                .map((x:any)=>{ const b=new Date(x.counter_time||x.proposed_time).getTime(); return { place:[x.venue_lat,x.venue_lng] as [number,number], start:b, end:b+(x.duration_minutes||120)*60000 } })
+                              const cand = { place:[(c as any).venue_lat,(c as any).venue_lng] as [number,number], start:base, end:base+((c as any).duration_minutes||120)*60000 }
+                              const res = foEvaluateSchedule(Date.now(), realGps, agenda, cand)
+                              if (!res.ok && (res.reason==='CHAINING'||res.reason==='REACH')) {
+                                showToast(lang==='en'
+                                  ? `⚠️ Tight chain: ~${Math.round(res.needMin||0)} min to travel, ~${Math.round(res.haveMin||0)} min free — sure you can make it?`
+                                  : `⚠️ Enchaînement serré : ~${Math.round(res.needMin||0)} min de trajet, ~${Math.round(res.haveMin||0)} min libres — sûr·e d'y arriver ?`, C.salmon)
+                              }
+                            }
+                          } catch {}
                           setLocalConfirmed(prev=>new Set([...prev,c.id]))
                           setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'confirmed'}:cl))
                           try { localStorage.setItem(`clutch_locked_at_${c.id}`, String(Date.now())); localStorage.setItem(`verrou_shown_${c.id}`, String(Date.now())) } catch {}

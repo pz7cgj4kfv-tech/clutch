@@ -120,8 +120,11 @@ const DAYPART_LABELS: Record<DayPartKey, [string, string, string, string]> = {
 function localMidnight(now: number, offset: number): number {
   const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset); return d.getTime()
 }
-export function dayParts(now: number, horizonH = 18, minMinutes = 20): DayPart[] {
+// leadMin = marge mini AVANT le début (David 30.06 : le moment EN COURS commence à maintenant +1h, pas
+//   maintenant). Du coup un moment sans place suffisante après ce +1h disparaît tout seul (ex : « matin » à 11h).
+export function dayParts(now: number, horizonH = 18, minMinutes = 20, leadMin = 0): DayPart[] {
   const horizonEnd = now + horizonH * 3_600_000
+  const earliest = now + leadMin * 60_000
   const out: DayPart[] = []
   for (let off = 0; off <= 2; off++) {
     const mid = localMidnight(now, off)
@@ -129,8 +132,8 @@ export function dayParts(now: number, horizonH = 18, minMinutes = 20): DayPart[]
       const start = mid + def.from * 3_600_000
       const end   = mid + def.to   * 3_600_000
       if (end <= now || start >= horizonEnd) continue          // déjà passé ou hors horizon
-      const cStart = Math.max(start, now), cEnd = Math.min(end, horizonEnd)
-      if (cEnd - cStart < minMinutes * 60_000) continue        // sliver inutile
+      const cStart = Math.max(start, earliest), cEnd = Math.min(end, horizonEnd)
+      if (cEnd - cStart < minMinutes * 60_000) continue        // pas (plus) assez de place → le moment disparaît
       // Étiquette : la nuit (0-6) se rattache au soir précédent → labelOffset = off - 1.
       let labelOff = def.key === 'nuit' ? off - 1 : off
       if (labelOff < 0) labelOff = 0                            // on est DEDANS (ex : 3h du matin) → « cette nuit »

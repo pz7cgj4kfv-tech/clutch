@@ -18,7 +18,7 @@ import { onRegister as eventOnRegister, responseDeadlineMs as evDeadlineMs, swee
 import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lieu de RDV (prévenir la receveuse, jamais bloquer)
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
-import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, evaluateSchedule as foEvaluateSchedule, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
+import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e9'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 229   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e3'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 223   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2298,25 +2298,6 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
         const _q = personaQuip(getPersona(), fz.severity===3?'infeasible_trip':'tight_trip', lang as 'fr'|'en')
         showToast(_q ? `${_main}  ${_q}` : _main, fz.severity===3?C.red:C.orange)
         setFeasAck(true); setLoading(false); return
-      }
-    } catch {}
-    // 🗓️ ENCHAÎNEMENT RÉEL (distance) vs mes RDV CONFIRMÉS — attrape « échecs 20h30 → Léa 22h30 ailleurs » (un RDV
-    //    AVANT, que le check ci-dessus rate car il ne regarde que le suivant). evaluateSchedule = vrai trajet. 2 temps.
-    try {
-      if (venueLat && venueLng && !feasAck) {
-        const { data: myCl } = await supabase.from('clutches')
-          .select('venue_lat,venue_lng,proposed_time,counter_time,duration_minutes,status')
-          .or(`sender_id.eq.${from.id},receiver_id.eq.${from.id}`).in('status',['confirmed','accepted','checked_in'])
-        const agenda = (myCl||[]).filter((x:any)=>x.venue_lat!=null&&x.venue_lng!=null&&(x.counter_time||x.proposed_time))
-          .map((x:any)=>{ const b=new Date(x.counter_time||x.proposed_time).getTime(); return { place:[x.venue_lat,x.venue_lng] as [number,number], start:b, end:b+(x.duration_minutes||120)*60000 } })
-        const cand = { place:[venueLat,venueLng] as [number,number], start:pt.getTime(), end:pt.getTime()+(isQuickDate?60:120)*60000 }
-        const res = foEvaluateSchedule(Date.now(), null, agenda, cand)
-        if (!res.ok && (res.reason==='CHAINING'||res.reason==='EXCLUSION')) {
-          showToast(lang==='fr'
-            ? `⚠️ Enchaînement serré avec un autre RDV : ~${Math.round(res.needMin||0)} min de trajet. Envoyer quand même ?`
-            : `⚠️ Tight chain with another meetup: ~${Math.round(res.needMin||0)} min travel. Send anyway?`, C.orange)
-          setFeasAck(true); setLoading(false); return
-        }
       }
     } catch {}
     const venueLabel=venueAddress?`${venueInput.trim()} · ${venueAddress}`:venueInput.trim()
@@ -5096,7 +5077,6 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
   const lang = fbLang||'fr'
   const other = clutch.sender_id===userId ? clutch.receiver : clutch.sender
   const [selected,setSelected] = useState<string|null>(null)
-  const [fav,setFav] = useState(false)          // ⭐ garder en favori (remplace l'ancienne 2ᵉ modale « garder le contact »)
   const [done,setDone] = useState(false)
   const [submitErr,setSubmitErr] = useState(false)
   const gpsVerified = !!(clutch as any).checkin_verified
@@ -5138,8 +5118,6 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
       pts_delta: r.pts,
       gps_verified_by_reporter: gpsVerified,
     }, { onConflict: 'clutch_id,given_by' })
-    // ⭐ Favori (remplace l'ancienne 2ᵉ modale « garder le contact ») — table favorites.
-    if (fav) { try { await supabase.from('favorites').upsert({ user_id: userId, profile_id: otherId }, { onConflict: 'user_id,profile_id' }) } catch {} }
     const ptsDelta = r.pts
     onScore(ptsDelta)
     setDone(true)
@@ -5202,15 +5180,6 @@ function FeedbackSheet({ clutch, userId, lang:fbLang, onClose, onScore, pendingC
                 )
               })}
             </div>
-            {/* ⭐ Garder en favori — une seule étape (fini la 2ᵉ modale « contact »). Favoris = gens + events. */}
-            <button onClick={()=>setFav(f=>!f)}
-              style={{display:'flex',alignItems:'center',gap:11,width:'100%',padding:'11px 14px',marginBottom:12,background:fav?'rgba(255,191,158,.12)':'transparent',border:`1.5px solid ${fav?C.salmon:C.border}`,borderRadius:14,cursor:'pointer',fontFamily:'inherit',transition:'all .15s'}}>
-              <span style={{fontSize:21,flexShrink:0}}>{fav?'⭐':'☆'}</span>
-              <div style={{flex:1,textAlign:'left'}}>
-                <div style={{fontSize:13,fontWeight:800,color:C.white}}>{lang==='en'?`Add ${other?.name||''} to favorites`:`Garder ${other?.name||''} en favori`}</div>
-                <div style={{fontSize:10,color:C.whiteMid}}>{lang==='en'?'They show up first when you’re both online':'Il·elle remonte en premier quand vous êtes en ligne tous les deux'}</div>
-              </div>
-            </button>
             {submitErr && <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(220,80,80,.12)',borderRadius:10,color:C.red,fontSize:12,fontWeight:700,textAlign:'center'}}>{lang==='en'?'Could not save — please try again':'Enregistrement impossible — réessaie'}</div>}
             <button onClick={submit} disabled={!selected}
               style={{width:'100%',padding:'14px',background:selected?C.plum:'rgba(255,255,255,.08)',border:'none',borderRadius:16,color:selected?C.bg:C.whiteMid,fontSize:15,fontWeight:900,cursor:selected?'pointer':'default',fontFamily:'inherit'}}>
@@ -9419,7 +9388,6 @@ export default function App2() {
   const [placeQuery,setPlaceQuery] = useState('')
   const [placeRes,setPlaceRes]     = useState<any[]>([])
   const [placeBusy,setPlaceBusy]   = useState(false)
-  const placeTimer = useRef<ReturnType<typeof setTimeout>|null>(null)  // débounce autocomplete carte (David 30.06)
   const searchPlace = async (q:string) => {
     const query = q.trim(); if (query.length < 3) { setPlaceRes([]); return }
     setPlaceBusy(true)
@@ -9466,7 +9434,7 @@ export default function App2() {
   //    jamais (prevFlow='carte') → départ proposé à +5min, curseur de rayon coincé (bug David 30.06).
   const [fromTime,setFromTime] = useState(() => makeSlots(new Date(Date.now()+60*60_000))[0] || initSlots[0] || '18:00')
   const [untilTime,setUntilTime] = useState(() => makeSlots(new Date(Date.now()+120*60_000))[0] || initSlots[4] || '20:00')
-  const [rayon,setRayon]       = useState(3)   // défaut 3km (David 30.06 : « +1h, rayon 3km »). Plancher 15min=1km. Slider jusqu'à 50km, plafonné par le Cône.
+  const [rayon,setRayon]       = useState(10)  // défaut 10km : couvre Lausanne + Morges/Renens/Pully (maximise les présences). Slider jusqu'à 100km.
   // 🕐 Moment de la journée choisi par bouton (ce soir / cette nuit / demain aprem…). Porte les EPOCHS exacts
   // (jour inclus) → handleOuvrirFenetre les utilise tels quels, sans l'ambiguïté « HH:MM aujourd'hui ».
   // null = l'user a réglé à la molette → on retombe sur le calcul HH:MM classique.
@@ -11012,8 +10980,8 @@ export default function App2() {
                     <div style={{display:'flex',alignItems:'center',gap:6,background:'#fff',borderRadius:20,padding:'7px 12px',boxShadow:'0 2px 10px rgba(83,41,67,.18)'}}>
                       <span style={{fontSize:13,opacity:.6}}>🔎</span>
                       <input value={placeQuery}
-                        onChange={e=>{ const v=e.target.value; setPlaceQuery(v); if(placeTimer.current) clearTimeout(placeTimer.current); if(!v.trim()){ setPlaceRes([]); return } placeTimer.current=setTimeout(()=>searchPlace(v), 500) /* autocomplete au fil de la frappe */ }}
-                        onKeyDown={e=>{ if(e.key==='Enter'){ if(placeTimer.current) clearTimeout(placeTimer.current); searchPlace(placeQuery) } }}
+                        onChange={e=>{ const v=e.target.value; setPlaceQuery(v); if(!v.trim()) setPlaceRes([]) }}
+                        onKeyDown={e=>{ if(e.key==='Enter') searchPlace(placeQuery) }}
                         placeholder={lang==='en'?'Search a place…':'Chercher un lieu…'}
                         style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:13,color:C.white,fontFamily:'inherit',minWidth:0}}/>
                       {placeQuery && <button onClick={()=>{setPlaceQuery('');setPlaceRes([])}} style={{border:'none',background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',padding:0,lineHeight:1}}>✕</button>}
@@ -11225,9 +11193,7 @@ export default function App2() {
                     Tap = je suis dispo de MAINTENANT jusqu'à la fin de ce moment (ex : « ce soir » → jusqu'à minuit).
                     Porte les epochs exacts (jour inclus) → pas d'ambiguïté de lendemain. */}
                 {(()=>{
-                  // 🌳 ARBRE DE DÉCISION (David 30.06) : début du moment EN COURS = maintenant +1h (lead 60),
-                  //    place mini 30 min → un moment sans place dispo disparaît tout seul (matin à 11h, etc.).
-                  const parts = dayParts(Date.now(), 18, 30, 60)
+                  const parts = dayParts(Date.now())
                   if (!parts.length) return null
                   const hhmm = (ms:number)=>{ const d=new Date(ms); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
                   const keyOf = (p:any)=>p.key+p.dayOffset
@@ -11265,14 +11231,10 @@ export default function App2() {
                 <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}>
                   <JogWheel slots={initSlots} value={fromTime} onChange={v => {
                     setPresetWin(null); setPickedMoments([])   // réglage manuel → on quitte le mode « moments » (créneau unique)
-                    // 🔧 FIX monstre bug (David 30.06) : la FIN suit toujours le DÉBUT en gardant la DURÉE de la fenêtre.
-                    //    → le début bouge librement, la fin n'est jamais « collée/bloquée ». (Pour changer la durée : molette de fin.)
-                    const toMin=(s:string)=>{ const [a,b]=s.split(':').map(Number); return a*60+b }
-                    let dur = toMin(untilTime) - toMin(fromTime); if (dur <= 0) dur += 1440  // durée ACTUELLE de la fenêtre (gère minuit)
-                    dur = Math.max(30, Math.min(18*60, dur))                                // bornée 30 min … 18 h
-                    const nu = (toMin(v) + dur) % 1440
                     setFromTime(v)
-                    setUntilTime(`${String(Math.floor(nu/60)).padStart(2,'0')}:${String(nu%60).padStart(2,'0')}`)
+                    const [h,m]=v.split(':').map(Number); const b=new Date(); b.setHours(h,m,0,0)
+                    const ns=makeSlots(new Date(b.getTime()+5*60_000)).slice(0,216)
+                    if (!ns.includes(untilTime)) setUntilTime(ns[1]||ns[0])
                   }}/>
                   <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
                   <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setPickedMoments([]); setUntilTime(v) }}/>
@@ -11575,11 +11537,11 @@ export default function App2() {
                       <div style={{display:'flex',alignItems:'center',gap:10,background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
                         <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu as bougé de ~${fmtKm(gpsDrift.km)} depuis ton lieu publié`:`You've moved ~${fmtKm(gpsDrift.km)} from your published spot`}</div>
-                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Tes créneaux pointent encore sur l’ancien endroit. Les recaler sur ta position actuelle ?':'Your slots still point to the old spot. Move them to where you are now?'}</div>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu t'es éloigné·e de ~${fmtKm(gpsDrift.km)} de ta zone`:`You've moved ~${fmtKm(gpsDrift.km)} from your zone`}</div>
+                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Recale ta zone sur ta position pour rester atteignable.':'Recenter your zone on your spot to stay reachable.'}</div>
                         </div>
-                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Laisser':'Keep'}</button>
-                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler sur moi':'Move here'}</button>
+                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Garder':'Keep'}</button>
+                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler ici':'Recenter'}</button>
                       </div>
                     )}
 
@@ -12194,24 +12156,6 @@ export default function App2() {
                       if (isNewRec) {
                         const accept = async () => {
                           if (paused) { showToast(lang==='en'?'⏸ On hold — you have a meetup at that time':'⏸ En pause — tu as un RDV à cette heure', C.salmon); return }
-                          // 🗓️ FORTERESSE MULTI-ENGAGEMENTS (branchée 30.06) — l'EXCLUSION (chevauchement) est déjà gérée
-                          //    (pause + contrainte DB). Ici on attrape l'ENCHAÎNEMENT : 2 RDV qui ne se chevauchent pas
-                          //    mais trop loin l'un de l'autre (échecs 20h30 → Léa 22h30 ailleurs). Alerte NON bloquante (gradient).
-                          try {
-                            const base = new Date((c as any).counter_time || c.proposed_time).getTime()
-                            if (realGps && (c as any).venue_lat != null && (c as any).venue_lng != null && base) {
-                              const agenda = (clutches as any[])
-                                .filter((x:any)=> x.id!==c.id && ['confirmed','accepted','checked_in'].includes(localConfirmed.has(x.id)?'confirmed':x.status) && x.venue_lat!=null && x.venue_lng!=null && (x.counter_time||x.proposed_time))
-                                .map((x:any)=>{ const b=new Date(x.counter_time||x.proposed_time).getTime(); return { place:[x.venue_lat,x.venue_lng] as [number,number], start:b, end:b+(x.duration_minutes||120)*60000 } })
-                              const cand = { place:[(c as any).venue_lat,(c as any).venue_lng] as [number,number], start:base, end:base+((c as any).duration_minutes||120)*60000 }
-                              const res = foEvaluateSchedule(Date.now(), realGps, agenda, cand)
-                              if (!res.ok && (res.reason==='CHAINING'||res.reason==='REACH')) {
-                                showToast(lang==='en'
-                                  ? `⚠️ Tight chain: ~${Math.round(res.needMin||0)} min to travel, ~${Math.round(res.haveMin||0)} min free — sure you can make it?`
-                                  : `⚠️ Enchaînement serré : ~${Math.round(res.needMin||0)} min de trajet, ~${Math.round(res.haveMin||0)} min libres — sûr·e d'y arriver ?`, C.salmon)
-                              }
-                            }
-                          } catch {}
                           setLocalConfirmed(prev=>new Set([...prev,c.id]))
                           setClutches(prev=>(prev as any[]).map((cl:any)=>cl.id===c.id?{...cl,status:'confirmed'}:cl))
                           try { localStorage.setItem(`clutch_locked_at_${c.id}`, String(Date.now())); localStorage.setItem(`verrou_shown_${c.id}`, String(Date.now())) } catch {}
@@ -13128,8 +13072,9 @@ export default function App2() {
               setFeedbackClutch(null)
               setTerminerClutchId(null)
               showToast('✓ RDV terminé — merci !', C.green)
-              // 🗑️ Plus de 2ᵉ modale « garder le contact » (David 30.06) : l'⭐ favori est DANS le feedback, en 1 geste.
-              //    « Contact » n'existe plus → c'est Favoris (gens + events).
+              // Proposer de garder le contact après le feedback
+              const clutchForContact = (clutches as any[]).find((cl:any)=>cl.id===doneId) || feedbackClutch
+              if (clutchForContact) setTimeout(()=>setKeepContactClutch(clutchForContact), 400)
               loadClutches()
               // Si plus de créneau actif → proposer d'en ouvrir un nouveau (toast discret, pas de redirect forcée)
               if (user && !(user.is_available && (user as any).available_until && new Date((user as any).available_until) > new Date())) {

@@ -22,10 +22,13 @@ export type Gender = 'F' | 'M'
 type SeekG = 'all' | 'man' | 'woman'
 export type Code = 'CHAINING' | 'EXCLUSION' | 'REACH' | 'CAP_RECEIVED' | 'FILTER' | 'EVENT_SEATS' | 'HORIZON' | 'COOLDOWN'
 export interface Alert { code: Code; tick: number; at: number; from: string; to?: string; msg: string }
-export interface AgentMeta { id: string; gender: Gender; age: number; premium: boolean; seekGender: SeekG }
+export interface AgentMeta { id: string; name: string; gender: Gender; age: number; premium: boolean; seekGender: SeekG; interests: string[] }
 export interface Frame { now: number; pos: number[]; online: number; sent: number; accept: number; refuse: number; alerts: number } // pos = [lat,lng,flag] aligné sur meta (flag 0 off,1 on,2 rdv)
+// 🎬 Le « vécu » d'un agent (pour les cartes de suivi POV). Une ligne = un événement de SA vie.
+export interface LifeEvent { tick: number; at: number; kind: 'sent' | 'received' | 'locked' | 'declined' | 'event'; otherIdx?: number; msg: string }
 export interface SimResult {
   meta: AgentMeta[]; frames: Frame[]; alerts: Alert[]
+  life: Record<number, LifeEvent[]>          // index agent → sa timeline (capée) pour les cartes de suivi
   byCode: Record<string, number>
   stats: { n: number; seed: number; ticks: number; slots: number; sent: number; accept: number; refuse: number; events: number; joins: number; peakOnline: number; thermoLabel: string; blocked: number }
 }
@@ -38,7 +41,7 @@ interface Slot { center: [number, number]; start: number; end: number }
 interface Eng { place: [number, number]; start: number; end: number; kind: 'clutch' | 'event' }
 interface Pending { from: string; to: string; place: [number, number]; start: number; end: number; born: number }
 interface Agent {
-  id: string; gender: Gender; age: number; interests: string[]; lat: number; lng: number; premium: boolean
+  id: string; idx: number; name: string; gender: Gender; age: number; interests: string[]; lat: number; lng: number; premium: boolean
   seekGender: SeekG; recepPause: boolean; online: boolean; slots: Slot[]; agenda: Eng[]
   cooldownUntil: Record<string, number>; receivedToday: number; reliability: number
   pOnline: number; pSend: number; pAccept: number; pRefuse: number; pMove: number; pEvent: number; nSlots: number
@@ -51,6 +54,9 @@ const schedMsg = (r: SchedResult) =>
       : r.reason === 'REACH' ? `RDV inatteignable : ${Math.round(r.needMin || 0)} min nécessaires, ${Math.round(r.haveMin || 0)} min avant (forteresse)`
         : `horizon 18h dépassé`
 const POOL =['Café', 'Jazz', 'Rando', 'Yoga', 'Ciné', 'Cuisine', 'Voyage', 'Art', 'Musique', 'Sport', 'Lecture', 'Photo', 'Danse', 'Tech', 'Nature', 'Vin']
+const NAMES_F = ['Léa', 'Camille', 'Sofia', 'Emma', 'Nora', 'Anaïs', 'Chloé', 'Inès', 'Manon', 'Eva', 'Julie', 'Sarah', 'Lucie', 'Mila', 'Jade', 'Alice']
+const NAMES_M = ['Lucas', 'Thomas', 'Nathan', 'Hugo', 'Yanis', 'Théo', 'Noé', 'Léo', 'Adam', 'Gabriel', 'Sam', 'Max', 'Eliott', 'Marius', 'Noah', 'Liam']
+const hm = (ms: number) => { const m = Math.round((ms - T0) / 60000); return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}` }
 
 export function runSim(cfg: SimConfig): SimResult {
   const N = cfg.n, rng = mulberry32(cfg.seed >>> 0), pick = <T,>(a: T[]) => a[Math.floor(rng() * a.length)]
@@ -63,8 +69,9 @@ export function runSim(cfg: SimConfig): SimResult {
     const lng = LAUSANNE[1] + (r / (111 * Math.cos(LAUSANNE[0] * Math.PI / 180))) * Math.sin(ang)
     const k = 2 + Math.floor(rng() * 4); const ints = new Set<string>(); while (ints.size < k) ints.add(pick(POOL))
     const seekGender = (['all', 'all', 'man', 'woman'] as SeekG[])[Math.floor(rng() * 4)]
+    const name = (gender === 'F' ? NAMES_F : NAMES_M)[Math.floor(rng() * 16)]
     agents.push({
-      id: 'a' + i, gender, age: 20 + Math.floor(rng() * 30), interests: [...ints], lat, lng,
+      id: 'a' + i, idx: i, name, gender, age: 20 + Math.floor(rng() * 30), interests: [...ints], lat, lng,
       premium: rng() < 0.15, seekGender, recepPause: rng() < 0.08, online: false, slots: [], agenda: [],
       cooldownUntil: {}, receivedToday: 0, reliability: Math.round(40 + rng() * 60),
       pOnline: 0.1 + rng() * 0.5, pSend: 0.15 + rng() * 0.5, pAccept: 0.3 + rng() * 0.5, pRefuse: 0.1 + rng() * 0.3,
@@ -75,6 +82,9 @@ export function runSim(cfg: SimConfig): SimResult {
   const pendings: Pending[] = [], events: Ev[] = [], alerts: Alert[] = [], frames: Frame[] = []
   let nSlots = 0, nSent = 0, nAccept = 0, nRefuse = 0, nEvents = 0, nJoin = 0, egid = 0, peak = 0, nBlocked = 0
   const A = (a: Alert) => { if (alerts.length < 500000) alerts.push(a) }
+  // 🎬 Journal de vie par agent (capé) → cartes de suivi POV. Capté pour TOUS (léger), l'UI choisit qui afficher.
+  const life: Record<number, LifeEvent[]> = {}, LIFE_CAP = 60
+  const logLife = (idx: number, e: LifeEvent) => { (life[idx] ||= []); if (life[idx].length < LIFE_CAP) life[idx].push(e) }
   const STEP = 5 * MIN, TICKS = HORIZON / STEP
 
   for (let tick = 0; tick < TICKS; tick++) {
@@ -116,6 +126,8 @@ export function runSim(cfg: SimConfig): SimResult {
           else {
             const place = mySlot.center, start = Math.max(now + 15 * MIN, mySlot.start), end = start + DEFAULT_RDV_MIN * MIN
             pendings.push({ from: a.id, to: best.id, place, start, end, born: now }); nSent++; best.receivedToday++
+            logLife(a.idx, { tick, at: now, kind: 'sent', otherIdx: best.idx, msg: `📤 Tu clutches ${best.name} pour ${hm(start)}` })
+            logLife(best.idx, { tick, at: now, kind: 'received', otherIdx: a.idx, msg: `📥 ${a.name} te clutche pour ${hm(start)}` })
             if (!genderAllowed(best.seekGender, a.gender)) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `filtre genre de ${best.id} exclut ${a.id} (C1)` })
             if (best.recepPause) A({ code: 'FILTER', tick, at: now, from: a.id, to: best.id, msg: `${best.id} en mode Pause (C3)` })
             if (best.gender === 'F' && best.receivedToday > 5) A({ code: 'CAP_RECEIVED', tick, at: now, from: best.id, msg: `${best.id} ♀ a ${best.receivedToday} reçus/jour (>5) (A6/E1)` })
@@ -143,8 +155,10 @@ export function runSim(cfg: SimConfig): SimResult {
             }
             a.agenda.push(engA); sender.agenda.push(engB)
             a.slots = a.slots.filter(s => s.start !== mine.start); nAccept++
+            logLife(a.idx, { tick, at: now, kind: 'locked', otherIdx: sender.idx, msg: `🔒 RDV verrouillé avec ${sender.name} à ${hm(mine.start)}` })
+            logLife(sender.idx, { tick, at: now, kind: 'locked', otherIdx: a.idx, msg: `🔒 ${a.name} a verrouillé · RDV à ${hm(mine.start)}` })
           }
-        } else if (roll < a.pAccept + a.pRefuse) { byId[mine.from].cooldownUntil[a.id] = now + 48 * 3600 * 1000; nRefuse++ }
+        } else if (roll < a.pAccept + a.pRefuse) { byId[mine.from].cooldownUntil[a.id] = now + 48 * 3600 * 1000; nRefuse++; logLife(byId[mine.from].idx, { tick, at: now, kind: 'declined', otherIdx: a.idx, msg: `❌ ${a.name} a refusé` }) }
         pendings.splice(pendings.indexOf(mine), 1)
       }
       // events — créer (l'event occupe MON agenda → soumis à la forteresse en mode corrigé)
@@ -183,8 +197,8 @@ export function runSim(cfg: SimConfig): SimResult {
   const byCode: Record<string, number> = {}
   for (const al of alerts) byCode[al.code] = (byCode[al.code] || 0) + 1
   return {
-    meta: agents.map(a => ({ id: a.id, gender: a.gender, age: a.age, premium: a.premium, seekGender: a.seekGender })),
-    frames, alerts, byCode,
+    meta: agents.map(a => ({ id: a.id, name: a.name, gender: a.gender, age: a.age, premium: a.premium, seekGender: a.seekGender, interests: a.interests })),
+    frames, alerts, life, byCode,
     stats: { n: N, seed: cfg.seed, ticks: TICKS, slots: nSlots, sent: nSent, accept: nAccept, refuse: nRefuse, events: nEvents, joins: nJoin, peakOnline: peak, thermoLabel: thermostat(peak).label, blocked: nBlocked },
   }
 }

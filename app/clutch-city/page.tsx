@@ -28,12 +28,19 @@ export default function ClutchCity() {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(6)        // ticks / seconde
   const [busy, setBusy] = useState(false)
+  const [watched, setWatched] = useState<number[]>([])   // 👥 agents suivis (cartes POV)
   const cv = useRef<HTMLCanvasElement | null>(null)
 
   const run = (enf = enforce) => {
     setBusy(true); setPlaying(false)
-    setTimeout(() => { const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf }); setRes(r); setTick(0); setBusy(false); setPlaying(true) }, 30)
+    setTimeout(() => {
+      const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf }); setRes(r); setTick(0); setBusy(false); setPlaying(true)
+      // 👥 par défaut : on suit les ~8 personnes dont il se passe LE PLUS de choses (la ville la plus vivante).
+      const ranked = Object.keys(r.life).map(k => +k).sort((a, b) => (r.life[b]?.length || 0) - (r.life[a]?.length || 0))
+      setWatched(ranked.slice(0, 8))
+    }, 30)
   }
+  const toggleWatch = (idx: number) => setWatched(w => w.includes(idx) ? w.filter(x => x !== idx) : (w.length >= 12 ? w : [...w, idx]))
   useEffect(() => { run(false) }, [])  // run initial
   const toggleForteresse = () => { const v = !enforce; setEnforce(v); run(v) }
 
@@ -72,7 +79,26 @@ export default function ClutchCity() {
       if (flag === 2) { ctx.fillStyle = C.green; ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill(); ctx.strokeStyle = C.green + '66'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.stroke() }
       else { ctx.fillStyle = r.meta[i].gender === 'F' ? C.rose : '#8fb3e0'; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill() }
     }
-  }, [res, tick])
+    // 👥 SURLIGNAGE des suivis : halo doré + nom, par-dessus tout.
+    for (const i of watched) {
+      if (i >= r.meta.length) continue
+      const [x, y] = px(pos[i * 3], pos[i * 3 + 1]); const fl = pos[i * 3 + 2]
+      ctx.strokeStyle = '#E27C00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8.5, 0, 7); ctx.stroke()
+      ctx.fillStyle = fl === 0 ? 'rgba(226,124,0,.5)' : '#E27C00'; ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill()
+      ctx.fillStyle = '#f5e8de'; ctx.font = 'bold 10px system-ui'; ctx.fillText(r.meta[i].name, x + 11, y + 3.5)
+    }
+  }, [res, tick, watched])
+
+  // clic sur la carte → suivre/dé-suivre l'agent le plus proche
+  const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = res, c = cv.current; if (!r || !c) return
+    const rect = c.getBoundingClientRect(); const mx = (e.clientX - rect.left) / rect.width * c.width, my = (e.clientY - rect.top) / rect.height * c.height
+    const fr = r.frames[Math.min(tick, r.frames.length - 1)]; if (!fr) return
+    const px = (lat: number, lng: number): [number, number] => [((lng - BB.lngMin) / (BB.lngMax - BB.lngMin)) * c.width, (1 - (lat - BB.latMin) / (BB.latMax - BB.latMin)) * c.height]
+    let best = -1, bd = 18 * 18
+    for (let i = 0; i < r.meta.length; i++) { const [x, y] = px(fr.pos[i * 3], fr.pos[i * 3 + 1]); const d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; best = i } }
+    if (best >= 0) toggleWatch(best)
+  }
 
   const last = res ? res.frames[Math.min(tick, res.frames.length - 1)] : null
   const recent = useMemo(() => res ? res.alerts.filter(a => a.tick <= tick).slice(-14).reverse() : [], [res, tick])
@@ -111,7 +137,7 @@ export default function ClutchCity() {
           {/* CARTE + HORLOGE */}
           <div style={{ flex: '1 1 420px', minWidth: 300 }}>
             <div style={{ background: '#241019', border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-              <canvas ref={cv} width={560} height={420} style={{ width: '100%', height: 'auto', display: 'block' }} />
+              <canvas ref={cv} width={560} height={420} onClick={onCanvasClick} style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }} />
             </div>
             {/* contrôles horloge */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
@@ -162,7 +188,57 @@ export default function ClutchCity() {
           </div>
         </div>
 
-        <div style={{ fontSize: 11, color: C.mid, marginTop: 12, lineHeight: 1.6 }}>
+        {/* 👥 CARTES DE SUIVI (POV) — le vécu de ~10 personnes, dans une ville vivante */}
+        {res && watched.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 16, fontWeight: 900 }}>👥 Tes profils suivis <span style={{ fontSize: 12, color: C.mid, fontWeight: 600 }}>({watched.length})</span></div>
+              <div style={{ fontSize: 11, color: C.mid }}>clique un point sur la carte pour suivre / lâcher quelqu'un · clique une ligne → saute le film à ce moment</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 10 }}>
+              {watched.map(idx => {
+                const m = res.meta[idx]; if (!m) return null
+                const flag = last ? last.pos[idx * 3 + 2] : 0
+                const ev = (res.life[idx] || []).filter(e => e.tick <= tick)
+                const nSent = ev.filter(e => e.kind === 'sent').length, nRec = ev.filter(e => e.kind === 'received').length, nLock = ev.filter(e => e.kind === 'locked').length
+                const feed = ev.slice(-6).reverse()
+                const gCol = m.gender === 'F' ? C.rose : '#8fb3e0'
+                const stCol = flag === 2 ? C.green : flag === 1 ? C.rose : C.mid
+                const stLabel = flag === 2 ? 'en RDV' : flag === 1 ? 'en ligne' : 'hors-ligne'
+                return (
+                  <div key={idx} style={{ background: C.card, border: `1px solid ${flag === 2 ? C.green + '66' : C.border}`, borderRadius: 14, padding: '11px 12px', boxShadow: '0 2px 10px rgba(0,0,0,.18)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: '50%', background: gCol, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#1a0d16', fontSize: 17, flexShrink: 0 }}>{m.name[0]}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 900 }}>{m.name} <span style={{ fontSize: 11, color: C.mid, fontWeight: 600 }}>{m.gender === 'F' ? '♀' : '♂'} {m.age}{m.premium ? ' ⭐' : ''}</span></div>
+                        <div style={{ fontSize: 10.5, color: stCol, fontWeight: 800 }}>● {stLabel}</div>
+                      </div>
+                      <button onClick={() => toggleWatch(idx)} title="ne plus suivre" style={{ background: 'transparent', border: 'none', color: C.mid, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      {([['📤', nSent, 'envoyés'], ['📥', nRec, 'reçus'], ['🔒', nLock, 'RDV']] as [string, number, string][]).map(([e, v, l]) => (
+                        <div key={l} style={{ flex: 1, background: C.bg, borderRadius: 8, padding: '5px 4px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 15, fontWeight: 900, color: l === 'RDV' && v > 0 ? C.green : C.ink }}>{v}</div><div style={{ fontSize: 9, color: C.mid }}>{e} {l}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ maxHeight: 122, overflowY: 'auto' }}>
+                      {feed.length === 0 && <div style={{ fontSize: 11, color: C.mid, padding: '4px 0' }}>Rien encore — laisse tourner ▶︎</div>}
+                      {feed.map((e, i) => (
+                        <button key={i} onClick={() => { setPlaying(false); setTick(e.tick) }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.border}55` : 'none', padding: '4px 0', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          <span style={{ fontSize: 9.5, color: C.mid, fontWeight: 700 }}>{fmtClock(e.at)}</span>
+                          <div style={{ fontSize: 11, color: C.ink, lineHeight: 1.3 }}>{e.msg}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, color: C.mid, marginTop: 16, lineHeight: 1.6 }}>
           ⚠️ Les alertes sont <b style={{ color: C.ink }}>attendues</b> : le simulateur joue la permissivité actuelle de l'app, le COQ révèle les trous (cf. <code>docs/clutch-city-trous.md</code>).
           Au fil des corrections de la forteresse (enchaînement, exclusion…), ces compteurs <b style={{ color: C.green }}>fondront</b>. Headless : <code>npx tsx scripts/clutch-city.mts</code>.
         </div>

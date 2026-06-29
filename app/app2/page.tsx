@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e6'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 226   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e7'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 227   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9400,6 +9400,7 @@ export default function App2() {
   const [placeQuery,setPlaceQuery] = useState('')
   const [placeRes,setPlaceRes]     = useState<any[]>([])
   const [placeBusy,setPlaceBusy]   = useState(false)
+  const placeTimer = useRef<ReturnType<typeof setTimeout>|null>(null)  // débounce autocomplete carte (David 30.06)
   const searchPlace = async (q:string) => {
     const query = q.trim(); if (query.length < 3) { setPlaceRes([]); return }
     setPlaceBusy(true)
@@ -10992,8 +10993,8 @@ export default function App2() {
                     <div style={{display:'flex',alignItems:'center',gap:6,background:'#fff',borderRadius:20,padding:'7px 12px',boxShadow:'0 2px 10px rgba(83,41,67,.18)'}}>
                       <span style={{fontSize:13,opacity:.6}}>🔎</span>
                       <input value={placeQuery}
-                        onChange={e=>{ const v=e.target.value; setPlaceQuery(v); if(!v.trim()) setPlaceRes([]) }}
-                        onKeyDown={e=>{ if(e.key==='Enter') searchPlace(placeQuery) }}
+                        onChange={e=>{ const v=e.target.value; setPlaceQuery(v); if(placeTimer.current) clearTimeout(placeTimer.current); if(!v.trim()){ setPlaceRes([]); return } placeTimer.current=setTimeout(()=>searchPlace(v), 500) /* autocomplete au fil de la frappe */ }}
+                        onKeyDown={e=>{ if(e.key==='Enter'){ if(placeTimer.current) clearTimeout(placeTimer.current); searchPlace(placeQuery) } }}
                         placeholder={lang==='en'?'Search a place…':'Chercher un lieu…'}
                         style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:13,color:C.white,fontFamily:'inherit',minWidth:0}}/>
                       {placeQuery && <button onClick={()=>{setPlaceQuery('');setPlaceRes([])}} style={{border:'none',background:'transparent',color:C.whiteMid,fontSize:14,cursor:'pointer',padding:0,lineHeight:1}}>✕</button>}

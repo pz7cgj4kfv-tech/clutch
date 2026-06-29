@@ -6,7 +6,7 @@
 //    le film à l'instant du bug. cf. docs/clutch-city-comportements.md + docs/clutch-city-trous.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { runSim, LAUSANNE, type SimResult, type Code } from '@/lib/sim/engine'
+import { runSim, LAUSANNE, type SimResult, type Code, type CustomSpec } from '@/lib/sim/engine'
 
 const C = { bg: '#2a1020', card: '#3a1a2e', ink: '#f5e8de', mid: '#c9a9bd', border: '#5a3048', green: '#77BC1F', rose: '#EB6BAF', plum: '#532943', orange: '#E27C00', red: '#E05353' }
 const CODES: Code[] = ['CHAINING', 'EXCLUSION', 'REACH', 'CAP_RECEIVED', 'FILTER', 'EVENT_SEATS', 'HORIZON', 'COOLDOWN']
@@ -29,16 +29,24 @@ export default function ClutchCity() {
   const [speed, setSpeed] = useState(6)        // ticks / seconde
   const [busy, setBusy] = useState(false)
   const [watched, setWatched] = useState<number[]>([])   // 👥 agents suivis (cartes POV)
+  const [customs, setCustoms] = useState<CustomSpec[]>([])  // 👤 profils créés à la main
+  const [showCreate, setShowCreate] = useState(false)
+  const [nm, setNm] = useState(''), [cg, setCg] = useState<'F' | 'M'>('F'), [cage, setCage] = useState(27), [csg, setCsg] = useState<'all' | 'man' | 'woman'>('all')
   const cv = useRef<HTMLCanvasElement | null>(null)
 
-  const run = (enf = enforce) => {
+  const run = (enf = enforce, cst = customs) => {
     setBusy(true); setPlaying(false)
     setTimeout(() => {
-      const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf }); setRes(r); setTick(0); setBusy(false); setPlaying(true)
-      // 👥 par défaut : on suit les ~8 personnes dont il se passe LE PLUS de choses (la ville la plus vivante).
-      const ranked = Object.keys(r.life).map(k => +k).sort((a, b) => (r.life[b]?.length || 0) - (r.life[a]?.length || 0))
-      setWatched(ranked.slice(0, 8))
+      const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf, custom: cst }); setRes(r); setTick(0); setBusy(false); setPlaying(true)
+      // 👤 mes profils créés (indices n..) TOUJOURS suivis · puis 👥 les plus vivants pour compléter.
+      const customIdx = cst.map((_, j) => n + j)
+      const ranked = Object.keys(r.life).map(k => +k).filter(i => !customIdx.includes(i)).sort((a, b) => (r.life[b]?.length || 0) - (r.life[a]?.length || 0))
+      setWatched([...customIdx, ...ranked].slice(0, 12))
     }, 30)
+  }
+  const addCustom = () => {
+    const spec: CustomSpec = { name: nm.trim() || (cg === 'F' ? 'Elle' : 'Lui'), gender: cg, age: cage, seekGender: csg }
+    const next = [...customs, spec]; setCustoms(next); setShowCreate(false); setNm(''); run(enforce, next)
   }
   const toggleWatch = (idx: number) => setWatched(w => w.includes(idx) ? w.filter(x => x !== idx) : (w.length >= 12 ? w : [...w, idx]))
   useEffect(() => { run(false) }, [])  // run initial
@@ -132,6 +140,28 @@ export default function ClutchCity() {
           🏰 Forteresse : <b style={{ color: enforce ? C.green : C.orange }}>{enforce ? 'CORRIGÉE ✅ (evaluateSchedule)' : 'permissive (app actuelle)'}</b>
           <span style={{ color: C.mid, fontWeight: 500 }}> — clique pour {enforce ? 'revoir les trous' : 'les faire fondre'}{enforce && res ? ` · ${res.stats.blocked} RDV impossibles bloqués` : ''}</span>
         </button>
+
+        {/* 👤 CRÉER UN PROFIL À LA MAIN — il est injecté dans la ville et toujours suivi */}
+        <div style={{ marginBottom: 12 }}>
+          {!showCreate ? (
+            <button onClick={() => setShowCreate(true)} disabled={busy} style={{ padding: '9px 14px', borderRadius: 11, border: `1px dashed ${C.rose}`, background: 'transparent', color: C.rose, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ➕ Créer un profil à la main {customs.length > 0 ? `· ${customs.length} créé(s)` : ''}
+            </button>
+          ) : (
+            <div style={{ background: C.card, border: `1px solid ${C.rose}55`, borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: '1 1 130px' }}><div style={{ fontSize: 10.5, color: C.mid, fontWeight: 700, marginBottom: 3 }}>Prénom</div>
+                <input value={nm} onChange={e => setNm(e.target.value)} placeholder="ex : Manon" style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 10px', color: C.ink, fontSize: 13, fontFamily: 'inherit' }} /></div>
+              <div><div style={{ fontSize: 10.5, color: C.mid, fontWeight: 700, marginBottom: 3 }}>Genre</div>
+                <div style={{ display: 'flex', gap: 4 }}>{(['F', 'M'] as const).map(g => <button key={g} onClick={() => setCg(g)} style={{ padding: '8px 12px', borderRadius: 9, border: `1.5px solid ${cg === g ? C.rose : C.border}`, background: cg === g ? `${C.rose}22` : 'transparent', color: C.ink, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{g === 'F' ? '♀' : '♂'}</button>)}</div></div>
+              <div style={{ width: 92 }}><div style={{ fontSize: 10.5, color: C.mid, fontWeight: 700, marginBottom: 3 }}>Âge {cage}</div>
+                <input type="range" min={18} max={60} value={cage} onChange={e => setCage(+e.target.value)} style={{ width: '100%', accentColor: C.rose }} /></div>
+              <div><div style={{ fontSize: 10.5, color: C.mid, fontWeight: 700, marginBottom: 3 }}>Cherche</div>
+                <div style={{ display: 'flex', gap: 4 }}>{([['all', 'Tous'], ['woman', '♀'], ['man', '♂']] as const).map(([k, l]) => <button key={k} onClick={() => setCsg(k)} style={{ padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${csg === k ? C.rose : C.border}`, background: csg === k ? `${C.rose}22` : 'transparent', color: C.ink, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>)}</div></div>
+              <button onClick={addCustom} style={{ padding: '9px 18px', borderRadius: 11, border: 'none', background: C.green, color: '#fff', fontSize: 13, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>Lâcher dans la ville</button>
+              <button onClick={() => setShowCreate(false)} style={{ padding: '9px 10px', borderRadius: 11, border: `1px solid ${C.border}`, background: 'transparent', color: C.mid, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>annuler</button>
+            </div>
+          )}
+        </div>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {/* CARTE + HORLOGE */}

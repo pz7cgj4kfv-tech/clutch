@@ -33,9 +33,11 @@ export interface SimResult {
   stats: { n: number; seed: number; ticks: number; slots: number; sent: number; accept: number; refuse: number; events: number; joins: number; peakOnline: number; thermoLabel: string; blocked: number }
 }
 
+// 👤 Profil créé À LA MAIN par David, injecté dans la ville (toujours suivi). Vit comme tout le monde.
+export interface CustomSpec { name: string; gender: Gender; age: number; seekGender: SeekG; lat?: number; lng?: number }
 // enforce = la forteresse CORRIGÉE (evaluateSchedule) refuse les RDV infaisables (B1/B2/REACH/horizon).
 //           false = permissivité actuelle de l'app → le COQ révèle les trous.
-export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean }
+export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean; custom?: CustomSpec[] }
 
 interface Slot { center: [number, number]; start: number; end: number }
 interface Eng { place: [number, number]; start: number; end: number; kind: 'clutch' | 'event' }
@@ -78,6 +80,21 @@ export function runSim(cfg: SimConfig): SimResult {
       pMove: rng() * 0.2, pEvent: rng() * 0.04, nSlots: 1 + Math.floor(rng() * 3),
     })
   }
+  // 👤 Profils créés À LA MAIN par David — injectés dans la ville, vivent comme tout le monde (traits actifs).
+  ;(cfg.custom || []).forEach((cs, j) => {
+    const i = N + j
+    const ang = rng() * Math.PI * 2, r = Math.sqrt(rng()) * CITY_R
+    const lat = cs.lat ?? LAUSANNE[0] + (r / 111) * Math.cos(ang)
+    const lng = cs.lng ?? LAUSANNE[1] + (r / (111 * Math.cos(LAUSANNE[0] * Math.PI / 180))) * Math.sin(ang)
+    const k = 2 + Math.floor(rng() * 4); const ints = new Set<string>(); while (ints.size < k) ints.add(pick(POOL))
+    agents.push({
+      id: 'a' + i, idx: i, name: cs.name || 'Toi', gender: cs.gender, age: cs.age, interests: [...ints], lat, lng,
+      premium: false, seekGender: cs.seekGender, recepPause: false, online: false, slots: [], agenda: [],
+      cooldownUntil: {}, receivedToday: 0, reliability: 80,
+      pOnline: 0.6, pSend: 0.5, pAccept: 0.5, pRefuse: 0.15, pMove: 0.05, pEvent: 0.03, nSlots: 2,
+    })
+  })
+  const TOT = agents.length
   const byId: Record<string, Agent> = Object.fromEntries(agents.map(a => [a.id, a]))
   const pendings: Pending[] = [], events: Ev[] = [], alerts: Alert[] = [], frames: Frame[] = []
   let nSlots = 0, nSent = 0, nAccept = 0, nRefuse = 0, nEvents = 0, nJoin = 0, egid = 0, peak = 0, nBlocked = 0
@@ -185,8 +202,8 @@ export function runSim(cfg: SimConfig): SimResult {
     }
 
     let onlineN = 0
-    const pos: number[] = cap ? new Array(N * 3) : []
-    for (let i = 0; i < N; i++) {
+    const pos: number[] = cap ? new Array(TOT * 3) : []
+    for (let i = 0; i < TOT; i++) {
       const a = agents[i]; if (a.online) onlineN++
       if (cap) { const rdv = a.agenda.some(e => e.start <= now && now < e.end); pos[i * 3] = a.lat; pos[i * 3 + 1] = a.lng; pos[i * 3 + 2] = rdv ? 2 : a.online ? 1 : 0 }
     }

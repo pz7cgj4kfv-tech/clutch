@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e7'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 227   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e8'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 228   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2298,6 +2298,25 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
         const _q = personaQuip(getPersona(), fz.severity===3?'infeasible_trip':'tight_trip', lang as 'fr'|'en')
         showToast(_q ? `${_main}  ${_q}` : _main, fz.severity===3?C.red:C.orange)
         setFeasAck(true); setLoading(false); return
+      }
+    } catch {}
+    // 🗓️ ENCHAÎNEMENT RÉEL (distance) vs mes RDV CONFIRMÉS — attrape « échecs 20h30 → Léa 22h30 ailleurs » (un RDV
+    //    AVANT, que le check ci-dessus rate car il ne regarde que le suivant). evaluateSchedule = vrai trajet. 2 temps.
+    try {
+      if (venueLat && venueLng && !feasAck) {
+        const { data: myCl } = await supabase.from('clutches')
+          .select('venue_lat,venue_lng,proposed_time,counter_time,duration_minutes,status')
+          .or(`sender_id.eq.${from.id},receiver_id.eq.${from.id}`).in('status',['confirmed','accepted','checked_in'])
+        const agenda = (myCl||[]).filter((x:any)=>x.venue_lat!=null&&x.venue_lng!=null&&(x.counter_time||x.proposed_time))
+          .map((x:any)=>{ const b=new Date(x.counter_time||x.proposed_time).getTime(); return { place:[x.venue_lat,x.venue_lng] as [number,number], start:b, end:b+(x.duration_minutes||120)*60000 } })
+        const cand = { place:[venueLat,venueLng] as [number,number], start:pt.getTime(), end:pt.getTime()+(isQuickDate?60:120)*60000 }
+        const res = foEvaluateSchedule(Date.now(), null, agenda, cand)
+        if (!res.ok && (res.reason==='CHAINING'||res.reason==='EXCLUSION')) {
+          showToast(lang==='fr'
+            ? `⚠️ Enchaînement serré avec un autre RDV : ~${Math.round(res.needMin||0)} min de trajet. Envoyer quand même ?`
+            : `⚠️ Tight chain with another meetup: ~${Math.round(res.needMin||0)} min travel. Send anyway?`, C.orange)
+          setFeasAck(true); setLoading(false); return
+        }
       }
     } catch {}
     const venueLabel=venueAddress?`${venueInput.trim()} · ${venueAddress}`:venueInput.trim()

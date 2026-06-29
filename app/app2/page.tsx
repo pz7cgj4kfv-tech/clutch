@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1dc'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 216   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1dd'  // Versionnage HEXADÉCIMAL. ~313e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 217   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -256,7 +256,7 @@ function MelPresenceCard({ p, dots = 4, stars, distZone, onClick }: { p: any; do
         <svg x="72.5" y="5.5" width="15" height="15" viewBox="0 0 28 28" fill="#7C7B7C">{MEL_GENDER[gender]}</svg>
         <text transform="matrix(1 0 0 1 88.5 20.6138)" fill="#706F6F" fontFamily={MEL_SF} fontWeight={700}><tspan fontSize="18.1023">{name}</tspan><tspan fontSize="8.8116" dx="4">{age}</tspan></text>
         <text fill="#707070" fontFamily={MEL_SF} fontWeight={700} fontSize="8.7999"><tspan x="73.1387" y="36.8667">{l1}</tspan><tspan x="73.1387" y="47.43">{l2}</tspan></text>
-        <text transform="matrix(1 0 0 1 73.1387 62.8481)" fill="#7C7B7C" fontFamily={MEL_SF} fontWeight={700} fontSize="10.0917">{distZone || ''}</text>
+        <text transform="matrix(1 0 0 1 73.1387 62.8481)" fill="#7C7B7C" fontFamily={MEL_SF} fontWeight={700} fontSize="10.0917">{(distZone || '').replace(/^📍\s*/, '')}</text>
         {pinned && <svg x="309" y="15" width="24" height="26" viewBox="145 258 312 338" fill="#B2B2B2"><path d="M411.354,307.221c-24.231-24.254-53.956-40.524-81.534-44.655c-3.393-0.438-6.969,1.016-9,3.924c-13.454,19.777-18.231,43.155-15.208,65.587l-41.355,41.355c-30.601-9.186-61.018-3.37-80.426,16.038c-13.754,13.755-4.57,48.971,18.277,81.603l-61.433,94.042c-2.377,3.669-1.892,8.492,1.2,11.585c1.777,1.776,4.154,2.7,6.531,2.7c1.754,0,3.508-0.485,5.054-1.5l93.696-61.156c11.216,8.216,22.708,15,33.809,19.478c10.131,4.062,19.293,6.093,27.14,6.093c8.792,0,15.924-2.539,20.978-7.593c19.408-19.339,25.225-49.756,16.062-80.403l41.494-41.493c4.084,0.53,8.146,1.2,12.346,1.2c19.062,0,37.409-5.632,53.079-16.293c2.931-2.008,4.454-5.493,3.946-9.001C451.924,361.177,435.632,331.476,411.354,307.221z M180.184,538.414l33.947-51.994c2.792,3.208,5.493,6.462,8.516,9.484c3.046,3.047,6.254,5.816,9.416,8.632L180.184,538.414z M316.042,521.659c-5.953,5.954-33.093-0.069-63.209-23.77c-0.069-0.046-0.139-0.115-0.208-0.162c-5.585-4.407-11.239-9.208-16.916-14.885c-15.624-15.601-28.455-34.87-35.263-52.825c-6.508-17.192-4.893-26.169-3.554-27.485c13.478-13.501,33.901-17.585,55.895-12.67c-4.985,16.017,2.285,38.032,20.078,55.848c14.193,14.17,31.086,21.785,45.487,21.785c3.669,0,7.061-0.762,10.338-1.777C333.628,487.759,329.542,508.183,316.042,521.659z M327.327,446.034c-6.67,6.646-25.755,2.284-41.401-13.386c-15.67-15.669-20.008-34.778-13.385-41.377l38.425-38.425c4.615,12.277,11.516,23.816,21.254,33.555c9.623,9.601,21.023,16.663,33.394,21.324L327.327,446.034z M345.282,373.339c-20.193-20.193-26.725-49.387-18.878-75.557c8.054,19.085,21.208,38.563,38.54,55.871c17.285,17.285,36.693,30.37,55.663,38.425C394.622,399.509,364.852,392.91,345.282,373.339z M378.006,340.592c-17.4-17.378-30.347-37.479-36.947-56.148c19.64,6.139,39.854,18.462,57.256,35.84c17.4,17.378,29.701,37.594,35.816,57.232C415.507,370.939,395.407,357.993,378.006,340.592z" /></svg>}
         {dotCx.map((cx, i) => i < dots
           ? <circle key={i} cx={cx} cy="57.946" r="4.796" fill="#B2B2B2" />

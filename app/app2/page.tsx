@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e0'  // Versionnage HEXADÉCIMAL. ~314e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 220   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e1'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 221   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9419,8 +9419,11 @@ export default function App2() {
 
   // Jog wheel states
   const [initSlots,setInitSlots] = useState<string[]>(() => makeSlots())   // rafraîchissable (était useMemo([]) figé → heure restait bloquée sur l'ancienne)
-  const [fromTime,setFromTime] = useState(() => initSlots[0] || '18:00')
-  const [untilTime,setUntilTime] = useState(() => initSlots[4] || '20:00')
+  // ⏰ DÉFAUT = +1h / +2h DÈS LE MONTAGE (pas initSlots[0]=+5min). Sinon un user NON-dispo atterrit direct sur
+  //    flow='carte' (état initial, routing ne passe à 'app' que si déjà dispo) → l'effet d'entrée +1h ne tourne
+  //    jamais (prevFlow='carte') → départ proposé à +5min, curseur de rayon coincé (bug David 30.06).
+  const [fromTime,setFromTime] = useState(() => makeSlots(new Date(Date.now()+60*60_000))[0] || initSlots[0] || '18:00')
+  const [untilTime,setUntilTime] = useState(() => makeSlots(new Date(Date.now()+120*60_000))[0] || initSlots[4] || '20:00')
   const [rayon,setRayon]       = useState(10)  // défaut 10km : couvre Lausanne + Morges/Renens/Pully (maximise les présences). Slider jusqu'à 100km.
   // 🕐 Moment de la journée choisi par bouton (ce soir / cette nuit / demain aprem…). Porte les EPOCHS exacts
   // (jour inclus) → handleOuvrirFenetre les utilise tels quels, sans l'ambiguïté « HH:MM aujourd'hui ».
@@ -11095,12 +11098,24 @@ export default function App2() {
                     const el = sliderRef.current; if(!el) return
                     const rect = el.getBoundingClientRect()
                     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-                    let target = sliderToRayon(ratio * 100)
+                    let raw = sliderToRayon(ratio * 100)
+                    let target = Math.min(RAYON_MAX_KM, Math.max(RAYON_MIN_KM, raw))
                     if (flag) {
-                      // 🔒 PLAFOND DUR = limite crédible pour le DÉBUT du créneau (David 28.06 : « je ne dois pas pouvoir
-                      //    mettre 50 km pour tout de suite »). TOUJOURS appliqué (le bug = le cap était sauté quand r6=0,
-                      //    donc le curseur filait à 50 km pour un départ proche). Léger frein décoratif en approchant, puis STOP net.
-                      if (r6>0 && target>r6 && r6<cap) { const frac=Math.min(1,(target-r6)/Math.max(0.5,cap-r6)); target=r6+(target-r6)*(1-frac*0.35) }
+                      // 🪢 FRICTION DIRECTIONNELLE (David 30.06 : « ça ne frotte que dans un sens »).
+                      //    ⬅️ vers un PETIT rayon (raw ≤ rayon) : ZÉRO friction, le thumb suit le doigt direct → on revient
+                      //       toujours librement à des rayons plus serrés.
+                      //    ➡️ vers un GRAND rayon (raw > rayon) : RÉSISTANCE qui MONTE à mesure qu'on « sort de la zone »
+                      //       atteignable (rubber-band, jamais un mur). Plus on est profond (près du plafond), moins le geste
+                      //       avance → ça « frotte » de plus en plus. Le PLAFOND DUR (cap) reste la borne infranchissable.
+                      if (raw > rayon) {
+                        const comfort = Math.max(0, r6)                                  // en-deçà = zone large/confort, libre
+                        const span = Math.max(0.5, cap - comfort)
+                        const u = Math.max(0, Math.min(1, (rayon - comfort) / span))      // profondeur dans la zone dure (0→1)
+                        const gain = 1 - 0.82 * u                                         // près du plafond : ~18% du geste → frotte fort
+                        target = rayon + (raw - rayon) * gain
+                      } else {
+                        target = raw                                                      // retour libre, glisse
+                      }
                       target = Math.min(cap, Math.max(RAYON_MIN_KM, target))
                     }
                     if (flag && typeof navigator!=='undefined' && (navigator as any).vibrate) {

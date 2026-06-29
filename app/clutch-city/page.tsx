@@ -22,6 +22,7 @@ const fmtClock = (ms: number) => { const m = Math.round(ms / 60000); return `${S
 
 export default function ClutchCity() {
   const [n, setN] = useState(300), [pf, setPf] = useState(50), [seed, setSeed] = useState(7)
+  const [enforce, setEnforce] = useState(false)   // forteresse corrigée (evaluateSchedule)
   const [res, setRes] = useState<SimResult | null>(null)
   const [tick, setTick] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -29,11 +30,12 @@ export default function ClutchCity() {
   const [busy, setBusy] = useState(false)
   const cv = useRef<HTMLCanvasElement | null>(null)
 
-  const run = () => {
+  const run = (enf = enforce) => {
     setBusy(true); setPlaying(false)
-    setTimeout(() => { const r = runSim({ n, seed, pctFemale: pf, captureFrames: true }); setRes(r); setTick(0); setBusy(false); setPlaying(true) }, 30)
+    setTimeout(() => { const r = runSim({ n, seed, pctFemale: pf, captureFrames: true, enforce: enf }); setRes(r); setTick(0); setBusy(false); setPlaying(true) }, 30)
   }
-  useEffect(() => { run() }, [])  // run initial
+  useEffect(() => { run(false) }, [])  // run initial
+  const toggleForteresse = () => { const v = !enforce; setEnforce(v); run(v) }
 
   // horloge : avance les ticks pendant la lecture
   useEffect(() => {
@@ -97,8 +99,13 @@ export default function ClutchCity() {
           <Slider label="Agents" val={n} set={setN} min={100} max={700} step={50} disabled={busy} />
           <Slider label="% femmes" val={pf} set={setPf} min={0} max={100} step={5} disabled={busy} />
           <Slider label="Seed" val={seed} set={setSeed} min={1} max={99} disabled={busy} />
-          <button onClick={run} disabled={busy} style={{ padding: '11px 20px', borderRadius: 12, border: 'none', background: busy ? C.plum : C.green, color: '#fff', fontSize: 14, fontWeight: 900, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit' }}>{busy ? '⏳ calcul…' : '▶︎ Lancer'}</button>
+          <button onClick={() => run()} disabled={busy} style={{ padding: '11px 20px', borderRadius: 12, border: 'none', background: busy ? C.plum : C.green, color: '#fff', fontSize: 14, fontWeight: 900, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit' }}>{busy ? '⏳ calcul…' : '▶︎ Lancer'}</button>
         </div>
+        {/* INTERRUPTEUR FORTERESSE — permissive (app actuelle) ↔ corrigée (evaluateSchedule) */}
+        <button onClick={toggleForteresse} disabled={busy} style={{ width: '100%', marginBottom: 12, padding: '10px 14px', borderRadius: 12, border: `1.5px solid ${enforce ? C.green : C.border}`, background: enforce ? `${C.green}1c` : C.card, color: C.ink, fontSize: 13, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          🏰 Forteresse : <b style={{ color: enforce ? C.green : C.orange }}>{enforce ? 'CORRIGÉE ✅ (evaluateSchedule)' : 'permissive (app actuelle)'}</b>
+          <span style={{ color: C.mid, fontWeight: 500 }}> — clique pour {enforce ? 'revoir les trous' : 'les faire fondre'}{enforce && res ? ` · ${res.stats.blocked} RDV impossibles bloqués` : ''}</span>
+        </button>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {/* CARTE + HORLOGE */}

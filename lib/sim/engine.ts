@@ -4,7 +4,7 @@
 //    Les agents agissent sur la VRAIE forteresse (forteresse-engine) + le VRAI algo (clutch-algo).
 //    Le reducer applique la PERMISSIVITÉ ACTUELLE de l'app → le COQ révèle les trous (docs/clutch-city-trous).
 // ─────────────────────────────────────────────────────────────────────────────
-import { evaluate, haversineKm } from '@/lib/forteresse-engine'
+import { evaluateSchedule, type SchedResult } from '@/lib/forteresse-engine'
 import { scoreProfile, thermostat } from '@/lib/clutch-algo'
 
 export function mulberry32(seed: number) {
@@ -16,7 +16,6 @@ const MIN = 60_000, H = 18, HORIZON = H * 60 * MIN
 export const T0 = 0
 export const LAUSANNE: [number, number] = [46.519, 6.633]
 const CITY_R = 6
-const travelMin = (km: number) => km * 60 * 1.35 / 47 + 12      // inverse de reachKm (modèle trajet forteresse)
 const DEFAULT_RDV_MIN = 120
 
 export type Gender = 'F' | 'M'
@@ -28,10 +27,12 @@ export interface Frame { now: number; pos: number[]; online: number; sent: numbe
 export interface SimResult {
   meta: AgentMeta[]; frames: Frame[]; alerts: Alert[]
   byCode: Record<string, number>
-  stats: { n: number; seed: number; ticks: number; slots: number; sent: number; accept: number; refuse: number; events: number; joins: number; peakOnline: number; thermoLabel: string }
+  stats: { n: number; seed: number; ticks: number; slots: number; sent: number; accept: number; refuse: number; events: number; joins: number; peakOnline: number; thermoLabel: string; blocked: number }
 }
 
-export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean }
+// enforce = la forteresse CORRIGÉE (evaluateSchedule) refuse les RDV infaisables (B1/B2/REACH/horizon).
+//           false = permissivité actuelle de l'app → le COQ révèle les trous.
+export interface SimConfig { n: number; seed: number; pctFemale: number; captureFrames?: boolean; enforce?: boolean }
 
 interface Slot { center: [number, number]; start: number; end: number }
 interface Eng { place: [number, number]; start: number; end: number; kind: 'clutch' | 'event' }
@@ -44,12 +45,16 @@ interface Agent {
 }
 interface Ev { id: string; host: string; place: [number, number]; start: number; end: number; maxSeats: number; joined: string[] }
 const genderAllowed = (s: SeekG, g: Gender) => s === 'all' || (s === 'man' && g === 'M') || (s === 'woman' && g === 'F')
-const overlaps = (a: Eng, s: number, e: number) => s < a.end && a.start < e
-const POOL = ['Café', 'Jazz', 'Rando', 'Yoga', 'Ciné', 'Cuisine', 'Voyage', 'Art', 'Musique', 'Sport', 'Lecture', 'Photo', 'Danse', 'Tech', 'Nature', 'Vin']
+const schedMsg = (r: SchedResult) =>
+  r.reason === 'EXCLUSION' ? `double-booking (B2)`
+    : r.reason === 'CHAINING' ? `enchaînement : ${Math.round(r.needMin || 0)} min de trajet nécessaires, ${Math.round(r.haveMin || 0)} min dispo (B1) 🎯`
+      : r.reason === 'REACH' ? `RDV inatteignable : ${Math.round(r.needMin || 0)} min nécessaires, ${Math.round(r.haveMin || 0)} min avant (forteresse)`
+        : `horizon 18h dépassé`
+const POOL =['Café', 'Jazz', 'Rando', 'Yoga', 'Ciné', 'Cuisine', 'Voyage', 'Art', 'Musique', 'Sport', 'Lecture', 'Photo', 'Danse', 'Tech', 'Nature', 'Vin']
 
 export function runSim(cfg: SimConfig): SimResult {
   const N = cfg.n, rng = mulberry32(cfg.seed >>> 0), pick = <T,>(a: T[]) => a[Math.floor(rng() * a.length)]
-  const cap = cfg.captureFrames !== false
+  const cap = cfg.captureFrames !== false, enforce = !!cfg.enforce
   const agents: Agent[] = []
   for (let i = 0; i < N; i++) {
     const gender: Gender = rng() * 100 < cfg.pctFemale ? 'F' : 'M'
@@ -68,7 +73,7 @@ export function runSim(cfg: SimConfig): SimResult {
   }
   const byId: Record<string, Agent> = Object.fromEntries(agents.map(a => [a.id, a]))
   const pendings: Pending[] = [], events: Ev[] = [], alerts: Alert[] = [], frames: Frame[] = []
-  let nSlots = 0, nSent = 0, nAccept = 0, nRefuse = 0, nEvents = 0, nJoin = 0, egid = 0, peak = 0
+  let nSlots = 0, nSent = 0, nAccept = 0, nRefuse = 0, nEvents = 0, nJoin = 0, egid = 0, peak = 0, nBlocked = 0
   const A = (a: Alert) => { if (alerts.length < 500000) alerts.push(a) }
   const STEP = 5 * MIN, TICKS = HORIZON / STEP
 
@@ -118,17 +123,20 @@ export function runSim(cfg: SimConfig): SimResult {
           const sender = byId[mine.from]
           const engA: Eng = { place: mine.place, start: mine.start, end: mine.end, kind: 'clutch' }
           const engB: Eng = { place: mine.place, start: mine.start, end: mine.end, kind: 'clutch' }
-          for (const [self, eng, other] of [[a, engA, sender], [sender, engB, a]] as [Agent, Eng, Agent][]) {
-            const ev = evaluate({ now, gps: [self.lat, self.lng], pin: eng.place, start: eng.start, end: eng.end, radiusKm: 0 })
-            if (ev.pinTooFar || !ev.feasible) A({ code: 'REACH', tick, at: now, from: self.id, to: other.id, msg: `RDV à ${ev.pinDistKm.toFixed(1)} km pour +${((eng.start - now) / 60000).toFixed(0)} min — inatteignable` })
-            for (const o of self.agenda) {
-              if (overlaps(o, eng.start, eng.end)) A({ code: 'EXCLUSION', tick, at: now, from: self.id, msg: `double-booking ${fmt(o.start)}–${fmt(o.end)} ∩ ${fmt(eng.start)}–${fmt(eng.end)} (B2)` })
-              if (o.end <= eng.start) { const need = travelMin(haversineKm(o.place[0], o.place[1], eng.place[0], eng.place[1])); if (o.end + need * MIN > eng.start) A({ code: 'CHAINING', tick, at: now, from: self.id, msg: `enchaînement : finit ${fmt(o.end)}, suivant ${fmt(eng.start)}, ${need.toFixed(0)} min de trajet (B1)` }) }
-              if (eng.end <= o.start) { const need = travelMin(haversineKm(eng.place[0], eng.place[1], o.place[0], o.place[1])); if (eng.end + need * MIN > o.start) A({ code: 'CHAINING', tick, at: now, from: self.id, msg: `enchaînement inverse, ${need.toFixed(0)} min (B1)` }) }
+          // 🗓️ LA FORTERESSE juge l'agenda ENTIER des DEUX personnes (B1/B2/REACH).
+          const resA = evaluateSchedule(now, [a.lat, a.lng], a.agenda, engA)
+          const resB = evaluateSchedule(now, [sender.lat, sender.lng], sender.agenda, engB)
+          const bad = !resA.ok || !resB.ok
+          if (enforce && bad) {
+            nBlocked++   // ✅ forteresse corrigée : on REFUSE → aucun RDV impossible n'est créé
+          } else {
+            if (bad) {   // permissif : on accepte ET le COQ crie (détection du trou)
+              for (const [self, res, other] of [[a, resA, sender], [sender, resB, a]] as [Agent, SchedResult, Agent][])
+                if (!res.ok) A({ code: res.reason as Code, tick, at: now, from: self.id, to: other.id, msg: schedMsg(res) })
             }
+            a.agenda.push(engA); sender.agenda.push(engB)
+            a.slots = a.slots.filter(s => s.start !== mine.start); nAccept++
           }
-          a.agenda.push(engA); sender.agenda.push(engB)
-          a.slots = a.slots.filter(s => s.start !== mine.start); nAccept++
         } else if (roll < a.pAccept + a.pRefuse) { byId[mine.from].cooldownUntil[a.id] = now + 48 * 3600 * 1000; nRefuse++ }
         pendings.splice(pendings.indexOf(mine), 1)
       }
@@ -161,7 +169,6 @@ export function runSim(cfg: SimConfig): SimResult {
   return {
     meta: agents.map(a => ({ id: a.id, gender: a.gender, age: a.age, premium: a.premium, seekGender: a.seekGender })),
     frames, alerts, byCode,
-    stats: { n: N, seed: cfg.seed, ticks: TICKS, slots: nSlots, sent: nSent, accept: nAccept, refuse: nRefuse, events: nEvents, joins: nJoin, peakOnline: peak, thermoLabel: thermostat(peak).label },
+    stats: { n: N, seed: cfg.seed, ticks: TICKS, slots: nSlots, sent: nSent, accept: nAccept, refuse: nRefuse, events: nEvents, joins: nJoin, peakOnline: peak, thermoLabel: thermostat(peak).label, blocked: nBlocked },
   }
 }
-function fmt(ms: number) { const m = Math.round((ms - T0) / 60000); return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` }

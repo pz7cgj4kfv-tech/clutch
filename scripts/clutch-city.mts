@@ -5,12 +5,13 @@ import { runSim, type Code } from '@/lib/sim/engine'
 const N = parseInt(process.argv[2] || '1000')
 const SEED = parseInt(process.argv[3] || '7')
 const PF = parseInt(process.argv[4] || '50')
-const r = runSim({ n: N, seed: SEED, pctFemale: PF, captureFrames: false })
+const ENFORCE = process.argv[5] === 'enforce'    // forteresse corrigée (evaluateSchedule)
+const r = runSim({ n: N, seed: SEED, pctFemale: PF, captureFrames: false, enforce: ENFORCE })
 const s = r.stats
 
-console.log(`\n🏙️  CLUTCH CITY — ${N} agents · Lausanne · 18h · seed ${SEED} · ${PF}% ♀ (${s.ticks} ticks)`)
+console.log(`\n🏙️  CLUTCH CITY — ${N} agents · Lausanne · 18h · seed ${SEED} · ${PF}% ♀ · forteresse ${ENFORCE ? 'CORRIGÉE ✅' : 'permissive (actuelle)'} (${s.ticks} ticks)`)
 console.log('─'.repeat(74))
-console.log(`Activité : ${s.slots} créneaux · ${s.sent} clutchs envoyés · ${s.accept} acceptés · ${s.refuse} refusés · ${s.events} events · ${s.joins} inscriptions`)
+console.log(`Activité : ${s.slots} créneaux · ${s.sent} clutchs envoyés · ${s.accept} acceptés · ${s.refuse} refusés${ENFORCE ? ` · ${s.blocked} bloqués par la forteresse` : ''} · ${s.events} events · ${s.joins} inscriptions`)
 console.log(`Densité  : pic ~${s.peakOnline} actifs · thermostat « ${s.thermoLabel} »`)
 console.log('─'.repeat(74))
 

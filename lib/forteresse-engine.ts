@@ -100,3 +100,43 @@ export function maxRadiusFor(now: number, gps: [number, number] | null, pin: [nu
   const e = evaluate({ now, gps, pin, start, end: start + MIN_DURATION_MIN * MIN, radiusKm: 0 })
   return Math.max(minKm, Math.min(maxKm, e.maxRadiusKm))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🗓️ FAISABILITÉ MULTI-ENGAGEMENTS (le trou logique #1 — David 30.06). La forteresse ne raisonne plus sur
+//    UN clutch isolé mais sur TOUT l'agenda : un nouveau RDV est faisable seulement si je peux PHYSIQUEMENT
+//    l'atteindre depuis ce que je fais juste avant ET repartir vers ce que je fais juste après.
+//      • EXCLUSION : il ne chevauche aucun engagement existant.
+//      • REACH     : je peux y arriver depuis ma position actuelle (aucun engagement avant).
+//      • CHAINING  : fin(précédent) + trajet ≤ début(nouveau)  ET  fin(nouveau) + trajet ≤ début(suivant).
+//    Trajet = même modèle que la portée du Cône (inverse de reachKm) → cohérence totale.
+// ─────────────────────────────────────────────────────────────────────────────
+const TOL_MIN = 2                     // tolérance minutes (imprécision)
+// Minutes nécessaires pour parcourir distKm (inverse exact de reachKm).
+export function travelMinKm(distKm: number): number { return distKm * 60 * DETOUR / TRAVEL_BASE + CONE_BUFFER_MIN }
+
+export interface SchedEngagement { place: [number, number]; start: number; end: number }
+export type SchedReason = 'HORIZON' | 'EXCLUSION' | 'REACH' | 'CHAINING' | null
+export interface SchedResult { ok: boolean; reason: SchedReason; needMin?: number; haveMin?: number }
+
+export function evaluateSchedule(now: number, gps: [number, number] | null, agenda: SchedEngagement[], cand: SchedEngagement): SchedResult {
+  if (cand.end > now + HORIZON_H * 60 * MIN + MIN) return { ok: false, reason: 'HORIZON' }
+  for (const e of agenda) if (cand.start < e.end && e.start < cand.end) return { ok: false, reason: 'EXCLUSION' }
+  const sorted = [...agenda].sort((a, b) => a.start - b.start)
+  let prev: SchedEngagement | null = null, next: SchedEngagement | null = null
+  for (const e of sorted) { if (e.end <= cand.start) prev = e; if (e.start >= cand.end && !next) next = e }
+  // arriver à `cand` depuis l'engagement précédent (ou depuis ma position actuelle s'il n'y en a pas)
+  const origin = prev ? prev.place : gps
+  const originTime = prev ? prev.end : now
+  if (origin) {
+    const need = travelMinKm(haversineKm(origin[0], origin[1], cand.place[0], cand.place[1]))
+    const have = (cand.start - originTime) / MIN
+    if (need > have + TOL_MIN) return { ok: false, reason: prev ? 'CHAINING' : 'REACH', needMin: need, haveMin: have }
+  }
+  // repartir de `cand` vers l'engagement suivant
+  if (next) {
+    const need = travelMinKm(haversineKm(cand.place[0], cand.place[1], next.place[0], next.place[1]))
+    const have = (next.start - cand.end) / MIN
+    if (need > have + TOL_MIN) return { ok: false, reason: 'CHAINING', needMin: need, haveMin: have }
+  }
+  return { ok: true, reason: null }
+}

@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1e1'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 221   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1e2'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 222   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -610,16 +610,19 @@ type AppFlow  = 'carte' | 'options' | 'app'  // flow une fois loggé
 type MainTab  = 'presences' | 'evenements' | 'clutchs' | 'contacts' | 'profil'
 
 // ─── Slots de temps — toutes les 5 minutes ───────────────────
+// ⏱️ PAS DES CRÉNEAUX — UNE SEULE VARIABLE (David 30.06 : « garde un truc variable »). 15 min = version cible
+//    (quarts d'heure) ; on pourra remettre 5/10/30 d'un seul chiffre. Le nb de slots se recalcule pour rester
+//    pile sur la fenêtre 18h quel que soit le pas (plus de « 216 » magique).
+const SLOT_STEP_MIN = 15
 function makeSlots(fromDate?: Date): string[] {
   const base = fromDate || new Date()
   const slots: string[] = []
-  // ⏱️ STEP = 5 min POUR LE TEST (choix David : créneaux fins pour tester). VERSION FINALE = 15 min (quarts d'heure).
-  // NB : le vrai souci d'UX = l'affichage en grille géante → à terme une MOLETTE/compact, pas une grille de 216 cases.
-  const STEP = 5
+  const STEP = SLOT_STEP_MIN
+  const COUNT = Math.round((18 * 60) / STEP)   // 18h ÷ pas → bornage propre (15min = 72, 5min = 216…)
   const rem = STEP - (base.getMinutes() % STEP)
   const start = new Date(base.getTime() + rem * 60_000)
   start.setSeconds(0, 0)
-  for (let i = 0; i <= 216; i++) {  // 18h à 5min = 216 slots (test) ; final 15min = 72
+  for (let i = 0; i <= COUNT; i++) {
     const t  = new Date(start.getTime() + i * STEP * 60_000)
     const hh = String(t.getHours()).padStart(2, '0')
     const mm = String(t.getMinutes()).padStart(2, '0')

@@ -48,11 +48,28 @@
 - **Dynamique** : le **temps avance** (le créneau se rapproche → portée se resserre) · je peux **me déplacer** (GPS bouge → dérive → recalage) · **modifier** un créneau · **retirer** la dispo · **fermer** un seul créneau.
 - **Premium** : **mode invisible** (explorer sans être vu) · plus de créneaux / clutchs.
 
+## 2bis. PRÉFÉRENCES & FILTRES (⚠️ « il faut absolument TOUT partout » — David)
+> Ce qui décide **QUI VOIT QUI** (avec la forteresse) + **le classement** (avec l'algo). Valeurs réelles du code :
+- **Genre recherché** (`seekGender`) : **tous / homme / femme** (filtre **symétrique** : si je cherche F et que F cherche M, on ne se voit pas).
+- **Mode de rencontre** (`looking_for`, niveau profil) : **❤️ Romantique · 🤝 Amical · 💼 Pro/Réseau · ✨ Tout**.
+- **Modes par créneau** (`available_modes`) : romantic / friend / **pro** (filtre **métier**) / **parent** (exclusif).
+- **Mood** (`seekMood`, soft) : café/balade/apéro/dîner/sport/culture — **n'exclut jamais**, oriente.
+- **Distance de recherche** (`seekDist`) : **quartier / ville / région**.
+- **Tranche d'âge** (premium) : min–max.
+- **Mode réception** (♀, `recepMode`) : **🟢 Ouverte · 🟡 Sélective · 🔴 Pause** — gouverne qui peut m'envoyer un clutch.
+- **Filtres EVENTS** : **catégories** (7 icônes Mel, multi-select, 0 = toutes) · **moment de la journée** · **genre de l'event** (tous/F/X) · **limite d'âge** de l'event.
+- **Premium** : « Filtres de recherche » avancés (genre + âge + distance) + mode invisible.
+
+## 2ter. L'ALGORITHME (qui voit qui · classement) — `lib/clutch-algo.ts` (source de vérité)
+- **Visibilité** = forteresse (intersection espace-temps) **∩** filtres ci-dessus. Si l'un coupe → invisible.
+- **Score de classement** = `scoreProfile` : **compatibilité 0.5** (intérêts communs) · **proximité 0.3** · **fiabilité 0.2**.
+- **Thermostat de densité** : sous 30 dispos = éteint ; au-dessus (→2000) on déplace du poids de la **proximité vers la compatibilité** (foule → on privilégie le match). `isClutchable()` filtre les non-éligibles.
+- ⚠️ **Le simulateur DOIT appeler CE module** (pas un algo dupliqué) — sinon il teste un faux système. `generatePopulation()` existe déjà → réutilisé pour peupler la ville.
+
 ## 3. DÉCOUVRIR (présences & events)
-- **Parcourir** les présences (qui est dispo et compatible avec mes créneaux).
-- **Filtrer** : par mode, par catégorie d'event, par distance, par mood.
+- **Parcourir** les présences (qui est dispo et compatible — filtré + classé par l'algo ci-dessus).
 - **Ouvrir un profil** · **mettre en favori** · **bloquer** · **signaler**.
-- Voir un agent dans la liste **dépend de la forteresse** (intersection de nos fenêtres espace-temps).
+- Voir un agent **dépend de la forteresse ∩ filtres ∩ algo** (cf. 2bis/2ter).
 
 ## 4. CLUTCHER (envoyer une invitation)
 - Choisir **qui** · **quel lieu** (dans ou **hors** zone du receveur → alerte, jamais bloquer [reco]) · **quelle heure** · **intention** (optionnelle) · **message** (optionnel) · **durée** (sinon 2h défaut).
@@ -105,6 +122,7 @@ Pour chaque axe ci-dessus, une **distribution réglable** (c'est ça « toutes l
 5. **Plafonds** : ≤3 créneaux · ≤N clutchs actifs · ≤5 reçus/jour ♀ · cooldown 48h respecté.
 6. **Cohérence sociale** : pas de clutch sur soi · pas via un blocage · inbox jamais > max.
 7. **Places events** : jamais > max · paliers cohérents · pas de double-inscription.
+8. **Filtres cohérents** : visibilité **symétrique** (si A voit B via les filtres, le clutch A→B respecte aussi les filtres de B : genre, mode, âge, distance, réception ≠ Pause). Pas de clutch qui contourne un filtre. Classement = `scoreProfile` réel (jamais un tri ad hoc).
 → Toute violation = **alerte horodatée + état rejouable (seed + tick)** + explication (règle dure, puis IA).
 
 ---

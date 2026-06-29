@@ -52,22 +52,46 @@ export interface CityEvent {
   joinedIds: string[]; waitlistIds: string[]
 }
 
+// ── PRÉFÉRENCES & FILTRES (« il faut absolument TOUT partout » — David) ──────
+//    Gouvernent QUI VOIT QUI (avec la forteresse) et le classement (avec lib/clutch-algo).
+export type LookingFor = 'romance' | 'friendship' | 'pro' | 'all'   // profile (Mode de rencontre)
+export type SeekGender = 'all' | 'man' | 'woman'                    // Genre recherché (filtre symétrique)
+export type SeekDist = 'quartier' | 'ville' | 'region'             // distance préférée
+export type RecepMode = 'open' | 'selective' | 'pause'             // mode réception (♀) : ouverte/sélective/pause
+export interface Preferences {
+  lookingFor: LookingFor                  // ce que je cherche (défaut profil)
+  seekGender: SeekGender                  // qui je veux voir (H/F/tous)
+  seekDist: SeekDist                      // rayon de recherche présences
+  seekAgeMin: number; seekAgeMax: number  // tranche d'âge (premium)
+  seekMood: string | null                 // mood recherché (soft, jamais exclure)
+  recepMode: RecepMode                    // comment je reçois les clutchs
+  eventCatFilter: string[]                // catégories d'events filtrées (0 = toutes) — icônes Mel
+  eventGenderFilter: 'all' | 'F' | 'X'    // filtre genre des events
+  profession?: string                     // mode Pro : filtrer par métier
+}
+
 // ── L'AGENT (un "humain" de la ville) ───────────────────────────────────────
 export interface AgentState {
   id: string
   gender: Gender; age: number; plan: Plan
+  interests: string[]              // pour le score de compatibilité (lib/clutch-algo)
   home: LatLng; gps: LatLng        // gps bouge si l'agent se déplace
   online: boolean
+  prefs: Preferences               // ✅ TOUS les filtres/préférences
   slots: Slot[]                    // 0..3 dispos ouvertes
   agenda: Engagement[]             // RDV/events confirmés (exclusifs)
   inbox: Clutch[]                  // clutchs reçus pending
   outbox: Clutch[]                 // clutchs envoyés actifs
   cooldownsUntil: Record<string, number>   // toId -> epoch (48h après refus)
   receivedToday: number            // ♀ : plafond 5/j
-  trust: number                    // fiabilité
+  trust: number                    // fiabilité (poids 0.2 dans l'algo)
   // "Caractère" (probas de comportement, tirées du panel statistique du simulateur)
   traits: AgentTraits
 }
+
+// ⚙️ QUI VOIT QUI + CLASSEMENT = forteresse (intersection espace-temps) ∩ filtres (Preferences)
+//    puis tri par lib/clutch-algo.ts → scoreProfile (compat 0.5 · proximité 0.3 · fiabilité 0.2),
+//    pondéré par thermostat(densité). Le simulateur DOIT appeler CE module (zéro algo dupliqué).
 
 export interface AgentTraits {
   pOnlinePerHour: number           // tendance à se mettre en ligne
@@ -117,6 +141,9 @@ export type Action =
   | { t: 'cancelEvent'; eventId: string }
   // 8. Sécurité
   | { t: 'sos' }
+  // 9. Préférences & filtres (changer ce que je cherche / qui je vois)
+  | { t: 'setPrefs'; patch: Partial<Preferences> }
+  | { t: 'setRecepMode'; mode: RecepMode }
 
 // ── LE MONDE ────────────────────────────────────────────────────────────────
 export interface World {

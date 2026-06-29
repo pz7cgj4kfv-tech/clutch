@@ -171,7 +171,7 @@ export default function ClutchCity() {
         </div>
         {/* INTERRUPTEUR FORTERESSE — permissive (app actuelle) ↔ corrigée (evaluateSchedule) */}
         <button onClick={toggleForteresse} disabled={busy} style={{ width: '100%', marginBottom: 12, padding: '10px 14px', borderRadius: 12, border: `1.5px solid ${enforce ? C.green : C.border}`, background: enforce ? `${C.green}1c` : C.card, color: C.ink, fontSize: 13, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-          🏰 Forteresse : <b style={{ color: enforce ? C.green : C.orange }}>{enforce ? 'CORRIGÉE ✅ (evaluateSchedule)' : 'permissive (app actuelle)'}</b>
+          🏰 Forteresse (mode du simulateur) : <b style={{ color: enforce ? C.green : C.orange }}>{enforce ? 'AVEC garde-fous ✅ (evaluateSchedule, blocage dur)' : 'SANS garde-fou (pour montrer les trous)'}</b>
           <span style={{ color: C.mid, fontWeight: 500 }}> — clique pour {enforce ? 'revoir les trous' : 'les faire fondre'}{enforce && res ? ` · ${res.stats.blocked} RDV impossibles bloqués` : ''}</span>
         </button>
 
@@ -316,7 +316,7 @@ export default function ClutchCity() {
         )}
 
         <div style={{ fontSize: 11, color: C.mid, marginTop: 16, lineHeight: 1.6 }}>
-          ⚠️ Les alertes sont <b style={{ color: C.ink }}>attendues</b> : le simulateur joue la permissivité actuelle de l'app, le COQ révèle les trous (cf. <code>docs/clutch-city-trous.md</code>).
+          ⚠️ Les alertes sont <b style={{ color: C.ink }}>attendues</b> en mode SANS garde-fou : le COQ révèle les trous (cf. <code>docs/clutch-city-trous.md</code>). 🛡️ La vraie app, elle, a DÉJÀ : double-booking bloqué dur + alertes d'enchaînement à l'envoi & à l'acceptation (cf. <code>docs/protection-forteresse.md</code>).
           Au fil des corrections de la forteresse (enchaînement, exclusion…), ces compteurs <b style={{ color: C.green }}>fondront</b>. Headless : <code>npx tsx scripts/clutch-city.mts</code>.
         </div>
       </div>

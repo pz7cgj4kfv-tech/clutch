@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1ee'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 234   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ef'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 235   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -4025,14 +4025,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{background:'#241019',border:`1px solid ${C.border}`,borderRadius:14,padding:8,marginBottom:12}}>
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block'}}>
                 {slots.map((s,i)=>{ const [x,y]=px(s.lat,s.lng); const col=SLOT_COLORS[i%SLOT_COLORS.length]; const rr=Math.max(7,s.radiusKm*kmY); return (
-                  <g key={i}><circle cx={x} cy={y} r={rr} fill={col+'14'} stroke={col} strokeWidth="1.2" strokeDasharray="4 3"/><text x={x} y={y-rr-3} fill={col} fontSize="9" fontWeight="800" textAnchor="middle">Créneau {i+1}</text></g>
+                  <g key={i}><circle cx={x} cy={y} r={rr} fill={col+'14'} stroke={col} strokeWidth="1.2" strokeDasharray="4 3"/><text x={x} y={y-rr-3} fill={col} fontSize="9" fontWeight="800" textAnchor="middle">{EN?'Slot':'Créneau'} {i+1}</text></g>
                 )})}
                 {evs.map((e,i)=>{ const [x,y]=px(e.venue_lat,e.venue_lng); const si=eventSlotIdx(e); const far=!eventReachable(e); const col=far?'#7a5560':(si>=0?SLOT_COLORS[si%SLOT_COLORS.length]:'#9b8a93'); return (
                   <circle key={i} cx={x} cy={y} r="4.2" fill={far?'none':col} stroke={far?'#7a5560':'#fff'} strokeWidth={far?'1.4':'1'} strokeDasharray={far?'2 2':undefined}/>
                 )})}
-                {(()=>{ const [x,y]=px(myLat,myLng); return <g><circle cx={x} cy={y} r="5" fill="#fff" stroke={C.plum} strokeWidth="2"/><text x={x} y={y+15} fill="#fff" fontSize="8.5" fontWeight="800" textAnchor="middle">moi</text></g> })()}
+                {(()=>{ const [x,y]=px(myLat,myLng); return <g><circle cx={x} cy={y} r="5" fill="#fff" stroke={C.plum} strokeWidth="2"/><text x={x} y={y+15} fill="#fff" fontSize="8.5" fontWeight="800" textAnchor="middle">{EN?'me':'moi'}</text></g> })()}
               </svg>
-              <div style={{fontSize:10,color:C.whiteMid,padding:'5px 4px 0',lineHeight:1.4}}>{evs.length} event(s) géolocalisés · couleur = créneau qui les contient · gris = hors de tes créneaux{slots.length===0?' · (ouvre un créneau pour voir les cercles)':''}</div>
+              <div style={{fontSize:10,color:C.whiteMid,padding:'5px 4px 0',lineHeight:1.4}}>{EN?`${evs.length} located event(s) · colour = the slot that contains it · grey = outside your slots${slots.length===0?' · (open a slot to see the circles)':''}`:`${evs.length} event(s) géolocalisés · couleur = créneau qui les contient · gris = hors de tes créneaux${slots.length===0?' · (ouvre un créneau pour voir les cercles)':''}`}</div>
             </div>
           )
         })()}
@@ -4075,7 +4075,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <span style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}><span style={{fontSize:11.5,fontWeight:800,color:C.white,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.creator||''}</span>{(ev as any).pinned && <span title={EN?'Fixed event':'Event fixe'} style={{fontSize:10,flexShrink:0}}>📌</span>}</span>
                 <span style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
                   {/* 🎨 Dans quel de MES créneaux tombe l'event (couleur 1/2/3) — David 30.06 */}
-                  {slotIdx>=0 && <span style={{fontSize:8.5,fontWeight:900,color:'#fff',background:SLOT_COLORS[slotIdx%SLOT_COLORS.length],borderRadius:5,padding:'1px 6px',whiteSpace:'nowrap'}}>Créneau {slotIdx+1}</span>}
+                  {slotIdx>=0 && <span style={{fontSize:8.5,fontWeight:900,color:'#fff',background:SLOT_COLORS[slotIdx%SLOT_COLORS.length],borderRadius:5,padding:'1px 6px',whiteSpace:'nowrap'}}>{EN?'Slot':'Créneau'} {slotIdx+1}</span>}
                   {km!=null && <KmRadar km={km}/>}
                 </span>
               </div>
@@ -4667,7 +4667,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 <div style={{fontSize:10,color:newEvDesc.length>=280?C.orange:C.whiteMid}}>{newEvDesc.length}/300</div>
               </div>
               <textarea value={newEvDesc} onChange={e=>setNewEvDesc(e.target.value.slice(0,300))} rows={3} maxLength={300}
-                placeholder={EN?'Help people decide:\n• What you\'ll do\n• Who it\'s for (beginners? level?)\n• What to bring':'Aide les gens à se décider :\n• Le déroulé (ce qu\'on va faire)\n• Pour qui (débutants ? niveau ?)\n• Ce qu\'il faut amener'}
+                placeholder={EN?'Help people decide:\n• What you\'ll do · level\n• What to bring (food/drinks?)\n• Transport / parking':'Aide les gens à se décider :\n• Le déroulé · le niveau\n• Quoi amener (à boire/manger ?)\n• Transport / place de parc'}
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${newEvDesc.trim()?C.salmon:C.border}`,borderRadius:12,padding:'12px 14px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',caretColor:C.salmon,resize:'none',boxSizing:'border-box',lineHeight:1.5}}/>
               {/* Pièce jointe réelle (PDF/programme/image) — prototype : on capte le nom, upload V2 */}
               {newEvFile ? (
@@ -13184,7 +13184,7 @@ export default function App2() {
                     <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${slotCol}55`,borderLeft:`4px solid ${slotCol}`,marginBottom:8,background:C.bgCard}}>
                       <span style={{width:9,height:9,borderRadius:'50%',background:slotCol,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)} <span style={{fontSize:10,fontWeight:800,color:slotCol}}>· Créneau {slotIdx+1}</span></div>
+                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)} <span style={{fontSize:10,fontWeight:800,color:slotCol}}>· {lang==='en'?'Slot':'Créneau'} {slotIdx+1}</span></div>
                         <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{setRad!=null?` · ${Math.round(setRad)} km`:''}{shrunk?<span style={{color:C.bordeaux,fontWeight:700}}> · ↓ {fmtKm(effRad!)} maintenant</span>:''}</div>
                         {/* 🎭 Badges mode + mood DU CRÉNEAU (décision 28.06 : chaque créneau porte son intention) */}
                         {(Array.isArray(s.modes)&&s.modes.length>0)||s.mood ? (

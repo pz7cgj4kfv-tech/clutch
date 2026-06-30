@@ -26,6 +26,33 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'prompt-lancement-0107',
+    date: '01.07.2026',
+    title: 'Prompt de challenge — stratégie de lancement complète',
+    sub: 'À reposer aux IA : matrices · coûts dans le temps · funding · timeline',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>POURQUOI</div>
+          <P>Avant de trancher la stratégie de lancement, on <strong>re-challenge GPT + Grok</strong> avec un prompt bien plus exigeant : <strong>matrices</strong> de scénarios, coûts <strong>dans le temps</strong>, du B2B au micro-influenceur, local vs global, business angel CH, et des <strong>projections par scénario × région × timeline</strong>.</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>Prompt complet (auto-suffisant, données réelles incluses) : <strong>docs/challenge-lancement-business-prompt.md</strong>.</p>
+
+        <H>Les 7 demandes du prompt</H>
+        <ol style={{ margin: '0 0 8px', paddingLeft: 20, fontSize: 13, lineHeight: 1.7, color: C.text }}>
+          <li><strong>Matrice des scénarios</strong> (bootstrap · event-led · paid · influence · B2B bars · PR · levée) — budget, temps de prépa, CAC, users M6/12/18, risque — + lesquels <strong>en parallèle</strong> et dans quel ordre.</li>
+          <li><strong>Séquence géo</strong> : une ville / région / plusieurs villes ? Local d'abord vs global ? Le <strong>seuil chiffré</strong> qui autorise Lausanne→Genève→Romandie→CH→Europe.</li>
+          <li><strong>Financement</strong> : business angel quand ? Venture Kick d'abord ? Montants CHF, valo, dilution, jalon qui débloque la levée.</li>
+          <li><strong>Boucle de réinvestissement</strong> : à partir de quel revenu la pub devient rentable (LTV:CAC ≥ 3:1).</li>
+          <li><strong>Projections</strong> : flop / moyen / bon / excellent × Lausanne / Romandie / CH × M6-M24.</li>
+          <li><strong>Timeline</strong> T-3mois → T+12mois avec jalons.</li>
+          <li><strong>LA conclusion</strong> : la meilleure stratégie en 5 étapes chiffrées + les 3 pièges.</li>
+        </ol>
+        <p style={{ fontSize: 11.5, lineHeight: 1.6, color: C.text, margin: '0 0 8px' }}>→ Copie le prompt, passe-le à GPT <strong>et</strong> Grok, ramène les 2 réponses. Je croise, je vire le bluff, je range dans l'audit financier + ici. <em>(La réponse viendra remplir la prochaine entrée datée.)</em></p>
+      </div>
+    ),
+  },
+  {
     id: 'challenge-panels-0107',
     date: '01.07.2026',
     title: 'Challenge GPT + Grok — synthèse tranchée',

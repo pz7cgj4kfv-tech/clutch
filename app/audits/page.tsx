@@ -26,6 +26,42 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'challenge-panels-0107',
+    date: '01.07.2026',
+    title: 'Challenge GPT + Grok — synthèse tranchée',
+    sub: 'Ce qu\'on garde, ce qu\'on vire · la Forteresse reste cachée',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>LE FIL ROUGE DES 2 PANELS</div>
+          <P>« Vous pensez tester Clutch, mais vous risquez de tester <strong>le vide</strong>. Au cold-start, les gens pardonnent les bugs techniques, <strong>pas le vide social</strong>. » → le 1er test doit être <strong>chorégraphié</strong>.</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>Doc complète : <strong>docs/challenge-panels-01jul-synthese.md</strong>.</p>
+
+        <H>✅ On garde (les 2 d'accord)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>1er test chorégraphié</strong> : 1 soir, 2h précises, centre Lausanne, rayon 2-5 km, « tout le monde ouvre une dispo à 19h30 » + groupe WhatsApp.</li>
+          <li><strong>Zéro bot d'ambiance romantique</strong> (LPD + confiance). Bots = Test Lab « BOT TEST » uniquement.</li>
+          <li><strong>Forteresse = moat interne</strong> (qualité/sécurité), <strong>pas</strong> un argument d'acquisition. Active mais jamais pitchée.</li>
+          <li>Avant le test : <strong>cycle humain complet qui tient</strong> + notifs fiables + <strong>jamais « rien ne se passe »</strong> + blocage/signalement/refus doux.</li>
+        </ul>
+
+        <H>🗑️ On vire (bluff / hors-sujet pour CE test)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>Modération texte serveur</strong> → over-engineering pour 30 amis (vrai pour le public, pas le test).</li>
+          <li><strong>Grok/CTO « forteresse GPS + i18n + premium stub » comme manques</strong> → se contredit avec sa propre liste « ne pas faire » + GPT. Rien de ça n'est requis pour tester.</li>
+          <li><strong>NPS après event</strong> → trop corporate ; feedback verbatim en vrac capte mieux.</li>
+        </ul>
+
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.salmon}55`, borderRadius: 12, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.salmon, letterSpacing: '.06em', marginBottom: 4 }}>🔒 DÉCISION DAVID — LA FORTERESSE RESTE CACHÉE</div>
+          <P>Le moteur (forteresse/cône) reste <strong>sous le capot</strong>, jamais mis en avant (défendabilité + non-vendeur). Côté user, on n'affiche <strong>QUE le RESSENTI</strong> : quand une situation <strong>devient impossible</strong>, il le <strong>SENT</strong> — sans voir l'algo ni les mots « forteresse/cône ».</P>
+          <P>Ce ressenti <strong>existe déjà</strong> = le <strong>cône vivant</strong> (slider qui se resserre + tension + boussole + haptique). Reste : le <strong>nommer sans jargon</strong> (« ta fenêtre se referme », souffle visuel) → 2-3 directions design Mel.</P>
+        </div>
+      </div>
+    ),
+  },
+  {
     id: 'finance-0107',
     date: '01.07.2026',
     title: 'Audit financier & stratégie de lancement',

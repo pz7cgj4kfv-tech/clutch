@@ -3406,6 +3406,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [newEvDate, setNewEvDate] = useState('Aujourd\'hui') // Aujourd'hui / Demain (contraint)
   const [newEvDur, setNewEvDur] = useState(2) // durée en heures (David : obligatoire)
   const [newEvMax, setNewEvMax] = useState(6)
+  const [newEvMin, setNewEvMin] = useState(2)  // 👥 « ça a lieu dès N » — seuil de lancement (David 30.06). Impairs OK.
   const [newEvDesc, setNewEvDesc] = useState('')
   const [newEvPrice, setNewEvPrice] = useState('Gratuit') // prix (David : oublié)
   const [newEvFile, setNewEvFile] = useState<string|null>(null) // nom du fichier joint (prototype)
@@ -3421,7 +3422,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const newEvValid = !!(newEvTitle.trim() && newEvLieu.trim() && newEvTime.trim() && newEvDesc.trim()) // desc obligatoire (David)
   const newEvDirty = !!(newEvTitle || newEvLieu || newEvDesc) // pour confirmer la fermeture
   const tryCloseCreate = () => { if (newEvDirty && !creating) setConfirmCloseEv(true); else setShowCreateGroup(false) }
-  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvAddrResults([]); setEvShowSugg(false) }
+  const resetCreateEv = () => { setShowCreateGroup(false); setConfirmCloseEv(false); setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvMin(2); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvAddrResults([]); setEvShowSugg(false) }
   // Recherche d'adresse (réutilise Nominatim, comme la mise en ligne — David)
   const [evAddrResults,setEvAddrResults]=useState<any[]>([])
   const [evShowSugg,setEvShowSugg]=useState(false)
@@ -3474,7 +3475,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           description: newEvDesc.trim() || 'Événement créé sur Clutch.',
           // 🔞 limite d'âge : clés AJOUTÉES seulement si activée → une création sans limite marche même AVANT la migration.
           ...(newEvAgeOn ? { age_min: newEvAgeMin, age_max: newEvAgeMax } : {}),
-          tags: ['groupe'], ev_gender: 'X', type: 'user', status: 'pending',
+          tags: ['groupe', 'min'+newEvMin], ev_gender: 'X', type: 'user', status: 'pending',
           active: true, created_by: userId, creator: 'Toi',
         }).select('id').single()
         if (ins?.id) {
@@ -3503,7 +3504,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
       bring: null,
       durationH: newEvDur,
       description: newEvDesc.trim() || 'Événement créé sur Clutch.',
-      tags: ['groupe'],
+      tags: ['groupe', 'min'+newEvMin],
       evGender: 'X',
       isGroupe: true,
       home_private: newEvHome,   // 🏠 adresse privée (quartier seulement)
@@ -3517,7 +3518,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     setGroupJoined(prev => new Set([...prev, newEv.id]))
     setCreating(false)
     setShowCreateGroup(false)
-    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvShowSugg(false)
+    setNewEvTitle(''); setNewEvLieu(''); setNewEvTime(((d)=>{d.setHours(d.getHours()+1,0,0,0);return d.toTimeString().slice(0,5)})(new Date())); setNewEvDate('Aujourd\'hui'); setNewEvDesc(''); setNewEvEmoji('🍷'); setNewEvMax(6); setNewEvMin(2); setNewEvDur(2); setNewEvPrice('Gratuit'); setNewEvFile(null); setNewEvAgeOn(false); setNewEvAgeMin(18); setNewEvAgeMax(99); setEvShowSugg(false)
     loadEvents()   // refresh immédiat → l'event apparaît tout de suite
   }
 
@@ -4607,13 +4608,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               </div>
             </div>
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:6}}>👥 {EN?'NUMBER OF SPOTS':'NOMBRE DE PLACES'}</div>
-              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                {[2,4,6,8,10,12].map(n=>(
-                  <button key={n} onClick={()=>setNewEvMax(n)}
-                    style={{flex:1,minWidth:44,padding:'9px 0',borderRadius:10,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${newEvMax===n?C.salmon:C.border}`,background:newEvMax===n?C.salmonFaint:'transparent',color:newEvMax===n?C.salmon:C.whiteMid}}>{n}</button>
-                ))}
-              </div>
+              <div style={{fontSize:10,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',marginBottom:8}}>👥 {EN?'SPOTS':'PLACES'}</div>
+              {/* 👥 Deux réglages (David 30.06) : « ça a lieu dès N » (seuil de lancement) + « max ». Nombres IMPAIRS OK. */}
+              {([['min', EN?'Happens from':'Ça a lieu dès', newEvMin, setNewEvMin] as const, ['max', EN?'Max spots':'Places max', newEvMax, setNewEvMax] as const]).map(([k,label,val,set])=>(
+                <div key={k} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+                  <span style={{flex:1,fontSize:12.5,color:C.white,fontWeight:700}}>{label}</span>
+                  <button onClick={()=>set((v:number)=>{ const nv=Math.max(1,v-1); if(k==='max'&&nv<newEvMin)setNewEvMin(nv); return nv })} style={{width:34,height:34,borderRadius:9,border:`1px solid ${C.border}`,background:'transparent',color:C.salmon,fontSize:19,fontWeight:800,cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>−</button>
+                  <span style={{minWidth:30,textAlign:'center',fontSize:16,fontWeight:900,color:C.salmon}}>{val}</span>
+                  <button onClick={()=>set((v:number)=>{ const nv=Math.min(20,v+1); if(k==='min'&&nv>newEvMax)setNewEvMax(nv); return nv })} style={{width:34,height:34,borderRadius:9,border:`1px solid ${C.border}`,background:'transparent',color:C.salmon,fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>+</button>
+                </div>
+              ))}
+              <div style={{fontSize:10,color:C.whiteMid,lineHeight:1.45,marginTop:2}}>{EN?`It only happens if at least ${newEvMin} join · up to ${newEvMax}. Odd numbers OK (e.g. 3 for pétanque).`:`Ça n'a lieu que si au moins ${newEvMin} s'inscrivent · jusqu'à ${newEvMax}. Nombres impairs OK (ex : 3 pour une pétanque).`}</div>
             </div>
 
             {/* Champ : LIMITE D'ÂGE (optionnel — David) */}

@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1ef'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 235   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1f0'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 236   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -6358,7 +6358,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     setSosSaving(true)
     const clean = sosContacts.filter(c=>c.name.trim()||c.phone.trim())
     try { localStorage.setItem(sosKey, JSON.stringify({contacts:clean})) } catch {}
-    setTimeout(()=>{setSosSaving(false); showToast('✓ Contacts SOS sauvegardés', C.green)}, 300)
+    setTimeout(()=>{setSosSaving(false); showToast(lang==='en'?'✓ SOS contacts saved':'✓ Contacts SOS sauvegardés', C.green)}, 300)
   }
   const sosWatchRef = useRef<number|null>(null)
   const [sosLiveToken, setSosLiveToken] = useState<string|null>(null)
@@ -6397,7 +6397,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const stopSOS = async () => {
     if (sosWatchRef.current!=null && navigator.geolocation) { navigator.geolocation.clearWatch(sosWatchRef.current); sosWatchRef.current=null }
     if (sosLiveToken) { try { await supabase.from('sos_sessions').update({ active:false }).eq('token', sosLiveToken) } catch {} ; setSosLiveToken(null) }
-    showToast('Alerte SOS arrêtée', C.orange)
+    showToast(lang==='en'?'SOS alert stopped':'Alerte SOS arrêtée', C.orange)
   }
 
   // Mode réception (pour les femmes) — persisté localStorage
@@ -6665,7 +6665,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       onUserUpdate({ ...user, photo_url: newMain } as Profile)
     }
     setSwapFromIdx(null)
-    showToast('✓ Photos réordonnées', C.green)
+    showToast(lang==='en'?'✓ Photos reordered':'✓ Photos réordonnées', C.green)
   }
 
   useEffect(() => {
@@ -6796,7 +6796,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const pickAndSave = async (field:string, k:string, setter:(v:string)=>void) => {
     setter(k); setEditField(null)
     await saveProfileField(field, k)
-    showToast('✓ Sauvegardé', C.green)
+    showToast(lang==='en'?'✓ Saved':'✓ Sauvegardé', C.green)
   }
 
   // ── Contenu des sous-pages ────────────────────────────────────
@@ -6868,7 +6868,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
                 style={{width:'100%',background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit',resize:'none',boxSizing:'border-box'}}/>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
                 <span style={{fontSize:10,color:C.whiteMid}}>{editBio.length}/160</span>
-                <button onClick={async()=>{await saveProfileField('bio',editBio.trim()||null);setEditField(null);showToast('✓ Bio sauvegardée',C.green)}}
+                <button onClick={async()=>{await saveProfileField('bio',editBio.trim()||null);setEditField(null);showToast(lang==='en'?'✓ Bio saved':'✓ Bio sauvegardée',C.green)}}
                   style={{padding:'6px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Save</button>
               </div>
             </div>
@@ -6879,7 +6879,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
               <input value={editName} onChange={e=>setEditName(e.target.value.slice(0,30))} autoFocus maxLength={30}
                 style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit'}}/>
-              <button onClick={async()=>{const n=editName.trim();if(!n)return;await saveProfileField('name',n);onUserUpdate({...user,name:n} as any);setEditField(null);showToast('✓ Prénom mis à jour',C.green)}}
+              <button onClick={async()=>{const n=editName.trim();if(!n)return;await saveProfileField('name',n);onUserUpdate({...user,name:n} as any);setEditField(null);showToast(lang==='en'?'✓ Name updated':'✓ Prénom mis à jour',C.green)}}
                 style={{padding:'8px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
             </div>
           </FieldRow>
@@ -6917,7 +6917,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
               <input value={editJob} onChange={e=>setEditJob(e.target.value.slice(0,50))} maxLength={50} autoFocus placeholder="Designer, Étudiant…"
                 style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.white,outline:'none',fontFamily:'inherit'}}/>
-              <button onClick={async()=>{await saveProfileField('job',editJob.trim()||null);setEditField(null);showToast('✓ Métier mis à jour',C.green)}}
+              <button onClick={async()=>{await saveProfileField('job',editJob.trim()||null);setEditField(null);showToast(lang==='en'?'✓ Job updated':'✓ Métier mis à jour',C.green)}}
                 style={{padding:'8px 18px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
             </div>
           </FieldRow>
@@ -6937,7 +6937,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
             isEditing={editField==='genre'&&!genderLocked} onTap={()=>!genderLocked&&setEditField(editField==='genre'?null:'genre')}>
             <div style={{padding:'4px 12px 12px',display:'flex',gap:8}}>
               {(['F','M','X'] as GenderKey[]).map(g=>(
-                <button key={g} onClick={async()=>{setEditGender(g);await saveProfileField('gender',g==='F'?'woman':g==='M'?'man':'other');setEditField(null);showToast('✓ Genre sauvegardé',C.green)}}
+                <button key={g} onClick={async()=>{setEditGender(g);await saveProfileField('gender',g==='F'?'woman':g==='M'?'man':'other');setEditField(null);showToast(lang==='en'?'✓ Gender saved':'✓ Genre sauvegardé',C.green)}}
                   style={{flex:1,padding:'8px 4px',borderRadius:10,border:`1.5px solid ${editGender===g?GC[g]:C.border}`,background:editGender===g?`${GC[g]}22`:'transparent',color:editGender===g?GC[g]:C.whiteMid,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
                   <GenderSvg gk={g} size={14}/>{g==='F'?'Femme':g==='M'?'Homme':'Autre'}
                 </button>
@@ -6951,7 +6951,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
               <input type="number" min={140} max={220} value={editHeight} onChange={e=>setEditHeight(e.target.value)} autoFocus placeholder="Ex: 175"
                 style={{flex:1,background:C.whiteFaint,border:`1px solid ${C.borderStrong}`,borderRadius:10,padding:'8px 12px',fontSize:16,color:C.white,outline:'none',fontFamily:'inherit'}}/>
               <span style={{color:C.whiteMid,fontSize:13}}>cm</span>
-              <button onClick={async()=>{const h=parseInt(editHeight);if(isNaN(h)||h<140||h>220){showToast('Taille invalide (140-220)',C.red);return}await saveProfileField('height_cm',h);setEditField(null);showToast('✓ Taille enregistrée',C.green)}}
+              <button onClick={async()=>{const h=parseInt(editHeight);if(isNaN(h)||h<140||h>220){showToast('Taille invalide (140-220)',C.red);return}await saveProfileField('height_cm',h);setEditField(null);showToast(lang==='en'?'✓ Height saved':'✓ Taille enregistrée',C.green)}}
                 style={{padding:'8px 14px',background:C.green,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
             </div>
           </FieldRow>

@@ -26,6 +26,81 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'finance-0107',
+    date: '01.07.2026',
+    title: 'Audit financier & stratégie de lancement',
+    sub: 'Vrais chiffres marché CH · cold-start · funding · ville→pays',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>VERDICT</div>
+          <P>Le marché CH est réel et il paie (Tinder ~$1.5M/mois rien qu'en Suisse), mais <strong>dominé</strong>. La seule porte d'entrée = <strong>hyper-local saturé</strong> (Lausanne-étudiants), pas la pub large. Lausanne-first ne sert pas à <em>gagner de l'argent</em>, il sert à <strong>prouver densité + rétention + monétisation</strong> → c'est ÇA qui finance la suite (levée).</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>⚠️ Benchmarks réels sourcés (industrie/marché CH), pas de la data Clutch. Doc complète : <strong>docs/audit-financier-strategie.md</strong>.</p>
+
+        <H>Marché (réel)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li>CH dating : pénétration ~<strong>11.8 %</strong>. Tinder ~<strong>120-133K</strong> users actifs/sem (~<strong>$1.5M/mois</strong> rev CH), Bumble ~70K, Hinge ~34K.</li>
+          <li>Lausanne : ~<strong>140K habitants</strong>, ~<strong>35 000 étudiants</strong> (EPFL+UNIL, plus grand campus CH) → densité idéale.</li>
+          <li>Tendance 2026 : <strong>fatigue du swipe</strong>, montée du IRL/intentionnel → l'angle Clutch est <strong>dans le sens du vent</strong>.</li>
+        </ul>
+
+        <H>Unit economics (benchmarks)</H>
+        <P>CPI iOS <strong>$4.70</strong> / Android $3.70 · CAC blended ~<strong>$29</strong> (dating = plus cher). CPM Insta ~$8 / TikTok ~$6 (CH ~$9-13). Règle viable : <strong>LTV:CAC ≥ 3:1</strong>. → acheter sa croissance trop tôt = <strong>brûler du cash</strong>.</P>
+
+        <H>3 scénarios de lancement (coûts réels)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong style={{ color: C.green }}>A — Bootstrap hyper-local</strong> (CHF 2-8K) : 1 campus, 1 soirée de lancement, ambassadeurs. <strong>Recommandé pour démarrer.</strong> Rapporte peu de cash mais la donnée qui vaut de l'or.</li>
+          <li><strong>B — Paid growth Lausanne</strong> (CHF 10-40K) : ~1-4K installs, ~10-20 % actifs. <strong>Après</strong> la preuve A, jamais avant.</li>
+          <li><strong>C — Levée</strong> : <strong>Venture Kick</strong> (non-dilutif, jusqu'à ~CHF 150K, EPFL-friendly) en priorité · angels CH 25-500K · valo seed CHF 1-5M. Après traction.</li>
+        </ul>
+
+        <H>« Lausanne peut-il financer la suite ? »</H>
+        <P>1 000 actifs × 5 % premium × CHF 19.90 ≈ <strong>CHF 1 000/mois</strong> → <strong>non</strong>, ça ne paie pas une expansion. Mais ça <strong>prouve la monétisation</strong> = le signal que les investisseurs achètent. On réinvestit <strong>la preuve, pas le cash</strong>.</P>
+
+        <H>Se faire connaître sans se faire piquer l'idée</H>
+        <P>L'idée est copiable, le moat ne l'est pas : (a) la <strong>forteresse</strong> (mois de R&D), (b) la <strong>densité locale + communauté</strong>, (c) la <strong>marque</strong> (Clutch/Verrou, déposable IGE). Être secret = suicide pour une app sociale. Parade = <strong>vitesse + lock-in local + marque déposée</strong>.</P>
+
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}><strong>Séquence :</strong> finir produit testable → bootstrap Lausanne (preuve densité) → déposer marque + candidater Venture Kick → paid/levée → Genève → Romandie → CH. <strong>Jamais « toute la Suisse » d'un coup</strong> (densité diluée). Le prompt de challenge expert (panel 4 voix, données incluses) est dans la doc.</div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'qa-couverture-0107',
+    date: '01.07.2026',
+    title: 'Couverture de test — qu\'est-ce qu\'on n\'a PAS testé ?',
+    sub: 'Matrice par feature · plan de test minimal avant les amis',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>LES 2 PLUS GROS RISQUES NON-TESTÉS</div>
+          <P><strong>Push notifs</strong> (sans elles, personne ne voit un clutch à temps → le concept « spontané » meurt) · <strong>comment un refus est vécu</strong> (UX émotionnelle, clé pour les femmes).</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>Doc complète (matrice ✅/🟦/🟧/⛔ par feature) : <strong>docs/qa-couverture-test.md</strong>.</p>
+
+        <H>Codé mais PAS testé bout-en-bout (🟦) — tes points</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>Création d'event</strong> (titre/lieu/dates/places min-max impairs/prix/âge) → tester Solo.</li>
+          <li><strong>Empilage / plafond simultané</strong> (♀20 · premium5 · free3) → Test Lab : N bots me clutchent jusqu'au plafond.</li>
+          <li><strong>5 reçus/jour (♀)</strong> → bombarder une ♀ de 6 clutchs, vérifier le 6e.</li>
+          <li><strong>Liste d'attente event plein</strong> + place qui se libère → Test Lab.</li>
+          <li><strong>Accepter / Refuser + cooldown 48h + message côté refusé</strong> → 2 téléphones.</li>
+          <li><strong>Enchaînement serré</strong> (RDV 20h30 puis 22h30 loin → alerte forteresse) → 2 tél.</li>
+        </ul>
+
+        <H>Le plan de test minimal (avant les amis)</H>
+        <ol style={{ margin: '0 0 4px', paddingLeft: 20, fontSize: 13, lineHeight: 1.7, color: C.text }}>
+          <li><strong>2 téléphones, happy path complet</strong> ×2 : dispo → présence → clutch → accept → Verrou → J'y suis → Terminer → feedback.</li>
+          <li><strong>Test Lab</strong> : empilage plafond · 6e reçu ♀ · cooldown 48h · waitlist event plein.</li>
+          <li><strong>Forteresse</strong> : enchaînement 20h30→22h30 loin · event qui se grise en se déplaçant.</li>
+          <li><strong>Push</strong> : un clutch reçu doit sonner <strong>app fermée</strong>.</li>
+        </ol>
+      </div>
+    ),
+  },
+  {
     id: 'meta-2806',
     date: '28.06.2026',
     title: 'Audit méta — marché, revenus, lancement',

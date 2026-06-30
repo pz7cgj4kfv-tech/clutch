@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1ec'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 232   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ed'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 233   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3264,7 +3264,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], suggestGroupEvent=false, onRegisteredObjs }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], showBotEvents=false, onGenTestEvents, onClearTestEvents, suggestGroupEvent=false, onRegisteredObjs }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -3281,6 +3281,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
   slotsFull?:{lat:number;lng:number;radiusKm:number;start:number;end:number}[];
+  showBotEvents?:boolean; onGenTestEvents?:()=>void; onClearTestEvents?:()=>void;
   suggestGroupEvent?:boolean;
 }) {
   const t = useT(lang)
@@ -3303,10 +3304,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const loadEvents = async () => {
     const { data } = await supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
     let rows = data || []
-    // 🤖 Events créés par des bots = TOUJOURS masqués de l'onglet Événements (David 28.06 : « c'est fini avec ces robots »).
-    //   Avant : masqués seulement en Réel → en mode Test Lab ils polluaient (+ donnaient « hors de ta dispo » au clic).
-    //   Le Test Lab vérifie la création d'event par ses propres fonctions admin, pas via cette liste user-facing.
-    if (rows.length) {
+    // 🤖 Events créés par des bots = masqués en mode RÉEL. En MODE DÉMO (showBotEvents), on les MONTRE → permet de
+    //    tester avec le générateur d'events sur créneaux (David 30.06). En Réel (vrais amis) : toujours masqués.
+    if (rows.length && !showBotEvents) {
       try {
         const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot', true)
         const botIds = new Set((bots||[]).map((b:any)=>b.id))
@@ -3826,6 +3826,9 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           </div>
           {/* ⚙ Affiner — ouvre le panneau tri + catégories (progressive disclosure) */}
           <button onClick={()=>setShowRefine(v=>!v)} title={EN?'Refine':'Affiner'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?`${C.pink}14`:'transparent',border:`1px solid ${(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.border}`,color:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.whiteMid,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'.15s'}}>⚙</button>
+          {/* 🧪 ADMIN : générer/nettoyer des events test sur mes créneaux (David 30.06) */}
+          {onGenTestEvents && <button onClick={async()=>{ await onGenTestEvents(); setTimeout(loadEvents, 700) }} title="Générer des events test sur mes créneaux" style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:`${C.green}1c`,border:`1px solid ${C.green}66`,color:C.green,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>🧪</button>}
+          {onClearTestEvents && <button onClick={async()=>{ await onClearTestEvents(); setTimeout(loadEvents, 700) }} title="Retirer les events test" style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:'transparent',border:`1px solid ${C.border}`,color:C.whiteMid,fontSize:14,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>🧹</button>}
           {/* + Organiser (compact, rond) */}
           <button onClick={()=>setShowCreateGroup(true)} title={EN?'Host an event':'Organiser un événement'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:C.salmonFaint,border:`1px solid ${C.salmon}44`,color:C.salmon,fontSize:21,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,paddingBottom:2}}>+</button>
         </div>
@@ -9281,6 +9284,40 @@ export default function App2() {
     // select('*') → récupère modes/mood SI les colonnes existent (sinon ignorées), sans casser avant la migration.
     const {data}=await supabase.from('availabilities').select('*').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
   const removeSlot = useCallback(async(id:string)=>{ await supabase.from('availabilities').update({active:false}).eq('id',id); reloadAvail() },[reloadAvail])
+  // 🧪 GÉNÉRATEUR D'EVENTS TEST SUR MES CRÉNEAUX (David 30.06) — events placés DANS mes cercles de créneaux,
+  //    à une heure DANS la fenêtre, hôtés par des BOTS (1 event/bot → zéro conflit d'occupation sur moi/eux),
+  //    tagués 'test'. Visibles en MODE DÉMO (cf. showBotEvents passé à EventsTab). admin only.
+  const EV_GEN_POOL: [string,string][] = [['🍷','Apéro spontané'],['🏃','Run tranquille'],['🎸','Jam session'],['☕','Café papote'],['🧘','Yoga au parc'],['🍕','Pizza party'],['🎲','Soirée jeux'],['🥾','Petite rando'],['🏓','Ping-pong'],['🎨','Atelier dessin'],['🎤','Karaoké'],['🏀','Basket']]
+  const genTestEvents = useCallback(async()=>{
+    if(!user?.id) return
+    const slots = (myAvail||[]).filter((s:any)=>s.lat!=null && s.lng!=null)
+    if(!slots.length){ showToast('Ouvre au moins 1 créneau (avec lieu), puis génère',C.orange); return }
+    const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot',true).limit(40)
+    const botIds = (bots||[]).map((b:any)=>b.id)
+    if(!botIds.length){ showToast('Crée d\'abord des bots dans le Test Lab',C.orange); return }
+    const hhmm=(ms:number)=>{const d=new Date(ms);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
+    const rows:any[]=[]; let bi=0
+    slots.forEach((s:any)=>{
+      const lat0=s.lat, lng0=s.lng, rad=(s.radius_km??3)||3
+      const t0=new Date(s.start_at).getTime(), t1=new Date(s.end_at).getTime()
+      for(let k=0;k<3 && bi<botIds.length;k++){
+        const ang=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*rad
+        const la=lat0+(r/111)*Math.cos(ang), lo=lng0+(r/(111*Math.cos(lat0*Math.PI/180)))*Math.sin(ang)
+        const st=t0+Math.random()*Math.max(60000,(t1-t0-3600000))
+        const [emoji,title]=EV_GEN_POOL[Math.floor(Math.random()*EV_GEN_POOL.length)]
+        const spots=4+Math.floor(Math.random()*8)
+        rows.push({ title, emoji, lieu:nearestCity(la,lo), event_time:hhmm(st), event_date:'Aujourd\'hui', spots, starts_at:new Date(st).toISOString(), venue_lat:la, venue_lng:lo, description:'Event test généré sur ton créneau.', tags:['groupe','test'], ev_gender:'X', type:'user', status:'pending', active:true, created_by:botIds[bi++], creator:title })
+      }
+    })
+    if(!rows.length){ showToast('Aucun créneau exploitable',C.orange); return }
+    const { error } = await supabase.from('events').insert(rows)
+    if(error){ showToast('Erreur génération : '+error.message,C.red) }
+    else showToast(`✨ ${rows.length} events test sur tes créneaux — passe en Mode Démo pour les voir`,C.green)
+  },[user?.id,myAvail])
+  const clearTestEvents = useCallback(async()=>{
+    const { error } = await supabase.from('events').update({active:false,status:'cancelled'}).contains('tags',['test'])
+    showToast(error?'Nettoyage partiel (RLS)':'🧹 Events test retirés',error?C.orange:C.whiteMid)
+  },[])
   // Multi-créneaux (A) : « promotion » du créneau qui couvre MAINTENANT dans profiles, pour être visible
   // pendant chacun de mes créneaux. PROMOTE-ONLY : ne rend JAMAIS indisponible (pire cas = ne fait rien).
   // → le gate (is_available && available_until>now) reste lu tel quel, AUCUN site de gate modifié.
@@ -12000,6 +12037,9 @@ export default function App2() {
                   ? [{ start: (user as any).available_from ? new Date((user as any).available_from).getTime() : Date.now(), end: new Date((user as any).available_until).getTime() }]
                   : []}
                 slotsFull={[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>({ lat:s.lat, lng:s.lng, radiusKm:(s.radius_km ?? 3), start:new Date(s.start_at).getTime(), end:new Date(s.end_at).getTime() }))}
+                showBotEvents={demoOn()}
+                onGenTestEvents={viewerIsAdmin?genTestEvents:undefined}
+                onClearTestEvents={viewerIsAdmin?clearTestEvents:undefined}
                 suggestGroupEvent={(()=>{ try{
                   const ageD=(user as any)?.created_at ? (Date.now()-new Date((user as any).created_at).getTime())/86400000 : 0
                   const recv=(clutches as any[]).filter((c:any)=>c.receiver_id===user?.id).length

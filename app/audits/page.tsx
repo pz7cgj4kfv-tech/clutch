@@ -27,7 +27,7 @@ const P = ({ children }: { children: React.ReactNode }) =>
 const ENTRIES: Entry[] = [
   {
     id: 'tri-or-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Le tri de l\'or — toutes les options, gardées ou écartées',
     sub: 'Synthèse finale GPT ×3 + Grok · seuils de densité · verdict par canal',
     body: (
@@ -63,7 +63,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'cible-analyse-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Analyse de cible — qui vise-t-on ? + modèle de prix',
     sub: 'Étudiants = carburant · actifs/expats = revenu · prix multi-paliers',
     body: (
@@ -96,7 +96,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'timeline-tranchee-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Réponses Grok + GPT — la timeline tranchée',
     sub: 'Ce qu\'on garde (challengé) + le calendrier qu\'on suit vraiment',
     body: (
@@ -144,7 +144,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'prompt-lancement-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Prompt de challenge — stratégie de lancement complète',
     sub: 'À reposer aux IA : matrices · coûts dans le temps · funding · timeline',
     body: (
@@ -171,7 +171,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'challenge-panels-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Challenge GPT + Grok — synthèse tranchée',
     sub: 'Ce qu\'on garde, ce qu\'on vire · la Forteresse reste cachée',
     body: (
@@ -207,7 +207,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'finance-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Audit financier & stratégie de lancement',
     sub: 'Vrais chiffres marché CH · cold-start · funding · ville→pays',
     body: (
@@ -249,7 +249,7 @@ const ENTRIES: Entry[] = [
   },
   {
     id: 'qa-couverture-0107',
-    date: '01.07.2026',
+    date: '30.06.2026',
     title: 'Couverture de test — qu\'est-ce qu\'on n\'a PAS testé ?',
     sub: 'Matrice par feature · plan de test minimal avant les amis',
     body: (

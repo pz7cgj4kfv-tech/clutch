@@ -25,6 +25,7 @@ const TABS: { href: string; icon: string; t: string; d: string; group: string; a
   { href: '/sim', icon: '🧪', t: 'Simulateur', d: 'L\'algo, de 5 à 50 000 personnes', group: 'Coulisses' },
   { href: '/cockpit', icon: '🛰️', t: 'Cockpit', d: 'Le centre de contrôle de la dynamique', group: 'Coulisses' },
   { href: '/clutch-test', icon: '🧪', t: 'Clutch Test v1', d: 'Orchestrer une soirée test : consigne, compte à rebours, densité live', group: 'Coulisses', accent: M.green },
+  { href: '/plan-lancement', icon: '📄', t: 'Plan de lancement (PDF)', d: 'Le vrai document investisseur : matrices, projections, graphes — fond blanc, imprimable', group: 'Docs', accent: M.pink },
   { href: '/audits', icon: '📋', t: 'Audits', d: 'Les audits IA datés (marché, revenus, lancement) — GPT + Grok croisés', group: 'Docs', accent: M.green },
   { href: '/manifeste', icon: '✨', t: 'ADN', d: 'Ce qui définit Clutch — slogans & phrases clés', group: 'Docs', accent: M.pink },
   { href: '/vision', icon: '🧭', t: 'Vision · le Graal', d: 'La stratégie et la philosophie', group: 'Docs' },

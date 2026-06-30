@@ -3264,7 +3264,7 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
-function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], showBotEvents=false, onGenTestEvents, onClearTestEvents, suggestGroupEvent=false, onRegisteredObjs }:{
+function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], showBotEvents=false, myGps=null, onGenTestEvents, onClearTestEvents, suggestGroupEvent=false, onRegisteredObjs }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
   waitlist:Set<string>; setWaitlist:(fn:any)=>void;
@@ -3281,7 +3281,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   showToast?:(m:string,c?:string)=>void;
   availSlots?:{start:number;end:number}[];
   slotsFull?:{lat:number;lng:number;radiusKm:number;start:number;end:number}[];
-  showBotEvents?:boolean; onGenTestEvents?:()=>void; onClearTestEvents?:()=>void;
+  showBotEvents?:boolean; myGps?:[number,number]|null; onGenTestEvents?:()=>void; onClearTestEvents?:()=>void;
   suggestGroupEvent?:boolean;
 }) {
   const t = useT(lang)
@@ -3293,6 +3293,17 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     for (let i=0;i<(slotsFull?.length||0);i++){ const s=slotsFull![i]; if(s.lat==null||s.lng==null) continue
       if (haversineKm(la,lo,s.lat,s.lng) <= s.radiusKm + 0.05 && (evMs==null || (evMs>=s.start-3600000 && evMs<=s.end))) return i }
     return -1
+  }
+  // 🛰️ FORTERESSE × EVENTS (David 30.06) : un event est-il encore JOIGNABLE depuis ma position GPS pour son heure ?
+  //    distance(moi→event) ≤ portée(temps restant). Si non → on FLAGUE (« trop loin pour l'heure »), on ne bloque pas dur.
+  //    Quand je me déplace (Lausanne→Genève) ou que le temps passe, des events deviennent injoignables tout seuls.
+  const eventReachable = (ev:any): boolean => {
+    if (!myGps) return true
+    const la = ev?.venue_lat, lo = ev?.venue_lng; if (typeof la!=='number' || typeof lo!=='number') return true
+    const evMs = ev?.starts_at ? new Date(ev.starts_at).getTime() : null; if (evMs==null) return true
+    const leadMin = (evMs - Date.now())/60000; if (leadMin <= 0) return true   // déjà commencé → on ne juge pas
+    const reach = foReachKm(leadMin)
+    return haversineKm(myGps[0], myGps[1], la, lo) <= reach + 0.5
   }
   // Nudge bienveillant « event de groupe » : doux, dismissible, max 1×/semaine, jamais culpabilisant.
   const [nudgeHidden,setNudgeHidden] = useState(()=>{ try{ const ts=localStorage.getItem('nudge_grpev_last'); return ts ? (Date.now()-Number(ts) < 7*86400000) : false }catch{ return false } })
@@ -4015,8 +4026,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
                 {slots.map((s,i)=>{ const [x,y]=px(s.lat,s.lng); const col=SLOT_COLORS[i%SLOT_COLORS.length]; const rr=Math.max(7,s.radiusKm*kmY); return (
                   <g key={i}><circle cx={x} cy={y} r={rr} fill={col+'14'} stroke={col} strokeWidth="1.2" strokeDasharray="4 3"/><text x={x} y={y-rr-3} fill={col} fontSize="9" fontWeight="800" textAnchor="middle">Créneau {i+1}</text></g>
                 )})}
-                {evs.map((e,i)=>{ const [x,y]=px(e.venue_lat,e.venue_lng); const si=eventSlotIdx(e); const col=si>=0?SLOT_COLORS[si%SLOT_COLORS.length]:'#9b8a93'; return (
-                  <circle key={i} cx={x} cy={y} r="4.2" fill={col} stroke="#fff" strokeWidth="1"/>
+                {evs.map((e,i)=>{ const [x,y]=px(e.venue_lat,e.venue_lng); const si=eventSlotIdx(e); const far=!eventReachable(e); const col=far?'#7a5560':(si>=0?SLOT_COLORS[si%SLOT_COLORS.length]:'#9b8a93'); return (
+                  <circle key={i} cx={x} cy={y} r="4.2" fill={far?'none':col} stroke={far?'#7a5560':'#fff'} strokeWidth={far?'1.4':'1'} strokeDasharray={far?'2 2':undefined}/>
                 )})}
                 {(()=>{ const [x,y]=px(myLat,myLng); return <g><circle cx={x} cy={y} r="5" fill="#fff" stroke={C.plum} strokeWidth="2"/><text x={x} y={y+15} fill="#fff" fontSize="8.5" fontWeight="800" textAnchor="middle">moi</text></g> })()}
               </svg>
@@ -4034,10 +4045,13 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           const cPhoto = (ev as any).creatorPhoto
           const cat = eventCat(ev)  // 🎨 catégorie + couleur (prototype système couleurs)
           const slotIdx = eventSlotIdx(ev)  // 🎨 dans quel de MES créneaux (1/2/3) tombe l'event
+          const tooFarEv = !eventReachable(ev)  // 🛰️ injoignable depuis ma position pour son heure → flag (jamais bloquer dur)
           return (
-          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)'}}>
+          <div key={ev.id} onClick={()=>{setSelEv(ev);setEvPhotoIdx(0)}} style={{background:C.bgCard,border:`1px solid ${tooFarEv?C.bordeaux+'55':C.border}`,borderRadius:16,cursor:'pointer',overflow:'hidden',minWidth:0,boxShadow:'0 1px 3px rgba(120,115,125,.14), 0 5px 14px rgba(120,115,125,.16)',opacity:tooFarEv?0.62:1}}>
             {/* Photo — DUOTONE par catégorie (photo désaturée + voile de la couleur du type). Prototype système couleurs. */}
             <div style={{position:'relative',height:104,background:isImg?'#e9e4e7':`linear-gradient(135deg,${C.plum},${C.bgSheet})`,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px 16px 0 0'}}>
+              {/* 🛰️ Flag « trop loin pour l'heure » (forteresse × event) — David 30.06 */}
+              {tooFarEv && <span style={{position:'absolute',top:7,right:registered.has(ev.id)?58:7,zIndex:3,fontSize:8,fontWeight:900,color:'#fff',background:C.bordeaux,borderRadius:5,padding:'2px 6px',boxShadow:'0 1px 4px rgba(0,0,0,.4)'}}>⛔ {EN?'Too far for the time':'Trop loin pour l’heure'}</span>}
               {isImg ? <img src={photo} alt="" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',borderRadius:'16px 16px 0 0',filter:'saturate(.5) contrast(1.03)'}}/> : <span style={{fontSize:42}}>{ev.emoji}</span>}
               {/* Voile couleur de la catégorie (duotone) */}
               <div style={{position:'absolute',inset:0,background:cat.c,mixBlendMode:'multiply',opacity:.5,borderRadius:'16px 16px 0 0'}}/>
@@ -12071,6 +12085,7 @@ export default function App2() {
                   : []}
                 slotsFull={[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any)=>({ lat:s.lat, lng:s.lng, radiusKm:(s.radius_km ?? 3), start:new Date(s.start_at).getTime(), end:new Date(s.end_at).getTime() }))}
                 showBotEvents={demoOn()}
+                myGps={realGps}
                 onGenTestEvents={viewerIsAdmin?genTestEvents:undefined}
                 onClearTestEvents={viewerIsAdmin?clearTestEvents:undefined}
                 suggestGroupEvent={(()=>{ try{

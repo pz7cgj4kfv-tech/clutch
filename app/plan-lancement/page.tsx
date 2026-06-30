@@ -95,6 +95,21 @@ function Branch({ label, verdict, cond, children, depth = 0 }: { label: string; 
   )
 }
 
+function SourceGroup({ title, links }: { title: string; links: [string, string][] }) {
+  return (
+    <div style={{ margin: '10px 0', breakInside: 'avoid' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: K.ink, marginBottom: 4 }}>{title}</div>
+      <ul style={{ margin: 0, paddingLeft: 18 }}>
+        {links.map(([label, url], i) => (
+          <li key={i} style={{ fontSize: 12, lineHeight: 1.5, margin: '0 0 3px' }}>
+            <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: K.blue, textDecoration: 'underline' }}>{label} ↗</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 const fr = (v: number) => v.toLocaleString('fr-CH')
 const chf = (v: number) => v >= 1e6 ? 'CHF ' + (v / 1e6).toFixed(1).replace('.0', '') + ' M' : 'CHF ' + fr(v)
 
@@ -295,8 +310,51 @@ export default function PlanLancement() {
 
         {/* 13 SOURCES */}
         <H2 n="13.">Sources & méthode</H2>
-        <P style={{ fontSize: 11.8 }}><strong>Marché :</strong> TBRC (apps sociales), Grand View (dating), Allied/Technavio (événements), Statista (dating CH 11,7 %), Sensor Tower (Tinder CH). <strong>Comparables :</strong> Timeleft (Substack), Fever (newsroom), Eventbrite (SEC FY2024), Strava (Business of Apps). <strong>Pub :</strong> AdAmigo (Meta CPM par pays), WebFX, Triple Whale (TikTok), AppTweak & SplitMetrics (ASA), Business of Apps & Adjust (CPI). <strong>Influence :</strong> Metromodels, Influencer Marketing Hub. <strong>Rétention/économie :</strong> a16z, Business of Apps (dating benchmarks), Adapty, SEM Nexus (LTV:CAC). <strong>Échec :</strong> DemandSage, Equidam, Fyresite. <strong>Démographie CH :</strong> OFS (âge, ménages, budget), Statistique Lausanne (2025), Statistique Vaud, Sport Suisse 2020 (OFSPO). <strong>Solitude :</strong> OMS (2025), Gallup, US Surgeon General. <strong>Financement :</strong> venturekick.ch, sictic.ch.</P>
-        <P style={{ fontSize: 11.8 }}><strong>Méthode :</strong> recherche web par 4 analystes (30.06.2026), chiffres marqués RÉEL (sourcé) ou ESTIMÉ (extrapolation explicitée). Les projections sont un <strong>modèle transparent à hypothèses affichées</strong>, pas des garanties. Détail complet et liens : <strong>docs/recherche-marche-30jun.md</strong>.</P>
+        <P style={{ fontSize: 12 }}><strong>Méthode :</strong> recherche web par 4 analystes (30.06.2026), chiffres marqués RÉEL (sourcé) ou ESTIMÉ (extrapolation explicitée). Les projections sont un <strong>modèle transparent à hypothèses affichées</strong>, pas des garanties. <strong>Toutes les sources ci-dessous sont cliquables.</strong></P>
+        <SourceGroup title="Marché (taille & croissance)" links={[
+          ['Apps sociales ~98 Md$, CAGR 28 % — TBRC', 'https://www.globenewswire.com/news-release/2025/01/27/3015333/28124/en/Social-Networking-App-Market-Outlook-Global-Social-Networking-App-Market-Projected-to-Reach-207-31-Billion-by-2028-with-a-CAGR-of-28-3.html'],
+          ['Industrie des événements ~736 Md$ — Allied Market Research', 'https://www.globenewswire.com/news-release/2025/02/04/3020163/0/en/Events-Industry-Market-to-Reach-2-5-Trillion-Globally-by-2035-at-6-8-CAGR-Allied-Market-Research.html'],
+          ['Croissance events Europe — Technavio', 'https://www.prnewswire.com/news-releases/events-industry-market-to-grow-by-usd-1-07-trillion-2025-2029-driven-by-increased-corporate-events-report-highlights-ai-driven-market-transformation---technavio-302358595.html'],
+          ['Pénétration dating CH 11,7 % — Statista', 'https://www.statista.com/outlook/emo/dating-services/online-dating/switzerland'],
+          ['Tinder ~1,3 % pop CH — Sensor Tower', 'https://sensortower.com/blog/2025-q2-unified-top-5-dating-units-ch-64c9b6bbe1714cfff1c9d0e8'],
+        ]} />
+        <SourceGroup title="Comparables (Timeleft, Fever, etc.)" links={[
+          ['Timeleft 18 M€ ARR — Substack', 'https://timfrin.substack.com/p/inside-timelefts-journey-to-connecting'],
+          ['Fever ~724 M$ — Newsroom', 'https://newsroom.feverup.com/en-US/250714-fever-secures-100m-strengthening-its-position-as-the-leading-independent-live-entertainment-tech-platform/'],
+          ['Eventbrite 325 M$ FY2024 — SEC', 'https://www.sec.gov/Archives/edgar/data/0001475115/000147511525000025/earningspressrelease-fy2024.htm'],
+          ['Strava — Business of Apps', 'https://www.businessofapps.com/data/strava-statistics/'],
+        ]} />
+        <SourceGroup title="Coûts publicitaires" links={[
+          ['Meta CPM par pays (Suisse) — AdAmigo', 'https://www.adamigo.ai/blog/meta-ads-cpm-cpc-benchmarks-by-country-2026'],
+          ['Benchmarks Meta — WebFX', 'https://www.webfx.com/blog/social-media/meta-benchmarks/'],
+          ['TikTok Ads — Triple Whale', 'https://www.triplewhale.com/blog/tiktok-benchmarks'],
+          ['Apple Search Ads (social/lifestyle) — AppTweak', 'https://www.apptweak.com/en/aso-blog/apple-ads-benchmarks'],
+          ['Coûts d\'acquisition (CPI/CAC) — Business of Apps', 'https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/'],
+          ['CPI dating — Adjust', 'https://www.adjust.com/blog/valentines-day-app-trends-2025/'],
+          ['Influence Suisse (tarifs) — Metromodels', 'https://www.metromodels.com/en/news/12142-schweizer-influencer-marketing-aktuelle-preise-und-marktentwicklung-2026/'],
+        ]} />
+        <SourceGroup title="Rétention, conversion, échec" links={[
+          ['Benchmark app sociale (D30) — a16z', 'https://a16z.com/do-you-have-lightning-in-a-bottle-how-to-benchmark-your-social-app/'],
+          ['Benchmarks dating (rétention 3 %) — Business of Apps', 'https://www.businessofapps.com/data/dating-app-benchmarks/'],
+          ['LTV:CAC — Adapty', 'https://adapty.io/blog/customer-acquisition-cost/'],
+          ['Taux d\'échec startups — DemandSage', 'https://www.demandsage.com/startup-failure-rate/'],
+        ]} />
+        <SourceGroup title="Démographie & société (officiel)" links={[
+          ['Population par âge — OFS', 'https://www.bfs.admin.ch/bfs/fr/home/statistiques/population/effectif-evolution/age.html'],
+          ['Ménages (17 % vivent seuls) — OFS', 'https://www.bfs.admin.ch/bfs/fr/home/statistiques/population/familles/menages.html'],
+          ['Budget des ménages (pouvoir d\'achat) — OFS', 'https://www.bfs.admin.ch/bfs/fr/home/statistiques/situation-economique-sociale-population/revenus-consommation-et-fortune/budget-des-menages.html'],
+          ['Statistique Lausanne (151 284 hab)', 'https://www.lausanne.ch/officiel/statistique'],
+          ['Statistique Vaud', 'https://www.vd.ch/etat-droit-finances/statistique/statistiques-par-domaine/01-population/etat-et-structure-de-la-population'],
+          ['Sport Suisse 2020 (84 % font du sport) — OFSPO', 'https://www.sportobs.ch/inhalte/Downloads/Bro_Sport_Schweiz_2020_f_WEB.pdf'],
+          ['Solitude = priorité santé mondiale — OMS 2025', 'https://www.who.int/news/item/30-06-2025-social-connection-linked-to-improved-heath-and-reduced-risk-of-early-death'],
+          ['Les plus seuls = jeunes hommes — Gallup', 'https://news.gallup.com/poll/690788/younger-men-among-loneliest-west.aspx'],
+          ['Seniors 50+ : 3 % actifs — Pew', 'https://www.pewresearch.org/short-reads/2023/07/17/dating-at-50-and-up-older-americans-experiences-with-online-dating/'],
+        ]} />
+        <SourceGroup title="Financement Suisse" links={[
+          ['Venture Kick (10k don + prêts convertibles)', 'https://www.venturekick.ch/fr'],
+          ['SICTIC (réseau business angels CH)', 'https://www.sictic.ch/'],
+        ]} />
+        <P style={{ fontSize: 11.8 }}>Détail complet de la recherche (tous les chiffres + statut RÉEL/ESTIMÉ) : fichier <strong>docs/recherche-marche-30jun.md</strong> du projet.</P>
 
         <div style={{ borderTop: `2px solid ${K.ink}`, marginTop: 36, paddingTop: 12, fontSize: 11, color: K.muted, textAlign: 'center' }}>Clutch · Plan de lancement & étude de marché · v2 · 30 juin 2026 · document confidentiel</div>
       </article>

@@ -110,6 +110,47 @@ FORMAT (obligatoire) :
 
 ---
 
+## 9. ✅ RÉPONSES Grok + GPT (01.07) — CE QU'ON GARDE, CHALLENGÉ
+
+**Convergent (Grok + GPT + panels précédents) → on prend :**
+- **OFFLINE AVANT ONLINE.** Piège n°1 de Grok : « la densité ne vient pas toute seule ». **Events physiques
+  récurrents dès le jour 1**, l'app vient se greffer dessus. (= « ne pas tester le vide ».)
+- **Lausanne jusqu'à ~2-3k actifs / seuil ~150-200 dispo un soir**, PUIS Genève → Romandie. Jamais avant.
+- **Venture Kick (non-dilutif ~150k) d'abord** ; **angel 200-400k à M6** si ~2k MAU. **Runway 80-120k** / 9-12 mois.
+- **Pas de burn paid avant M4** (preuve de rétention d'abord). Boucle rentable **~8-12k MRR**, auto-alimentée **M9-M12**.
+- **Ne pas survendre la Forteresse** (invisible) → confirme la décision « forteresse cachée ».
+
+**Challengé / dégonflé (bluff ou trop optimiste) :**
+- **Budgets Grok gonflés** : « bootstrap 15-25k » suppose du cash qu'on n'a pas. Notre bootstrap réel (soirée +
+  ambassadeurs) tient en **quelques milliers**. Grok raisonne « équipe financée ».
+- **MRR Grok gonflé** : « 8k MAU → 25-45k MRR » incohérent (8k × 5% prem × 19.90 ≈ **8k CHF/mois**). Pour aller plus
+  haut il FAUT empiler events payants + B2B + boosts → **décomposer les revenus**, pas un MRR magique (point GPT #4).
+- **Probas trop roses** : « Moyen 40% » pour un cold-start dating → je pondère **flop 45-50%** (la plupart meurent).
+
+### 🗓️ LA TIMELINE TRANCHÉE (ce qu'on suit vraiment)
+- **T-3 → T-1 (prépa, ~CHF 2-8k)** : finir le **cycle humain** (notifs fiables, zéro écran muet, onboarding 60s,
+  profil) · **déposer la marque IGE** · **candidater Venture Kick** · recruter **10-20 ambassadeurs** campus · nouer
+  **2-3 bars partenaires**.
+- **T0 — lancement hyper-local** : **Clutch Test v1** (soirée chorégraphiée, `/clutch-test`) → puis **events
+  physiques récurrents** (jeudi soir, campus). **Offline first.**
+- **M1-M3** : cadence events + bouche-à-oreille + **influence micro/nano locale** (créateurs EPFL/UNIL). Mesurer
+  **rétention M1**. Premiers revenus = events payants / commissions B2B.
+- **M3-M4** : SI la rétention tient → **1er test paid LIMITÉ** (petit budget, mesurer CAC réel vs LTV).
+- **M6 — jalon levée** : si **~2k MAU + rétention + des gens paient** → **angel 200-400k** (après Venture Kick).
+- **M9-M12** : boucle de réinvestissement s'auto-alimente (~8-12k MRR, réinjecter ~40% en pub).
+- **M12+** : densité Lausanne prouvée (~2-3k actifs) → **Genève puis Romandie**. Jamais avant.
+
+**3 garde-fous (les 3 pièges convergents) :** (1) events dès jour 1 — offline avant online · (2) pas de paid avant
+M4/preuve de rétention · (3) Forteresse cachée, jamais un argument d'acquisition.
+
+### 🔶 DÉCISIONS HUMAINES À TRANCHER (David)
+- **Prix premium** : 9.90 vs 14.90 vs **19.90** ? GPT alerte : 19.90 peut-être trop haut pour des étudiants. → à
+  **tester sur le terrain** (A/B ou sondage <30j).
+- **Cible primaire** : **étudiants** (viralité, dispo, pouvoir d'achat faible) vs **jeunes actifs** (paient, moins
+  viraux) ? Probablement **étudiants pour la densité, jeunes actifs pour le revenu** — à valider.
+
+---
+
 ## Sources (benchmarks, à re-vérifier pour 2026 CH)
 - Marché dating CH : [Sensor Tower CH Q2 2025](https://sensortower.com/blog/2025-q2-unified-top-5-dating-units-ch-64c9b6bbe1714cfff1c9d0e8) · [Statista Dating CH](https://www.statista.com/outlook/emo/dating-services/switzerland) · [Business of Apps](https://www.businessofapps.com/data/dating-app-market/)
 - CAC / CPI : [Business of Apps — UA costs](https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/) · [Adaction UA 2026](https://www.adaction.com/blog/mobile-app-user-acquisition-cost)

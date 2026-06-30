@@ -26,6 +26,54 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'timeline-tranchee-0107',
+    date: '01.07.2026',
+    title: 'Réponses Grok + GPT — la timeline tranchée',
+    sub: 'Ce qu\'on garde (challengé) + le calendrier qu\'on suit vraiment',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>LE PIÈGE N°1 (Grok)</div>
+          <P>« Croire que la densité vient toute seule. Sans <strong>events physiques récurrents dès le jour 1</strong>, l'app meurt même avec la meilleure Forteresse. <strong>Offline avant online.</strong> »</P>
+        </div>
+
+        <H>✅ On garde (Grok + GPT d'accord)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>Offline avant online</strong> : events récurrents dès le jour 1, l'app se greffe dessus.</li>
+          <li><strong>Lausanne jusqu'à ~2-3k actifs</strong> (seuil ~150-200 dispo un soir) PUIS Genève → Romandie.</li>
+          <li><strong>Venture Kick (~150k non-dilutif) d'abord</strong> ; angel <strong>200-400k à M6</strong> si ~2k MAU. Runway <strong>80-120k</strong> / 9-12 mois.</li>
+          <li><strong>Pas de paid avant M4</strong> ; boucle rentable ~<strong>8-12k MRR</strong>, auto-alimentée M9-M12.</li>
+        </ul>
+
+        <H>🗑️ Dégonflé (challengé)</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>Budgets Grok gonflés</strong> (« bootstrap 15-25k » = cash qu'on n'a pas ; le nôtre tient en quelques milliers).</li>
+          <li><strong>MRR Grok gonflé</strong> : 8k MAU × 5% × 19.90 ≈ 8k CHF/mois, pas 25-45k → décomposer premium / events / B2B / boosts.</li>
+          <li><strong>Probas trop roses</strong> : flop pondéré plutôt à 45-50% (la plupart des apps de rencontre meurent).</li>
+        </ul>
+
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.salmon}55`, borderRadius: 12, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.salmon, letterSpacing: '.06em', marginBottom: 6 }}>🗓️ LA TIMELINE QU'ON SUIT</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7, color: C.text }}>
+            <li><strong>T-3 → T-1</strong> (~2-8k) : cycle humain fini · marque IGE · Venture Kick · 10-20 ambassadeurs · 2-3 bars.</li>
+            <li><strong>T0</strong> : Clutch Test v1 (soirée chorégraphiée) → events récurrents jeudi soir campus.</li>
+            <li><strong>M1-M3</strong> : events + bouche-à-oreille + influence micro/nano locale. Mesurer rétention M1.</li>
+            <li><strong>M3-M4</strong> : si rétention OK → 1er paid LIMITÉ (mesurer CAC vs LTV).</li>
+            <li><strong>M6</strong> : si ~2k MAU + rétention + des gens paient → lever angel 200-400k.</li>
+            <li><strong>M9-M12</strong> : réinvestissement auto-alimenté. <strong>M12+</strong> : Genève → Romandie.</li>
+          </ul>
+        </div>
+
+        <H>🔶 À trancher (David)</H>
+        <ul style={{ margin: '0 0 4px', paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: C.text }}>
+          <li><strong>Prix premium</strong> : 9.90 / 14.90 / 19.90 ? (GPT : 19.90 peut-être trop haut pour étudiants → tester &lt;30j.)</li>
+          <li><strong>Cible</strong> : étudiants (densité/viralité) vs jeunes actifs (revenu) — sans doute les deux, à valider.</li>
+        </ul>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '6px 0 0' }}>Détail : <strong>docs/audit-financier-strategie.md</strong> §9. Prompt amélioré (fixes GPT) dans docs/challenge-lancement-business-prompt.md.</p>
+      </div>
+    ),
+  },
+  {
     id: 'prompt-lancement-0107',
     date: '01.07.2026',
     title: 'Prompt de challenge — stratégie de lancement complète',

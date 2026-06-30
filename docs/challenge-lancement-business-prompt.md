@@ -25,7 +25,7 @@ SECRET (moteur « forteresse » : impossible d'être à 2 endroits à la fois + 
 physiquement s'y rendre à temps) — ce n'est PAS un argument marketing, c'est un moat de qualité interne. Premium
 prévu CHF 19.90/mois. Équipe : 3 personnes (fondateur non-dev + designer + dev-IA), peu/pas de salaire, Lausanne (CH).
 
-═══ DONNÉES RÉELLES (2025-2026, à challenger) ═══
+═══ BENCHMARKS DE TRAVAIL (2025-2026, À VÉRIFIER/CHALLENGER — pas des vérités absolues) ═══
 - Marché CH dating : pénétration ~11.8 %. Tinder ~120-133K users actifs/sem CH (~$1.5M/mois rev CH), Bumble ~70K,
   Hinge ~34K. Tendance 2026 : fatigue du swipe, montée du « IRL / intentionnel / events ».
 - Lausanne : ~140K habitants, ~35 000 étudiants (EPFL+UNIL, plus grand campus CH), ville compacte. Genève ~200K.
@@ -60,6 +60,10 @@ prévu CHF 19.90/mois. Équipe : 3 personnes (fondateur non-dev + designer + dev
 5) PROJECTIONS PAR SCÉNARIO × RÉGION × TEMPS. Pour 4 issues — FLOP / MOYEN / BON / EXCELLENT — donnez un TABLEAU :
    users actifs, % premium, revenu mensuel (CHF), cash brûlé cumulé, à M6 / M12 / M18 / M24, pour Lausanne puis
    Romandie puis Suisse. Hypothèses explicites (conversion premium %, ARPU, rétention M1/M3).
+   ⚠️ SÉPAREZ les flux de revenus : premium · crédits/boosts · events payants · B2B partenaires (pas un MRR vague).
+   ⚠️ CHALLENGEZ le prix premium : CHF 19.90 est-il trop élevé pour Lausanne/étudiants ? Comparez 9.90 / 14.90 / 19.90.
+   ⚠️ DISTINGUEZ étudiants vs jeunes actifs : pouvoir d'achat, sécurité, disponibilité, viralité (35 000 étudiants
+      ≠ 35 000 clients premium).
 
 6) TIMELINE. Combien de temps de prépa AVANT un lancement crédible ? Donnez un calendrier T-3mois → T+12mois avec
    les jalons (produit prêt, 1er test amis, soirée de lancement, 1er palier de densité, 1ère pub rentable, levée).
@@ -75,7 +79,13 @@ prévu CHF 19.90/mois. Équipe : 3 personnes (fondateur non-dev + designer + dev
 - Question 7 : « LA STRATÉGIE » (≤5 étapes chiffrées) + « LES 3 PIÈGES À ÉVITER ».
 - Le piège n°1 que des fondateurs comme nous ne voient pas. SOYEZ BRUTAUX : si une hypothèse (premium CHF 19.90,
   Lausanne-étudiants d'abord, bootstrap avant pub, le moat secret) est mauvaise, dites-le et chiffrez pourquoi.
+- Pour CHAQUE hypothèse que vous jugez fragile, écrivez « HYPOTHÈSE FRAGILE » + le TEST TERRAIN qui permettrait de
+  la valider/invalider en MOINS DE 30 JOURS (le moins cher possible).
 ```
+
+> Note (intégrée après le 1er passage GPT+Grok) : le vrai nerf de la guerre = **combien de personnes dispo
+> SIMULTANÉMENT, combien ça coûte de les obtenir, et à quel moment le revenu peut réalimenter l'acquisition.**
+> Exigez des réponses chiffrées là-dessus en priorité.
 
 ---
 

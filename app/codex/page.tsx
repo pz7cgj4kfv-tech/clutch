@@ -234,7 +234,44 @@ function Roadmap(){return(<div><H c="À implémenter (roadmap technique)"/>
   <Todo c={<><b>Refactor app2</b> (~11,8k l) — extraire composants/helpers. Avec David, testé.</>}/>
 </div>)}
 
+function Systemes(){return(<div>
+  <H c="La Forteresse, le Cône & le COQ — les systèmes (récap 28.06 → 01.07)"/>
+  <Note c="Le cœur logique de Clutch. Trois pièces : la FORTERESSE (les règles espace-temps), le CÔNE (sa formule), le COQ (le validateur qui prouve qu'aucune règle ne casse, même à 1000 personnes)."/>
+
+  <Sub c="🏰 LA FORTERESSE — les 2 Graals"/>
+  <P c={<><b>Graal 1 — exclusion :</b> on ne peut pas être à 2 endroits en même temps. Garanti DUR par la base (table <code>occupancies</code> + contrainte <code>EXCLUDE gist</code> : chevauchement impossible par construction). Un clutch verrouillé OU un event accepté = un engagement qui occupe un créneau. Même moteur.</>}/>
+  <P c={<><b>Graal 2 — causalité (le déplacement physique) :</b> on ne doit imposer le <i>moins</i> de tension possible à l'espace-temps. Concrètement : pour aller à un RDV, il faut le temps physique de s'y rendre. <b>Plus c'est loin, plus ça doit être tard.</b></>}/>
+
+  <Sub c="🌀 LE CÔNE — la formule de causalité"/>
+  <P c={<>Une seule inégalité gouverne tout (fichier <code>lib/forteresse-engine.ts</code>, prouvé) :</>}/>
+  <Code c={`D + R ≤ portée(Δt)
+  D  = distance moi → lieu (km)
+  R  = rayon de recherche (km)
+  Δt = temps avant le début (min)
+  portée(Δt) = km parcourables en Δt  (modèle trajet ~35 km/h effectif)`}/>
+  <P c={<>Tout en sort : le <b>plafond du rayon</b>, le flag <b>« trop loin »</b>, la <b>tension 0→10</b> (10 = la limite), la fenêtre <b>18h</b>. Le « cône » : à mesure que l'heure approche (Δt→0), la portée se resserre → la fenêtre du possible rétrécit comme un cône de lumière en relativité.</>}/>
+  <Rev c={<>Affinage 30.06 (David) : pour un EVENT/lieu, on a <b>découplé</b> R de la contrainte. Seul le CENTRE doit être atteignable (<code>D ≤ portée</code>) ; le rayon = juste la zone de recherche, plafonné par le temps seul. Déplacer le pin loin ne rétrécit plus le rayon (la carte ne dézoome plus) — on <b>flague</b> « trop loin », on ne bloque pas dur.</>}/>
+
+  <Sub c="🗓️ evaluateSchedule — le trou logique #1 (multi-engagements)"/>
+  <P c={<>La forteresse ne raisonnait que sur UN clutch isolé. Le vrai manque : enchaîner DEUX engagements. Ex : échecs 20h30 (2h) → on accepte Léa 22h30 à Genève = <i>impossible</i> (pas le temps d'y aller), mais c'était autorisé.</>}/>
+  <Code c={`fin(A) + trajet(lieuA → lieuB) ≤ début(B)   pour toute paire d'engagements
++ EXCLUSION (pas de chevauchement) + REACH (atteignable depuis ma position)`}/>
+  <P c={<><b>En vigueur dans l'app (build 226-228) :</b> double-booking = bloqué DUR · enchaînement serré = <b>alerte</b> à l'envoi ET à l'acceptation (jamais bloquer, prévenir). cf <code>docs/protection-forteresse.md</code>.</>}/>
+
+  <Sub c="🐓 LE COQ — le validateur logique"/>
+  <P c={<>Nom de code du fuzzer nouvelle génération (clin d'œil au prouveur <i>Coq</i> de Dom). Il <b>énumère/bombarde</b> toutes les configs et <b>prouve les invariants</b> : aucun état impossible ne peut exister. <code>scripts/test-forteresse</code> = 26/26. <code>scripts/clutch-city</code> = la version vivante (ci-dessous).</>}/>
+
+  <Sub c="🏙️ CLUTCH CITY — la ville-test"/>
+  <P c={<>Page <code>/clutch-city</code> : N agents (jusqu'à ~700) vivent 18h à Lausanne sur la VRAIE forteresse + le VRAI algo de matching, RNG seedé (rejouable). Le COQ compte les trous en direct. Interrupteur <b>« forteresse corrigée »</b> → <b>14 415 trous → 0</b> (prouve que les règles tiennent à grande échelle).</>}/>
+  <P c={<>Cockpit POV : on suit ~10 personnes (piochées ou <b>créées à la main</b>), on voit leur vécu (qui les clutche, RDV…), mode <b>👁 POV</b> (zoom + qui-elles-voient + leur rayon), <b>incarnation</b> (agir à leur place, la ville rejoue). Headless : <code>npx tsx scripts/clutch-city.mts</code>.</>}/>
+  <Note c="⚠️ Le COQ/Clutch City prouve la LOGIQUE (zéro état impossible), pas l'adoption/UX (agents aléatoires, pas de vraies psychologies)."/>
+
+  <Sub c="🎟️ Events × forteresse"/>
+  <P c={<>Un event est <b>flagué « ⛔ trop loin pour l'heure » + grisé</b> dès que tu ne peux plus l'atteindre depuis ta position GPS pour son heure. Quand tu te déplaces (Lausanne→Genève) ou que le temps passe, les events injoignables se grisent seuls — sur la liste ET la carte 🗺️. Couleur de l'event = créneau (1/2/3) qui le contient.</>}/>
+</div>)}
+
 const TABS=[
+  {k:'systemes',l:'🏰 Forteresse & COQ',e:<Systemes/>},
   {k:'histoire',l:'Histoire',e:<Histoire/>},
   {k:'schema',l:'Schéma réel',e:<Schema/>},
   {k:'archi',l:'Architecture SQL',e:<Archi/>},
@@ -248,7 +285,7 @@ const TABS=[
 ]
 
 export default function CodexPage(){
-  const [ok,setOk]=useState(false); const [tab,setTab]=useState('histoire')
+  const [ok,setOk]=useState(false); const [tab,setTab]=useState('systemes')
   useEffect(()=>{ try{ if(localStorage.getItem('codex_ok')==='1') setOk(true) }catch{} },[])
   if(!ok) return <Lock onUnlock={()=>setOk(true)}/>
   const A=TABS.find(t=>t.k===tab)||TABS[0]

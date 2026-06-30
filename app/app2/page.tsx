@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1ed'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 233   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1ee'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 234   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3535,6 +3535,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [sortMode, setSortMode] = useState<'time'|'dist'|'pop'|'surprise'>('time')  // tri : au plus tôt / proche / populaires / 🎲 surprise (IA = au hasard les plus folles)
   const [surpriseSeed, setSurpriseSeed] = useState(0)  // re-tirage Surprise
   const [showRefine, setShowRefine] = useState(false)  // panneau « Affiner » (progressive disclosure)
+  const [showEvMap, setShowEvMap] = useState(false)    // 🗺️ carte des events par rapport à mes créneaux (David 30.06)
+  const evMapCv = useRef<HTMLCanvasElement | null>(null)
   // 🤝 Partenaires suivis (prototype, persisté localStorage)
   const [followedPartners, setFollowedPartners] = useState<Set<string>>(()=>{ try{const s=localStorage.getItem('clutch_partners');return s?new Set(JSON.parse(s)):new Set()}catch{return new Set()} })
   const togglePartner = (id:string) => setFollowedPartners(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); try{localStorage.setItem('clutch_partners',JSON.stringify([...n]))}catch{}; return n })
@@ -3826,6 +3828,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
           </div>
           {/* ⚙ Affiner — ouvre le panneau tri + catégories (progressive disclosure) */}
           <button onClick={()=>setShowRefine(v=>!v)} title={EN?'Refine':'Affiner'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?`${C.pink}14`:'transparent',border:`1px solid ${(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.border}`,color:(showRefine||sortMode!=='time'||['sport','bienetre','culture','gastro','musique'].includes(evFilter))?C.pink:C.whiteMid,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'.15s'}}>⚙</button>
+          {/* 🗺️ Carte des events par rapport à mes créneaux */}
+          <button onClick={()=>setShowEvMap(v=>!v)} title={EN?'Events map':'Carte des events'} style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:showEvMap?`${C.green}1c`:'transparent',border:`1px solid ${showEvMap?C.green:C.border}`,color:showEvMap?C.green:C.whiteMid,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>🗺️</button>
           {/* 🧪 ADMIN : générer/nettoyer des events test sur mes créneaux (David 30.06) */}
           {onGenTestEvents && <button onClick={async()=>{ await onGenTestEvents(); setTimeout(loadEvents, 700) }} title="Générer des events test sur mes créneaux" style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:`${C.green}1c`,border:`1px solid ${C.green}66`,color:C.green,fontSize:15,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>🧪</button>}
           {onClearTestEvents && <button onClick={async()=>{ await onClearTestEvents(); setTimeout(loadEvents, 700) }} title="Retirer les events test" style={{flexShrink:0,width:36,height:36,borderRadius:'50%',background:'transparent',border:`1px solid ${C.border}`,color:C.whiteMid,fontSize:14,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>🧹</button>}
@@ -3991,6 +3995,35 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
             <div style={{fontSize:13,fontWeight:700,color:C.white}}>{lang==='en'?'No events in this category':'Aucun événement dans cette catégorie'}</div>
           </div>
         )}
+        {/* 🗺️ CARTE DES EVENTS PAR CRÉNEAU (David 30.06) — cercles de mes créneaux colorés 1/2/3, events colorés selon
+            le créneau qui les contient (gris = hors de mes créneaux), + ma position. SVG = simple & robuste. */}
+        {showEvMap && (()=>{
+          const evs = (sortedEvs as any[]).filter(e=> typeof e.venue_lat==='number' && typeof e.venue_lng==='number')
+          const slots = (slotsFull||[]).filter(s=>s.lat!=null && s.lng!=null)
+          const myLat = centerLat ?? 46.5197, myLng = centerLng ?? 6.6323
+          const pts:[number,number][] = [[myLat,myLng], ...evs.map(e=>[e.venue_lat,e.venue_lng] as [number,number])]
+          slots.forEach(s=>{ const dLat=s.radiusKm/111, dLng=s.radiusKm/(111*Math.cos(s.lat*Math.PI/180)); pts.push([s.lat+dLat,s.lng+dLng],[s.lat-dLat,s.lng-dLng]) })
+          let latMin=Math.min(...pts.map(p=>p[0])), latMax=Math.max(...pts.map(p=>p[0])), lngMin=Math.min(...pts.map(p=>p[1])), lngMax=Math.max(...pts.map(p=>p[1]))
+          const padLat=(latMax-latMin)*0.12+0.004, padLng=(lngMax-lngMin)*0.12+0.004
+          latMin-=padLat;latMax+=padLat;lngMin-=padLng;lngMax+=padLng
+          const W=320,H=210
+          const px=(la:number,lo:number):[number,number]=>[ (lo-lngMin)/((lngMax-lngMin)||1)*W, (1-(la-latMin)/((latMax-latMin)||1))*H ]
+          const kmY = H/(((latMax-latMin)*111)||1)
+          return (
+            <div style={{background:'#241019',border:`1px solid ${C.border}`,borderRadius:14,padding:8,marginBottom:12}}>
+              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block'}}>
+                {slots.map((s,i)=>{ const [x,y]=px(s.lat,s.lng); const col=SLOT_COLORS[i%SLOT_COLORS.length]; const rr=Math.max(7,s.radiusKm*kmY); return (
+                  <g key={i}><circle cx={x} cy={y} r={rr} fill={col+'14'} stroke={col} strokeWidth="1.2" strokeDasharray="4 3"/><text x={x} y={y-rr-3} fill={col} fontSize="9" fontWeight="800" textAnchor="middle">Créneau {i+1}</text></g>
+                )})}
+                {evs.map((e,i)=>{ const [x,y]=px(e.venue_lat,e.venue_lng); const si=eventSlotIdx(e); const col=si>=0?SLOT_COLORS[si%SLOT_COLORS.length]:'#9b8a93'; return (
+                  <circle key={i} cx={x} cy={y} r="4.2" fill={col} stroke="#fff" strokeWidth="1"/>
+                )})}
+                {(()=>{ const [x,y]=px(myLat,myLng); return <g><circle cx={x} cy={y} r="5" fill="#fff" stroke={C.plum} strokeWidth="2"/><text x={x} y={y+15} fill="#fff" fontSize="8.5" fontWeight="800" textAnchor="middle">moi</text></g> })()}
+              </svg>
+              <div style={{fontSize:10,color:C.whiteMid,padding:'5px 4px 0',lineHeight:1.4}}>{evs.length} event(s) géolocalisés · couleur = créneau qui les contient · gris = hors de tes créneaux{slots.length===0?' · (ouvre un créneau pour voir les cercles)':''}</div>
+            </div>
+          )
+        })()}
         {/* 2 événements par ligne (demande Mel). minmax(0,1fr) = empêche une carte au contenu large de faire DÉPASSER la grille de l'écran (bug overflow « Tout »). */}
         <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:11,width:'100%',boxSizing:'border-box'}}>
         {sortedEvs.map(ev=>{

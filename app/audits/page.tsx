@@ -26,6 +26,39 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'cible-analyse-0107',
+    date: '01.07.2026',
+    title: 'Analyse de cible — qui vise-t-on ? + modèle de prix',
+    sub: 'Étudiants = carburant · actifs/expats = revenu · prix multi-paliers',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>LE PRINCIPE</div>
+          <P>Une app de rencontre spontanée a 2 besoins, pas forcément les mêmes gens : le <strong>CARBURANT de densité</strong> (nombreux, même lieu, même heure, souvent) et le <strong>REVENU</strong> (ceux qui paient). On amorce avec l'un, on monétise avec l'autre.</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>Analyse complète (matrice 4 segments × 4 critères) : <strong>docs/cible-analyse.md</strong>.</p>
+
+        <H>Les 3 insights</H>
+        <ol style={{ margin: '0 0 8px', paddingLeft: 20, fontSize: 13, lineHeight: 1.7, color: C.text }}>
+          <li><strong>Étudiants EPFL/UNIL (35k)</strong> = le <strong>carburant</strong> (denses + viraux), mais faible pouvoir d'achat → pas le portefeuille.</li>
+          <li><strong>Expats / nouveaux arrivants</strong> = la <strong>pépite de douleur</strong> (besoin aigu de rencontrer, paient), mais besoin d'anglais (i18n) → Phase 2.</li>
+          <li><strong>Jeunes actifs + expats + 30+</strong> = le <strong>revenu</strong>, une fois la densité créée par les étudiants.</li>
+        </ol>
+
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.salmon}55`, borderRadius: 12, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.salmon, letterSpacing: '.06em', marginBottom: 6 }}>✅ RECO</div>
+          <P><strong>Beachhead = étudiants</strong> (amorcer la densité) → <strong>monétiser via actifs + expats</strong>. On <strong>séquence</strong>, on ne choisit pas densité OU revenu. Pivot vers actifs/expats si la rétention étudiante est faible (à surveiller dès le 1er test).</P>
+        </div>
+
+        <H>🧪 Test &lt;30j pour valider la cible</H>
+        <P>Soirée chorégraphiée sur 1 campus → mesurer dispo / Clutchs envoyés / <strong>vrais RDV</strong> / <strong>retour la semaine d'après</strong> (rétention M1). + 5-10 interviews (étudiant vs actif vs expat) : qui a le plus mal, qui paierait, qui se sent en sécurité.</P>
+
+        <H>💳 Modèle de prix (direction David)</H>
+        <P><strong>Multi-paliers</strong> : ~2 abos (entrée + intermédiaire) + 1 <strong>palier VIP cher</strong> chargé de fonctionnalités. ⚠️ <strong>Garde-fou</strong> : auditer l'impact équilibre H/F de chaque feature VIP avant de coder — jamais de pay-to-play qui force l'attention d'une femme. Prix d'entrée à tester (9.90/14.90/19.90).</P>
+      </div>
+    ),
+  },
+  {
     id: 'timeline-tranchee-0107',
     date: '01.07.2026',
     title: 'Réponses Grok + GPT — la timeline tranchée',

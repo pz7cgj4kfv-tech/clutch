@@ -143,11 +143,15 @@ FORMAT (obligatoire) :
 **3 garde-fous (les 3 pièges convergents) :** (1) events dès jour 1 — offline avant online · (2) pas de paid avant
 M4/preuve de rétention · (3) Forteresse cachée, jamais un argument d'acquisition.
 
-### 🔶 DÉCISIONS HUMAINES À TRANCHER (David)
-- **Prix premium** : 9.90 vs 14.90 vs **19.90** ? GPT alerte : 19.90 peut-être trop haut pour des étudiants. → à
-  **tester sur le terrain** (A/B ou sondage <30j).
-- **Cible primaire** : **étudiants** (viralité, dispo, pouvoir d'achat faible) vs **jeunes actifs** (paient, moins
-  viraux) ? Probablement **étudiants pour la densité, jeunes actifs pour le revenu** — à valider.
+### 🔶 DÉCISIONS HUMAINES — orientations David (01.07)
+- **Prix = MULTI-PALIERS** (direction David) : ~**2 abos** (entrée + intermédiaire) **+ 1 palier VIP cher** chargé
+  de fonctionnalités. Reste à définir prix (tester 9.90/14.90/19.90 pour l'entrée) + features VIP. ⚠️ **GARDE-FOU** :
+  auditer l'impact équilibre H/F de chaque feature VIP avant de coder (jamais de pay-to-play qui force l'attention
+  d'une femme). Détail : **docs/cible-analyse.md** §prix.
+- **Cible** (analyse faite, **docs/cible-analyse.md**) : **étudiants EPFL/UNIL = carburant de densité** (amorçage),
+  **jeunes actifs + expats = revenu** (greffés une fois la ville vivante). On **séquence**, on ne choisit pas. Pivot
+  vers actifs/expats si la rétention étudiante est faible. À trancher avec le **test terrain <30j** (rétention M1 +
+  5-10 interviews).
 
 ---
 

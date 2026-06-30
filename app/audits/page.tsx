@@ -26,6 +26,42 @@ const P = ({ children }: { children: React.ReactNode }) =>
 
 const ENTRIES: Entry[] = [
   {
+    id: 'tri-or-0107',
+    date: '01.07.2026',
+    title: 'Le tri de l\'or — toutes les options, gardées ou écartées',
+    sub: 'Synthèse finale GPT ×3 + Grok · seuils de densité · verdict par canal',
+    body: (
+      <div>
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, letterSpacing: '.06em', marginBottom: 4 }}>L\'ÉQUATION DU SUCCÈS (tous d\'accord)</div>
+          <P><strong>personnes dispo en même temps × confiance des femmes × qualité des premiers events.</strong> Tout le reste est secondaire. Le risque n°1 = la <strong>liquidité simultanée</strong>, pas la technique.</P>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.55, margin: '4px 0 8px' }}>Synthèse complète : <strong>docs/lancement-options-tri.md</strong>.</p>
+
+        <H>🎯 Les seuils de densité (la pépite concrète)</H>
+        <P>Dispo SIMULTANÉS un soir : <strong>&lt;30-50 = mort</strong> · 100-150 = ça vit · 200-300 = très bon · 400+ = scale. MAU Lausanne : viable ~1.5k · agréable 3k · très bon 6k. <strong>Gate de lancement : ne pas lancer en grand avant ~200-300 dispo/soir (~2k MAU).</strong></P>
+
+        <H>🧩 Verdict par canal</H>
+        <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, lineHeight: 1.7, color: C.text }}>
+          <li>✅ <strong>Event-led</strong> (pilier — crée la liquidité) · ✅ <strong>B2B bars</strong> (sous-estimé, énorme canal) · ✅ <strong>Campus hyper-local</strong> (carburant densité) · ✅ <strong>Micro-influence</strong> (phase 3).</li>
+          <li>⏳ <strong>Paid social</strong> (M4+ seulement, sinon brûle le cash) · ⏳ <strong>PR/presse</strong> (crédibilité, pas densité — opportuniste).</li>
+          <li>❌ <strong>Levée agressive précoce</strong> (avant traction = mauvaise valo) · ❌ plusieurs villes d\'un coup · ❌ vendre la Forteresse · ❌ compter sur l\'algo pour la liquidité.</li>
+        </ul>
+
+        <H>✅ La séquence</H>
+        <P><strong>Events + B2B bars</strong> → <strong>campus</strong> → <strong>micro-influence</strong> → <strong>paid limité</strong>. Offline d\'abord, online ensuite.</P>
+
+        <H>💳 + 💰 Consolidé</H>
+        <P>Prix multi-paliers 9.90/14.90/19.90 + VIP (19.90 jugé trop cher pour étudiants) · conversion 2-6% · ARPU 13-16 · revenus = Premium 60 / Partenaires 20 / Crédits 15 / Events 5. Funding : <strong>Venture Kick ~150k puis angel 250-450k à M6</strong> (valo 2.5-4.5M), runway 12 mois, besoin 100-150k.</P>
+
+        <div style={{ background: C.cardSoft, border: `1px solid ${C.salmon}55`, borderRadius: 12, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.salmon, letterSpacing: '.06em', marginBottom: 6 }}>EN UNE PHRASE</div>
+          <P>Event-led + B2B + campus pour fabriquer la densité (offline d\'abord), micro-influence puis paid pour amplifier, Venture Kick puis angel pour financer — et on ne lance en grand que quand le gate densité (~200-300 dispo/soir) tient.</P>
+        </div>
+      </div>
+    ),
+  },
+  {
     id: 'cible-analyse-0107',
     date: '01.07.2026',
     title: 'Analyse de cible — qui vise-t-on ? + modèle de prix',

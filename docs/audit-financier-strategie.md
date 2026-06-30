@@ -40,7 +40,7 @@ Une app de rencontre *spontanée* est un **marché 2 faces** : sans monde EN LIG
 - ⚠️ **À ne PAS faire AVANT** d'avoir prouvé la rétention en A (sinon = brûler le budget). C'est l'**accélérateur**, pas l'amorce.
 
 ### Scénario C — LEVÉE pour scaler · CHF 100K-1M
-- **Venture Kick** (CH, **non-dilutif**, jusqu'à **CHF 150K** par étapes, + réseau) — **à viser en priorité** (gratuit en equity, EPFL-friendly).
+- **Venture Kick** (CH, jusqu'à **CHF 150K** par étapes) — ⚠️ **CORRECTION (vérifié 30.06)** : seuls les **10K** sont un don, les **40K+100K** sont des **prêts convertibles** (dilutifs au prochain tour), et le programme **exige un lien académique** (EPFL/UNIL). Pas « non-dilutif ». Voir docs/recherche-marche-30jun.md §E.
 - **Business Angels CH** : chèque individuel **CHF 25-500K**, syndicats (SICTIC) **CHF 1-3M**, valo pre-money seed **CHF 1-5M** (+ si EPFL-backed).
 - **Quand** : **après** avoir une preuve de traction locale (Scénario A). Lever AVANT = mauvaise valo + risque de se faire dire non.
 

@@ -3264,6 +3264,51 @@ function parseEventMinutes(t:string|undefined):number|null {
   return hh*60+mm
 }
 
+// 👑 DASHBOARD ORGANISATEUR — l'orga voit les DEMANDES en attente de SON event et accepte/refuse.
+//    Le refus (state='declined') déclenche la notice DOUCE côté participant + masque l'event pour lui (anti-tension).
+//    Additif : ne change RIEN à l'inscription (curated crée déjà des 'requested'). RLS = evpart_update_organizer.
+function OrganizerRequests({ eventId, lang, showToast, onChange }:{ eventId:string; lang:Lang; showToast?:(m:string,c?:string)=>void; onChange?:()=>void }){
+  const EN = lang==='en'
+  const [reqs,setReqs] = useState<any[]>([])
+  const [loading,setLoading] = useState(true)
+  const [busyId,setBusyId] = useState<string|null>(null)
+  const load = async ()=>{ setLoading(true)
+    try{
+      const { data } = await supabase.from('event_participants').select('id,user_id,state,created_at').eq('event_id',eventId).in('state',['requested','waitlisted']).order('created_at')
+      const rows=((data as any[])||[])
+      if(rows.length){ const ids=rows.map(r=>r.user_id); const { data:profs }=await supabase.from('profiles').select('id,name,age,gender').in('id',ids); const pm=new Map((profs||[]).map((p:any)=>[p.id,p])); rows.forEach(r=>{ r._p=pm.get(r.user_id) }) }
+      setReqs(rows)
+    }catch{} setLoading(false)
+  }
+  useEffect(()=>{ load() },[eventId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const decide = async (r:any, accept:boolean)=>{ setBusyId(r.id)
+    try{ const { error }=await supabase.from('event_participants').update({ state: accept?'accepted':'declined' }).eq('id',r.id)
+      if(error){ showToast?.('❌ '+(/permission|rls|policy/i.test(error.message)?'applique event_participants_update':error.message), C.red) }
+      else { showToast?.(accept?(EN?'✓ Accepted':'✓ Accepté·e'):(EN?'Declined gently':'Refusé·e en douceur'), accept?C.green:C.salmon); setReqs(prev=>prev.filter(x=>x.id!==r.id)); onChange?.() }
+    }catch(e:any){ showToast?.('❌ '+e.message, C.red) } setBusyId(null)
+  }
+  if(loading) return <div style={{fontSize:11,color:C.whiteMid,textAlign:'center',padding:'8px 0'}}>…</div>
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.05em',marginBottom:8}}>📥 {EN?'REQUESTS TO REVIEW':'DEMANDES À VALIDER'}{reqs.length?` (${reqs.length})`:''}</div>
+      {!reqs.length ? <div style={{fontSize:11,color:C.whiteMid,padding:'2px 0 6px'}}>{EN?'No pending request — people who ask will show up here.':'Aucune demande en attente — les personnes qui demandent apparaîtront ici.'}</div>
+      : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {reqs.map(r=>{ const p=r._p; return (
+          <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px'}}>
+            <span style={{fontSize:16}}>🙂</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.white}}>{p?.name||'?'}{r.state==='waitlisted'?` · ${EN?'waitlist':'liste'}`:''}</div>
+              <div style={{fontSize:10.5,color:C.whiteMid}}>{[p?.gender==='woman'?'♀':p?.gender==='man'?'♂':'',p?.age?`${p.age} a`:''].filter(Boolean).join(' · ')||'—'}</div>
+            </div>
+            <button disabled={busyId===r.id} onClick={()=>decide(r,false)} title={EN?'Decline':'Refuser'} style={{padding:'7px 12px',borderRadius:999,border:`1px solid ${C.salmon}66`,background:'transparent',color:C.salmon,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+            <button disabled={busyId===r.id} onClick={()=>decide(r,true)} style={{padding:'7px 14px',borderRadius:999,border:'none',background:C.green,color:'#fff',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busyId===r.id?'…':(EN?'Accept':'Accepter')}</button>
+          </div>
+        )})}
+      </div>}
+    </div>
+  )
+}
+
 function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlist, lang, initialEventId, onClearInitialEvent, onPenalty, onOpenProfile, userId, userAge, centerLat, centerLng, isCertified, showToast, availSlots=[], slotsFull=[], showBotEvents=false, myGps=null, onGenTestEvents, onClearTestEvents, suggestGroupEvent=false, onRegisteredObjs }:{
   onClutch:(p:Profile)=>void;
   registered:Set<string>; setRegistered:(fn:any)=>void;
@@ -4381,6 +4426,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               {((!!userId && selEv.created_by===userId) || selEv.creator==='Toi') ? (
                 <div>
                   <div style={{fontSize:12,color:C.whiteMid,textAlign:'center',marginBottom:8}}>👑 {lang==='en'?"You're the organizer":"Tu es l'organisateur·ice"}</div>
+                  {isRealEvent(selEv.id) && <OrganizerRequests eventId={selEv.id} lang={lang} showToast={showToast} onChange={loadEvents} />}
                   <button onClick={()=>{ if(cancelArmed) cancelMyEvent(selEv); else setCancelArmed(true) }} disabled={cancelling}
                     style={{width:'100%',padding:'14px',background:cancelArmed?C.red:'rgba(220,80,80,.12)',border:`1px solid ${C.red}${cancelArmed?'':'55'}`,borderRadius:16,color:cancelArmed?'#fff':C.red,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:cancelling?0.6:1}}>
                     {cancelling?'…':cancelArmed?(lang==='en'?'⚠️ Tap again to confirm':'⚠️ Touche encore pour confirmer'):(lang==='en'?'🚫 Cancel this event':"🚫 Annuler l'événement")}

@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f0'  // Versionnage HEXADÉCIMAL. ~315e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 236   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1f1'  // Versionnage HEXADÉCIMAL. ~316e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 237   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -13499,6 +13499,10 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const [armed,setArmed] = useState(false)
   const [onlineStart,setOnlineStart] = useState('now')   // picker d'heure pour mettre un bot en ligne
   const [onlineDur,setOnlineDur] = useState(2)
+  const [nOnline,setNOnline] = useState(6)               // combien de bots mettre en ligne (Ville vivante)
+  const [live,setLive] = useState(false)                 // 🌆 Ville vivante : dynamique aléatoire auto
+  const [nMake,setNMake] = useState(8)                   // combien de bots créer (RPC create_test_bots)
+  const liveRef = useRef<any>(null)
   const [fabPos,setFabPos] = useState<{x:number;y:number}|null>(null)   // lanceur flottant déplaçable (« manette »)
   const fabRef = useRef<{ox:number;oy:number;sx:number;sy:number;moved:boolean}|null>(null)
   const ACT=['pending','accepted','confirmed','checked_in']
@@ -13629,6 +13633,88 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     showToast(`🎉 Event ${hh} · ${joined} inscrits${blocked?` · ${blocked} pleins`:''}`, C.green); note(`🎉 ${nameOf(botId)} a créé un event à ${hh} · ${joined} bots inscrits${blocked?`, ${blocked} en liste d'attente`:''} → onglet Événements`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
+  // ── 🌆 VILLE VIVANTE — dynamique aléatoire : les bots vivent tout seuls (comme des amis), vraies données. ──
+  const myCenter=async()=>{ const { data } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle(); return { lat:(data as any)?.center_lat||46.5197, lng:(data as any)?.center_lng||6.6323 } }
+  const rnd=(a:number,b:number)=> a+Math.random()*(b-a)
+  const pick=<T,>(arr:T[]):T|undefined=> arr.length?arr[Math.floor(Math.random()*arr.length)]:undefined
+  // Mettre N bots en ligne, chacun avec un créneau/rayon/heure LÉGÈREMENT différents (réaliste, pas tous pareils).
+  const putNOnline=async(n:number)=>{ setBusy('non'); try{
+    const { lat,lng } = await myCenter()
+    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const ids=((bs as any[])||[]).map(b=>b.id).sort(()=>Math.random()-0.5).slice(0,Math.max(1,n))
+    let ok=0
+    for(const id of ids){
+      const startOff=pick([0,0,0,15,30,60])||0                 // la plupart maintenant, certains décalés
+      const from=Date.now()+startOff*60000, durH=1+Math.floor(rnd(1,4))
+      const jLat=lat+rnd(-0.02,0.02), jLng=lng+rnd(-0.03,0.03)  // dispersés autour de moi
+      const { data } = await supabase.rpc('admin_set_availability',{ p_actor:id, p_from:new Date(from).toISOString(), p_until:new Date(from+durH*3600e3).toISOString(), p_lat:jLat, p_lng:jLng, p_radius:Math.round(rnd(3,15)) })
+      if((data as any)?.ok!==false) ok++
+    }
+    showToast(`🌆 ${ok} bots en ligne (créneaux variés)`, C.green); note(`🌆 ${ok} bots mis en ligne autour de toi, heures & rayons variés`); refreshAll(); loadBots()
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // Un « tour de vie » : quelques bots s'allument/s'éteignent, l'un crée un event, l'un te clutche. Léger (pas de toast spam).
+  const cityTick=async()=>{ try{
+    const { lat,lng } = await myCenter()
+    const { data: bs } = await supabase.from('profiles').select('id,is_available,available_until').eq('is_bot',true)
+    const all=((bs as any[])||[]); if(!all.length) return
+    const now=Date.now()
+    const on=all.filter(b=>b.is_available && b.available_until && new Date(b.available_until).getTime()>now)
+    const off=all.filter(b=>!on.includes(b))
+    const acts:string[]=[]
+    // 1) allumer 1-2 bots hors ligne
+    for(const b of off.sort(()=>Math.random()-0.5).slice(0,Math.random()<.7?1:2)){
+      const durH=1+Math.floor(rnd(1,4))
+      await supabase.rpc('admin_set_availability',{ p_actor:b.id, p_from:new Date().toISOString(), p_until:new Date(now+durH*3600e3).toISOString(), p_lat:lat+rnd(-0.02,0.02), p_lng:lng+rnd(-0.03,0.03), p_radius:Math.round(rnd(3,15)) })
+      acts.push(`🟢 ${nameOf(b.id)} arrive`)
+    }
+    // 2) éteindre 0-1 bot en ligne (rotation naturelle) — jamais s'il est en Verrou
+    if(on.length>3 && Math.random()<.4){ const b=pick(on)!; const c=await verrouOf(b.id); if(!c){ await supabase.from('profiles').update({ is_available:false }).eq('id',b.id); acts.push(`⚪️ ${nameOf(b.id)} part`) } }
+    // 3) 25 % : un bot en ligne crée un event dans ~1h
+    if(on.length && Math.random()<.25){ const b=pick(on)!; const startMs=now+Math.round(rnd(40,120))*60000
+      const { data } = await supabase.rpc('admin_create_event',{ p_actor:b.id, p_title:`${pick(['Apéro','Yoga','Rando','Jass','Padel','Café','Concert'])} — ${nameOf(b.id)}`, p_starts_at:new Date(startMs).toISOString(), p_lat:lat+rnd(-0.02,0.02), p_lng:lng+rnd(-0.03,0.03) })
+      if((data as any)?.ok) acts.push(`🎉 ${nameOf(b.id)} crée un event`) }
+    // 4) 30 % : un bot en ligne te clutche (RDV cohérent avec sa fenêtre)
+    if(on.length && Math.random()<.3){ const b=pick(on)!
+      const { data: bp } = await supabase.from('profiles').select('available_from,available_until').eq('id',b.id).maybeSingle()
+      const f=(bp as any)?.available_from?new Date((bp as any).available_from).getTime():now, u=(bp as any)?.available_until?new Date((bp as any).available_until).getTime():now+2*3600e3
+      const rdv=coherentRdv(f,u)
+      const { data } = await supabase.rpc('admin_create_clutch',{ p_actor:b.id, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:new Date(rdv).toISOString(), p_venue_lat:lat, p_venue_lng:lng, p_message:`Un verre ? — ${nameOf(b.id)}` })
+      if((data as any)?.ok) acts.push(`📨 ${nameOf(b.id)} te clutche (${hhmmOf(rdv)})`) }
+    if(acts.length) note('🌆 '+acts.join(' · '))
+    refreshAll(); loadBots()
+  }catch{} }
+  const toggleLive=()=>{ if(live){ if(liveRef.current) clearInterval(liveRef.current); liveRef.current=null; setLive(false); note('🌆 Ville vivante en pause') }
+    else { setLive(true); note('🌆 Ville vivante ON — les bots vivent tout seuls (~8 s)'); cityTick(); liveRef.current=setInterval(cityTick,8000) } }
+  useEffect(()=>()=>{ if(liveRef.current) clearInterval(liveRef.current) },[])
+
+  // ── ♻️ RESETS RANGÉS ──
+  const resetMine=async()=>{ setBusy('resetmine'); try{
+    const { error } = await supabase.rpc('reset_my_test_state')
+    if(error){ showToast('❌ '+error.message,C.red); note('❌ reset interactions : '+error.message) }
+    else { showToast('♻️ Mes interactions + cooldowns effacés', C.green); note('♻️ Tes clutchs & cooldowns remis à zéro (bots gardés)'); refreshAll(); loadBots() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
+  // ── ➕ CRÉER DES BOTS (RPC create_test_bots — À APPLIQUER en base, cf. migration 20260630) ──
+  const createBots=async(n:number)=>{ setBusy('make'); try{
+    const { data,error } = await supabase.rpc('create_test_bots',{ p_n:n })
+    if(error){ showToast('⚠️ Applique la migration create_test_bots — '+error.message, C.orange); note('⚠️ RPC create_test_bots absente/à appliquer : '+error.message) }
+    else { const c=(data as any)?.created ?? n; showToast(`➕ ${c} bots créés`, C.green); note(`➕ ${c} nouveaux bots créés (âge 25-45, marqueur 🤖) → « Tout mettre en ligne »`); loadBots() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
+  // ── 🎭 INCARNATION : le bot crée un event / édite ses params (âge, genre) ──
+  const incCreateEvent=async(botId:string)=>{ if(!botId)return; setBusy('increv'); try{
+    const { lat,lng } = await myCenter()
+    const startMs=Date.now()+Math.round(rnd(40,120))*60000
+    const { data,error } = await supabase.rpc('admin_create_event',{ p_actor:botId, p_title:`${pick(['Apéro','Yoga','Rando','Padel','Café'])} — ${nameOf(botId)}`, p_starts_at:new Date(startMs).toISOString(), p_lat:lat, p_lng:lng })
+    if(error){ showToast('❌ '+error.message,C.red); note('❌ event : '+error.message) }
+    else { const r:any=data; showToast(r?.ok?`🎉 Event créé (${hhmmOf(startMs)})`:'🚫 '+(r?.message||''), r?.ok?C.green:C.orange); note(r?.ok?`🎉 ${nameOf(botId)} a créé un event à ${hhmmOf(startMs)} → onglet Événements`:'🚫 '+(r?.message||'')); refreshAll() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  const incEditParam=async(botId:string, patch:any, label:string)=>{ if(!botId)return; try{
+    const { error } = await supabase.from('profiles').update(patch).eq('id',botId)
+    if(error){ showToast('❌ '+error.message,C.red) }
+    else { note(`✏️ ${nameOf(botId)} : ${label}`); loadBots(); if(inc) loadSeen(botId) }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } }
+
   // ── CYCLE DE VIE DU RDV côté bot (David : « il manque j'y suis, terminer, accepte/refuse »). ──
   const verrouOf=async(botId:string)=>{
     const { data } = await supabase.from('clutches')
@@ -13722,6 +13808,17 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
             <Big id="ref" icon="🚫" label="Je refuse son clutch" sub="teste le refus + cooldown" onTap={()=>botRefuse(inc)}/>
             <Big id="rdvnow" icon="⏱" label="RDV = maintenant" sub="active ton « j'y suis »" onTap={()=>botRdvNow(inc)}/>
             <Big id="arrive" icon="📍" label="Je dis « j'y suis »" sub="je suis arrivé·e au RDV → à toi de confirmer, puis Terminer" onTap={()=>botArrive(inc)} wide/>
+            <Big id="increv" icon="🎉" label="Je crée un event" sub="depuis ce bot, dans ~1h (mêmes données que le vrai)" onTap={()=>incCreateEvent(inc)} wide/>
+          </div>
+          {/* Éditer les params du bot comme si c'était son app */}
+          <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 12px',flexWrap:'wrap'}}>
+            <span style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.05em'}}>✏️ SES PARAMS</span>
+            {(() => { const b=bots.find(x=>x.id===inc); const age=b?.age||30; const g=b?.gender||'woman'; return (<>
+              <button onClick={()=>incEditParam(inc,{age:Math.max(18,age-1)},`âge ${Math.max(18,age-1)}`)} style={{padding:'6px 11px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>−</button>
+              <span style={{fontSize:13,fontWeight:800,color:C.white,minWidth:34,textAlign:'center'}}>{age} a</span>
+              <button onClick={()=>incEditParam(inc,{age:Math.min(80,age+1)},`âge ${Math.min(80,age+1)}`)} style={{padding:'6px 11px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>+</button>
+              <button onClick={()=>incEditParam(inc,{gender:g==='woman'?'man':g==='man'?'nb':'woman'},`genre ${g==='woman'?'homme':g==='man'?'nb':'femme'}`)} style={{padding:'6px 13px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{g==='woman'?'♀ Femme':g==='man'?'♂ Homme':'⚧ NB'}</button>
+            </>) })()}
           </div>
           <div style={{fontSize:10.5,color:C.whiteMid,margin:'0 0 16px',lineHeight:1.5}}>Flow complet : J'accepte → RDV maintenant → (ton radar montre « j'y suis ») → Je dis « j'y suis » → tu confirmes → Terminer.</div>
           {/* Ce que le bot voit */}
@@ -13779,6 +13876,35 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <Big id="ev" icon="🎉" label="Event + demandes" sub={`${nameOf(sel)} crée un event, les bots s'inscrivent`} onTap={()=>eventDemands(sel)}/>
           <Big id="inc" icon="🎭" label="Incarner le bot" sub={`Voir l'app comme ${nameOf(sel)}`} onTap={()=>incarnate(sel)}/>
           <Big id="reset" icon={armed?'⚠️':'🧹'} label={armed?'Touche encore = TOUT effacer':'Reset total'} sub={armed?'Bots + tes interactions (Mel incluse)':'Repartir de zéro · double-tap'} danger wide onTap={resetTotal}/>
+        </div>
+
+        {/* ── 🌆 VILLE VIVANTE — la dynamique aléatoire (comme des amis, mais des bots) ── */}
+        <div style={{marginTop:18,padding:'14px',borderRadius:16,border:`1.5px solid ${live?C.green:C.border}`,background:live?'rgba(119,188,31,.08)':C.bgCard}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <span style={{fontSize:14,fontWeight:900,color:C.white}}>🌆 Ville vivante</span>
+            <span style={{fontSize:10.5,color:C.whiteMid}}>les bots vivent tout seuls (arrivent, partent, créent des events, te clutchent)</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontSize:11.5,color:C.whiteMid}}>Combien en ligne</span>
+            {[3,6,10,20].map(n=>(
+              <button key={n} onClick={()=>setNOnline(n)} style={{padding:'5px 12px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,border:`1.5px solid ${nOnline===n?C.green:C.border}`,background:nOnline===n?C.green:C.bgCard,color:nOnline===n?'#fff':C.white}}>{n}</button>
+            ))}
+            <button disabled={busy==='non'} onClick={()=>putNOnline(nOnline)} style={{marginLeft:'auto',padding:'8px 14px',borderRadius:999,border:'none',background:C.bordeaux,color:'#fff',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='non'?'⏳':`🟢 ${nOnline} en ligne`}</button>
+          </div>
+          <button onClick={toggleLive} style={{width:'100%',padding:'11px',borderRadius:12,border:'none',background:live?C.green:C.bordeaux,color:'#fff',fontSize:13.5,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+            {live?'⏸ Mettre la ville en PAUSE':'▶️ Lancer la ville vivante (auto ~8 s)'}
+          </button>
+          <div style={{fontSize:10.5,color:C.whiteMid,marginTop:6,lineHeight:1.4}}>Vraies données en base. Regarde les onglets Présences / Clutchs / Événements se remplir tout seuls. Le journal en bas raconte ce qui se passe.</div>
+        </div>
+
+        {/* ── ➕ CRÉER DES BOTS + ♻️ RESETS RANGÉS ── */}
+        <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11.5,color:C.whiteMid}}>Créer</span>
+          {[5,8,15,30].map(n=>(
+            <button key={n} onClick={()=>setNMake(n)} style={{padding:'5px 11px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,border:`1.5px solid ${nMake===n?C.bordeaux:C.border}`,background:nMake===n?C.bordeaux:C.bgCard,color:nMake===n?'#fff':C.white}}>{n}</button>
+          ))}
+          <button disabled={busy==='make'} onClick={()=>createBots(nMake)} style={{padding:'7px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='make'?'⏳':`➕ ${nMake} bots`}</button>
+          <button disabled={busy==='resetmine'} onClick={resetMine} style={{marginLeft:'auto',padding:'7px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns'}</button>
         </div>
 
         {/* ── CYCLE DU RDV (une fois un Verrou créé avec ce bot) ── */}

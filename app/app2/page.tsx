@@ -3311,6 +3311,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [evLoading, setEvLoading] = useState(true)
   const [cancelledNotice, setCancelledNotice] = useState<string|null>(null)
+  const [declinedNotice, setDeclinedNotice] = useState<string|null>(null)   // refus DOUX d'une demande d'event (curated)
 
   const loadEvents = async () => {
     const { data } = await supabase.from('events').select('*').eq('active', true).order('sort_order').order('created_at')
@@ -3322,6 +3323,14 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot', true)
         const botIds = new Set((bots||[]).map((b:any)=>b.id))
         rows = rows.filter((e:any)=> !botIds.has(e.created_by))
+      } catch {}
+    }
+    // 🚫 ANTI-TENSION : les events dont MA demande a été refusée par l'orga (curated) ne me sont PLUS remontrés.
+    if (rows.length && userId) {
+      try {
+        const { data: dec } = await supabase.from('event_participants').select('event_id').eq('user_id', userId).eq('state','declined')
+        const declinedIds = new Set((dec||[]).map((p:any)=>p.event_id))
+        if (declinedIds.size) rows = rows.filter((e:any)=> !declinedIds.has(e.id))
       } catch {}
     }
     setDbEvents(rows)
@@ -3347,6 +3356,21 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         await supabase.from('event_participants').delete().eq('user_id', userId).in('event_id', mine.map((c:any)=>c.id))
         setRegistered((prev:Set<string>)=>{ const n=new Set(prev); mine.forEach((c:any)=>n.delete(c.id)); return n })
       }
+      // 🌱 Refus DOUX : ma demande à un event (curated) a été refusée par l'orga → notice gentille, UNE seule fois.
+      try {
+        const { data: dec } = await supabase.from('event_participants').select('event_id').eq('user_id', userId).eq('state','declined')
+        const decIds = (dec||[]).map((p:any)=>p.event_id)
+        if (decIds.length) {
+          let ack:string[] = []; try { ack = JSON.parse(localStorage.getItem('clutch_declined_ack')||'[]') } catch {}
+          const fresh = decIds.filter((id:string)=>!ack.includes(id))
+          if (fresh.length) {
+            const { data: evT } = await supabase.from('events').select('title').in('id', fresh)
+            const titles = (evT||[]).map((e:any)=>e.title).filter(Boolean)
+            if (titles.length) setDeclinedNotice(titles.join(' · '))
+            try { localStorage.setItem('clutch_declined_ack', JSON.stringify([...ack, ...fresh])) } catch {}
+          }
+        }
+      } catch {}
     })()
   }, [userId])
 
@@ -3985,6 +4009,16 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
               <div style={{fontSize:11,color:C.whiteMid,marginTop:2}}>{cancelledNotice} — {lang==='en'?'you\'ve been freed, no penalty for you.':'tu es libéré·e, aucune pénalité pour toi.'}</div>
             </div>
             <button onClick={()=>setCancelledNotice(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:16,cursor:'pointer',padding:0}}>✕</button>
+          </div>
+        )}
+        {declinedNotice && (
+          <div style={{background:`${C.salmon}12`,border:`1px solid ${C.salmon}44`,borderRadius:12,padding:'11px 13px',marginBottom:10,display:'flex',alignItems:'flex-start',gap:8}}>
+            <span style={{fontSize:16}}>🌱</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.white}}>{lang==='en'?'A spot went to someone else':'Une place est partie à quelqu\'un d\'autre'}</div>
+              <div style={{fontSize:11,color:C.whiteMid,marginTop:2,lineHeight:1.45}}>{declinedNotice} — {lang==='en'?'the organizer filled it differently this time. Plenty of other moments to jump on 💫':'l\'organisateur·ice a complété autrement cette fois. Plein d\'autres moments à saisir 💫'}</div>
+            </div>
+            <button onClick={()=>setDeclinedNotice(null)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:16,cursor:'pointer',padding:0}}>✕</button>
           </div>
         )}
         {/* Place libérée : event où je suis sur liste d'attente ET où une place s'est ouverte */}
@@ -9932,8 +9966,22 @@ export default function App2() {
         const recent = (lap||[]).filter((f:any)=>{ const ts = f.submitted_at ? new Date(f.submitted_at).getTime() : 0; return ts >= cutoff })
         setLapinIds(new Set(recent.map((f:any)=>f.to_id)))
       } catch {}
+      // 📥 BOÎTE PLEINE → INVISIBLE : une personne dont la file de clutchs EN ATTENTE (pending) atteint son plafond
+      //    (max_received_clutchs, défaut 5) n'est plus proposée — inutile de lui envoyer un clutch qui serait refusé
+      //    (INBOX_FULL). Elle RÉAPPARAÎT dès qu'elle accepte ou refuse un clutch (le pending sort de la file).
+      //    Cohérent avec le gardien create_clutch (qui compte aussi les 'pending').
+      let shown = real
+      try {
+        const candIds = real.map((p:any)=>p.id)
+        if (candIds.length) {
+          const { data: pend } = await supabase.from('clutches').select('receiver_id').eq('status','pending').in('receiver_id', candIds)
+          const cnt = new Map<string, number>()
+          ;(pend||[]).forEach((c:any)=>{ cnt.set(c.receiver_id, (cnt.get(c.receiver_id)||0)+1) })
+          shown = real.filter((p:any)=>{ const cap = (p.max_received_clutchs ?? 5); return (cnt.get(p.id)||0) < cap })
+        }
+      } catch {}
       // Max (bot GPS de test) SUPPRIMÉ — demande David.
-      setProfiles(real)
+      setProfiles(shown)
     }
   },[user?.id])
 

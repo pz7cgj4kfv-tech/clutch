@@ -249,6 +249,27 @@ export default function PlanLancement() {
         </div>
         <P><strong>Séquence dans le temps :</strong> A + B + C en parallèle dès le départ → D quand ça vit → E/F au cas par cas après la preuve → G seulement après une ville prouvée.</P>
 
+        {/* 8bis SCÉNARIO ROMANDIE */}
+        <H2 n="8b.">Option ambitieuse : « Romandie villes-phares » — projection mensuelle</H2>
+        <P>Variante plus agressive : attaquer la <strong>Suisse romande</strong> comme marché, mais concentrer la densité physique sur <strong>2-3 villes-phares</strong> (Lausanne + Genève, puis Fribourg/Neuchâtel), avec un <strong>gros événement de lancement par ville</strong> et une <strong>liste d'attente Romandie-large</strong>. La Romandie est petite et connectée (Lausanne-Genève 40 min) → un « truc d'événement » y circule bien. Le débordement vers la <strong>France frontalière</strong> (Genève-Annemasse) se fait ensuite naturellement si le produit plaît.</P>
+        <Note tone="red"><strong>Le trade-off à assumer :</strong> « partout d'un coup » au sens strict dilue la densité (= mort). La version viable = <strong>marque + waitlist partout</strong> (gratuit) mais <strong>densité concentrée sur les villes-phares</strong> qui s'allument l'une après l'autre. Et surtout : cette option coûte <strong>~CHF 100-150 k d'entrée</strong> (2 gros events + influence multi-villes) → il faut <strong>lever AVANT la preuve</strong> = plus risqué que Lausanne-d'abord.</Note>
+        <LineChart title="Revenu mensuel — scénario Romandie villes-phares (CHF, base CHF 1,3/actif)" xLabels={['M0', 'M3', 'M6', 'M9', 'M12', 'M15', 'M18']} yMax={30000} yUnit="Revenu = utilisateurs actifs × CHF 1,3/mois. M0 = début de la campagne Romandie (≈ 2027 après la preuve Lausanne). En haut de fourchette (events forts, CHF 1,8/actif) : +40 %."
+          series={[
+            { name: 'Flop', color: K.red, data: [0, 390, 780, 1170, 1300, 1430, 1560] },
+            { name: 'Moyen', color: K.amber, data: [0, 650, 1950, 3640, 5200, 7150, 9100] },
+            { name: 'Bon / viral', color: K.green, data: [0, 1300, 5200, 10400, 15600, 22100, 28600] },
+          ]} />
+        <Table head={['', 'Flop', 'Moyen', 'Bon / viral']} rows={[
+          ['Utilisateurs actifs M6', '~600', '~1 500', '~4 000'],
+          ['Utilisateurs actifs M12', '~1 000', '~4 000', '~12 000'],
+          ['Utilisateurs actifs M18', '~1 200', '~7 000', '~22 000'],
+          ['Revenu / mois à M12', 'CHF ~1 300', 'CHF ~5 200', 'CHF ~15 600'],
+          ['Revenu / mois à M18', 'CHF ~1 560', 'CHF ~9 100', 'CHF ~28 600'],
+          ['Revenu cumulé année 1', '~CHF 8-10 k', '~CHF 25-35 k', '~CHF 80-110 k'],
+          ['Coût de la campagne (12-18 mois)', 'CHF 100-150 k', 'CHF 100-150 k', 'CHF 100-150 k'],
+        ]} accentCol={3} />
+        <Note tone="accent"><strong>Lecture honnête :</strong> même en scénario « bon/viral », l'<strong>année 1 reste déficitaire</strong> (revenu ~80-110 k vs coût ~130 k) — mais tu sors avec ~<strong>22 000 actifs et ~CHF 29 k/mois de revenu</strong>, une base qui devient rentable en année 2 et qui vaut une vraie valorisation. En « moyen », tu es à ~CHF 9 k/mois à M18 : ça vit, ça ne finance pas encore la Suisse. Cette option <strong>maximise l'upside mais exige de lever ~150 k d'abord</strong> — l'inverse du chemin prudent Lausanne-d'abord.</Note>
+
         {/* 9 CIBLE */}
         <H2 n="9.">Cible : qui viser</H2>
         <Table head={['Segment', 'Rôle', 'Ce que dit la donnée']} rows={[

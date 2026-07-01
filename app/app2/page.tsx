@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f3'  // ~318e version
-const BUILD = 239   // build Apple
+const V = '0x1f4'  // ~319e version
+const BUILD = 240   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -13812,6 +13812,14 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     else { const c=(data as any)?.created ?? n; showToast(`➕ ${c} bots créés`, C.green); note(`➕ ${c} nouveaux bots créés (âge 25-45, marqueur 🤖) → « Tout mettre en ligne »`); loadBots() }
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
+  // ── 🗑️ SUPPRIMER les bots créés (🤖) — vide la pile, garde les originaux (RPC delete_test_bots) ──
+  const [delArmed,setDelArmed] = useState(false)
+  const deleteBots=async()=>{ if(!delArmed){ setDelArmed(true); setTimeout(()=>setDelArmed(false),4000); return } setDelArmed(false); setBusy('delbots'); try{
+    const { data,error } = await supabase.rpc('delete_test_bots')
+    if(error){ showToast('⚠️ Applique la migration delete_test_bots — '+error.message, C.orange); note('⚠️ RPC delete_test_bots absente/à appliquer : '+error.message) }
+    else { const c=(data as any)?.deleted ?? 0; showToast(`🗑️ ${c} bots 🤖 supprimés`, C.green); note(`🗑️ ${c} bots créés supprimés (originaux Sophie/Anaïs… gardés)`); loadBots() }
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+
   // ── 🎭 INCARNATION : le bot crée un event / édite ses params (âge, genre) ──
   const incCreateEvent=async(botId:string)=>{ if(!botId)return; setBusy('increv'); try{
     const { lat,lng } = await myCenter()
@@ -14008,15 +14016,19 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <div style={{fontSize:10.5,color:C.whiteMid,marginTop:6,lineHeight:1.4}}>Vraies données en base. Regarde les onglets Présences / Clutchs / Événements se remplir tout seuls. Le journal en bas raconte ce qui se passe.</div>
         </div>
 
-        {/* ── ➕ CRÉER DES BOTS + ♻️ RESETS RANGÉS ── */}
+        {/* ── ➕ CRÉER / 🗑️ SUPPRIMER LES BOTS ── */}
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <span style={{fontSize:11.5,color:C.whiteMid}}>Créer</span>
+          <span style={{fontSize:11.5,color:C.whiteMid}}>Bots 🤖</span>
           {[5,8,15,30].map(n=>(
             <button key={n} onClick={()=>setNMake(n)} style={{padding:'5px 11px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,border:`1.5px solid ${nMake===n?C.bordeaux:C.border}`,background:nMake===n?C.bordeaux:C.bgCard,color:nMake===n?'#fff':C.white}}>{n}</button>
           ))}
-          <button disabled={busy==='make'} onClick={()=>createBots(nMake)} style={{padding:'7px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='make'?'⏳':`➕ ${nMake} bots`}</button>
-          <button disabled={busy==='resetmine'} onClick={resetMine} style={{marginLeft:'auto',padding:'7px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns'}</button>
+          <button disabled={busy==='make'} onClick={()=>createBots(nMake)} style={{padding:'7px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='make'?'⏳':`➕ ${nMake}`}</button>
+          <button disabled={busy==='delbots'} onClick={deleteBots} style={{padding:'7px 12px',borderRadius:999,border:`1.5px solid ${delArmed?C.red:C.border}`,background:delArmed?C.red:C.bgCard,color:delArmed?'#fff':C.salmon,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='delbots'?'⏳':delArmed?'⚠️ Confirmer':'🗑️ Vider les 🤖'}</button>
         </div>
+        <div style={{fontSize:10,color:C.whiteMid,margin:'6px 2px 0',lineHeight:1.4}}>
+          <b>♻️ Reset cooldowns</b> = efface tes clutchs + cooldowns (garde les bots) · <b>🧹 Reset total</b> = efface toutes les interactions + remet les bots hors-ligne (les garde) · <b>🗑️ Vider les 🤖</b> = supprime pour de bon les bots créés (garde les originaux).
+        </div>
+        <button disabled={busy==='resetmine'} onClick={resetMine} style={{marginTop:8,padding:'8px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns (garde les bots)'}</button>
 
         {/* ── CYCLE DU RDV (une fois un Verrou créé avec ce bot) ── */}
         <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',margin:'18px 0 8px'}}>CYCLE DU RDV — {nameOf(sel).toUpperCase()} (après un Verrou)</div>

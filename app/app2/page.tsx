@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f1'  // Versionnage HEXADÉCIMAL. ~316e version. NB: le build Apple reste un entier dans pbxproj.
-const BUILD = 237   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
+const V = '0x1f2'  // Versionnage HEXADÉCIMAL. ~317e version. NB: le build Apple reste un entier dans pbxproj.
+const BUILD = 238   // numéro de build Apple/TestFlight (= CURRENT_PROJECT_VERSION). À bumper avec V.
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -217,7 +217,7 @@ function GenderSvg({gk, size=16, style}:{gk:GenderKey; size?:number; style?:Reac
 // monde a la carte de Mel (bascule en 1 ligne le jour où on enlève l'aide aux tests).
 // ⚠️ Limite prénom provisoire (cf project-limites-caracteres, à trancher) : ~14 car + ellipsis.
 // ─────────────────────────────────────────────────────────────────────────────
-const MEL_CARD_FOR_ALL = false
+const MEL_CARD_FOR_ALL = true   // David 30.06 : les bots doivent s'afficher EXACTEMENT comme de vraies personnes (carte Mel), seul le nom/tag « BOT » diffère.
 const MEL_SF = '-apple-system,BlinkMacSystemFont,"SF Pro Text","SF UI Text",Helvetica Neue,Arial,sans-serif'
 const MEL_GENDER: Record<string, React.ReactNode> = {
   female: <><path d="M17.7,5.4c0.5,0,0.9,0,1.3,0.1C17.8,4,16,3,14,3c-3.5,0-6.4,3-6.4,6.6c0,3.2,2.2,5.9,5.1,6.5c-0.9-1.1-1.4-2.6-1.4-4.1C11.3,8.4,14.1,5.4,17.7,5.4z"/><path d="M23.2,9.7c0-5.1-4.1-9.2-9.2-9.2S4.8,4.7,4.8,9.7c0,4.8,3.7,8.8,8.4,9.2v2.7H9.9c-0.4,0-0.8,0.4-0.8,0.8s0.4,0.8,0.8,0.8h3.3v3.5c0,0.4,0.4,0.8,0.8,0.8s0.8-0.4,0.8-0.8v-3.5h3.3c0.4,0,0.8-0.4,0.8-0.8s-0.4-0.8-0.8-0.8h-3.3v-2.7C19.5,18.5,23.2,14.6,23.2,9.7z M6.2,9.7C6.2,5.5,9.7,2,14,2s7.8,3.5,7.8,7.8c0,4.3-3.4,7.7-7.7,7.8c0,0-0.1,0-0.1,0s-0.1,0-0.1,0C9.7,17.5,6.2,14,6.2,9.7z"/></>,
@@ -13728,37 +13728,39 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
   // ── 🌆 VILLE VIVANTE — dynamique aléatoire : les bots vivent tout seuls (comme des amis), vraies données. ──
-  const myCenter=async()=>{ const { data } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle(); return { lat:(data as any)?.center_lat||46.5197, lng:(data as any)?.center_lng||6.6323 } }
+  const myCenter=async()=>{ const { data } = await supabase.from('profiles').select('center_lat,center_lng,available_until').eq('id',userId).maybeSingle()
+    const now=Date.now(); const du=(data as any)?.available_until ? new Date((data as any).available_until).getTime() : 0
+    // Fenêtre cible pour les bots : ils doivent être actifs MAINTENANT et COUVRIR mon créneau (sinon invisibles).
+    const until = du>now+30*60000 ? du : now+4*3600e3
+    return { lat:(data as any)?.center_lat||46.5197, lng:(data as any)?.center_lng||6.6323, until } }
   const rnd=(a:number,b:number)=> a+Math.random()*(b-a)
   const pick=<T,>(arr:T[]):T|undefined=> arr.length?arr[Math.floor(Math.random()*arr.length)]:undefined
   // Mettre N bots en ligne, chacun avec un créneau/rayon/heure LÉGÈREMENT différents (réaliste, pas tous pareils).
   const putNOnline=async(n:number)=>{ setBusy('non'); try{
-    const { lat,lng } = await myCenter()
+    const { lat,lng,until } = await myCenter()
     const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true)
     const ids=((bs as any[])||[]).map(b=>b.id).sort(()=>Math.random()-0.5).slice(0,Math.max(1,n))
     let ok=0
     for(const id of ids){
-      const startOff=pick([0,0,0,15,30,60])||0                 // la plupart maintenant, certains décalés
-      const from=Date.now()+startOff*60000, durH=1+Math.floor(rnd(1,4))
-      const jLat=lat+rnd(-0.02,0.02), jLng=lng+rnd(-0.03,0.03)  // dispersés autour de moi
-      const { data } = await supabase.rpc('admin_set_availability',{ p_actor:id, p_from:new Date(from).toISOString(), p_until:new Date(from+durH*3600e3).toISOString(), p_lat:jLat, p_lng:jLng, p_radius:Math.round(rnd(3,15)) })
+      // Actifs MAINTENANT (from = maintenant) et jusqu'à la fin de MON créneau → ils tombent dans ma fenêtre = visibles.
+      const from=Date.now(), jLat=lat+rnd(-0.02,0.02), jLng=lng+rnd(-0.03,0.03)  // dispersés autour de moi
+      const { data } = await supabase.rpc('admin_set_availability',{ p_actor:id, p_from:new Date(from).toISOString(), p_until:new Date(until).toISOString(), p_lat:jLat, p_lng:jLng, p_radius:Math.round(rnd(3,15)) })
       if((data as any)?.ok!==false) ok++
     }
     showToast(`🌆 ${ok} bots en ligne (créneaux variés)`, C.green); note(`🌆 ${ok} bots mis en ligne autour de toi, heures & rayons variés`); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // Un « tour de vie » : quelques bots s'allument/s'éteignent, l'un crée un event, l'un te clutche. Léger (pas de toast spam).
   const cityTick=async()=>{ try{
-    const { lat,lng } = await myCenter()
+    const { lat,lng,until } = await myCenter()
     const { data: bs } = await supabase.from('profiles').select('id,is_available,available_until').eq('is_bot',true)
     const all=((bs as any[])||[]); if(!all.length) return
     const now=Date.now()
     const on=all.filter(b=>b.is_available && b.available_until && new Date(b.available_until).getTime()>now)
     const off=all.filter(b=>!on.includes(b))
     const acts:string[]=[]
-    // 1) allumer 1-2 bots hors ligne
+    // 1) allumer 1-2 bots hors ligne — actifs maintenant, couvrant MON créneau (visibles)
     for(const b of off.sort(()=>Math.random()-0.5).slice(0,Math.random()<.7?1:2)){
-      const durH=1+Math.floor(rnd(1,4))
-      await supabase.rpc('admin_set_availability',{ p_actor:b.id, p_from:new Date().toISOString(), p_until:new Date(now+durH*3600e3).toISOString(), p_lat:lat+rnd(-0.02,0.02), p_lng:lng+rnd(-0.03,0.03), p_radius:Math.round(rnd(3,15)) })
+      await supabase.rpc('admin_set_availability',{ p_actor:b.id, p_from:new Date().toISOString(), p_until:new Date(until).toISOString(), p_lat:lat+rnd(-0.02,0.02), p_lng:lng+rnd(-0.03,0.03), p_radius:Math.round(rnd(3,15)) })
       acts.push(`🟢 ${nameOf(b.id)} arrive`)
     }
     // 2) éteindre 0-1 bot en ligne (rotation naturelle) — jamais s'il est en Verrou

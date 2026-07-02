@@ -288,3 +288,11 @@ Lab (bots réels via RPC gardées) + `/clutch-test` (cockpit de soirée). Rien �
 - **Produit** : 8/10 — vision différenciée, cohérente, défendable ; 2 décisions à trancher (récit, premium).
 - **Prêt au lancement** : 5/10 aujourd'hui → **8/10 atteignable au J14** si le plan est suivi et le scope gelé.
 - **La phrase de l'audit** : *l'app n'a plus besoin de nouvelles idées ; elle a besoin de 14 jours de discipline.*
+
+---
+
+## ✅ DÉCISIONS TRANCHÉES PAR DAVID (03.07, à la lecture de l'audit)
+1. **🎪 Soirée test choréographiée : 14 JUILLET 2026** (fixée — tout le plan s'ancre dessus, J11 = 13-14.07).
+2. **Récit V1 : LES DEUX** — rencontres ET activités, assumées ensemble (l'app montre les deux dès l'onboarding).
+3. **Premium : OFF au lancement** — tout gratuit, on mesure d'abord, prix décidé avec de vraies données.
+4. **Gel du scope : ACTÉ** — plus aucune feature nouvelle avant le 14.07 ; les idées vont dans le hub.

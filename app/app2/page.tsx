@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f8'  // ~323e version
-const BUILD = 244   // build Apple
+const V = '0x1f9'  // ~324e version
+const BUILD = 245   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -2750,6 +2750,11 @@ function ClutchIncoming({ clutch, onAccept, onDecline, onLater, onCounter, lang:
             {onCounter && (
               <button onClick={()=>setShowCounter(true)} style={{width:'100%',padding:'11px',background:'rgba(235,107,175,.1)',border:'1.5px solid rgba(235,107,175,.33)',borderRadius:14,color:"C.gold",fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                 ↩ {isFr?'Contre-clutch…':'Counter-clutch…'}
+              </button>
+            )}
+            {onLater && (
+              <button onClick={onLater} style={{width:'100%',padding:'10px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:14,color:C.whiteMid,fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                ⏸ {isFr?'Plus tard (garder de côté)':'Later (set aside)'}
               </button>
             )}
           </>) : (
@@ -12366,6 +12371,10 @@ export default function App2() {
                 const actifsWithHdrs:any[] = []
                 if (subShown===2) { let _pg=-1; tabItems.forEach((c:any)=>{ const g=rankOf(c); if(g!==_pg){ actifsWithHdrs.push({__hdr:g}); _pg=g } actifsWithHdrs.push(c) }) }
                 else { actifsWithHdrs.push(...tabItems) }
+                // 📥 PLAFOND DE RÉCEPTION (David 02.07) : X/cap clutchs REÇUS en attente. À cap → boîte pleine (rien de nouveau tant que je n'ai pas répondu).
+                const recPending = actifs.filter((c:any)=>c.receiver_id===user.id && c.status==='pending').length
+                const recCap = Math.max(1, (user as any)?.max_received_clutchs ?? 5)
+                const boxFull = recPending >= recCap
                 return (
                 <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column'}}>
                   <div style={{padding:'12px 16px 10px',paddingTop:'calc(var(--sat) + 12px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -12391,6 +12400,16 @@ export default function App2() {
                         <span style={{fontSize:12,color:C.whiteMid}}>→</span>
                       </div>
                     )}
+                    {/* 📥 BOÎTE PLEINE (David 02.07) : message ROUGE — plus de clutchs reçus tant que non répondu. */}
+                    {boxFull && (
+                      <div style={{display:'flex',alignItems:'center',gap:9,padding:'9px 13px',borderRadius:12,marginBottom:10,background:'rgba(211,51,51,.12)',border:'1px solid #d33'}}>
+                        <span style={{fontSize:18,flexShrink:0}}>📥</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:800,color:'#e5736b'}}>{lang==='en'?`Your inbox is full (${recPending}/${recCap})`:`Ta boîte est pleine (${recPending}/${recCap})`}</div>
+                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35}}>{lang==='en'?'You won\'t receive new clutches until you accept or decline some.':'Tu ne recevras plus de nouveaux clutchs tant que tu n\'as pas accepté ou refusé certains.'}</div>
+                        </div>
+                      </div>
+                    )}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                       <div>
                         {/* Titre « Mes Clutchs » retiré (déjà dans la nav du bas) — on garde le compte (David : libérer le haut) */}
@@ -12398,6 +12417,8 @@ export default function App2() {
                           {aRepondre>0
                             ? <span style={{fontWeight:800,color:'#fff',background:C.salmon,borderRadius:20,padding:'2px 10px',fontSize:11}}>🔴 {aRepondre} {lang==='en'?'to answer':'à répondre'}</span>
                             : <span style={{fontWeight:700,color:C.white}}>{actifs.length} {lang==='en'?'active':'actif'}</span>}
+                          {/* 📥 Compteur de boîte de réception X/cap (David 02.07) — rouge quand pleine */}
+                          <span style={{fontWeight:800,color:'#fff',background:boxFull?'#d33':C.bordeaux,borderRadius:20,padding:'2px 10px',fontSize:11}}>📥 {recPending}/{recCap}</span>
                           <span style={{color:C.whiteMid}}>· {actifs.length+displayHist.length} {lang==='en'?'total':'total'}</span>
                           {user?.is_available && user?.available_until && new Date(user.available_until)>new Date() && (
                             <span style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,borderRadius:20,padding:'2px 7px',fontSize:10,color:C.whiteMid}}>
@@ -13703,7 +13724,7 @@ export default function App2() {
               setIncomingClutch(null)
               setClutches(prev=>(prev as any[]).filter(c=>c.id!==incomingClutch.id) as any)
             }}
-            onLater={()=>setIncomingClutch(null)}
+            onLater={()=>{ setIncomingClutch(null); _setTab('clutchs'); showToast(lang==='en'?'⏸ Set aside — find it in Clutchs → To answer':'⏸ Mis de côté — retrouve-le dans Clutchs → À répondre',C.salmon) }}
           />}
         </>
       )}
@@ -13753,8 +13774,15 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const loadBots=async()=>{
     const { data } = await supabase.from('profiles').select('id,name,age,gender,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
     const arr=((data as any[])||[])
+    // 🔧 FIX David 02.07 : NE dédoublonner QUE les bots ORIGINAUX (Sophie, Anaïs…). Les bots créés (marqueur 🤖)
+    //    sont des profils DISTINCTS même s'ils partagent un prénom → on les garde TOUS (sinon « 15 créés → 7 affichés »).
     const seen=new Set<string>(); const uniq:any[]=[]
-    for(const b of arr){ const k=(b.name||'').replace(/\s*test\s*$/i,'').trim().toLowerCase(); if(k&&seen.has(k))continue; seen.add(k); uniq.push({...b,name:(b.name||'').replace(/\s*test\s*$/i,'').trim()}) }
+    for(const b of arr){
+      const isMade=/🤖/.test(b.name||'')
+      if(isMade){ uniq.push(b); continue }   // bot créé → toujours gardé
+      const k=(b.name||'').replace(/\s*test\s*$/i,'').trim().toLowerCase(); if(k&&seen.has(k))continue; seen.add(k)
+      uniq.push({...b,name:(b.name||'').replace(/\s*test\s*$/i,'').trim()})
+    }
     setBots(uniq); setSel(p=>p||uniq[0]?.id||'')
   }
   useEffect(()=>{ if(open) loadBots() },[open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -13781,6 +13809,11 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
       if(!error) n++
     }
     showToast(`✓ ${n} bots en ligne sur toi 📍`, C.green); note(`✅ ${n} bots en ligne dans ta zone (créneaux + rayons variés)`); refreshAll(); loadBots()
+  }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
+  // ⚪️ Tout mettre HORS ligne (David 02.07 : « le même bouton, tout en ligne / tout hors ligne »).
+  const allOffline=async()=>{ setBusy('off'); try{
+    await supabase.from('profiles').update({ is_available:false }).eq('is_bot',true)
+    showToast('⚪️ Tous les bots hors ligne', C.salmon); note('⚪️ Tous les bots mis hors ligne'); refreshAll(); loadBots()
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
   // ⏰ Mettre un bot en ligne à une HEURE choisie (David : « je ne peux pas choisir l'heure »). Via admin_set_availability.
   const ONLINE_STARTS:[string,string,number][] = [['now','Maintenant',0],['30','+30 min',30],['1h','+1h',60],['2h','+2h',120],['soir','Ce soir 19h',-1]]
@@ -13915,6 +13948,11 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
       if(on.length && Math.random()<.5){ const b=pick(on)!; const startMs=now+Math.round(rnd(40,120))*60000
         const { data,error } = await supabase.rpc('admin_create_event',{ p_actor:b.id, p_title:`${pick(['Apéro','Yoga','Rando','Jass','Padel','Café','Concert'])} — ${nameOf(b.id)}`, p_starts_at:new Date(startMs).toISOString(), p_lat:lat+rnd(-0.02,0.02), p_lng:lng+rnd(-0.03,0.03) })
         if((data as any)?.ok) acts.push(`🎉 event ${nameOf(b.id)}`); else if(error) acts.push(`⚠️ event: ${error.message.slice(0,30)}`) }
+      // 3b) LES BOTS S'ORGANISENT ENTRE EUX (David : « qu'elles se clutchent entre elles ») : un bot en clutche un autre.
+      if(on.length>=2 && Math.random()<.4){ const a=pick(on)!; const b=pick(on.filter(x=>x.id!==a.id))!
+        if(b){ const rdv=coherentRdv(now, now+2*3600e3)
+          const { data } = await supabase.rpc('admin_create_clutch',{ p_actor:a.id, p_receiver:b.id, p_venue:'Lausanne', p_proposed_time:new Date(rdv).toISOString(), p_venue_lat:lat, p_venue_lng:lng, p_message:'On se voit ?' })
+          if((data as any)?.ok) acts.push(`🤝 ${nameOf(a.id)}→${nameOf(b.id)}`) } }
       // 4) des bots te clutchent — SAUF si ta boîte est pleine (INBOX_FULL) → on le DIT
       const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true}).eq('receiver_id',userId).eq('status','pending')
       const { data: meP } = await supabase.from('profiles').select('max_received_clutchs').eq('id',userId).maybeSingle()
@@ -14154,9 +14192,12 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
             ))}
             <button disabled={busy==='non'} onClick={()=>putNOnline(nOnline)} style={{marginLeft:'auto',padding:'8px 14px',borderRadius:999,border:'none',background:C.bordeaux,color:'#fff',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='non'?'⏳':`🟢 ${nOnline} en ligne`}</button>
           </div>
-          <button onClick={toggleLive} style={{width:'100%',padding:'11px',borderRadius:12,border:'none',background:live?C.green:C.bordeaux,color:'#fff',fontSize:13.5,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
-            {live?'⏸ Mettre la ville en PAUSE':'▶️ Lancer la ville vivante (auto ~8 s)'}
-          </button>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={toggleLive} style={{flex:1,padding:'11px',borderRadius:12,border:'none',background:live?C.green:C.bordeaux,color:'#fff',fontSize:13.5,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>
+              {live?'⏸ PAUSE':'▶️ Lancer la ville'}
+            </button>
+            <button disabled={busy==='off'} onClick={allOffline} style={{flexShrink:0,padding:'11px 14px',borderRadius:12,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='off'?'⏳':'⚪️ Tous hors ligne'}</button>
+          </div>
           <div style={{fontSize:10.5,color:C.whiteMid,marginTop:6,lineHeight:1.4}}>Vraies données en base. Regarde les onglets Présences / Clutchs / Événements se remplir tout seuls. Le journal en bas raconte ce qui se passe.</div>
         </div>
 

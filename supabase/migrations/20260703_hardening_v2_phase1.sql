@@ -10,13 +10,15 @@
 -- Les autres = arrondi ~1 km (protection de la localisation, ADN ProximityRadar).
 -- Liste de colonnes construite DYNAMIQUEMENT depuis le vrai schéma (zéro risque
 -- de nom de colonne faux) en excluant les sensibles.
+-- (corrigé 03.07 : deleted_at n'existe pas · on protège AUSSI lat/lng hérités + certif_selfie)
 do $$
 declare cols text;
 begin
   select string_agg(quote_ident(column_name), ', ' order by ordinal_position) into cols
   from information_schema.columns
   where table_schema='public' and table_name='profiles'
-    and column_name not in ('center_lat','center_lng','stripe_customer_id','stripe_subscription_id');
+    and column_name not in ('center_lat','center_lng','lat','lng','certif_selfie',
+                            'stripe_customer_id','stripe_subscription_id');
   execute format($f$
     create or replace view public.public_profiles as
     select %s,
@@ -25,7 +27,7 @@ begin
       case when id = auth.uid() then center_lng
            else round(center_lng::numeric, 2)::double precision end as center_lng
     from public.profiles
-    where coalesce(is_banned, false) is not true and deleted_at is null
+    where coalesce(is_banned, false) is not true
   $f$, cols);
 end $$;
 

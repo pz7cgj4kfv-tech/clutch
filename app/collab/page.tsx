@@ -65,6 +65,25 @@ CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
 
 3 QUESTIONS : (a) langage JS/TS ou Python ? (b) autonome (formules) ou appels API en direct — lesquelles + clé ? (c) peux-tu livrer la fonction isolée + 10-20 cas de test ?`
 
+  // Retour d'intégration Graal 2 (02.07 · 23h) — pour le bouton Copier de l'entrée « reçu & intégré ».
+  const GRAAL2_DONE_TXT = `✅ TON MOTEUR GRAAL 2 EST REÇU, TESTÉ ET INTÉGRÉ — 02.07.2026
+
+Bravo Dom. travel-estimate.ts + travel-estimate.test.ts reçus. Exactement le bon format :
+- TypeScript (pas Python) ✅
+- Fonction PURE autonome, ZÉRO réseau ✅ (parfait pour Clutch = export statique sans serveur)
+- Multi-mode marche/vélo/ebike/voiture/CFF, Suisse-aware, conservateur ✅
+- 6 cas de test fournis ✅
+
+CE QUE J'AI FAIT CHEZ NOUS :
+1. Copié ton module VERBATIM dans lib/travel-estimate.ts (rien réécrit).
+2. Porté tes 6 cas au format de test du projet (scripts/test-travel-estimate.mts) → 15/15 PASSENT. Parité prouvée.
+3. Branché derrière un FEATURE FLAG (GRAAL2_DOM_LIVE, =false par défaut) dans la réjoignabilité GPS de la forteresse : OFF = comportement actuel inchangé, ON = ton moteur décide. Revert = 1 ligne. Zéro régression.
+4. Ajouté un bouton Test Lab « 🚗 Tester le moteur de Dom » pour le voir tourner en direct dans l'app (3 routes Lausanne/Lutry/Sion).
+
+PROCHAINE ÉTAPE (quand tu veux) : la sortie idéale pour brancher la TENSION 0-10 du cône, ce serait aussi { tension, via } en plus de { minutes, modeUsed, confidence }. Mais on peut la dériver de minutes vs temps restant côté Clutch — pas bloquant.
+
+QUESTION : ta signature actuelle prend (from, to, now, modes?). Pour la version « publiée qui se recale » (dispo qui vit), on aura besoin d'appeler ça à intervalle avec la position GPS live — c'est déjà compatible. Rien à changer pour l'instant. Continue comme ça 👌`
+
   const TABS: { id: Tab; icon: string; label: string }[] = [
     { id: 'mur', icon: '🧱', label: 'Mur d\'équipe' },
     { id: 'hierarchie', icon: '🏛️', label: 'Hiérarchie' },
@@ -195,6 +214,20 @@ CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
           <div style={{ fontSize: 12, fontWeight: 800, color: M.pink, letterSpacing: '.04em', margin: '10px 0 6px' }}>📓 JOURNAL — LE PLUS RÉCENT EN HAUT</div>
 
           {/* ▼▼▼ NOUVELLE ENTRÉE À AJOUTER ICI (date + heure au sommet) ▼▼▼ */}
+          <Card accent={M.green}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: M.ink40, marginBottom: 4 }}>02.07.2026 · 23:00</div>
+            <H>✅ Reçu, testé (15/15) & intégré — bravo Dom</H>
+            <P>Ton <code>travel-estimate.ts</code> + <code>travel-estimate.test.ts</code> sont arrivés. <strong>Exactement le bon format</strong> : TypeScript, fonction pure <strong>autonome (zéro réseau)</strong>, multi-mode voiture/CFF/vélo, Suisse-aware, avec tes 6 cas de test. 👏</P>
+            <Step n={1}>Copié ton module <strong>verbatim</strong> dans <code>lib/travel-estimate.ts</code> (rien réécrit).</Step>
+            <Step n={2}>Porté tes 6 cas au format du projet → <strong>15/15 passent</strong>. Parité prouvée.</Step>
+            <Step n={3}>Branché <strong>derrière un feature-flag</strong> (OFF par défaut) dans la réjoignabilité GPS de la forteresse : zéro régression, revert = 1 ligne.</Step>
+            <Step n={4}>Bouton Test Lab <strong>« 🚗 Tester le moteur de Dom »</strong> pour le voir tourner en direct dans l'app.</Step>
+            <Rule>Prochaine étape (pas bloquant) : si tu peux sortir aussi <code>{'{ tension 0-10, via }'}</code> en plus de <code>{'{ minutes, modeUsed, confidence }'}</code>, je branche direct la tension du cône. Sinon je la dérive de <code>minutes</code> vs temps restant côté Clutch. Continue comme ça 👌</Rule>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <CopyBtn text={GRAAL2_DONE_TXT} />
+            </div>
+          </Card>
+          {/* ▲ entrée précédente ▲ */}
           <Card accent={M.pink}>
             <div style={{ fontSize: 11, fontWeight: 800, color: M.ink40, marginBottom: 4 }}>02.07.2026 · 21:44</div>
             <H>🔗 Intégrer TON moteur Graal 2 (Antigravity) dans Clutch</H>

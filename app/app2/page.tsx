@@ -31,8 +31,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1fd'  // ~328e version
-const BUILD = 249   // build Apple
+const V = '0x1fe'  // ~329e version
+const BUILD = 250   // build Apple
 
 // 🚗 GRAAL 2 — moteur de trajet de Dom (Antigravity, 02.07). RÉJOIGNABILITÉ FORTERESSE branchée dessus.
 //    ON  = la forteresse (dérive/blocage GPS + events) utilise l'estimation multi-mode de Dom (voiture/CFF/vélo).
@@ -40,6 +40,13 @@ const BUILD = 249   // build Apple
 //    Double-check : scripts/test-forteresse-reach.mts prouve que OFF == ancien modèle (112 combos) + sanité ON.
 //    Toute la logique est centralisée dans lib/forteresse-reach.ts (un seul point de vérité).
 const GRAAL2_DOM_LIVE = true
+
+// 🛡️ HARDENING V2 (03.07) — TOUTES les LECTURES de profils passent par la vue `public_profiles` :
+//    ma ligne = position exacte · les AUTRES = position arrondie ~1 km (anti-triangulation, ADN ProximityRadar).
+//    Les ÉCRITURES restent sur `profiles` (la vue est en lecture seule). Migration 20260703_hardening_v2_phase1.
+//    ⇦ REVERT = false ici (1 ligne) → tout relit la table directe comme avant. Phase 3 (REVOKE) = après validation.
+const HARDENING_V2_LIVE = true
+const PROFILES_READ = (HARDENING_V2_LIVE ? 'public_profiles' : 'profiles') as 'profiles'
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -1382,7 +1389,7 @@ function LoginScreen({onSuccess,onRegister,showToast}:{onSuccess:(p:Profile)=>vo
       if(!em||!pass){ setLoading(false); setStatus('❌ Entre ton email et ton mot de passe'); return }
       const{data,error}=await supabase.auth.signInWithPassword({email:em,password:pass})
       if(error){ setLoading(false); setStatus('❌ '+(error.message||'Email ou mot de passe incorrect')); return }
-      const{data:p}=await supabase.from('profiles').select('*').eq('id',data.user.id).single()
+      const{data:p}=await supabase.from(PROFILES_READ).select('*').eq('id',data.user.id).single()
       setLoading(false)
       if(p){ setStatus('✓ Connecté'); onSuccess(p) } else { setStatus('❌ Profil introuvable — recrée ton compte') }
     } catch(e:any){ setLoading(false); setStatus('❌ '+(e?.message||'Pas de connexion réseau')) }
@@ -1467,7 +1474,7 @@ function RegisterScreen({onSuccess,onLogin,showToast}:{onSuccess:(p:Profile)=>vo
         account_type: 'free',
         reliability_score: 100,
       })
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
+      const { data: p } = await supabase.from(PROFILES_READ).select('*').eq('id', data.user.id).single()
       setLoading(false)
       if (p) onSuccess(p)
     }
@@ -2223,7 +2230,7 @@ function SendModal({from,to,onClose,onSent,showToast,fromTime,untilTime,lang,onT
     const isGpsBot = (to as any)._isGpsTestBot === true
     if (!isGpsBot) {
       // Vérifier que la cible est toujours disponible au moment d'envoyer
-      const {data:freshTarget} = await supabase.from('profiles').select('is_available,available_until').eq('id',to.id).single()
+      const {data:freshTarget} = await supabase.from(PROFILES_READ).select('is_available,available_until').eq('id',to.id).single()
       if (!freshTarget?.is_available || !freshTarget?.available_until || new Date(freshTarget.available_until) <= new Date()) {
         setLoading(false)
         onTargetUnavailable?.()
@@ -3303,7 +3310,7 @@ function OrganizerRequests({ eventId, lang, showToast, onChange }:{ eventId:stri
     try{
       const { data } = await supabase.from('event_participants').select('id,user_id,state,created_at').eq('event_id',eventId).in('state',['requested','waitlisted']).order('created_at')
       const rows=((data as any[])||[])
-      if(rows.length){ const ids=rows.map(r=>r.user_id); const { data:profs }=await supabase.from('profiles').select('id,name,age,gender').in('id',ids); const pm=new Map((profs||[]).map((p:any)=>[p.id,p])); rows.forEach(r=>{ r._p=pm.get(r.user_id) }) }
+      if(rows.length){ const ids=rows.map(r=>r.user_id); const { data:profs }=await supabase.from(PROFILES_READ).select('id,name,age,gender').in('id',ids); const pm=new Map((profs||[]).map((p:any)=>[p.id,p])); rows.forEach(r=>{ r._p=pm.get(r.user_id) }) }
       setReqs(rows)
     }catch{} setLoading(false)
   }
@@ -3392,7 +3399,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     //    tester avec le générateur d'events sur créneaux (David 30.06). En Réel (vrais amis) : toujours masqués.
     if (rows.length && !showBotEvents) {
       try {
-        const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot', true)
+        const { data: bots } = await supabase.from(PROFILES_READ).select('id').eq('is_bot', true)
         const botIds = new Set((bots||[]).map((b:any)=>b.id))
         rows = rows.filter((e:any)=> !botIds.has(e.created_by))
       } catch {}
@@ -3759,7 +3766,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
         await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
         if (userId) {
           await supabase.from('event_participants').delete().eq('event_id', ev.id).eq('user_id', userId)
-          const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', userId).maybeSingle()
+          const { data:p } = await supabase.from(PROFILES_READ).select('reliability_score').eq('id', userId).maybeSingle()
           const cur = (p as any)?.reliability_score ?? 100
           await supabase.from('profiles').update({ reliability_score: Math.max(0, cur-10) }).eq('id', userId)
         }
@@ -5822,7 +5829,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     morges:{ lat: 46.5094,      lng: 6.4983,       label:'Morges ~12km' },
   }
   const load = async () => {
-    const { data } = await supabase.from('profiles')
+    const { data } = await supabase.from(PROFILES_READ)
       .select('id,name,gender,age,is_available,center_lat,center_lng,available_radius_km,account_type,looking_for,available_from,available_until,available_modes')
       .eq('is_bot', true).order('name')
     setBots(data||[]); setLoading(false)
@@ -5954,7 +5961,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   const fillMyInbox = async () => {
     setBusy('all')
     // Besoin de 4 bots pour couvrir tous les groupes de la hiérarchie. À défaut, on fait avec ce qu'on a.
-    const { data: bs } = await supabase.from('profiles').select('id,name').eq('is_bot', true).limit(5)
+    const { data: bs } = await supabase.from(PROFILES_READ).select('id,name').eq('is_bot', true).limit(5)
     if (!bs?.length) { setBusy(null); showToast('Aucun bot — génère-en d\'abord', C.orange); return }
     // B6 — unicité par paire active : on NETTOIE d'abord la paire (sens 2), puis on remplit chaque groupe.
     const botIds = bs.map((b:any)=>b.id)
@@ -5988,7 +5995,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
   // RESET COMPLET : efface MES interactions avec les bots (clutchs + lapins) + les remet propres (dé-Driver, déverrouille)
   const clearBotInteractions = async () => {
     setBusy('all')
-    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot', true)
+    const { data: botRows } = await supabase.from(PROFILES_READ).select('id').eq('is_bot', true)
     const botIds = (botRows||[]).map((b:any)=>b.id)
     if (botIds.length) {
       const ACT = ['pending','accepted','confirmed','checked_in']
@@ -6014,7 +6021,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const { data: evs } = await supabase.from('events').select('id,title,spots,created_by').eq('active',true).order('created_at',{ascending:false}).limit(1)
     if (!evs?.length) { setBusy(null); showToast("Aucun event actif — crée-en un d'abord (🎟️)", C.orange); return }
     const ev = evs[0]
-    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)))  // remplit jusqu'à COMPLET (test liste d'attente)
+    const { data: botRows } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true).neq('id', ev.created_by||'00000000-0000-0000-0000-000000000000').limit(Math.max(1,(ev.spots||6)))  // remplit jusqu'à COMPLET (test liste d'attente)
     const botIds = (botRows||[]).map((b:any)=>b.id)
     let inserted=0
     for (const bid of botIds) {
@@ -6035,7 +6042,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const { data: evs } = await supabase.from('events').select('id,title').eq('active',true).order('created_at',{ascending:false}).limit(1)
     if (!evs?.length) { setBusy(null); showToast("Aucun event actif", C.orange); return }
     const ev = evs[0]
-    const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const { data: bots } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true)
     const botIds = new Set((bots||[]).map((b:any)=>b.id))
     const { data: parts } = await supabase.from('event_participants').select('user_id').eq('event_id', ev.id)
     const botPart = (parts||[]).find((p:any)=>botIds.has(p.user_id))
@@ -6050,7 +6057,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     const { data: evs } = await supabase.from('events').select('id,title').eq('active',true).eq('created_by', user.id).neq('status','cancelled').order('created_at',{ascending:false}).limit(1)
     if (!evs?.length) { setBusy(null); showToast("Crée d'abord TON event (🎟️) puis relance", C.orange); return }
     const ev = evs[0]
-    const { data: botRows } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id', user.id).limit(3)
+    const { data: botRows } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true).neq('id', user.id).limit(3)
     const botIds = (botRows||[]).map((b:any)=>b.id)
     if (!botIds.length) { setBusy(null); showToast('Aucun bot — génère-en', C.orange); return }
     let n=0; let lastErr=''
@@ -6110,7 +6117,7 @@ function BotLab({ user, onClose, showToast }:{ user:any; onClose:()=>void; showT
     if (!evs?.length) { setBusy(null); showToast(`${bot.name} n'a aucun event actif (crée-en un 🎟️)`, C.orange); return }
     const ev = evs[0]
     await supabase.from('events').update({ active:false, status:'cancelled' }).eq('id', ev.id)
-    const { data:p } = await supabase.from('profiles').select('reliability_score').eq('id', bot.id).maybeSingle()
+    const { data:p } = await supabase.from(PROFILES_READ).select('reliability_score').eq('id', bot.id).maybeSingle()
     await supabase.from('profiles').update({ reliability_score: Math.max(0,((p as any)?.reliability_score??100)-10) }).eq('id', bot.id)
     setBusy(null); showToast(`🚫 ${bot.name} a annulé "${ev.title}" → inscrits libérés, ${bot.name} pénalisé`, C.orange); load()
   }
@@ -6781,7 +6788,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       .then(async ({data}) => {
         if (!data?.length) return
         const ids = data.map((d:any) => d.profile_id)
-        const {data:profiles} = await supabase.from('profiles').select('*').in('id', ids)
+        const {data:profiles} = await supabase.from(PROFILES_READ).select('*').in('id', ids)
         if (profiles) setFavorites(profiles)
       })
     // Charger bloqués
@@ -6789,7 +6796,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       .then(async ({data}) => {
         if (!data?.length) return
         const ids = data.map((d:any) => d.blocked_id)
-        const {data:profiles} = await supabase.from('profiles').select('*').in('id', ids)
+        const {data:profiles} = await supabase.from(PROFILES_READ).select('*').in('id', ids)
         if (profiles) setBlocked(profiles)
       })
   }, [user.id])
@@ -6810,14 +6817,14 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
       payload.gender = genderDbVal
       // NOTE: has_kids / kids_ages n'existent pas encore en DB → ne pas inclure
       // TODO: ajouter ces colonnes dans Supabase quand Mode Amitié sera implémenté
-      const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().maybeSingle()
+      const {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select('id').maybeSingle()
       setSavingEdit(false)
       if (error || !data) {
         // Erreur (colonne inconnue) OU 0 ligne (profil absent/RLS) → retry minimal + upsert fallback (ne jamais perdre la sauvegarde en silence)
         if (error) console.warn('[Profile] save error:', error.message)
         const {data:d2} = await supabase.from('profiles').update({
           name:payload.name, bio:payload.bio, gender:genderDbVal
-        }).eq('id',user.id).select().maybeSingle()
+        }).eq('id',user.id).select('id').maybeSingle()
         if (!d2) { await supabase.from('profiles').upsert({ id:user.id, name:payload.name, bio:payload.bio, gender:genderDbVal }) }
         const merged = {...user, ...(d2||{}), gender: genderDbVal, languages: editLanguages, name: payload.name, bio: payload.bio}
         onUserUpdate(merged as Profile); setEditing(false); showToast('✓ Profile updated',C.green)
@@ -6846,7 +6853,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert:true, contentType: file.type||undefined })
     if (error) { showToast('Erreur upload : '+error.message, C.red); return }
     const { data:{ publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-    const { data, error: upErr } = await supabase.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id).select().maybeSingle()
+    const { data, error: upErr } = await supabase.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id).select('id').maybeSingle()
     if (!upErr && (!data)) {
       // 0 ligne modifiée (ligne profiles absente/RLS) → upsert fallback pour ne jamais perdre la photo en silence
       await supabase.from('profiles').upsert({ id: user.id, photo_url: publicUrl })
@@ -8968,7 +8975,7 @@ function ProximityRadar({ verrou, userId, lang, onClick, onCheckin, onTerminer, 
                     try { localStorage.setItem(ackKey,'1') } catch {}
                     // Malus fiabilité léger (-3 pts)
                     try {
-                      const {data:prof} = await sb?.from('profiles').select('reliability_score').eq('id',userId).single()
+                      const {data:prof} = await sb?.from(PROFILES_READ).select('reliability_score').eq('id',userId).single()
                       const cur = prof?.reliability_score ?? 100
                       await sb?.from('profiles').update({reliability_score:Math.max(0,cur-3)}).eq('id',userId)
                     } catch {}
@@ -9244,9 +9251,9 @@ function SetupWizard({user, onDone, showToast, isPreview}:{user:Profile; onDone:
       available_city: city||'Lausanne',
     }
     // update + fallback upsert si la ligne profil n'existe pas encore (bug Supabase .update() silencieux)
-    let {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select().maybeSingle()
+    let {data, error} = await supabase.from('profiles').update(payload).eq('id',user.id).select('id').maybeSingle()
     if (!error && !data) {
-      const up = await supabase.from('profiles').upsert({ id:user.id, ...payload }).select().maybeSingle()
+      const up = await supabase.from('profiles').upsert({ id:user.id, ...payload }).select('id').maybeSingle()
       data = up.data; error = up.error
     }
     setSaving(false)
@@ -9458,7 +9465,7 @@ export default function App2() {
     if(!user?.id) return
     const slots = (myAvail||[]).filter((s:any)=>s.lat!=null && s.lng!=null)
     if(!slots.length){ showToast('Ouvre au moins 1 créneau (avec lieu), puis génère',C.orange); return }
-    const { data: bots } = await supabase.from('profiles').select('id').eq('is_bot',true).limit(40)
+    const { data: bots } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true).limit(40)
     const botIds = (bots||[]).map((b:any)=>b.id)
     if(!botIds.length){ showToast('Crée d\'abord des bots dans le Test Lab',C.orange); return }
     const hhmm=(ms:number)=>{const d=new Date(ms);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
@@ -10030,7 +10037,7 @@ export default function App2() {
   useEffect(() => {
     supabase.auth.getSession().then(async({data:{session}}) => {
       if (session?.user) {
-        const {data:p} = await supabase.from('profiles').select('*').eq('id',session.user.id).single()
+        const {data:p} = await supabase.from(PROFILES_READ).select('*').eq('id',session.user.id).single()
         if (p) {
           setUser(p); setAuthTarget('main')
           // Skip onboarding si déjà disponible au refresh — va direct aux présences
@@ -10068,7 +10075,7 @@ export default function App2() {
     const nowIso = new Date().toISOString()
     const {data:bd} = await supabase.from('blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
     const bids = (bd||[]).map((b:any) => b.blocker_id===user.id?b.blocked_id:b.blocker_id)
-    let q = supabase.from('profiles').select('*').neq('id',user.id).neq('is_banned',true).eq('is_available',true).or(`available_until.is.null,available_until.gt.${nowIso}`)
+    let q = supabase.from(PROFILES_READ).select('*').neq('id',user.id).neq('is_banned',true).eq('is_available',true).or(`available_until.is.null,available_until.gt.${nowIso}`)
     bids.forEach((bid:string) => { q=q.neq('id',bid) })
     const {data, error} = await q
     if (!error && data) {
@@ -10112,7 +10119,7 @@ export default function App2() {
     const { data } = await supabase.from('favorites').select('profile_id').eq('user_id', user.id)
     const ids = (data||[]).map((d:any)=>d.profile_id)
     if(!ids.length){ setFavProfiles([]); return }
-    const { data: profs } = await supabase.from('profiles').select('*').in('id', ids)
+    const { data: profs } = await supabase.from(PROFILES_READ).select('*').in('id', ids)
     setFavProfiles(((profs||[]) as any[]).map(enrichProfile))
   },[user?.id])
   useEffect(()=>{ loadFavorites() },[loadFavorites])
@@ -10259,7 +10266,7 @@ export default function App2() {
       const reqIds = [...new Set(incoming.map((i:any)=>i.user_id))]
       let profMap = new Map<string,any>()
       if (reqIds.length) {
-        const { data } = await supabase.from('profiles').select('id,name,photo_url').in('id', reqIds)
+        const { data } = await supabase.from(PROFILES_READ).select('id,name,photo_url').in('id', reqIds)
         profMap = new Map((data||[]).map((p:any)=>[p.id,p]))
       }
       const incomingByEv = new Map<string,any[]>()
@@ -10590,7 +10597,7 @@ export default function App2() {
         event:'INSERT', schema:'public', table:'clutches',
         filter:`receiver_id=eq.${uid}`,
       }, async payload => {
-        const {data:sender} = await supabase.from('profiles').select('*').eq('id',payload.new.sender_id).single()
+        const {data:sender} = await supabase.from(PROFILES_READ).select('*').eq('id',payload.new.sender_id).single()
         // Auto-decline if receiver already has an active confirmed Clutch
         const activeThresh = new Date(Date.now() - 3*3600*1000).toISOString()
         const {data:alreadyLocked} = await supabase.from('clutches')
@@ -10964,7 +10971,7 @@ export default function App2() {
       pref_age_min: parseInt(ageMin) || 18,
       pref_age_max: ageMax === '65+' ? 99 : (parseInt(ageMax) || 99),
       ...(intentMsg ? {bio:intentMsg} : {}),
-    } as any).eq('id',user.id).select()
+    } as any).eq('id',user.id).select('id')
 
     if (error) {
       // 🛡️ Le trigger serveur de modération a rejeté → message bienveillant (pas une erreur technique).
@@ -13833,7 +13840,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
 
   useEffect(()=>{ const h=()=>setOpen(true); window.addEventListener('clutch:open-testlab',h); return ()=>window.removeEventListener('clutch:open-testlab',h) },[])
   const loadBots=async()=>{
-    const { data } = await supabase.from('profiles').select('id,name,age,gender,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
+    const { data } = await supabase.from(PROFILES_READ).select('id,name,age,gender,is_available,available_until,center_lat,center_lng,available_radius_km').eq('is_bot',true).order('name')
     const arr=((data as any[])||[])
     // 🔧 FIX David 02.07 : NE dédoublonner QUE les bots ORIGINAUX (Sophie, Anaïs…). Les bots créés (marqueur 🤖)
     //    sont des profils DISTINCTS même s'ils partagent un prénom → on les garde TOUS (sinon « 15 créés → 7 affichés »).
@@ -13860,9 +13867,9 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null)
   }
   const allOnline=async()=>{ setBusy('on'); try{
-    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const { data: me } = await supabase.from(PROFILES_READ).select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true); const rows=((bs as any[])||[])
+    const { data: bs } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true); const rows=((bs as any[])||[])
     let n=0
     for(let i=0;i<rows.length;i++){
       const durH=2+(i%5), rad=5+(i%4)*5
@@ -13880,7 +13887,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const ONLINE_STARTS:[string,string,number][] = [['now','Maintenant',0],['30','+30 min',30],['1h','+1h',60],['2h','+2h',120],['soir','Ce soir 19h',-1]]
   const startEpoch=(k:string)=>{ if(k==='soir'){ const d=new Date(); d.setHours(19,0,0,0); if(d.getTime()<Date.now()) d.setDate(d.getDate()+1); return d.getTime() } const m=(ONLINE_STARTS.find(s=>s[0]===k)?.[2])||0; return Date.now()+m*60000 }
   const setBotOnlineAt=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('onlineat'); try{
-    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const { data: me } = await supabase.from(PROFILES_READ).select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
     const s=startEpoch(onlineStart)
     const { data, error } = await supabase.rpc('admin_set_availability',{ p_actor:botId, p_from:new Date(s).toISOString(), p_until:new Date(s+onlineDur*3600e3).toISOString(), p_lat:lat, p_lng:lng, p_radius:10 })
@@ -13898,9 +13905,9 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const hhmmOf=(ms:number)=> new Date(ms).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
   // 🛡️ RPC GARDÉE admin_create_clutch. AVANT : si le bot n'est pas dispo, on le met en ligne près de moi → puis RDV DANS sa fenêtre.
   const clutchToMe=async(fromId:string)=>{ if(!fromId){ showToast('Choisis un bot',C.orange); return } setBusy('c2me'); try{
-    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const { data: me } = await supabase.from(PROFILES_READ).select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
-    const { data: b } = await supabase.from('profiles').select('available_from,available_until,is_available').eq('id',fromId).maybeSingle()
+    const { data: b } = await supabase.from(PROFILES_READ).select('available_from,available_until,is_available').eq('id',fromId).maybeSingle()
     let from=(b as any)?.available_from ? new Date((b as any).available_from).getTime() : 0
     let until=(b as any)?.available_until ? new Date((b as any).available_until).getTime() : 0
     const live=(b as any)?.is_available && until>Date.now()
@@ -13929,9 +13936,9 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const havKm=(aLat:number,aLng:number,bLat:number,bLng:number)=>{ const R=6371,dLa=(bLat-aLat)*Math.PI/180,dLo=(bLng-aLng)*Math.PI/180; const s=Math.sin(dLa/2)**2+Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLo/2)**2; return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)) }
   const loadSeen=async(botId:string)=>{
     let b:any = bots.find(x=>x.id===botId)
-    if(b?.center_lat==null){ const { data } = await supabase.from('profiles').select('center_lat,center_lng,available_radius_km').eq('id',botId).maybeSingle(); b={...b,...(data||{})} }
+    if(b?.center_lat==null){ const { data } = await supabase.from(PROFILES_READ).select('center_lat,center_lng,available_radius_km').eq('id',botId).maybeSingle(); b={...b,...(data||{})} }
     const lat=b?.center_lat, lng=b?.center_lng, rad=b?.available_radius_km||10, now=Date.now()
-    const { data } = await supabase.from('profiles').select('id,name,is_bot,gender,age,center_lat,center_lng,available_until').eq('is_available',true).neq('id',botId)
+    const { data } = await supabase.from(PROFILES_READ).select('id,name,is_bot,gender,age,center_lat,center_lng,available_until').eq('is_available',true).neq('id',botId)
     const rows=((data as any[])||[]).filter(p=>p.available_until && new Date(p.available_until).getTime()>now)
       .map(p=>({ ...p, km:(lat!=null&&p.center_lat!=null)?havKm(lat,lng,p.center_lat,p.center_lng):null }))
       .filter(p=> p.km==null || p.km<=Math.max(rad,1)+0.05).sort((a,b)=>(a.km??999)-(b.km??999))
@@ -13945,7 +13952,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   const eventDemands=async(botId:string)=>{ if(!botId){ showToast('Choisis un bot',C.orange); return } setBusy('ev'); try{
     // 🕐 COHÉRENT : event dans ~1h (pas 20h sorti de nulle part) + on met les bots dispo pour COUVRIR cette heure,
     //    sinon join_event les refuse (dispo↔event). Sans ça « 0 inscrits » — l'incohérence que David voyait.
-    const { data: me } = await supabase.from('profiles').select('center_lat,center_lng').eq('id',userId).maybeSingle()
+    const { data: me } = await supabase.from(PROFILES_READ).select('center_lat,center_lng').eq('id',userId).maybeSingle()
     const lat=(me as any)?.center_lat||46.5197, lng=(me as any)?.center_lng||6.6323
     const startMs=Date.now()+60*60000   // +1h
     const starts=new Date(startMs)
@@ -13953,7 +13960,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     if(error){ showToast('❌ '+error.message+' — applique la migration event_rpc_dispo',C.red); note('❌ RPC : '+error.message); setBusy(null); return }
     const r:any=ce; if(!r?.ok){ showToast('🚫 '+(r?.message||''),C.orange); note('🚫 event : '+(r?.message||'')); setBusy(null); return }
     const evId=r.event_id
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true).neq('id',botId); const ids=((bs as any[])||[]).map(b=>b.id)
+    const { data: bs } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true).neq('id',botId); const ids=((bs as any[])||[]).map(b=>b.id)
     // fenêtre dispo qui couvre l'heure de l'event (maintenant → +2h)
     const winFrom=new Date().toISOString(), winUntil=new Date(Date.now()+2*3600e3).toISOString()
     let joined=0, blocked=0
@@ -13966,7 +13973,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   }catch(e:any){ showToast('❌ '+e.message,C.red) } setBusy(null) }
 
   // ── 🌆 VILLE VIVANTE — dynamique aléatoire : les bots vivent tout seuls (comme des amis), vraies données. ──
-  const myCenter=async()=>{ const { data } = await supabase.from('profiles').select('center_lat,center_lng,available_until').eq('id',userId).maybeSingle()
+  const myCenter=async()=>{ const { data } = await supabase.from(PROFILES_READ).select('center_lat,center_lng,available_until').eq('id',userId).maybeSingle()
     const now=Date.now(); const du=(data as any)?.available_until ? new Date((data as any).available_until).getTime() : 0
     // Fenêtre cible pour les bots : ils doivent être actifs MAINTENANT et COUVRIR mon créneau (sinon invisibles).
     const until = du>now+30*60000 ? du : now+4*3600e3
@@ -13976,7 +13983,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
   // Mettre N bots en ligne, chacun avec un créneau/rayon/heure LÉGÈREMENT différents (réaliste, pas tous pareils).
   const putNOnline=async(n:number)=>{ setBusy('non'); try{
     const { lat,lng,until } = await myCenter()
-    const { data: bs } = await supabase.from('profiles').select('id').eq('is_bot',true)
+    const { data: bs } = await supabase.from(PROFILES_READ).select('id').eq('is_bot',true)
     const ids=((bs as any[])||[]).map(b=>b.id).sort(()=>Math.random()-0.5).slice(0,Math.max(1,n))
     let ok=0
     for(const id of ids){
@@ -13992,7 +13999,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
     const acts:string[]=[]
     try{
       const { lat,lng,until } = await myCenter()
-      const { data: bs } = await supabase.from('profiles').select('id,is_available,available_until').eq('is_bot',true)
+      const { data: bs } = await supabase.from(PROFILES_READ).select('id,is_available,available_until').eq('is_bot',true)
       const all=((bs as any[])||[]); if(!all.length){ note('🌆 Aucun bot — tape « ➕ bots » d\'abord'); return }
       const now=Date.now()
       let on=all.filter(b=>b.is_available && b.available_until && new Date(b.available_until).getTime()>now)
@@ -14016,7 +14023,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           if((data as any)?.ok) acts.push(`🤝 ${nameOf(a.id)}→${nameOf(b.id)}`) } }
       // 4) des bots te clutchent — SAUF si ta boîte est pleine (INBOX_FULL) → on le DIT
       const { count } = await supabase.from('clutches').select('id',{count:'exact',head:true}).eq('receiver_id',userId).eq('status','pending')
-      const { data: meP } = await supabase.from('profiles').select('max_received_clutchs').eq('id',userId).maybeSingle()
+      const { data: meP } = await supabase.from(PROFILES_READ).select('max_received_clutchs').eq('id',userId).maybeSingle()
       const cap=(meP as any)?.max_received_clutchs ?? 5
       if((count??0)>=cap){ acts.push(`📥 ta boîte est pleine (${count}/${cap}) → accepte/refuse pour en recevoir`) }
       else if(on.length){
@@ -14026,7 +14033,7 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
         const elig=on.filter(b=>!busy.has(b.id))
         const nC=Math.min(elig.length, cap-(count??0), 1+(Math.random()<.5?1:0))
         for(const b of elig.sort(()=>Math.random()-0.5).slice(0,Math.max(0,nC))){
-          const { data: bp } = await supabase.from('profiles').select('available_from,available_until').eq('id',b.id).maybeSingle()
+          const { data: bp } = await supabase.from(PROFILES_READ).select('available_from,available_until').eq('id',b.id).maybeSingle()
           const f=(bp as any)?.available_from?new Date((bp as any).available_from).getTime():now, u=(bp as any)?.available_until?new Date((bp as any).available_until).getTime():until
           const rdv=coherentRdv(f,u)
           const { data,error } = await supabase.rpc('admin_create_clutch',{ p_actor:b.id, p_receiver:userId, p_venue:'Lausanne', p_proposed_time:new Date(rdv).toISOString(), p_venue_lat:lat, p_venue_lng:lng, p_message:`Un verre ? — ${nameOf(b.id)}` })

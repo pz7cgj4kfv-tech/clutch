@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f9'  // ~324e version
-const BUILD = 245   // build Apple
+const V = '0x1fa'  // ~325e version
+const BUILD = 246   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -646,6 +646,15 @@ const DAYPART_META: Record<string,{fr:string;en:string;emoji:string}> = {
   matin:{fr:'Ce matin',en:'Morning',emoji:'☀️'}, aprem:{fr:'Aprèm',en:'Afternoon',emoji:'🌤️'},
   soir:{fr:'Ce soir',en:'Tonight',emoji:'🌙'}, nuit:{fr:'Cette nuit',en:'Late',emoji:'🌌'},
 }
+// 🎟️ ICÔNE PAR TYPE D'ÉVÉNEMENT (David 02.07 : « l'icône = le type d'event, couleur pétante »). Dérivée du titre.
+const EVENT_ICONS: [RegExp,string][] = [
+  [/yoga|médit|medit|zen|pilates/i,'🧘'], [/padel|tennis|foot|basket|sport|gym|fitness/i,'🏓'],
+  [/run|course|jog|marche|rando|hike|vélo|velo|bike/i,'🏃'], [/apéro|apero|verre|bar|drink/i,'🍹'],
+  [/café|cafe|brunch|coffee/i,'☕'], [/dîner|diner|resto|repas|dinner|lunch/i,'🍽️'],
+  [/concert|musique|music|dj|danse|dance|club/i,'🎵'], [/jass|jeu|cartes|game|quiz/i,'🃏'],
+  [/ciné|cinema|film|movie/i,'🎬'], [/expo|musée|musee|culture|art/i,'🎨'],
+]
+const eventIcon = (title?:string):string => { const t=title||''; for(const [re,ic] of EVENT_ICONS) if(re.test(t)) return ic; return '🎉' }
 // 🎭 MOODS (contexte du créneau, soft — V1 : 6 max, décidé avec GPT). e=emoji, fr/en=label.
 const MOOD_OPTS: {k:string;e:string;fr:string;en:string}[] = [
   {k:'cafe',e:'☕',fr:'Café',en:'Coffee'}, {k:'balade',e:'🚶',fr:'Balade',en:'Walk'}, {k:'apero',e:'🍷',fr:'Apéro',en:'Drinks'},
@@ -3432,7 +3441,7 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
   const PARTNERS_MOCK = labClean() ? [] : PARTNERS_ALL
   const partnerEvents = dbEvents.length > 0 ? dbEvents.map(e => ({
     id: e.id,
-    emoji: e.emoji || '🎉',
+    emoji: (e.emoji && e.emoji!=='🎟️' && e.emoji!=='📅') ? e.emoji : eventIcon(e.title),  // 🎟️ icône = type d'event (David 02.07)
     title: e.title,
     creator: e.creator,
     created_by: e.created_by,
@@ -10057,9 +10066,9 @@ export default function App2() {
       const real = data.map(enrichProfile)
       // Badge 🔒 événement : marquer les profils qui hébergent un événement actif
       try {
-        const { data: evs } = await supabase.from('events').select('id,created_by,emoji').eq('active',true).not('created_by','is',null)
+        const { data: evs } = await supabase.from('events').select('id,created_by,emoji,title').eq('active',true).not('created_by','is',null)
         const hostMap = new Map((evs||[]).map((e:any)=>[e.created_by, e]))
-        real.forEach((p:any)=>{ const e:any = hostMap.get(p.id); if(e){ p._hasEvent=true; p._eventId=e.id; p._eventEmoji=e.emoji||'📅' } })
+        real.forEach((p:any)=>{ const e:any = hostMap.get(p.id); if(e){ p._hasEvent=true; p._eventId=e.id; p._eventTitle=e.title; p._eventEmoji=eventIcon(e.title) } })
       } catch {}
       // Lapins : personnes à qui J'AI mis un "absent" (no-show) → masquées des présences pendant 48h (cooldown, pas à vie : une erreur/imprévu ne doit pas bannir quelqu'un définitivement — cf audit confiance)
       try {
@@ -10087,6 +10096,21 @@ export default function App2() {
       setProfiles(shown)
     }
   },[user?.id])
+
+  // ⭐ FAVORIS (David 02.07 : « ça marche pas ») — charge les gens que J'AI mis en favori (table favorites) pour l'onglet Favoris + badge nav.
+  const [favProfiles,setFavProfiles] = useState<any[]>([])
+  const loadFavorites = useCallback(async()=>{ if(!user?.id) return
+    const { data } = await supabase.from('favorites').select('profile_id').eq('user_id', user.id)
+    const ids = (data||[]).map((d:any)=>d.profile_id)
+    if(!ids.length){ setFavProfiles([]); return }
+    const { data: profs } = await supabase.from('profiles').select('*').in('id', ids)
+    setFavProfiles(((profs||[]) as any[]).map(enrichProfile))
+  },[user?.id])
+  useEffect(()=>{ loadFavorites() },[loadFavorites])
+  useEffect(()=>{ if(tab==='contacts') loadFavorites() },[tab, loadFavorites])
+  useEffect(()=>{ if(!showProfileSheet) loadFavorites() },[showProfileSheet, loadFavorites])   // ⭐ reload après avoir favorité dans la fiche
+  useEffect(()=>{ const h=()=>loadFavorites(); window.addEventListener('clutch:refresh',h); return ()=>window.removeEventListener('clutch:refresh',h) },[loadFavorites])
+  const unfavorite = async(pid:string)=>{ try{ await supabase.from('favorites').delete().eq('user_id',user!.id).eq('profile_id',pid) }catch{}; setFavProfiles(prev=>prev.filter(p=>p.id!==pid)) }
 
   // 🛰️ FORTERESSE GPS DYNAMIQUE (Phase 2, #10) — DÉTECTION de dérive (foreground only).
   //    Quand je suis LIVE et que je m'éloigne (>0.7 km) du centre que j'ai publié, on le détecte et on PROPOSE
@@ -12113,9 +12137,9 @@ export default function App2() {
                                   {(p as any)._isGpsTestBot&&<span style={{fontSize:9,fontWeight:900,padding:'2px 7px',borderRadius:8,background:'rgba(34,197,94,.15)',color:'#22C55E',border:'1px solid rgba(34,197,94,.4)',letterSpacing:0.3}}>🛰️ GPS TEST · Morges Gare</span>}
                                   {(p as any)._hasEvent&&(
                                     <span onClick={e=>{e.stopPropagation();setTab('evenements');setOpenEventId((p as any)._eventId||null)}}
-                                      style={{fontSize:12,padding:'1px 5px',borderRadius:6,background:'rgba(235,107,175,.15)',border:'1px solid rgba(235,107,175,.35)',cursor:'pointer'}}
-                                      title="Voir l'événement">
-                                      {(p as any)._eventEmoji||'📅'}
+                                      style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:12.5,fontWeight:800,padding:'2px 8px',borderRadius:9,background:'#EB6BAF',color:'#fff',cursor:'pointer',boxShadow:'0 1px 6px rgba(235,107,175,.5)'}}
+                                      title={`Voir l'événement${(p as any)._eventTitle?` : ${(p as any)._eventTitle}`:''}`}>
+                                      {(p as any)._eventEmoji||'🎉'} <span style={{fontSize:9.5,fontWeight:800}}>{lang==='en'?'event':'event'}</span>
                                     </span>
                                   )}
                                 </div>
@@ -13102,14 +13126,39 @@ export default function App2() {
 
                 return (
                   <div className="fi" style={{position:'fixed',inset:0,bottom:'calc(72px + var(--sab))',background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
-                    {/* Header compact — titre « Mes contacts » retiré (déjà dans la nav du bas), on garde le compte (David : libérer le haut) */}
+                    {/* Header compact */}
                     <div style={{padding:'10px 16px 8px',paddingTop:'calc(var(--sat) + 8px)',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-                      <div style={{fontSize:12.5,fontWeight:700,color:C.white}}>{contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
+                      <div style={{fontSize:12.5,fontWeight:700,color:C.white}}>⭐ {favProfiles.length} {lang==='en'?'favorite'+(favProfiles.length!==1?'s':''):'favori'+(favProfiles.length!==1?'s':'')} · {contactClutches.length} contact{contactClutches.length!==1?'s':''}</div>
                     </div>
 
                     {/* Liste */}
                     <div style={{flex:1,overflowY:'auto',padding:'8px 12px',WebkitOverflowScrolling:'touch' as any}}>
-                      {contactClutches.length === 0 ? (
+                      {/* ⭐ SECTION FAVORIS (David 02.07) : les gens que j'ai mis en favori depuis les présences. En ligne d'abord (classement intelligent). */}
+                      {favProfiles.length>0 && (()=>{
+                        const nowT=Date.now()
+                        const isOn=(p:any)=> !!(p.is_available && (p as any).available_until && new Date((p as any).available_until).getTime()>nowT)
+                        const sorted=[...favProfiles].sort((a,b)=> (isOn(b)?1:0)-(isOn(a)?1:0))
+                        return (
+                          <div style={{marginBottom:14}}>
+                            <div style={{fontSize:11,fontWeight:800,color:'#EB6BAF',letterSpacing:'.05em',margin:'2px 2px 8px'}}>⭐ {lang==='en'?'FAVORITES':'FAVORIS'}</div>
+                            {sorted.map((p:any)=>{ const on=isOn(p); return (
+                              <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',background:'rgba(235,107,175,.06)',border:`1px solid rgba(235,107,175,.22)`,borderRadius:14,marginBottom:6}}>
+                                <button onClick={()=>{ setSelProfile(p); setShowProfileSheet(true) }} style={{display:'flex',alignItems:'center',gap:12,flex:1,minWidth:0,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',padding:0}}>
+                                  <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',flexShrink:0,border:`2px solid ${on?C.green:'rgba(235,107,175,.3)'}`,background:'rgba(235,107,175,.15)',position:'relative'}}>
+                                    {p.photo_url?<img src={p.photo_url} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/>:<div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:C.white}}>{(p.name||'?')[0]?.toUpperCase()}</div>}
+                                  </div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:14.5,fontWeight:800,color:C.white}}>{p.name||'?'} {p.age?<span style={{fontSize:12,fontWeight:600,color:C.whiteMid}}>{p.age}</span>:null}</div>
+                                    <div style={{fontSize:11,color:on?C.green:C.whiteMid,fontWeight:on?800:500}}>{on?(lang==='en'?'● online now':'● en ligne'):(lang==='en'?'offline':'hors ligne')}</div>
+                                  </div>
+                                </button>
+                                <button onClick={()=>unfavorite(p.id)} title={lang==='en'?'Remove':'Retirer'} style={{background:'transparent',border:'none',color:C.whiteMid,fontSize:18,cursor:'pointer',fontFamily:'inherit',flexShrink:0,padding:'4px 6px'}}>★</button>
+                              </div>
+                            )})}
+                          </div>
+                        )
+                      })()}
+                      {contactClutches.length === 0 && favProfiles.length===0 ? (
                         <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'60vh',gap:12,textAlign:'center',padding:'0 32px'}}>
                           <div style={{fontSize:48,marginBottom:8}}>💬</div>
                           <div style={{fontSize:16,fontWeight:800,color:'#f5e8de'}}>{t2('contacts.empty')}</div>
@@ -13233,7 +13282,7 @@ export default function App2() {
                 // ── PRÉSENCES — pas de chiffre, juste vie/mort ──
                 // Point vert = des gens sont dispo. Pas de nombre (c'est info, pas notif)
                 const presenceBadge: TabBadge = profiles.length > 0 ? {type:'activity'} : null
-                const contactsBadge: TabBadge = contactsUnread > 0 ? {type:'contact-msg', count:contactsUnread} : null
+                const contactsBadge: TabBadge = contactsUnread > 0 ? {type:'contact-msg', count:contactsUnread} : (favProfiles.length>0 ? {type:'contact-msg', count:favProfiles.length} : null)
 
                 return <TabBar tab={tab} set={setTab} lang={lang}
                   badges={{clutchs: clutchBadge, evenements: evBadge, presences: presenceBadge, contacts: contactsBadge}}
@@ -14202,7 +14251,8 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
         </div>
 
         {/* ── ➕ CRÉER / 🗑️ SUPPRIMER LES BOTS ── */}
-        <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <div style={{fontSize:10,color:C.whiteMid,marginTop:10,lineHeight:1.4}}>💡 <b>Créer</b> = fabriquer des profils bots (ils restent, même hors ligne) · <b>Combien en ligne</b> (au-dessus) = combien tu en rends visibles maintenant dans ta zone.</div>
+        <div style={{marginTop:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:11.5,color:C.whiteMid}}>Bots 🤖</span>
           {[5,8,15,30].map(n=>(
             <button key={n} onClick={()=>setNMake(n)} style={{padding:'5px 11px',borderRadius:999,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,border:`1.5px solid ${nMake===n?C.bordeaux:C.border}`,background:nMake===n?C.bordeaux:C.bgCard,color:nMake===n?'#fff':C.white}}>{n}</button>

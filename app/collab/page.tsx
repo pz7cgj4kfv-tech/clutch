@@ -33,6 +33,36 @@ export default function Collab() {
       <span style={{ flexShrink: 0 }}>{bad ? '🚫' : '✅'}</span><div>{children}</div>
     </div>
   )
+  // 📋 Bouton COPIER (David 02.07) : Dom copie le texte du journal sans sélectionner à la souris.
+  const CopyBtn = ({ text }: { text: string }) => {
+    const [done, setDone] = useState(false)
+    return (
+      <button onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1800) } catch {} }}
+        style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: done ? M.green : M.pink, border: 'none', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+        {done ? '✓ Copié' : '📋 Copier le texte'}
+      </button>
+    )
+  }
+  const DlBtn = ({ href, children }: { href: string; children: any }) => (
+    <a href={href} download style={{ fontSize: 12, fontWeight: 800, color: M.plum, background: M.soft, border: `1px solid ${M.border}`, borderRadius: 9, padding: '6px 12px', textDecoration: 'none', display: 'inline-block' }}>{children}</a>
+  )
+  // Texte brut de l'entrée journal Graal 2 (pour le bouton Copier) — auto-suffisant à transférer à Dom.
+  const GRAAL2_TXT = `INTÉGRER TON MOTEUR GRAAL 2 (Antigravity) DANS CLUTCH — 02.07.2026
+
+Tu as codé le Graal 2 (faisabilité d'un créneau selon position + temps qui passe, trajet voiture + CFF). Pour l'intégrer proprement, il me faut 5 choses :
+
+1. Le code en JavaScript ou TypeScript (PAS Python — l'app ne peut pas exécuter du Python). Si c'est en Python : donne-moi la LOGIQUE (formules, seuils, tables), je la réécris en TS.
+2. Une FONCTION PURE avec signature claire : entrée = (ma position, la zone/lieu, l'heure du créneau, mode auto/voiture/transit) → sortie = { reachable, travelMinutes, tension 0-10, via }.
+3. La LISTE des critères utilisés + lesquels ont besoin d'un APPEL RÉSEAU (API CFF/Google) vs sont AUTONOMES (formules, zéro réseau).
+4. 10-20 CAS DE TEST « entrée → sortie attendue » que tu as validés (ex : Lausanne→Sion à 14h pour un créneau 15h = reachable ou pas, X min).
+5. Le FICHIER ISOLÉ (jamais dans le repo principal).
+
+CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
+- Idéal = moteur AUTONOME (formules/tables, zéro réseau).
+- Sinon = API publique SANS clé (l'API CFF transport.opendata.ch est gratuite/sans clé = OK).
+- Sinon (Google, clé) = petit proxy serveur à ajouter (à éviter si les formules suffisent).
+
+3 QUESTIONS : (a) langage JS/TS ou Python ? (b) autonome (formules) ou appels API en direct — lesquelles + clé ? (c) peux-tu livrer la fonction isolée + 10-20 cas de test ?`
 
   const TABS: { id: Tab; icon: string; label: string }[] = [
     { id: 'hierarchie', icon: '🏛️', label: 'Hiérarchie' },
@@ -113,7 +143,12 @@ export default function Collab() {
             <Step n={4}>Des <strong>10-20 cas de test</strong> « entrée → sortie attendue » que tu as validés (ex : Lausanne→Sion à 14h pour un créneau 15h = reachable ou pas, X min) → je prouve la parité chez nous.</Step>
             <Step n={5}>Le <strong>fichier isolé</strong> (jamais dans notre repo), comme d'habitude.</Step>
             <Rule>⚠️ Contrainte clé : Clutch = <strong>zéro serveur</strong> + aucune clé secrète dans l'app. Donc l'idéal = un moteur <strong>autonome</strong> (formules/tables, zéro réseau). Sinon : API publique <strong>sans clé</strong> (l'API CFF <code>transport.opendata.ch</code> est gratuite/sans clé = OK). Sinon (Google, clé) : je devrai ajouter un petit proxy serveur — à éviter si le modèle autonome suffit.</Rule>
-            <P style={{ margin: 0 }}>📄 Détail complet + plan d'assemblage (feature flag + parité prouvée, zéro régression) : <strong><code>docs/handoff-dom-graal2.md</code></strong>.</P>
+            <P style={{ margin: 0 }}>📄 Détail complet + plan d'assemblage (feature flag + parité prouvée, zéro régression) ci-dessous en téléchargement.</P>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <CopyBtn text={GRAAL2_TXT} />
+              <DlBtn href="/dom/handoff-dom-graal2.md">⬇️ Brief d'intégration (.md)</DlBtn>
+              <DlBtn href="/dom/spec-dom-moteur-causalite.md">⬇️ Spec du moteur (.md)</DlBtn>
+            </div>
           </Card>
           {/* ▲▲▲ Les entrées plus ANCIENNES restent dessous ▲▲▲ */}
 

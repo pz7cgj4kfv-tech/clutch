@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f6'  // ~321e version
-const BUILD = 242   // build Apple
+const V = '0x1f7'  // ~322e version
+const BUILD = 243   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -970,11 +970,15 @@ function MapLeaflet({ rayon, userPhoto, profiles=[], showPin=false, onReady, onG
         }
         // Verrouiller le centre pendant le zoom (pinch ne déplace pas le curseur)
         const emitCenter = () => { const c2 = lockedCenter || map.getCenter(); onCenterChange?.(c2.lat, c2.lng) }  // 🛰️ centre LIVE → forteresse pin↔GPS
-        map.on('zoomstart', () => { lockedCenter = map.getCenter() })
+        // 🫥 David 02.07 : masquer l'épingle/les markers PENDANT le zoom (ça saute), les réafficher à l'arrêt.
+        //    (Le pan/déplacement n'est PAS concerné — seulement le zoom.)
+        const markerPane = () => map.getPane('markerPane')
+        map.on('zoomstart', () => { lockedCenter = map.getCenter(); const p=markerPane(); if(p){ p.style.transition='opacity .12s'; p.style.opacity='0' } })
         map.on('zoomend',   () => {
           if (lockedCenter) map.panTo(lockedCenter, {animate:false})
           lockedCenter = null
           syncCircle(); emitCenter()
+          const p=markerPane(); if(p) p.style.opacity='1'
         })
         map.on('move', syncCircle)
         map.on('moveend', () => { syncCircle(); emitCenter() })
@@ -9412,6 +9416,13 @@ export default function App2() {
   const [eventHostIds,setEventHostIds] = useState<Set<string>>(new Set()) // 📅 qui a créé un event actif → badge sur l'avatar en Présences (David 30.06)
   const [myAvail,setMyAvail] = useState<any[]>([]) // multi-créneaux : mes créneaux de dispo actifs (max 3)
   const [showSlots,setShowSlots] = useState(false) // feuille « Mes créneaux »
+  const [slotsTab,setSlotsTab] = useState<'active'|'history'>('active')   // 🕓 onglet Actifs / Historique (David 02.07)
+  const [slotHistory,setSlotHistory] = useState<any[]>([])
+  const loadSlotHistory = useCallback(async()=>{ if(!user?.id) return
+    // créneaux passés OU éteints (inactifs) — l'historique « ce qui s'est passé »
+    const nowIso = new Date().toISOString()
+    const { data } = await supabase.from('availabilities').select('*').eq('user_id',user.id).or(`active.eq.false,end_at.lt.${nowIso}`).order('end_at',{ascending:false}).limit(30)
+    setSlotHistory(data||[]) },[user?.id])
   const reloadAvail = useCallback(async()=>{ if(!user?.id) return
     // select('*') → récupère modes/mood SI les colonnes existent (sinon ignorées), sans casser avant la migration.
     const {data}=await supabase.from('availabilities').select('*').eq('user_id',user.id).eq('active',true).gt('end_at',new Date().toISOString()).order('start_at',{ascending:true}); setMyAvail(data||[]) },[user?.id])
@@ -10082,7 +10093,16 @@ export default function App2() {
       navigator.geolocation.getCurrentPosition(pos => {
         if (cancelled) return
         const km = haversineKm(driftPubLat, driftPubLng, pos.coords.latitude, pos.coords.longitude)
-        setGpsDrift(km > 0.7 ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
+        // 🏰 FORTERESSE-AWARE (David 02.07) : on n'alerte PLUS sur « pin ≠ GPS » (pinner loin exprès est légitime).
+        //    On alerte SEULEMENT si ma zone est INJOIGNABLE pour l'heure de mon prochain créneau (le moteur décide).
+        const slot = myAvail[0]   // le créneau le plus tôt (myAvail est trié)
+        const radius = (slot?.radius_km ?? (user as any)?.available_radius_km ?? 5)
+        const startMs = slot?.start_at ? new Date(slot.start_at).getTime() : Date.now()
+        const leadMin = Math.max(0, (startMs - Date.now())/60000)
+        const reach = foReachKm(leadMin)           // ce que je peux couvrir d'ici le début du créneau
+        const inZone = km <= radius + 0.1          // je suis déjà dans ma zone → RAS
+        const reachable = km <= reach + radius     // je peux y arriver à temps → RAS (même si loin)
+        setGpsDrift((!inZone && !reachable) ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
       }, () => {}, { enableHighAccuracy:false, timeout:8000, maximumAge:60000 })
     }
     sample()
@@ -10090,7 +10110,7 @@ export default function App2() {
     document.addEventListener('visibilitychange', onVis)
     const t = setInterval(sample, 90_000)   // foreground only, échantillon doux (batterie)
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
-  }, [availableRef, screen, driftPubLat, driftPubLng]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [availableRef, screen, driftPubLat, driftPubLng, myAvail]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recalage EN 1 TAP de ma zone publiée sur ma position actuelle (override visible — jamais auto-silencieux).
   const recenterMyZone = async () => {
@@ -13316,9 +13336,34 @@ export default function App2() {
                   <div style={{fontSize:16,fontWeight:900,color:C.white}}>📍 {lang==='en'?'My slots':'Mes créneaux'} <span style={{color:C.whiteMid,fontWeight:700,fontSize:13}}>{myAvail.length}/3</span></div>
                   <button onClick={()=>setShowSlots(false)} style={{background:'none',border:'none',color:C.whiteMid,fontSize:24,cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>×</button>
                 </div>
-                <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:12}}>{lang==='en'?'When and where you\'re open to spontaneous meetups (next 18h).':'Quand et où tu es ouvert·e aux rencontres spontanées (dans les 18h).'}</div>
-                {myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
-                {[...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any, slotIdx:number)=>{
+                <div style={{fontSize:11.5,color:C.whiteMid,marginBottom:10}}>{lang==='en'?'When and where you\'re open to spontaneous meetups (next 18h).':'Quand et où tu es ouvert·e aux rencontres spontanées (dans les 18h).'}</div>
+                {/* 🕓 Onglets Actifs / Historique (David 02.07) */}
+                <div style={{display:'flex',gap:6,marginBottom:12}}>
+                  {(['active','history'] as const).map(tk=>(
+                    <button key={tk} onClick={()=>{ setSlotsTab(tk); if(tk==='history') loadSlotHistory() }} style={{flex:1,padding:'7px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:800,
+                      border:`1.5px solid ${slotsTab===tk?C.orange:C.border}`, background:slotsTab===tk?C.orange:C.bgCard, color:slotsTab===tk?'#fff':C.whiteMid}}>
+                      {tk==='active'?(lang==='en'?'Active':'Actifs'):(lang==='en'?'History':'Historique')}
+                    </button>
+                  ))}
+                </div>
+                {slotsTab==='history' && (
+                  <div>
+                    {slotHistory.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No past slot yet.':'Aucun créneau passé pour l\'instant.'}</div>}
+                    {slotHistory.map((s:any)=>{ const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
+                      const ended = u.getTime() < Date.now(); const status = ended ? (lang==='en'?'ended':'terminé') : (lang==='en'?'turned off':'éteint')
+                      return (
+                        <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,marginBottom:6,background:C.bgCard,opacity:.85}}>
+                          <span style={{fontSize:14}}>{ended?'🌙':'⚪️'}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12.5,fontWeight:700,color:C.white}}>{fmt(f)} → {u.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</div>
+                            <div style={{fontSize:10.5,color:C.whiteMid}}>📍 {s.place||'—'}{s.radius_km!=null?` · ${Math.round(s.radius_km)} km`:''} · {status}</div>
+                          </div>
+                        </div>
+                      ) })}
+                  </div>
+                )}
+                {slotsTab==='active' && myAvail.length===0 && <div style={{color:C.whiteMid,fontSize:13,textAlign:'center',padding:'18px 0'}}>{lang==='en'?'No active slot.':'Aucun créneau actif.'}</div>}
+                {slotsTab==='active' && [...myAvail].sort((a:any,b:any)=>new Date(a.start_at).getTime()-new Date(b.start_at).getTime()).map((s:any, slotIdx:number)=>{
                   const slotCol = SLOT_COLORS[slotIdx % SLOT_COLORS.length]   // 🎨 couleur du créneau 1/2/3
                   const f=new Date(s.start_at), u=new Date(s.end_at); const fmt=(d:Date)=>d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})
                   // Rayon affiché : celui du créneau (fallback profil). + 📉 effectif DYNAMIQUE pour un créneau À VENIR
@@ -13331,7 +13376,10 @@ export default function App2() {
                     <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'11px 12px',borderRadius:12,border:`1px solid ${slotCol}55`,borderLeft:`4px solid ${slotCol}`,marginBottom:8,background:C.bgCard}}>
                       <span style={{width:9,height:9,borderRadius:'50%',background:slotCol,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{fmt(f)}–{fmt(u)} <span style={{fontSize:10,fontWeight:800,color:slotCol}}>· {lang==='en'?'Slot':'Créneau'} {slotIdx+1}</span></div>
+                        {/* ▶️ EN COURS (David 02.07) : si le début est passé, on affiche « maintenant → fin · en cours », pas 06:00. */}
+                        {(()=>{ const enCours = startMs<=nowMs && u.getTime()>nowMs; const dispFrom = enCours ? new Date(nowMs) : f; return (
+                          <div style={{fontSize:13.5,fontWeight:800,color:C.white}}>{enCours?(lang==='en'?'now':'maintenant'):fmt(dispFrom)}–{fmt(u)} <span style={{fontSize:10,fontWeight:800,color:slotCol}}>· {lang==='en'?'Slot':'Créneau'} {slotIdx+1}</span>{enCours && <span style={{fontSize:9.5,fontWeight:800,color:C.green,marginLeft:5}}>· {lang==='en'?'live':'en cours'}</span>}</div>
+                        ) })()}
                         <div style={{fontSize:11,color:C.whiteMid,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {s.place||'—'}{setRad!=null?` · ${Math.round(setRad)} km`:''}{shrunk?<span style={{color:C.bordeaux,fontWeight:700}}> · ↓ {fmtKm(effRad!)} maintenant</span>:''}</div>
                         {/* 🎭 Badges mode + mood DU CRÉNEAU (décision 28.06 : chaque créneau porte son intention) */}
                         {(Array.isArray(s.modes)&&s.modes.length>0)||s.mood ? (

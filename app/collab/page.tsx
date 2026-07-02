@@ -5,14 +5,15 @@
 // Règle d'or : un seul détenteur du code (David) ; on n'y touche jamais à distance.
 // Page isolée, zéro import de l'app → zéro risque runtime.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'   // 🧱 UNIQUEMENT pour le mur d'équipe (table collab_log, RLS confinée)
 
 const M = {
   studio: '#F4F1F4', white: '#FFFFFF', pink: '#EB6BAF', plum: '#532943', green: '#77BC1F',
   ink: '#1a1418', ink70: '#555', ink40: '#9a9a9a', border: '#E6E3E6', soft: '#FBF7FA',
 }
 
-type Tab = 'hierarchie' | 'dom' | 'mel'
+type Tab = 'hierarchie' | 'dom' | 'mel' | 'mur'
 
 export default function Collab() {
   const [tab, setTab] = useState<Tab>('hierarchie')
@@ -65,10 +66,31 @@ CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
 3 QUESTIONS : (a) langage JS/TS ou Python ? (b) autonome (formules) ou appels API en direct — lesquelles + clé ? (c) peux-tu livrer la fonction isolée + 10-20 cas de test ?`
 
   const TABS: { id: Tab; icon: string; label: string }[] = [
+    { id: 'mur', icon: '🧱', label: 'Mur d\'équipe' },
     { id: 'hierarchie', icon: '🏛️', label: 'Hiérarchie' },
     { id: 'dom', icon: '🛠️', label: 'Dom · dev' },
     { id: 'mel', icon: '🎨', label: 'Mel · design' },
   ]
+
+  // 🧱 MUR D'ÉQUIPE (David ↔ Dom, async) — lecture/écriture sur la table collab_log (RLS confinée : ajout seul).
+  const [wall, setWall] = useState<any[]>([])
+  const [wAuthor, setWAuthor] = useState<string>(() => { try { return localStorage.getItem('collab_author') || '' } catch { return '' } })
+  const [wMsg, setWMsg] = useState('')
+  const [wFile, setWFile] = useState('')
+  const [wBusy, setWBusy] = useState(false)
+  const [wErr, setWErr] = useState('')
+  const loadWall = async () => { try { const { data } = await supabase.from('collab_log').select('*').order('created_at', { ascending: false }).limit(200); setWall(data || []) } catch {} }
+  useEffect(() => { if (tab === 'mur') loadWall() }, [tab])
+  const postWall = async () => {
+    if (!wAuthor.trim() || !wMsg.trim()) { setWErr('Mets ton nom et un message.'); return }
+    setWBusy(true); setWErr('')
+    try { localStorage.setItem('collab_author', wAuthor.trim()) } catch {}
+    const role = /dom/i.test(wAuthor) ? 'dom' : /david|saugy/i.test(wAuthor) ? 'david' : /claude/i.test(wAuthor) ? 'claude' : null
+    const { error } = await supabase.from('collab_log').insert({ author: wAuthor.trim(), role, message: wMsg.trim(), file_url: wFile.trim() || null })
+    if (error) { setWErr(error.message.includes('collab_log') || error.code === '42P01' ? 'Le mur n\'est pas encore activé en base (applique la migration 20260702_collab_wall).' : error.message) }
+    else { setWMsg(''); setWFile(''); loadWall() }
+    setWBusy(false)
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: M.studio, fontFamily: 'ui-sans-serif,system-ui,-apple-system,sans-serif', color: M.ink }}>
@@ -98,6 +120,46 @@ CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
       </div>
 
       <div className="cc-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '26px 18px 70px' }}>
+
+        {/* ───────── 🧱 MUR D'ÉQUIPE ───────── */}
+        {tab === 'mur' && <>
+          <h1 style={{ fontSize: 30, fontWeight: 900, color: M.plum, margin: '0 0 6px' }}>🧱 Mur d'équipe</h1>
+          <P>On bosse en <strong>async</strong> : chacun poste ici quand il finit un truc, l'autre lit à sa prochaine ouverture. <strong>Pas besoin de s'appeler.</strong> Claude lit ce mur en début de session et y poste en fin.</P>
+          <div className="no-print" style={{ background: M.white, border: `1px solid ${M.border}`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input value={wAuthor} onChange={e => setWAuthor(e.target.value)} placeholder="Ton nom (Dom / David…)"
+                style={{ flex: '0 0 40%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${M.border}`, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
+              <input value={wFile} onChange={e => setWFile(e.target.value)} placeholder="Lien fichier (optionnel : Drive, WeTransfer…)"
+                style={{ flex: 1, padding: '9px 11px', borderRadius: 9, border: `1px solid ${M.border}`, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+            </div>
+            <textarea value={wMsg} onChange={e => setWMsg(e.target.value)} placeholder="Ton message… (ex : « Graal 2 fini en TS, autonome, 14 cas de test verts — lien ci-dessus »). Tu peux coller du code directement."
+              rows={4} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: `1px solid ${M.border}`, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical' }} />
+            {wErr && <div style={{ fontSize: 12, color: '#c0392b', marginTop: 6 }}>{wErr}</div>}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <button onClick={postWall} disabled={wBusy}
+                style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', background: M.pink, border: 'none', borderRadius: 10, padding: '9px 18px', cursor: 'pointer', fontFamily: 'inherit' }}>{wBusy ? '…' : '📌 Poster sur le mur'}</button>
+              <button onClick={loadWall} style={{ fontSize: 12.5, fontWeight: 700, color: M.plum, background: M.soft, border: `1px solid ${M.border}`, borderRadius: 10, padding: '9px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>↻ Recharger</button>
+              <span style={{ fontSize: 11, color: M.ink40 }}>Append-only : personne ne peut effacer/modifier les messages.</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: M.pink, letterSpacing: '.04em', margin: '2px 0 8px' }}>📜 LE FIL — LE PLUS RÉCENT EN HAUT</div>
+          {wall.length === 0 && <P style={{ color: M.ink40 }}>Rien encore. Poste le premier message ci-dessus. <em>(Si ça n'enregistre pas : la migration <code>20260702_collab_wall.sql</code> n'est pas encore appliquée en base.)</em></P>}
+          {wall.map((m: any) => {
+            const ic = m.role === 'dom' ? '🛠️' : m.role === 'david' ? '👑' : m.role === 'claude' ? '🤖' : '💬'
+            const dt = (() => { try { return new Date(m.created_at).toLocaleString('fr-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' } })()
+            return (
+              <div key={m.id} style={{ background: M.white, border: `1px solid ${M.border}`, borderLeft: `3px solid ${m.role === 'dom' ? M.green : m.role === 'david' ? M.pink : M.plum}`, borderRadius: 12, padding: '12px 15px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <span style={{ fontSize: 15 }}>{ic}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: M.plum }}>{m.author}</span>
+                  <span style={{ fontSize: 11, color: M.ink40, marginLeft: 'auto' }}>{dt}</span>
+                </div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.55, color: M.ink, whiteSpace: 'pre-wrap' }}>{m.message}</div>
+                {m.file_url && <a href={m.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12.5, fontWeight: 700, color: M.pink, textDecoration: 'none' }}>📎 Ouvrir le fichier ↗</a>}
+              </div>
+            )
+          })}
+        </>}
 
         {/* ───────── HIÉRARCHIE ───────── */}
         {tab === 'hierarchie' && <>
@@ -151,6 +213,18 @@ CONTRAINTE CLÉ : Clutch = ZÉRO serveur + aucune clé secrète dans l'app.
             </div>
           </Card>
           {/* ▲▲▲ Les entrées plus ANCIENNES restent dessous ▲▲▲ */}
+
+          {/* 🧱 MARCHE À SUIVRE — le flow async via le Mur d'équipe (David 02.07) */}
+          <Card accent={M.green}>
+            <H>🧱 Comment on bosse ensemble (async, sans s'appeler)</H>
+            <P>On a un <strong>Mur d'équipe</strong> (onglet « 🧱 Mur d'équipe » en haut de cette page). C'est notre boîte à messages partagée : <strong>tu postes, on lit</strong>, chacun à son rythme.</P>
+            <Step n={1}>Quand tu <strong>finis une brique</strong> (ou tu as une question, un blocage) → va sur l'onglet <strong>« 🧱 Mur d'équipe »</strong>, mets ton nom (« Dom »), écris ton message.</Step>
+            <Step n={2}>Ton <strong>fichier</strong> : mets-le sur Drive / WeTransfer / Dropbox et colle le <strong>lien</strong> dans le champ « Lien fichier ». (Ou colle directement le code court dans le message.)</Step>
+            <Step n={3}>Clique <strong>« 📌 Poster sur le mur »</strong>. C'est enregistré, visible par tous. <strong>Personne ne peut effacer</strong> les messages (append-only).</Step>
+            <Step n={4}>Claude <strong>lit le mur au début de chaque session</strong> → il voit ce que tu as posté <strong>avant</strong> de commencer, et te répond en postant à son tour. Pas besoin de s'appeler.</Step>
+            <Rule>Tu écris <strong>UNIQUEMENT</strong> sur ce mur. Tu n'as (et ne dois avoir) <strong>aucun accès</strong> au code de Clutch ni au reste de la base — c'est verrouillé côté serveur. Ta brique se fait depuis la spec, isolée. C'est plus propre et plus sûr.</Rule>
+            <P style={{ margin: 0, fontSize: 12.5, color: M.ink40 }}>Astuce : mets cette page en favori. Recharge-la (bouton ↻) pour voir les nouveaux messages.</P>
+          </Card>
 
           <div style={{ fontSize: 12, fontWeight: 800, color: M.ink40, letterSpacing: '.04em', margin: '18px 0 6px' }}>📌 LA MISSION DE FOND (référence permanente)</div>
 

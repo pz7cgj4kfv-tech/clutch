@@ -19,6 +19,7 @@ import { placeSafety } from '@/lib/place-safety'  // 🛡️ sécurité d'un lie
 import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un clutch (gradient) + moments de la journée
 import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
 import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, evaluateSchedule as foEvaluateSchedule, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
+import { estimateTravelMax as domTravelMax } from '@/lib/travel-estimate'  // 🚗 GRAAL 2 (Dom) — multi-mode voiture/CFF/vélo, prouvé test-travel-estimate 15/15
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -29,8 +30,14 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1fa'  // ~325e version
-const BUILD = 246   // build Apple
+const V = '0x1fb'  // ~326e version
+const BUILD = 247   // build Apple
+
+// 🚗 GRAAL 2 — moteur de trajet de Dom (Antigravity, 02.07). Branché DERRIÈRE UN FLAG (sécurité 1re intégration) :
+//    OFF = comportement inchangé (repli sur foReachKm, le moteur forteresse actuel). ON = la réjoignabilité GPS
+//    utilise l'estimation multi-mode de Dom (voiture/CFF/vélo). Revert instantané = repasser à false.
+//    Prouvé par scripts/test-travel-estimate.mts (15/15). cf lib/travel-estimate.ts.
+const GRAAL2_DOM_LIVE = false
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -10132,9 +10139,20 @@ export default function App2() {
         const radius = (slot?.radius_km ?? (user as any)?.available_radius_km ?? 5)
         const startMs = slot?.start_at ? new Date(slot.start_at).getTime() : Date.now()
         const leadMin = Math.max(0, (startMs - Date.now())/60000)
-        const reach = foReachKm(leadMin)           // ce que je peux couvrir d'ici le début du créneau
         const inZone = km <= radius + 0.1          // je suis déjà dans ma zone → RAS
-        const reachable = km <= reach + radius     // je peux y arriver à temps → RAS (même si loin)
+        let reachable: boolean
+        if (GRAAL2_DOM_LIVE) {
+          // 🚗 GRAAL 2 (Dom) : temps de trajet réel GPS→zone (multi-mode). Réjoignable si j'atteins le BORD
+          //    (radius km avant le centre) à temps. Repli conservateur sur foReachKm si l'estimation échoue.
+          try {
+            const est = domTravelMax({ lat: pos.coords.latitude, lng: pos.coords.longitude }, { lat: driftPubLat, lng: driftPubLng }, new Date(startMs))
+            const edgeFrac = km > 0 ? Math.max(0, (km - radius) / km) : 0   // part du trajet jusqu'au bord de la zone
+            reachable = (est.minutes * edgeFrac) <= leadMin
+          } catch { reachable = km <= foReachKm(leadMin) + radius }
+        } else {
+          const reach = foReachKm(leadMin)         // ce que je peux couvrir d'ici le début du créneau
+          reachable = km <= reach + radius         // je peux y arriver à temps → RAS (même si loin)
+        }
         const unreachable = !inZone && !reachable
         setGpsDrift(unreachable ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
         // 🛰️ BLOCAGE : 2 lectures consécutives injoignables → modal forcé (anti-blip). Reset si redevenu joignable.
@@ -14267,6 +14285,16 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
           <button disabled={busy==='resetmine'} onClick={resetMine} style={{flex:1,padding:'8px 12px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns'}</button>
           {/* 🛰️ Tester le MODAL DE BLOCAGE forteresse (créneau injoignable) sans se déplacer physiquement. */}
           <button onClick={()=>{ try{ window.dispatchEvent(new Event('clutch:foblock-test')) }catch{}; showToast('🛰️ Modal de blocage déclenché',C.orange); note('🛰️ Test blocage : modal « créneau injoignable » ouvert (ouvre un créneau d\'abord pour un vrai test)') }} style={{flex:1,padding:'8px 12px',borderRadius:999,border:`1.5px solid ${C.bordeaux}`,background:C.bgCard,color:C.bordeaux,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🛰️ Tester blocage GPS</button>
+        </div>
+        {/* 🚗 GRAAL 2 (Dom) — voir le moteur de trajet EN DIRECT sur 3 routes tests (Lausanne intra / Lutry ~5km / Sion ~66km). Ne change RIEN, juste une preuve. */}
+        <div style={{display:'flex',gap:8,marginTop:8}}>
+          <button onClick={()=>{
+            const now=new Date(); const gare={lat:46.5197,lng:6.6323}
+            const routes:[string,{lat:number,lng:number}][]=[['Lausanne intra (~180m)',{lat:46.5208,lng:6.6295}],['Lutry (~5km)',{lat:46.5023,lng:6.6853}],['Sion (~66km)',{lat:46.2294,lng:7.3608}]]
+            const lines=routes.map(([lbl,to])=>{ const e=domTravelMax(gare,to,now); return `${lbl} → ${e.minutes} min · ${e.modeUsed} · ${e.confidence}` })
+            const msg='🚗 Moteur de Dom (Graal 2) — depuis Lausanne Gare :\n\n'+lines.join('\n')+`\n\nFlag GRAAL2_DOM_LIVE = ${GRAAL2_DOM_LIVE?'ON (réjoignabilité GPS = Dom)':'OFF (repli forteresse actuel)'}`
+            try{ window.alert(msg) }catch{}; note('🚗 Moteur de Dom testé : '+lines.join(' · '))
+          }} style={{flex:1,padding:'8px 12px',borderRadius:999,border:`1.5px solid ${C.orange}`,background:C.bgCard,color:C.orange,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🚗 Tester le moteur de Dom</button>
         </div>
 
         {/* ── CYCLE DU RDV (une fois un Verrou créé avec ce bot) ── */}

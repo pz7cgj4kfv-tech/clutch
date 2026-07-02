@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f7'  // ~322e version
-const BUILD = 243   // build Apple
+const V = '0x1f8'  // ~323e version
+const BUILD = 244   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9564,6 +9564,10 @@ export default function App2() {
   //    Éthique (audit GPS) : on DÉTECTE auto + on EXPLIQUE, mais le recalage est en 1 tap (jamais de mutation
   //    silencieuse de la position publiée). Foreground only · dernière position seulement · zéro historique.
   const [gpsDrift,setGpsDrift] = useState<{km:number;lat:number;lng:number}|null>(null)
+  // 🛰️ BLOCAGE forteresse (David 02.07) : quand un créneau devient INJOIGNABLE (2 lectures GPS consécutives),
+  //    modal BLOQUANT « Éteindre / Je le garde » — jamais de créneau flottant. Anti-blip via compteur par créneau.
+  const [foBlock,setFoBlock] = useState<any|null>(null)
+  const foBlockRef = useRef<{counts:Record<string,number>; snooze:Record<string,number>}>({counts:{}, snooze:{}})
   const [openEventId,setOpenEventId] = useState<string|null>(null)
   const [userScore,setUserScore] = useState<number|null>(null) // Score local (sync avec DB)
   const [lang,setLang] = useState<Lang>(() => {
@@ -10102,7 +10106,19 @@ export default function App2() {
         const reach = foReachKm(leadMin)           // ce que je peux couvrir d'ici le début du créneau
         const inZone = km <= radius + 0.1          // je suis déjà dans ma zone → RAS
         const reachable = km <= reach + radius     // je peux y arriver à temps → RAS (même si loin)
-        setGpsDrift((!inZone && !reachable) ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
+        const unreachable = !inZone && !reachable
+        setGpsDrift(unreachable ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
+        // 🛰️ BLOCAGE : 2 lectures consécutives injoignables → modal forcé (anti-blip). Reset si redevenu joignable.
+        if (slot?.id) {
+          const R = foBlockRef.current
+          if (unreachable) {
+            const snoozed = R.snooze[slot.id] && (Date.now() - R.snooze[slot.id] < 8*60_000)
+            if (!foBlock && !snoozed) {
+              R.counts[slot.id] = (R.counts[slot.id]||0) + 1
+              if (R.counts[slot.id] >= 2) { R.counts[slot.id] = 0; setFoBlock({ ...slot, _km: km }) }
+            }
+          } else { R.counts[slot.id] = 0 }
+        }
       }, () => {}, { enableHighAccuracy:false, timeout:8000, maximumAge:60000 })
     }
     sample()
@@ -10111,6 +10127,13 @@ export default function App2() {
     const t = setInterval(sample, 90_000)   // foreground only, échantillon doux (batterie)
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
   }, [availableRef, screen, driftPubLat, driftPubLng, myAvail]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 🧪 TEST : déclencher le modal de blocage à la demande (Test Lab) sans avoir à se déplacer physiquement.
+  useEffect(() => {
+    const h = () => { const s = myAvail[0] || { id:'test', place:'Sion', start_at:new Date().toISOString(), end_at:new Date(Date.now()+2*3600e3).toISOString() }; setFoBlock({ ...s, _km: 71 }) }
+    window.addEventListener('clutch:foblock-test', h)
+    return () => window.removeEventListener('clutch:foblock-test', h)
+  }, [myAvail])
 
   // Recalage EN 1 TAP de ma zone publiée sur ma position actuelle (override visible — jamais auto-silencieux).
   const recenterMyZone = async () => {
@@ -13418,6 +13441,26 @@ export default function App2() {
               </div>
             </div>
           )}
+          {/* 🛰️ MODAL BLOQUANT FORTERESSE (David 02.07) : créneau injoignable → choix FORCÉ (jamais de créneau flottant). */}
+          {foBlock && (()=>{ const km=(foBlock as any)._km; const place=foBlock.place||'ta zone'
+            const tISO=foBlock.end_at?new Date(foBlock.end_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}):''
+            return (
+              <div style={{position:'fixed',inset:0,zIndex:9500,background:'rgba(10,4,8,.94)',backdropFilter:'blur(6px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
+                <div style={{maxWidth:360,textAlign:'center'}}>
+                  <div style={{fontSize:42,marginBottom:14}}>🛰️</div>
+                  <div style={{fontSize:18,fontWeight:900,color:C.white,marginBottom:10}}>{lang==='en'?"You can't make this slot anymore":'Tu ne peux plus honorer ce créneau'}</div>
+                  <div style={{fontSize:13,color:C.whiteMid,lineHeight:1.55,marginBottom:22}}>{lang==='en'
+                    ? `The GPS shows you're ~${Math.round(km)} km from ${place}${tISO?` (until ${tISO})`:''} — too far to get there in time. A slot you can't keep lets someone down. What do you want to do?`
+                    : `Le GPS montre que tu es à ~${Math.round(km)} km de ${place}${tISO?` (jusqu'à ${tISO})`:''} — trop loin pour y être à temps. Un créneau qu'on ne peut pas tenir, ça déçoit l'autre. Que veux-tu faire ?`}</div>
+                  <button onClick={async()=>{ try{ if(foBlock.id && foBlock.id!=='test') await removeSlot(foBlock.id) }catch{}; setFoBlock(null); showToast(lang==='en'?'Slot turned off':'Créneau éteint',C.green) }}
+                    style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:C.orange,color:'#fff',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>{lang==='en'?'Turn off this slot':'Éteindre ce créneau'}</button>
+                  <button onClick={()=>{ if(foBlock.id) foBlockRef.current.snooze[foBlock.id]=Date.now(); setFoBlock(null) }}
+                    style={{width:'100%',padding:'13px',borderRadius:16,border:`1.5px solid ${C.border}`,background:'transparent',color:C.whiteMid,fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{lang==='en'?"I'll keep it (I'm heading there)":'Je le garde (j\'y vais)'}</button>
+                  <div style={{fontSize:10,color:`${C.whiteMid}99`,marginTop:12,lineHeight:1.4}}>{lang==='en'?'Kept? We won\'t ask again for a few minutes.':'Gardé ? On ne te redemande pas avant quelques minutes.'}</div>
+                </div>
+              </div>
+            ) })()}
+
           {/* Overlay bloquant feedback — aucune interaction possible tant que feedback non donné */}
           {showFeedback&&feedbackClutch&&<div style={{position:'fixed',inset:0,zIndex:3999,background:'rgba(10,4,8,.92)',backdropFilter:'blur(4px)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}} onClick={e=>e.stopPropagation()}>
             <div style={{padding:'20px 20px 0',textAlign:'center',maxWidth:380}}>
@@ -14129,7 +14172,11 @@ function TestLab({ userId, showToast }: { userId:string; showToast:(m:string,c?:
         <div style={{fontSize:10,color:C.whiteMid,margin:'6px 2px 0',lineHeight:1.4}}>
           <b>♻️ Reset cooldowns</b> = efface tes clutchs + cooldowns (garde les bots) · <b>🧹 Reset total</b> = efface toutes les interactions + remet les bots hors-ligne (les garde) · <b>🗑️ Vider les 🤖</b> = supprime pour de bon les bots créés (garde les originaux).
         </div>
-        <button disabled={busy==='resetmine'} onClick={resetMine} style={{marginTop:8,padding:'8px 14px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns (garde les bots)'}</button>
+        <div style={{display:'flex',gap:8,marginTop:8}}>
+          <button disabled={busy==='resetmine'} onClick={resetMine} style={{flex:1,padding:'8px 12px',borderRadius:999,border:`1.5px solid ${C.border}`,background:C.bgCard,color:C.white,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{busy==='resetmine'?'⏳':'♻️ Reset cooldowns'}</button>
+          {/* 🛰️ Tester le MODAL DE BLOCAGE forteresse (créneau injoignable) sans se déplacer physiquement. */}
+          <button onClick={()=>{ try{ window.dispatchEvent(new Event('clutch:foblock-test')) }catch{}; showToast('🛰️ Modal de blocage déclenché',C.orange); note('🛰️ Test blocage : modal « créneau injoignable » ouvert (ouvre un créneau d\'abord pour un vrai test)') }} style={{flex:1,padding:'8px 12px',borderRadius:999,border:`1.5px solid ${C.bordeaux}`,background:C.bgCard,color:C.bordeaux,fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🛰️ Tester blocage GPS</button>
+        </div>
 
         {/* ── CYCLE DU RDV (une fois un Verrou créé avec ce bot) ── */}
         <div style={{fontSize:11,fontWeight:800,color:C.whiteMid,letterSpacing:'.06em',margin:'18px 0 8px'}}>CYCLE DU RDV — {nameOf(sel).toUpperCase()} (après un Verrou)</div>

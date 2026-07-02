@@ -20,6 +20,7 @@ import { classifySlot, dayParts } from '@/lib/feasibility'  // faisabilité d'un
 import { travelMs as coneTravelMs, earliestCredibleStart, coneTension, radiusAtTension, credibleRadiusKm } from '@/lib/cone'  // 🌀 le Cône (couplage rayon↔heure)
 import { evaluate as foEvaluate, maxRadiusFor as foMaxRadiusFor, reachKm as foReachKm, clampStart as foClampStart, earliestStart as foEarliestStart, latestStart as foLatestStart, evaluateSchedule as foEvaluateSchedule, DEFAULT_LEAD_MIN as FO_DEFAULT_LEAD, MIN_DURATION_MIN as FO_MIN_DUR, HORIZON_H as FO_HORIZON_H } from '@/lib/forteresse-engine'  // 🏰 moteur UNIQUE forteresse (prouvé test-forteresse 26/26)
 import { estimateTravelMax as domTravelMax } from '@/lib/travel-estimate'  // 🚗 GRAAL 2 (Dom) — multi-mode voiture/CFF/vélo, prouvé test-travel-estimate 15/15
+import { foReachable } from '@/lib/forteresse-reach'  // 🏰 réjoignabilité UNIFIÉE (flag OFF=historique · ON=Dom), prouvé test-forteresse-reach 9/9
 // 🚩 Feature flag : le mode « curated » (inscription = demande à valider par l'orga) n'est PAS encore live
 // (le dashboard organisateur = étape 2). Tant que false → tout est auto-accept (comportement actuel, rien ne casse).
 const EVENTS_CURATED_LIVE = false
@@ -30,14 +31,15 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1fb'  // ~326e version
-const BUILD = 247   // build Apple
+const V = '0x1fc'  // ~327e version
+const BUILD = 248   // build Apple
 
-// 🚗 GRAAL 2 — moteur de trajet de Dom (Antigravity, 02.07). Branché DERRIÈRE UN FLAG (sécurité 1re intégration) :
-//    OFF = comportement inchangé (repli sur foReachKm, le moteur forteresse actuel). ON = la réjoignabilité GPS
-//    utilise l'estimation multi-mode de Dom (voiture/CFF/vélo). Revert instantané = repasser à false.
-//    Prouvé par scripts/test-travel-estimate.mts (15/15). cf lib/travel-estimate.ts.
-const GRAAL2_DOM_LIVE = false
+// 🚗 GRAAL 2 — moteur de trajet de Dom (Antigravity, 02.07). RÉJOIGNABILITÉ FORTERESSE branchée dessus.
+//    ON  = la forteresse (dérive/blocage GPS + events) utilise l'estimation multi-mode de Dom (voiture/CFF/vélo).
+//    OFF = retour EXACT à l'ancien modèle isotrope foReachKm (~35 km/h). ⇦ REVERT = remettre `false` ici, 1 seule ligne.
+//    Double-check : scripts/test-forteresse-reach.mts prouve que OFF == ancien modèle (112 combos) + sanité ON.
+//    Toute la logique est centralisée dans lib/forteresse-reach.ts (un seul point de vérité).
+const GRAAL2_DOM_LIVE = true
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -3372,8 +3374,8 @@ function EventsTab({ onClutch:_, registered, setRegistered, waitlist, setWaitlis
     const la = ev?.venue_lat, lo = ev?.venue_lng; if (typeof la!=='number' || typeof lo!=='number') return true
     const evMs = ev?.starts_at ? new Date(ev.starts_at).getTime() : null; if (evMs==null) return true
     const leadMin = (evMs - Date.now())/60000; if (leadMin <= 0) return true   // déjà commencé → on ne juge pas
-    const reach = foReachKm(leadMin)
-    return haversineKm(myGps[0], myGps[1], la, lo) <= reach + 0.5
+    // 🏰 Réjoignabilité UNIFIÉE (flag OFF = historique foReachKm+0.5 · ON = moteur de Dom). Point de vérité unique.
+    return foReachable({ lat: myGps[0], lng: myGps[1] }, { lat: la, lng: lo }, leadMin, 0.5, GRAAL2_DOM_LIVE)
   }
   // Nudge bienveillant « event de groupe » : doux, dismissible, max 1×/semaine, jamais culpabilisant.
   const [nudgeHidden,setNudgeHidden] = useState(()=>{ try{ const ts=localStorage.getItem('nudge_grpev_last'); return ts ? (Date.now()-Number(ts) < 7*86400000) : false }catch{ return false } })
@@ -10139,21 +10141,13 @@ export default function App2() {
         const radius = (slot?.radius_km ?? (user as any)?.available_radius_km ?? 5)
         const startMs = slot?.start_at ? new Date(slot.start_at).getTime() : Date.now()
         const leadMin = Math.max(0, (startMs - Date.now())/60000)
-        const inZone = km <= radius + 0.1          // je suis déjà dans ma zone → RAS
-        let reachable: boolean
-        if (GRAAL2_DOM_LIVE) {
-          // 🚗 GRAAL 2 (Dom) : temps de trajet réel GPS→zone (multi-mode). Réjoignable si j'atteins le BORD
-          //    (radius km avant le centre) à temps. Repli conservateur sur foReachKm si l'estimation échoue.
-          try {
-            const est = domTravelMax({ lat: pos.coords.latitude, lng: pos.coords.longitude }, { lat: driftPubLat, lng: driftPubLng }, new Date(startMs))
-            const edgeFrac = km > 0 ? Math.max(0, (km - radius) / km) : 0   // part du trajet jusqu'au bord de la zone
-            reachable = (est.minutes * edgeFrac) <= leadMin
-          } catch { reachable = km <= foReachKm(leadMin) + radius }
-        } else {
-          const reach = foReachKm(leadMin)         // ce que je peux couvrir d'ici le début du créneau
-          reachable = km <= reach + radius         // je peux y arriver à temps → RAS (même si loin)
-        }
-        const unreachable = !inZone && !reachable
+        // 🏰 Réjoignabilité UNIFIÉE (un seul point de vérité) : flag OFF = modèle historique · ON = moteur de Dom.
+        const reachable = foReachable(
+          { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          { lat: driftPubLat, lng: driftPubLng },
+          leadMin, radius, GRAAL2_DOM_LIVE
+        )
+        const unreachable = !reachable
         setGpsDrift(unreachable ? { km, lat: pos.coords.latitude, lng: pos.coords.longitude } : null)
         // 🛰️ BLOCAGE : 2 lectures consécutives injoignables → modal forcé (anti-blip). Reset si redevenu joignable.
         if (slot?.id) {

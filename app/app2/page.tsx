@@ -31,8 +31,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1fc'  // ~327e version
-const BUILD = 248   // build Apple
+const V = '0x1fd'  // ~328e version
+const BUILD = 249   // build Apple
 
 // 🚗 GRAAL 2 — moteur de trajet de Dom (Antigravity, 02.07). RÉJOIGNABILITÉ FORTERESSE branchée dessus.
 //    ON  = la forteresse (dérive/blocage GPS + events) utilise l'estimation multi-mode de Dom (voiture/CFF/vélo).
@@ -1817,7 +1817,7 @@ const TEST_PROFILE_PREFIXES = [
 function isTestProfile(id: string): boolean { return TEST_PROFILE_PREFIXES.some(p => id.startsWith(p)) }
 // 🤖 Mode Démo (bots/mock visibles) ON par défaut · '0' = Réel (app vide pour tester avec de vrais amis). Lisible partout.
 function demoOn(): boolean { try { return localStorage.getItem('clutch_demo_mode') !== '0' } catch { return true } }
-const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864']
+const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864','bfb0eabf-8982-4e36-a65e-81b51ec4eef6']
 function isAdminId(id?: string | null): boolean { return !!id && ADMIN_IDS.includes(id) }
 // 🧪 « Labo propre » (cockpit) : coupe TOUT le décor codé en dur (mock events + group events démo) pour avoir
 // un terrain de test net = uniquement la vraie base que l'opérateur pilote. Réglé par le cockpit.
@@ -6391,7 +6391,7 @@ function ProfileTab({ user, flow:_flow, setFlow, signOut, setShowDelete, showToa
   const [showConvDemo, setShowConvDemo] = useState(false) // aperçu de la Convergence (demande David)
   const [showMbti, setShowMbti] = useState(false) // test de personnalité 16 types
   const [mbtiType, setMbtiType] = useState<string>(()=>{ try{return localStorage.getItem('clutch_mbti')||''}catch{return ''} })
-  const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864'].includes(user.id)
+  const isAdmin = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864','bfb0eabf-8982-4e36-a65e-81b51ec4eef6'].includes(user.id)
   // 🤖 Mode DÉMO (bots visibles, étiquetés) ↔ RÉEL (app vide, pour tester avec de vrais amis). null = pas réglé → défaut selon admin.
   const [demoMode, setDemoMode] = useState<boolean|null>(()=>{ try{const v=localStorage.getItem('clutch_demo_mode'); return v===null?null:v==='1'}catch{return null} })
   // 🤖 Bots/mock affichés ? Démo (défaut) = oui · Réel = non (app vide pour tester avec de vrais amis). Cohérent avec demoOn().
@@ -9854,7 +9854,7 @@ export default function App2() {
   // 🔧 DEV (admin) : résultat réel de l'envoi push → toast visible (combien de destinataires / erreur).
   // Permet de diagnostiquer les notifs SANS fouiller Supabase (David : « j'en ai marre de chercher »).
   useEffect(() => {
-    const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864']
+    const ADMIN_IDS = ['bad38f3e-87df-40e0-a2d2-75c03b58d72b','409e83dc-dda8-42c3-bb98-3ea900857d35','9626a0ba-037f-49dd-9957-ebd37e58a864','bfb0eabf-8982-4e36-a65e-81b51ec4eef6']
     const onResult = (e: any) => {
       if (!ADMIN_IDS.includes((user as any)?.id)) return
       const d = e?.detail || {}

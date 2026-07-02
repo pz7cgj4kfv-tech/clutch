@@ -98,6 +98,27 @@ export default function Collab() {
         {/* ───────── DOM ───────── */}
         {tab === 'dom' && <>
           <h1 style={{ fontSize: 30, fontWeight: 900, color: M.plum, margin: '0 0 6px' }}>🛠️ Dom — la marche à suivre (dev)</h1>
+
+          {/* 📓 JOURNAL DATÉ — le plus RÉCENT en haut, l'historique dessous (règle David 02.07). */}
+          <div style={{ fontSize: 12, fontWeight: 800, color: M.pink, letterSpacing: '.04em', margin: '10px 0 6px' }}>📓 JOURNAL — LE PLUS RÉCENT EN HAUT</div>
+
+          {/* ▼▼▼ NOUVELLE ENTRÉE À AJOUTER ICI (date + heure au sommet) ▼▼▼ */}
+          <Card accent={M.pink}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: M.ink40, marginBottom: 4 }}>02.07.2026 · 21:44</div>
+            <H>🔗 Intégrer TON moteur Graal 2 (Antigravity) dans Clutch</H>
+            <P>Tu as codé le Graal 2 (faisabilité d'un créneau selon position + temps qui passe, trajet <strong>voiture + CFF</strong>). Bravo — c'est le plus dur. Pour l'intégrer chez nous proprement, il me faut <strong>5 choses</strong> :</P>
+            <Step n={1}>Le code en <strong>JavaScript ou TypeScript</strong> (pas Python — l'app ne peut pas exécuter du Python). Si Antigravity l'a fait en Python : donne-moi <strong>la logique</strong> (formules, seuils, tables), je la réécris en TS.</Step>
+            <Step n={2}>Une <strong>fonction PURE</strong> avec une signature claire : entrée = (ma position, la zone/lieu, l'heure du créneau, mode auto/voiture/transit) → sortie = {'{ reachable, travelMinutes, tension 0-10, via }'}.</Step>
+            <Step n={3}>La <strong>liste des critères</strong> utilisés + lesquels ont besoin d'un <strong>appel réseau</strong> (API CFF/Google en direct) vs sont <strong>auto-suffisants</strong> (formules, zéro réseau).</Step>
+            <Step n={4}>Des <strong>10-20 cas de test</strong> « entrée → sortie attendue » que tu as validés (ex : Lausanne→Sion à 14h pour un créneau 15h = reachable ou pas, X min) → je prouve la parité chez nous.</Step>
+            <Step n={5}>Le <strong>fichier isolé</strong> (jamais dans notre repo), comme d'habitude.</Step>
+            <Rule>⚠️ Contrainte clé : Clutch = <strong>zéro serveur</strong> + aucune clé secrète dans l'app. Donc l'idéal = un moteur <strong>autonome</strong> (formules/tables, zéro réseau). Sinon : API publique <strong>sans clé</strong> (l'API CFF <code>transport.opendata.ch</code> est gratuite/sans clé = OK). Sinon (Google, clé) : je devrai ajouter un petit proxy serveur — à éviter si le modèle autonome suffit.</Rule>
+            <P style={{ margin: 0 }}>📄 Détail complet + plan d'assemblage (feature flag + parité prouvée, zéro régression) : <strong><code>docs/handoff-dom-graal2.md</code></strong>.</P>
+          </Card>
+          {/* ▲▲▲ Les entrées plus ANCIENNES restent dessous ▲▲▲ */}
+
+          <div style={{ fontSize: 12, fontWeight: 800, color: M.ink40, letterSpacing: '.04em', margin: '18px 0 6px' }}>📌 LA MISSION DE FOND (référence permanente)</div>
+
           <P>Tu construis des <strong>modules de code isolés et purs</strong>, tout seul chez toi, <strong>sans accès au code de Clutch</strong>. Tu livres un fichier + ses tests ; on le branche de notre côté. Tu peux utiliser <strong>Antigravity</strong> (l’IDE agentique de Google, à base de Gemini) — ou n’importe quel outil : seul le code livré compte.</P>
 
           <Card accent={M.pink}>

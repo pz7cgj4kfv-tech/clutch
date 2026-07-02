@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f5'  // ~320e version
-const BUILD = 241   // build Apple
+const V = '0x1f6'  // ~321e version
+const BUILD = 242   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -9730,17 +9730,54 @@ export default function App2() {
   //    en TEMPS RÉEL (la fenêtre rétrécit quand l'heure de départ approche). Aucun GPS background : pur recalcul
   //    local de l'espace-temps. Gated à flow==='carte' pour ne rien recalculer ailleurs (batterie/perf).
   const [, setConeTick] = useState(0)
+  // 🔔 Débounce des ALERTES FORTERESSE (David 02.07 : « préviens quand l'algo bouge l'espace/le temps, mais SANS spam »).
+  const foAlertRef = useRef<{ radiusAt:number; lastR:number; endWarnedFor:number; endedFor:number }>({ radiusAt:0, lastR:99, endWarnedFor:0, endedFor:0 })
   useEffect(() => {
     if (flow !== 'carte') return
     // 📉 RÉTRÉCISSEMENT DYNAMIQUE (David) : à chaque tick on re-clamp le rayon au plafond crédible RECALCULÉ
     //    pour MAINTENANT → quand l'heure de départ approche, le rayon diminue tout seul (moins de temps = moins loin).
     const reclamp = () => {
       const maxOk = foMaxRadius()   // 🏰 moteur unique (intègre pin + temps restant)
-      setRayon(r => r > maxOk + 0.05 ? maxOk : r)
+      setRayon(r => {
+        if (r > maxOk + 0.05) {
+          // 🔔 Notif DOUCE si l'algorithme resserre l'espace de façon notable (≥25%), max 1× / 8 min (pas de spam).
+          const now = Date.now()
+          if (r >= maxOk * 1.25 && now - foAlertRef.current.radiusAt > 8*60_000) {
+            foAlertRef.current.radiusAt = now
+            showToast(lang==='fr' ? `⏳ L'heure approche — ta zone se resserre à ~${Math.round(maxOk)} km` : `⏳ Time's closing in — your zone tightened to ~${Math.round(maxOk)} km`, C.salmon)
+          }
+          return maxOk
+        }
+        return r
+      })
     }
     const t = setInterval(() => { setConeTick(x => x + 1); reclamp() }, 30_000)
     return () => clearInterval(t)
-  }, [flow, fromTime, presetWin]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flow, fromTime, presetWin, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 🔔 ALERTES FORTERESSE quand je suis LIVE (hors du flow d'édition) : fin de créneau proche + créneau terminé.
+  //    Arbre de décision (David) : on NE prévient PAS toutes les 2 min → 1 alerte « ~15 min avant la fin »,
+  //    puis 1 alerte « terminé ». Debounce par valeur de available_until (jamais 2× la même).
+  useEffect(() => {
+    const check = () => {
+      const au = (user as any)?.available_until; const avail = (user as any)?.is_available
+      if (!avail || !au) return
+      const endMs = new Date(au).getTime(), now = Date.now(); const minToEnd = (endMs - now)/60000
+      if (minToEnd > 0 && minToEnd <= 15 && foAlertRef.current.endWarnedFor !== endMs) {
+        foAlertRef.current.endWarnedFor = endMs
+        showToast(lang==='fr' ? `⏰ Ton créneau se termine dans ~${Math.max(1,Math.round(minToEnd))} min` : `⏰ Your slot ends in ~${Math.max(1,Math.round(minToEnd))} min`, C.salmon)
+      }
+      if (minToEnd <= 0 && foAlertRef.current.endedFor !== endMs) {
+        foAlertRef.current.endedFor = endMs
+        showToast(lang==='fr' ? '🌙 Ton créneau est terminé — tu n\'es plus visible' : '🌙 Your slot ended — you\'re no longer visible', C.salmon)
+      }
+    }
+    check()
+    const t = setInterval(check, 45_000)
+    const onVis = () => { if (typeof document!=='undefined' && document.visibilityState==='visible') check() }
+    if (typeof document!=='undefined') document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(t); if (typeof document!=='undefined') document.removeEventListener('visibilitychange', onVis) }
+  }, [user, lang]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🏰 FORTERESSE — POINT D'ENTRÉE UNIQUE (29.06). Tout le démarrage passe par CES helpers → un seul calcul,
   //    plus de contradictions. foStartAt = le DÉBUT du créneau (epoch). foEval = le verdict du moteur prouvé.
@@ -11463,7 +11500,10 @@ export default function App2() {
                       {(()=>{ const R15=15*60_000; const s=Math.ceil(Date.now()/R15)*R15; const e=s+18*3600_000
                         const on = !!presetWin && Math.abs(presetWin.from - s) < R15 && Math.abs(presetWin.until - e) < R15
                         return (
-                          <button onClick={()=>{ setPickedMoments([]); setPresetWin({from:s,until:e}); setFromTime(hhmm(s)); setUntilTime(hhmm(e)); if(typeof navigator!=='undefined'&&(navigator as any).vibrate)(navigator as any).vibrate(6) }}
+                          <button onClick={()=>{ setPickedMoments([]); setPresetWin({from:s,until:e}); setFromTime(hhmm(s)); setUntilTime(hhmm(e));
+                            // 🏰 FORTERESSE : « Maintenant » (lead≈0) → rayon clampé à ce qu'on peut RÉELLEMENT atteindre tout de suite (pas 50 km).
+                            const maxR=Math.max(RAYON_MIN_KM,Math.min(RAYON_MAX_KM,foReachKm(Math.max(0,(s-Date.now())/60000)))); setRayon(r=>Math.min(r,maxR));
+                            if(typeof navigator!=='undefined'&&(navigator as any).vibrate)(navigator as any).vibrate(6) }}
                             style={{flexShrink:0,padding:'7px 13px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:on?900:800,whiteSpace:'nowrap',
                               background:on?C.orange:`${C.orange}1e`, color:on?'#fff':C.orange, border:`1.5px solid ${C.orange}${on?'':'66'}`}}>⚡ {lang==='en'?'Now':'Maintenant'}</button>
                         ) })()}

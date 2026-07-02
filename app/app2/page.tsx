@@ -29,8 +29,8 @@ import { CLUTCH_CONFIG } from '@/lib/clutch-config'  // tous les seuils réglabl
 import { checkIntent, intentRefusal } from '@/lib/intent-moderation'  // 🛡️ modération du texte d'intention (page 2 épurée)
 import { deriveMoods } from '@/lib/mood'  // 🎭 déduction du mood depuis l'intention (remplace les tuiles mode/mood)
 
-const V = '0x1f4'  // ~319e version
-const BUILD = 240   // build Apple
+const V = '0x1f5'  // ~320e version
+const BUILD = 241   // build Apple
 // Convention : on incrémente le numéro à chaque deploy (Z38 → Z39…). Quand le numéro
 // approche 99, on passe à la lettre suivante et on repart à 1 (ex: Z99 → A1) pour ne
 // jamais avoir de grands nombres pénibles à lire.
@@ -11459,6 +11459,14 @@ export default function App2() {
                   return (
                     <div style={{display:'flex',gap:6,padding:'2px 12px 6px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}
                       onTouchStart={e=>e.stopPropagation()} onTouchEnd={e=>e.stopPropagation()}>
+                      {/* ⚡ MAINTENANT (David 02.07) : de maintenant jusqu'à +18h (le max) en 1 tap, tout à gauche. */}
+                      {(()=>{ const R15=15*60_000; const s=Math.ceil(Date.now()/R15)*R15; const e=s+18*3600_000
+                        const on = !!presetWin && Math.abs(presetWin.from - s) < R15 && Math.abs(presetWin.until - e) < R15
+                        return (
+                          <button onClick={()=>{ setPickedMoments([]); setPresetWin({from:s,until:e}); setFromTime(hhmm(s)); setUntilTime(hhmm(e)); if(typeof navigator!=='undefined'&&(navigator as any).vibrate)(navigator as any).vibrate(6) }}
+                            style={{flexShrink:0,padding:'7px 13px',borderRadius:16,cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:on?900:800,whiteSpace:'nowrap',
+                              background:on?C.orange:`${C.orange}1e`, color:on?'#fff':C.orange, border:`1.5px solid ${C.orange}${on?'':'66'}`}}>⚡ {lang==='en'?'Now':'Maintenant'}</button>
+                        ) })()}
                       {parts.map(p=>{
                         const active = pickedMoments.length===1 && pickedMoments[0].key===keyOf(p)
                         return (
@@ -11477,14 +11485,12 @@ export default function App2() {
                 <div style={{display:'flex',gap:0,padding:'0 8px',height:106,alignItems:'stretch'}}>
                   <JogWheel slots={initSlots} value={fromTime} onChange={v => {
                     setPresetWin(null); setPickedMoments([])   // réglage manuel → on quitte le mode « moments » (créneau unique)
-                    // 🔧 FIX monstre bug (David 30.06) : la FIN suit toujours le DÉBUT en gardant la DURÉE de la fenêtre.
-                    //    → le début bouge librement, la fin n'est jamais « collée/bloquée ». (Pour changer la durée : molette de fin.)
+                    // 🔧 FIX David 02.07 : changer le DÉBUT ne déplace PLUS la fin (elle reste EXACTEMENT où on l'a mise).
+                    //    On ne touche la fin QUE si le nouveau début la dépasse (créneau invalide) → fin = début + 1h.
                     const toMin=(s:string)=>{ const [a,b]=s.split(':').map(Number); return a*60+b }
-                    let dur = toMin(untilTime) - toMin(fromTime); if (dur <= 0) dur += 1440  // durée ACTUELLE de la fenêtre (gère minuit)
-                    dur = Math.max(30, Math.min(18*60, dur))                                // bornée 30 min … 18 h
-                    const nu = (toMin(v) + dur) % 1440
                     setFromTime(v)
-                    setUntilTime(`${String(Math.floor(nu/60)).padStart(2,'0')}:${String(nu%60).padStart(2,'0')}`)
+                    const sMin=toMin(v), uMin=toMin(untilTime)
+                    if (uMin <= sMin) { const nu=(sMin+60)%1440; setUntilTime(`${String(Math.floor(nu/60)).padStart(2,'0')}:${String(nu%60).padStart(2,'0')}`) }
                   }}/>
                   <div style={{width:1,background:C.border,margin:'12px 4px'}}/>
                   <JogWheel slots={untilSlots} value={untilTime} onChange={v=>{ setPresetWin(null); setPickedMoments([]); setUntilTime(v) }}/>
@@ -11784,14 +11790,21 @@ export default function App2() {
 
                     {/* 🛰️ FORTERESSE GPS DYNAMIQUE — tu t'es éloigné·e de ta zone publiée → recalage en 1 tap (explicite). */}
                     {gpsDrift && myAvail.length>0 && (
-                      <div style={{display:'flex',alignItems:'center',gap:10,background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
-                        <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Tu as bougé de ~${fmtKm(gpsDrift.km)} depuis ton lieu publié`:`You've moved ~${fmtKm(gpsDrift.km)} from your published spot`}</div>
-                          <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Tes créneaux pointent encore sur l’ancien endroit. Les recaler sur ta position actuelle ?':'Your slots still point to the old spot. Move them to where you are now?'}</div>
+                      <div style={{background:`${C.bordeaux}0d`,border:`1px solid ${C.bordeaux}2e`,borderRadius:14,padding:'11px 13px',marginBottom:12}}>
+                        <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                          <span style={{fontSize:20,flexShrink:0}}>🛰️</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            {/* David 02.07 : wording FACTUEL (« ta zone est à X km de toi »), plus « tu as bougé » qui accusait à tort. */}
+                            <div style={{fontSize:12.5,fontWeight:800,color:C.white}}>{lang==='fr'?`Ta zone de dispo est à ~${fmtKm(gpsDrift.km)} de ta position`:`Your zone is ~${fmtKm(gpsDrift.km)} from where you are`}</div>
+                            <div style={{fontSize:10.5,color:C.whiteMid,lineHeight:1.35,marginTop:1}}>{lang==='fr'?'Difficile d’y être à temps. Recale-la ici, éteins ton créneau, ou laisse (si tu y vas exprès).':'Hard to make it in time. Move it here, turn off your slot, or keep it (if that\'s on purpose).'}</div>
+                          </div>
                         </div>
-                        <button onClick={()=>setGpsDrift(null)} style={{flexShrink:0,background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 4px'}}>{lang==='fr'?'Laisser':'Keep'}</button>
-                        <button onClick={recenterMyZone} style={{flexShrink:0,background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler sur moi':'Move here'}</button>
+                        <div style={{display:'flex',gap:8,marginTop:9,justifyContent:'flex-end'}}>
+                          <button onClick={()=>setGpsDrift(null)} style={{background:'transparent',border:'none',color:C.whiteMid,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:'6px 8px'}}>{lang==='fr'?'Laisser':'Keep'}</button>
+                          <button onClick={async()=>{ try{ for(const s of myAvail){ if((s as any).id) await supabase.from('availabilities').update({active:false}).eq('id',(s as any).id) } await supabase.from('profiles').update({is_available:false,available_until:null}).eq('id',user!.id); setUser(u=>u?({...u,is_available:false,available_until:null} as any):u); reloadAvail(); showToast(lang==='fr'?'Créneau éteint':'Slot off',C.green) }catch{} setGpsDrift(null) }}
+                            style={{background:'transparent',border:`1px solid ${C.salmon}66`,color:C.salmon,fontSize:12,fontWeight:800,borderRadius:14,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Éteindre':'Turn off'}</button>
+                          <button onClick={recenterMyZone} style={{background:C.bordeaux,border:'none',color:'#fff',fontSize:12,fontWeight:800,borderRadius:14,padding:'7px 13px',cursor:'pointer',fontFamily:'inherit'}}>{lang==='fr'?'Recaler ici':'Move here'}</button>
+                        </div>
                       </div>
                     )}
 

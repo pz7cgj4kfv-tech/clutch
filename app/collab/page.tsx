@@ -84,6 +84,25 @@ PROCHAINE ÉTAPE (quand tu veux) : la sortie idéale pour brancher la TENSION 0-
 
 QUESTION : ta signature actuelle prend (from, to, now, modes?). Pour la version « publiée qui se recale » (dispo qui vit), on aura besoin d'appeler ça à intervalle avec la position GPS live — c'est déjà compatible. Rien à changer pour l'instant. Continue comme ça 👌`
 
+  // Retour « passé LIVE » (02.07 · 22h30) — pour le bouton Copier.
+  const GRAAL2_LIVE_TXT = `🚗 TON MOTEUR GRAAL 2 EST PASSÉ LIVE DANS LA FORTERESSE — build 248, 02.07.2026
+
+On a levé le flag : ta fonction pilote maintenant la réjoignabilité de la forteresse en VRAI.
+
+CE QUI L'UTILISE :
+- La dérive/blocage GPS (le modal « créneau injoignable » quand quelqu'un s'éloigne trop de sa zone).
+- Les events (le flag « trop loin pour l'heure »).
+→ Avant : estimation à vol d'oiseau ~35 km/h. Maintenant : TON calcul multi-mode (voiture 70 km/h, CFF, vélo).
+→ Effet concret : moins de FAUX blocages (quelqu'un en voiture à 60 km reste joignable, alors qu'avant il était bloqué à tort).
+
+COMMENT C'EST FAIT (proprement, zéro régression) :
+- Toute la logique est centralisée dans lib/forteresse-reach.ts → foReachable(from, to, leadMin, radiusKm, useDom). 1 seul point de vérité.
+- Double-check automatisé (scripts/test-forteresse-reach.mts) : le mode OFF est PROUVÉ identique à l'ancien modèle sur 112 combinaisons. Donc revert = 1 ligne, garanti sans surprise.
+- Repli défensif : si ton estimateur lève une erreur, on retombe sur l'ancien modèle (jamais de crash).
+
+PROCHAINE ÉTAPE (pas bloquant, quand tu veux) :
+Si tu peux sortir aussi { tension: 0-10, via: string } en plus de { minutes, modeUsed, confidence }, je branche DIRECT la tension du cône (le slider qui se resserre côté user) sur ta sortie. Sinon je la dérive de minutes vs temps restant. Ta signature actuelle est déjà parfaite pour la suite. Bravo 👏`
+
   const TABS: { id: Tab; icon: string; label: string }[] = [
     { id: 'mur', icon: '🧱', label: 'Mur d\'équipe' },
     { id: 'hierarchie', icon: '🏛️', label: 'Hiérarchie' },
@@ -214,6 +233,19 @@ QUESTION : ta signature actuelle prend (from, to, now, modes?). Pour la version 
           <div style={{ fontSize: 12, fontWeight: 800, color: M.pink, letterSpacing: '.04em', margin: '10px 0 6px' }}>📓 JOURNAL — LE PLUS RÉCENT EN HAUT</div>
 
           {/* ▼▼▼ NOUVELLE ENTRÉE À AJOUTER ICI (date + heure au sommet) ▼▼▼ */}
+          <Card accent={M.green}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: M.ink40, marginBottom: 4 }}>02.07.2026 · 23:30</div>
+            <H>🚗 Ton moteur est passé LIVE dans la forteresse — build 248</H>
+            <P>On a <strong>levé le flag</strong> : ta fonction pilote maintenant la réjoignabilité de la forteresse <strong>en vrai</strong> (dérive/blocage GPS + events). Avant = estimation à vol d'oiseau ~35 km/h ; maintenant = <strong>ton calcul multi-mode</strong> (voiture 70, CFF, vélo). Effet concret : <strong>moins de faux blocages</strong>.</P>
+            <Step n={1}>Logique centralisée dans <code>lib/forteresse-reach.ts</code> → <code>foReachable(...)</code> = 1 seul point de vérité.</Step>
+            <Step n={2}>Double-check auto : le mode OFF est <strong>prouvé identique</strong> à l'ancien modèle sur <strong>112 combinaisons</strong> → revert = 1 ligne, garanti.</Step>
+            <Step n={3}>Repli défensif : si ton estimateur plante, on retombe sur l'ancien modèle (jamais de crash).</Step>
+            <Rule>Prochaine étape (pas bloquant) : sors aussi <code>{'{ tension 0-10, via }'}</code> et je branche direct le slider du cône côté user sur ta sortie. Ta signature actuelle est déjà parfaite. Bravo 👏</Rule>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <CopyBtn text={GRAAL2_LIVE_TXT} />
+            </div>
+          </Card>
+          {/* ▲ entrée précédente ▲ */}
           <Card accent={M.green}>
             <div style={{ fontSize: 11, fontWeight: 800, color: M.ink40, marginBottom: 4 }}>02.07.2026 · 23:00</div>
             <H>✅ Reçu, testé (15/15) & intégré — bravo Dom</H>
